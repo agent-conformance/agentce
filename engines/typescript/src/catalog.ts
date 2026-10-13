@@ -109,20 +109,23 @@ function minSourceClass(controlId: string, evaluation: unknown): string {
   );
 }
 
+/** The named `source_class_from` links, distinct and byte-sorted; anything else in the list is dropped. */
 function sourceClassFrom(evaluation: Record<string, unknown>): string[] {
   const value = evaluation.source_class_from;
-  return Array.isArray(value)
-    ? value.filter(
-        (name): name is string => typeof name === "string" && SOURCE_CLASS_FROM.has(name),
-      )
-    : [];
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const names = value.filter(
+    (name): name is string => typeof name === "string" && SOURCE_CLASS_FROM.has(name),
+  );
+  return [...new Set(names)].sort(byteCompare);
 }
 
 function controlFromDict(data: Record<string, unknown>): ControlSpec {
   const evaluation = isRecord(data.evaluation) ? data.evaluation : {};
   const applicability = isRecord(data.applicability) ? data.applicability : {};
   const id = String(data.id ?? "");
-  const minimum = minSourceClass(id, data.evaluation ?? {});
+  const minimum = minSourceClass(id, evaluation);
   return {
     id,
     version: String(data.version ?? ""),

@@ -30,6 +30,7 @@ from .quarantine import QuarantineReason, QuarantineRecord
 from .safe_json import JSONError, load_json
 from .schema import event_types, validate_event
 from .signing import MAX_JSON_DEPTH
+from .source_class import SOURCE_CLASS_RANK
 from .structural import compare_instants
 
 #: Default maximum size of a single event line, in bytes (SPEC App. F ``oversize``).
@@ -37,8 +38,6 @@ DEFAULT_MAX_EVENT_BYTES = 1_048_576
 #: The whitespace JSON itself allows around a value (RFC 8259 §2); nothing else is trimmed from a line.
 _JSON_WHITESPACE = " \t\r\n"
 
-#: The evidence ladder (SPEC §6.4 classes, lowest first): of two records with one id, the lower class is quarantined.
-_CLASS_RANK = {"self_report": 0, "enforcement_point": 1, "independent_system": 2}
 
 _TYPE_RE = re.compile(r"^org\.agent-conformance\.evidence\.(?P<name>[A-Za-z0-9]+)\.v1$")
 
@@ -255,7 +254,8 @@ def ingest(
                 event = {**event, "agentcesourceclass": "self_report"}
 
             event_id = str(event["id"])
-            rank = _CLASS_RANK[str(event["agentcesourceclass"])]
+            # The evidence ladder (SPEC §6.4): of two records with one id, the lower class is quarantined.
+            rank = SOURCE_CLASS_RANK[str(event["agentcesourceclass"])]
             owner_rank[event_id] = max(rank, owner_rank.get(event_id, rank))
             records.append((event, raw_event, source, type_value, rank))
 

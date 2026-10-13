@@ -10,10 +10,10 @@
  * told something by the user is never taken as given. A port of Python's `agentce.source_class`.
  */
 
+import { TRUSTED_INSTRUCTION, dataOf, isRecord, pyEquals, refsOf, text } from "./graph";
+import type { Event } from "./graph";
 import type { GraphStore } from "./store";
-import { byteCompare, sortKeysDeep } from "./util";
-
-type Event = Record<string, unknown>;
+import { byteCompare } from "./util";
 
 /** The source classes in their SPEC §6.4 order; the rank is the order. `any` is not a class. */
 export const SOURCE_CLASS_RANK: ReadonlyMap<string, number> = new Map([
@@ -35,31 +35,9 @@ export const SOURCE_CLASS_FROM: ReadonlyMap<string, string> = new Map([
  * constant, so a later reading of single-source evidence (SPEC §10.4 `partial`) changes it in one place. */
 export const BELOW_MINIMUM_OUTCOME = "insufficient_evidence";
 
-/** The Appendix F instruction source classes an agent may act on (the graph's trusted set, SPEC §7.7). */
-const TRUSTED_INSTRUCTION = new Set([
-  "user",
-  "operator",
-  "service",
-  "agent_identified",
-  "memory_trusted",
-]);
-
 /** The rank of a record's class; a record with no class, or one outside SPEC §6.4, ranks as self_report. */
 export function classRank(value: unknown): number {
   return typeof value === "string" ? (SOURCE_CLASS_RANK.get(value) ?? 0) : 0;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function dataOf(event: Event): Record<string, unknown> {
-  return isRecord(event.data) ? event.data : {};
-}
-
-function refsOf(event: Event): Record<string, unknown> {
-  const refs = dataOf(event).refs;
-  return isRecord(refs) ? refs : {};
 }
 
 function typeOf(event: Event): string {
@@ -71,18 +49,9 @@ function principalId(value: unknown): string | null {
   return isRecord(value) && typeof value.id === "string" && value.id !== "" ? value.id : null;
 }
 
-function text(value: unknown): string | null {
-  return typeof value === "string" && value !== "" ? value : null;
-}
-
-/** Python `==` over decoded JSON values: an absent member and null are both None. */
+/** Python `a.get(k) == b.get(k)` over decoded JSON values: an absent member and null are both None. */
 function sameValue(a: unknown, b: unknown): boolean {
-  const left = a === undefined ? null : a;
-  const right = b === undefined ? null : b;
-  if (left === null || right === null || typeof left !== "object" || typeof right !== "object") {
-    return left === right;
-  }
-  return JSON.stringify(sortKeysDeep(left)) === JSON.stringify(sortKeysDeep(right));
+  return pyEquals(a ?? null, b ?? null);
 }
 
 /** Which witnesses may stand in for an instruction's own class at (iv): its own class only (a twin), its
@@ -100,17 +69,45 @@ export interface Judged {
 
 /** Judges foci against one subject's held records (`events`: graph IRI -> event) and graph. */
 export class SourceClassJudge {
-  private readonly instructions: string[];
-  private readonly policyDecisions: string[];
+  /** Each enforcement-point Instruction with a content_ref and refs.task, by (content_ref, refs.task,
+   * principal id), in held order: the candidate twins of an instruction with those three. */
+  private readonly twins = new Map<string, string[]>();
+  /** (refs.request, principal id) of each enforcement-point PolicyDecision allow that names a principal. */
+  private readonly allows = new Set<string>();
 
   constructor(
     private readonly store: GraphStore,
     private readonly events: Map<string, Event>,
   ) {
-    this.instructions = [...events].filter(([, e]) => typeOf(e) === "Instruction").map(([i]) => i);
-    this.policyDecisions = [...events]
-      .filter(([, e]) => typeOf(e) === "PolicyDecision")
-      .map(([i]) => i);
+    for (const [iri, event] of events) {
+      if (event.agentcesourceclass !== ENFORCEMENT_POINT) {
+        continue;
+      }
+      const data = dataOf(event);
+      const refs = refsOf(event);
+      const ptype = typeOf(event);
+      const principal = principalId(data.principal);
+      if (ptype === "Instruction") {
+        const content = text(data.content_ref);
+        const task = text(refs.task);
+        if (content !== null && task !== null) {
+          const key = JSON.stringify([content, task, principal]);
+          const bucket = this.twins.get(key);
+          if (bucket === undefined) {
+            this.twins.set(key, [iri]);
+          } else {
+            bucket.push(iri);
+          }
+        }
+      } else if (
+        ptype === "PolicyDecision" &&
+        data.decision === "allow" &&
+        typeof refs.request === "string" &&
+        principal !== null
+      ) {
+        this.allows.add(JSON.stringify([refs.request, principal]));
+      }
+    }
   }
 
   private ownRank(node: string): number {
@@ -197,18 +194,13 @@ export class SourceClassJudge {
     if (content === null || task === null) {
       return false;
     }
-    for (const twin of this.instructions) {
+    const key = JSON.stringify([content, task, principalId(data.principal)]);
+    for (const twin of this.twins.get(key) ?? []) {
       if (twin === node || visiting.has(twin)) {
         continue;
       }
-      const other = this.events.get(twin) as Event;
-      const otherData = dataOf(other);
       if (
-        other.agentcesourceclass === ENFORCEMENT_POINT &&
-        text(otherData.content_ref) === content &&
-        text(refsOf(other).task) === task &&
-        sameValue(otherData.source_class, data.source_class) &&
-        principalId(otherData.principal) === principalId(data.principal) &&
+        sameValue(dataOf(this.events.get(twin) as Event).source_class, data.source_class) &&
         this.attestedAt(twin, twin, visiting, OWN) &&
         this.lineageTrusted(twin)
       ) {
@@ -242,19 +234,7 @@ export class SourceClassJudge {
    * is the instruction's (both present). */
   private decisionWitnesses(focus: string, event: Event): boolean {
     const principal = principalId(dataOf(event).principal);
-    if (principal === null) {
-      return false;
-    }
-    return this.policyDecisions.some((decision) => {
-      const record = this.events.get(decision) as Event;
-      const data = dataOf(record);
-      return (
-        record.agentcesourceclass === ENFORCEMENT_POINT &&
-        data.decision === "allow" &&
-        refsOf(record).request === focus &&
-        principalId(data.principal) === principal
-      );
-    });
+    return principal !== null && this.allows.has(JSON.stringify([focus, principal]));
   }
 
   /** A record one hop from the focus: an Instruction ranks enforcement_point only when attested; anything
@@ -272,15 +252,15 @@ export class SourceClassJudge {
   }
 
   /** The lowest class the judgment of `focus` rests on; null when nothing contributes (a Decision with no
-   * record through any named link: there is no record the judgment rests on to hold to a class). */
+   * record through any named link: there is no record the judgment rests on to hold to a class).
+   * `sourceClassFrom` holds distinct {@link SOURCE_CLASS_FROM} names, sorted (as the catalog stores them). */
   judgedClass(focus: string, sourceClassFrom: Iterable<string>): Judged | null {
     const contributors: Array<[number, string]> = [];
     const event = this.events.get(focus);
     if (event === undefined || typeOf(event) !== "Decision") {
       contributors.push([this.ownRank(focus), event !== undefined ? typeOf(event) : ""]);
     }
-    const names = [...new Set(sourceClassFrom)].filter((n) => SOURCE_CLASS_FROM.has(n));
-    for (const name of names.sort(byteCompare)) {
+    for (const name of sourceClassFrom) {
       for (const node of this.store.objects(focus, `agentce:${name}`)) {
         contributors.push(this.attestedRank(focus, node, SOURCE_CLASS_FROM.get(name) as string));
       }
@@ -294,19 +274,22 @@ export class SourceClassJudge {
   }
 }
 
-/** The foci whose judged class is below `minimum`, sorted, and the record types that put them there. */
+/** The foci whose judged class is below `minimum`, sorted, and the record types that put them there.
+ * `judge` builds (or returns) the subject's judge, called only when a focus can fall below the minimum. */
 export function belowMinimum(
-  judge: SourceClassJudge,
+  judge: () => SourceClassJudge,
   foci: Iterable<string>,
   minimum: string,
-  sourceClassFrom: Iterable<string>,
+  sourceClassFrom: readonly string[],
 ): [string[], string[]] {
   const floor = SOURCE_CLASS_RANK.get(minimum) as number;
-  const named = [...sourceClassFrom];
   const below: string[] = [];
   const kinds = new Set<string>();
+  if (floor === 0) {
+    return [below, []]; // nothing ranks below self_report
+  }
   for (const focus of [...foci].sort(byteCompare)) {
-    const judged = judge.judgedClass(focus, named);
+    const judged = judge().judgedClass(focus, sourceClassFrom);
     if (judged !== null && judged.rank < floor) {
       below.push(focus);
       for (const kind of judged.lowest) {

@@ -37,10 +37,6 @@ public final class Ingest {
 
     public static final int DEFAULT_MAX_EVENT_BYTES = 1_048_576;
 
-    /** The evidence ladder (SPEC §6.4 classes, lowest first): of two records with one id, the lower class is quarantined. */
-    private static final Map<String, Integer> CLASS_RANK =
-            Map.of("self_report", 0, "enforcement_point", 1, "independent_system", 2);
-
     /** A record that passed every per-record check, waiting for the id and time-order checks. */
     private record Candidate(JsonNode event, JsonNode rawEvent, String source, String typeValue, int rank) {}
     private static final Pattern TYPE_RE =
@@ -248,7 +244,8 @@ public final class Ingest {
                 }
 
                 String eventId = event.get("id").asText();
-                int rank = CLASS_RANK.get(event.get("agentcesourceclass").asText());
+                // The evidence ladder (SPEC §6.4): of two records with one id, the lower class is quarantined.
+                int rank = SourceClass.RANK.get(event.get("agentcesourceclass").asText());
                 ownerRank.merge(eventId, rank, Math::max);
                 records.add(new Candidate(event, rawEvent, source, typeValue, rank));
             }

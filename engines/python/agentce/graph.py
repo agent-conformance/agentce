@@ -547,7 +547,7 @@ class _Builder:
             source_class = data.get("source_class")
             untrusted = _untrusted_source_class(source_class)
             self.instruction_untrusted[node] = untrusted
-            if not untrusted and not _is_one_of(source_class, _TRUSTED_INSTRUCTION):
+            if not isinstance(source_class, str):
                 # No class at all (or not a string): ROB-02 reads it as untrusted content (18.127).
                 self.instruction_unclassed.add(node)
             self.store.add_literal(
@@ -753,24 +753,23 @@ class _Builder:
         return tainted
 
     def _robust_literals(
-        self, events: list[dict[str, Any]], tainted: set[str], unruled: set[str]
+        self, decisions: list[dict[str, Any]], tainted: set[str], unruled: set[str]
     ) -> None:
-        """ROB-02's two literals on each decision in ``events`` (see :meth:`_robust_to_untrusted`)."""
-        for event in events:
-            if self._ptype(event) == "Decision":
-                node = event_iri(str(event["id"]))
-                self.store.add_literal(
-                    node,
-                    "agentce:robustToUntrustedContent",
-                    "false" if node in tainted else "true",
-                    BOOL,
-                )
-                self.store.add_literal(
-                    node,
-                    "agentce:untrustedContentRuledOn",
-                    "false" if node in unruled else "true",
-                    BOOL,
-                )
+        """ROB-02's two literals on each of ``decisions`` (see :meth:`_robust_to_untrusted`)."""
+        for event in decisions:
+            node = event_iri(str(event["id"]))
+            self.store.add_literal(
+                node,
+                "agentce:robustToUntrustedContent",
+                "false" if node in tainted else "true",
+                BOOL,
+            )
+            self.store.add_literal(
+                node,
+                "agentce:untrustedContentRuledOn",
+                "false" if node in unruled else "true",
+                BOOL,
+            )
 
     # --- materialised (glue) edges (SPEC §7.2) ---
 

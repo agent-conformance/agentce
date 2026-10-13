@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Mapping
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 import yaml
@@ -58,16 +60,15 @@ def _minimums(catalogs_dir: Path) -> dict[str, str]:
 def explain(
     assertions: list[dict[str, Any]],
     supplies: dict[str, list[str]],
-    minimums: dict[str, str] | None = None,
+    minimums: Mapping[str, str] = MappingProxyType({}),
 ) -> dict[str, Any]:
     """Group insufficient_evidence assertions by the missing member and suggest adapters."""
-    minimums = minimums or {}
     by_cause: dict[str, dict[str, Any]] = {}
     for assertion in assertions:
         if str(assertion.get("outcome")) != "insufficient_evidence":
             continue
         control = str(assertion.get("control", assertion.get("id", "<control>")))
-        minimum = minimums.get(control, assertion.get("min_source_class"))
+        minimum = minimums.get(control)
         missing = [
             str(m)
             for m in assertion.get("missing_members") or assertion.get("missing") or []

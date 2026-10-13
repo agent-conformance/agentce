@@ -159,8 +159,9 @@ public final class Catalog {
         out.append('"');
     }
 
+    /** The named {@code source_class_from} links, distinct and byte-sorted; anything else in the list is dropped. */
     private static List<String> sourceClassFrom(JsonNode evaluation) {
-        List<String> names = new ArrayList<>();
+        Set<String> names = new java.util.TreeSet<>(Json::byteCompare);
         JsonNode value = evaluation.get("source_class_from");
         if (value != null && value.isArray()) {
             for (JsonNode name : value) {
@@ -169,7 +170,7 @@ public final class Catalog {
                 }
             }
         }
-        return names;
+        return new ArrayList<>(names);
     }
 
     private static ControlSpec controlFromDict(JsonNode data) {

@@ -3047,14 +3047,14 @@
         {
           "description": "Python marks every decision robust, so a decision that used a record the guard marked untrusted reads ROB-02 conformant",
           "file": "engines/python/agentce/graph.py",
-          "search": "                    \"false\" if node in tainted else \"true\",",
-          "replace": "                    \"true\","
+          "search": "                \"false\" if node in tainted else \"true\",",
+          "replace": "                \"true\","
         },
         {
           "description": "TypeScript marks every decision robust, so a decision that used a record the guard marked untrusted reads ROB-02 conformant",
           "file": "engines/typescript/src/graph.ts",
-          "search": "          tainted.has(node) ? \"false\" : \"true\",",
-          "replace": "          \"true\","
+          "search": "        tainted.has(node) ? \"false\" : \"true\",",
+          "replace": "        \"true\","
         },
         {
           "description": "Java marks every decision robust, so a decision that used a record the guard marked untrusted reads ROB-02 conformant",
@@ -3065,14 +3065,14 @@
         {
           "description": "Python marks every decision's used content ruled on, so a decision whose own memory reads are only self-reported reads ROB-02 conformant",
           "file": "engines/python/agentce/graph.py",
-          "search": "                    \"false\" if node in unruled else \"true\",",
-          "replace": "                    \"true\","
+          "search": "                \"false\" if node in unruled else \"true\",",
+          "replace": "                \"true\","
         },
         {
           "description": "TypeScript marks every decision's used content ruled on, so a decision whose own memory reads are only self-reported reads ROB-02 conformant",
           "file": "engines/typescript/src/graph.ts",
-          "search": "          unruled.has(node) ? \"false\" : \"true\",",
-          "replace": "          \"true\","
+          "search": "        unruled.has(node) ? \"false\" : \"true\",",
+          "replace": "        \"true\","
         },
         {
           "description": "Java marks every decision's used content ruled on, so a decision whose own memory reads are only self-reported reads ROB-02 conformant",
@@ -3833,8 +3833,8 @@
         {
           "description": "Python ranks a record by the class it asserts, not the class ingest trusts, so an undeclared source asserting independent_system displaces the enforcement point's ToolCall",
           "file": "engines/python/agentce/ingest.py",
-          "search": "rank = _CLASS_RANK[str(event[\"agentcesourceclass\"])]",
-          "replace": "rank = _CLASS_RANK[str(raw_event[\"agentcesourceclass\"])]"
+          "search": "rank = SOURCE_CLASS_RANK[str(event[\"agentcesourceclass\"])]",
+          "replace": "rank = SOURCE_CLASS_RANK[str(raw_event[\"agentcesourceclass\"])]"
         },
         {
           "description": "TypeScript ignores the source class at the id check (first record wins)",
@@ -3845,8 +3845,8 @@
         {
           "description": "TypeScript ranks a record by the class it asserts, not the class ingest trusts",
           "file": "engines/typescript/src/ingest.ts",
-          "search": "const rank = CLASS_RANK[String(effectiveEvent.agentcesourceclass)];",
-          "replace": "const rank = CLASS_RANK[String(rawEvent.agentcesourceclass)];"
+          "search": "const rank = SOURCE_CLASS_RANK.get(String(effectiveEvent.agentcesourceclass)) as number;",
+          "replace": "const rank = SOURCE_CLASS_RANK.get(String(rawEvent.agentcesourceclass)) as number;"
         },
         {
           "description": "Java ignores the source class at the id check (first record wins)",
@@ -3857,8 +3857,8 @@
         {
           "description": "Java ranks a record by the class it asserts, not the class ingest trusts",
           "file": "engines/java/src/main/java/org/agentce/Ingest.java",
-          "search": "int rank = CLASS_RANK.get(event.get(\"agentcesourceclass\").asText());",
-          "replace": "int rank = CLASS_RANK.get(rawEvent.get(\"agentcesourceclass\").asText());"
+          "search": "int rank = SourceClass.RANK.get(event.get(\"agentcesourceclass\").asText());",
+          "replace": "int rank = SourceClass.RANK.get(rawEvent.get(\"agentcesourceclass\").asText());"
         }
       ]
     },

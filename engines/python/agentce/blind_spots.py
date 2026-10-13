@@ -221,11 +221,6 @@ def compute_blind_spots(
         if a.outcome != "insufficient_evidence":
             continue
         missing = [r for r in control.minimum_evidence if not _met(subject_id, r)]
-        # A focus below the control's min_source_class (HR-5) misses a record of that type at the minimum
-        # (assess.missing_evidence). Never provably sufficient alone: it only ever lands in needed_by.
-        class_keys = {
-            (kind, _normalize_class(control.min_source_class)) for kind in a.class_gap
-        }
         normalized_keys = sorted(
             {
                 (str(r.get("event", "")), _normalize_class(str(r.get("class", "any"))))
@@ -238,9 +233,13 @@ def compute_blind_spots(
             "control": control.id,
             "control_version": control.version,
         }
-        for key in sorted(class_keys):
-            groups.setdefault(key, ([], []))[1].append(check_ref)
-        if not normalized_keys and not class_keys:
+        # A focus below the control's min_source_class (HR-5) misses a record of that type at the minimum
+        # (assess.missing_evidence). Never provably sufficient alone: it only ever lands in needed_by. class_gap
+        # is already distinct and sorted.
+        minimum = _normalize_class(control.min_source_class)
+        for kind in a.class_gap:
+            groups.setdefault((kind, minimum), ([], []))[1].append(check_ref)
+        if not normalized_keys and not a.class_gap:
             # Every minimum_evidence entry is actually satisfied, yet the shape's own structural
             # population was still empty -- a narrower, rarer condition than "which branch fired"
             # (RFC 0008 Sec.4); this holds regardless of population[0], so it is checked before the
@@ -252,7 +251,7 @@ def compute_blind_spots(
         # sufficient -- but only when exactly one key is missing (RFC 0008 Sec.2: no partial credit).
         # The empty-population branch's non-empty missing set is informative but never provably
         # sufficient on its own (round 3), so it always lands in `needed_by`, never `unlocked`.
-        unlocked = a.population[0] > 0 and len(normalized_keys) == 1 and not class_keys
+        unlocked = a.population[0] > 0 and len(normalized_keys) == 1 and not a.class_gap
         for key in normalized_keys:
             unlocked_list, needed_list = groups.setdefault(key, ([], []))
             (unlocked_list if unlocked else needed_list).append(check_ref)

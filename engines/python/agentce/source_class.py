@@ -10,10 +10,12 @@ which counts as ``enforcement_point`` only when attested (:meth:`SourceClassJudg
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
+from .graph import _TRUSTED_INSTRUCTION, _data, _refs, _text
+from .statistical import event_type as _type
 from .store import GraphStore
 
 #: The source classes in their SPEC §6.4 order; the rank is the order. ``any`` is not a class.
@@ -22,7 +24,6 @@ SOURCE_CLASS_RANK: dict[str, int] = {
     "enforcement_point": 1,
     "independent_system": 2,
 }
-SELF_REPORT = "self_report"
 ENFORCEMENT_POINT = "enforcement_point"
 
 #: The graph links ``evaluation.source_class_from`` may name, each one hop from the focus (SPEC §6.3), and the
@@ -37,40 +38,16 @@ SOURCE_CLASS_FROM: dict[str, str] = {
 #: constant, so a later reading of single-source evidence (SPEC §10.4 ``partial``) changes it in one place.
 BELOW_MINIMUM_OUTCOME = "insufficient_evidence"
 
-#: The Appendix F instruction source classes an agent may act on (the graph's trusted set, SPEC §7.7).
-_TRUSTED_INSTRUCTION: frozenset[str] = frozenset(
-    {"user", "operator", "service", "agent_identified", "memory_trusted"}
-)
-
 
 def class_rank(value: Any) -> int:
     """The rank of a record's class; a record with no class, or one outside SPEC §6.4, ranks as self_report."""
     return SOURCE_CLASS_RANK.get(value, 0) if isinstance(value, str) else 0
 
 
-def _data(event: dict[str, Any]) -> dict[str, Any]:
-    data = event.get("data")
-    return data if isinstance(data, dict) else {}
-
-
-def _refs(event: dict[str, Any]) -> dict[str, Any]:
-    refs = _data(event).get("refs")
-    return refs if isinstance(refs, dict) else {}
-
-
-def _type(event: dict[str, Any]) -> str:
-    ptype = _data(event).get("@type")
-    return ptype if isinstance(ptype, str) else ""
-
-
 def _principal_id(value: Any) -> str | None:
     if isinstance(value, dict) and isinstance(value.get("id"), str) and value["id"]:
         return str(value["id"])
     return None
-
-
-def _text(value: Any) -> str | None:
-    return value if isinstance(value, str) and value else None
 
 
 #: Which witnesses may stand in for an instruction's own class at (iv): its own class only (a twin), its own
@@ -94,14 +71,28 @@ class SourceClassJudge:
     ) -> None:
         self.store = store
         self.events = events_by_iri
-        self._instructions = [
-            iri for iri, event in events_by_iri.items() if _type(event) == "Instruction"
-        ]
-        self._policy_decisions = [
-            iri
-            for iri, event in events_by_iri.items()
-            if _type(event) == "PolicyDecision"
-        ]
+        #: Each enforcement-point Instruction with a content_ref and refs.task, by (content_ref, refs.task,
+        #: principal id), in held order: the candidate twins of an instruction with those three.
+        self._twins: dict[tuple[str, str, str | None], list[str]] = {}
+        #: (refs.request, principal id) of each enforcement-point PolicyDecision allow that names a principal.
+        self._allows: set[tuple[str, str]] = set()
+        for iri, event in events_by_iri.items():
+            if event.get("agentcesourceclass") != ENFORCEMENT_POINT:
+                continue
+            data, refs = _data(event), _refs(event)
+            ptype = _type(event)
+            principal = _principal_id(data.get("principal"))
+            if ptype == "Instruction":
+                content, task = _text(data.get("content_ref")), _text(refs.get("task"))
+                if content is not None and task is not None:
+                    self._twins.setdefault((content, task, principal), []).append(iri)
+            elif (
+                ptype == "PolicyDecision"
+                and data.get("decision") == "allow"
+                and isinstance(refs.get("request"), str)
+                and principal is not None
+            ):
+                self._allows.add((refs["request"], principal))
 
     def _own_rank(self, node: str) -> int:
         event = self.events.get(node)
@@ -162,22 +153,16 @@ class SourceClassJudge:
     ) -> bool:
         """(iv) by an enforcement-point twin: the same content_ref, refs.task, source_class and principal, held
         under the subject, meeting (i)-(iv) by its own class, every instruction above it declaring a trusted class."""
-        data, refs = _data(event), _refs(event)
-        content, task = _text(data.get("content_ref")), _text(refs.get("task"))
+        data = _data(event)
+        content, task = _text(data.get("content_ref")), _text(_refs(event).get("task"))
         if content is None or task is None:
             return False
-        for twin in self._instructions:
+        key = (content, task, _principal_id(data.get("principal")))
+        for twin in self._twins.get(key, ()):
             if twin == node or twin in visiting:
                 continue
-            other = self.events[twin]
-            other_data = _data(other)
             if (
-                other.get("agentcesourceclass") == ENFORCEMENT_POINT
-                and _text(other_data.get("content_ref")) == content
-                and _text(_refs(other).get("task")) == task
-                and other_data.get("source_class") == data.get("source_class")
-                and _principal_id(other_data.get("principal"))
-                == _principal_id(data.get("principal"))
+                _data(self.events[twin]).get("source_class") == data.get("source_class")
                 and self._attested(twin, twin, visiting, _OWN)
                 and self._lineage_trusted(twin)
             ):
@@ -203,19 +188,7 @@ class SourceClassJudge:
         """(iv) by an enforcement-point PolicyDecision allow whose refs.request is the focus and whose principal is
         the instruction's (both present)."""
         principal = _principal_id(_data(event).get("principal"))
-        if principal is None:
-            return False
-        for decision in self._policy_decisions:
-            record = self.events[decision]
-            data = _data(record)
-            if (
-                record.get("agentcesourceclass") == ENFORCEMENT_POINT
-                and data.get("decision") == "allow"
-                and _refs(record).get("request") == focus
-                and _principal_id(data.get("principal")) == principal
-            ):
-                return True
-        return False
+        return principal is not None and (focus, principal) in self._allows
 
     def _attested_rank(self, focus: str, node: str, kind: str) -> tuple[int, str]:
         """A record one hop from the focus: an Instruction ranks enforcement_point only when attested; anything
@@ -232,12 +205,13 @@ class SourceClassJudge:
         self, focus: str, source_class_from: Iterable[str]
     ) -> Judged | None:
         """The lowest class the judgment of ``focus`` rests on; ``None`` when nothing contributes (a Decision with
-        no record through any named link: there is no record the judgment rests on to hold to a class)."""
+        no record through any named link: there is no record the judgment rests on to hold to a class).
+        ``source_class_from`` holds distinct :data:`SOURCE_CLASS_FROM` names, sorted (as the catalog stores them)."""
         contributors: list[tuple[int, str]] = []
         event = self.events.get(focus)
         if event is None or _type(event) != "Decision":
             contributors.append((self._own_rank(focus), _type(event) if event else ""))
-        for name in sorted(set(source_class_from) & set(SOURCE_CLASS_FROM)):
+        for name in source_class_from:
             for node in self.store.objects(focus, f"agentce:{name}"):
                 contributors.append(
                     self._attested_rank(focus, node, SOURCE_CLASS_FROM[name])
@@ -249,18 +223,20 @@ class SourceClassJudge:
 
 
 def below_minimum(
-    judge: SourceClassJudge,
+    judge: Callable[[], SourceClassJudge],
     foci: Iterable[str],
     minimum: str,
-    source_class_from: Iterable[str],
+    source_class_from: list[str],
 ) -> tuple[list[str], tuple[str, ...]]:
-    """The foci whose judged class is below ``minimum``, sorted, and the record types that put them there."""
+    """The foci whose judged class is below ``minimum``, sorted, and the record types that put them there.
+    ``judge`` builds (or returns) the subject's judge, called only when a focus can fall below the minimum."""
     floor = SOURCE_CLASS_RANK[minimum]
-    named = list(source_class_from)
     below: list[str] = []
     kinds: set[str] = set()
+    if floor == 0:  # nothing ranks below self_report
+        return below, ()
     for focus in sorted(foci):
-        judged = judge.judged_class(focus, named)
+        judged = judge().judged_class(focus, source_class_from)
         if judged is not None and judged.rank < floor:
             below.append(focus)
             kinds.update(judged.lowest)

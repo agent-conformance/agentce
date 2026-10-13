@@ -11,7 +11,8 @@ evaluated in Phase 1; other rungs become ``not_assessed`` until their evaluators
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Sequence
+import functools
+from collections.abc import Callable, Sequence
 from typing import Any
 
 from .applicability import effective_roles
@@ -151,6 +152,7 @@ def _assert_control(
     events: list[dict[str, Any]],
     events_by_iri: dict[str, dict[str, Any]],
     window: tuple[str, str],
+    judge: Callable[[], SourceClassJudge],
     *,
     applicability_declared: bool = True,
 ) -> Assertion:
@@ -210,32 +212,26 @@ def _assert_control(
     # rule never runs on a non-conformant verdict, which stays non-conformant.
     below, kinds = (
         below_minimum(
-            SourceClassJudge(store, events_by_iri),
-            applicable,
-            control.min_source_class,
-            control.source_class_from,
+            judge, applicable, control.min_source_class, control.source_class_from
         )
         if conformant
         else ([], ())
     )
     if below:
-        return Assertion(
-            outcome=BELOW_MINIMUM_OUTCOME,
-            population=(len(applicable), 0),
-            evidence=_evidence(events_by_iri, below),
-            source_class_satisfied=False,
-            class_gap=kinds,
-            **base,
-        )
-    outcome = "conformant" if conformant else "non-conformant"
-    focus_for_evidence = sorted(failing) if failing else applicable
+        outcome = BELOW_MINIMUM_OUTCOME
+    else:
+        outcome = "conformant" if conformant else "non-conformant"
+    # Below the minimum, the outcome rests on the below foci alone: none counts as failing, and no verdict is given.
     return Assertion(
         outcome=outcome,
-        population=(len(applicable), len(failing)),
-        violations=[v.to_json() for v in violations],
-        evidence=_evidence(events_by_iri, focus_for_evidence),
+        population=(len(applicable), 0 if below else len(failing)),
+        violations=[] if below else [v.to_json() for v in violations],
+        evidence=_evidence(
+            events_by_iri, below or (sorted(failing) if failing else applicable)
+        ),
         source_class_satisfied=not below,
-        evidence_strength=control.raw.get("evidence_strength"),
+        evidence_strength=None if below else control.raw.get("evidence_strength"),
+        class_gap=kinds,
         **base,
     )
 
@@ -359,6 +355,9 @@ def assess_subjects(
         cf_events = _counterfactual(subject_events, readable) if readable else []
         cf_store = build_graph(cf_events, domain=domain) if cf_events else store
         cf_by_iri = _events_by_iri(cf_events)
+        # Each graph's judge is built once, on the first control whose minimum it may fall below.
+        judge = functools.cache(lambda: SourceClassJudge(store, events_by_iri))
+        cf_judge = functools.cache(lambda: SourceClassJudge(cf_store, cf_by_iri))
         for catalog in catalogs:
             for control in catalog.controls:
                 assertion = _assert_control(
@@ -370,6 +369,7 @@ def assess_subjects(
                     subject_events,
                     events_by_iri,
                     window,
+                    judge,
                     applicability_declared=applicability_declared,
                 )
                 flattered = bool(own) and (
@@ -397,6 +397,7 @@ def assess_subjects(
                         cf_events,
                         cf_by_iri,
                         window,
+                        cf_judge,
                         applicability_declared=applicability_declared,
                     ).outcome
                 )

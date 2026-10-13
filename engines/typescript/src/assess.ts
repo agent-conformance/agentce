@@ -159,6 +159,7 @@ function assertControl(
   events: Event[],
   eventsByIri: Map<string, Event>,
   win: [string, string],
+  judge: () => SourceClassJudge,
   applicabilityDeclared: boolean,
 ): Assertion {
   const base = {
@@ -217,34 +218,38 @@ function assertControl(
   // HR-5: a pass counts only when every focus's judged class meets the control's minimum (SPEC §6.4). The
   // rule never runs on a non-conformant verdict, which stays non-conformant.
   const [below, kinds] = conformant
-    ? belowMinimum(
-        new SourceClassJudge(store, eventsByIri),
-        applicable,
-        control.minSourceClass,
-        control.sourceClassFrom,
-      )
+    ? belowMinimum(judge, applicable, control.minSourceClass, control.sourceClassFrom)
     : [[], []];
-  if (below.length > 0) {
-    return makeAssertion({
-      ...base,
-      outcome: BELOW_MINIMUM_OUTCOME,
-      population: [applicable.length, 0],
-      evidence: evidence(eventsByIri, below),
-      sourceClassSatisfied: false,
-      classGap: kinds,
-    });
-  }
-  const focusForEvidence = failing.size > 0 ? [...failing].sort(byteCompare) : applicable;
+  const isBelow = below.length > 0;
+  const outcome = isBelow ? BELOW_MINIMUM_OUTCOME : conformant ? "conformant" : "non-conformant";
+  // Below the minimum, the outcome rests on the below foci alone: none counts as failing, and no verdict is given.
+  const focusForEvidence = isBelow
+    ? below
+    : failing.size > 0
+      ? [...failing].sort(byteCompare)
+      : applicable;
   return makeAssertion({
     ...base,
-    outcome: conformant ? "conformant" : "non-conformant",
-    population: [applicable.length, failing.size],
-    violations: violations.map(violationToJson),
+    outcome,
+    population: [applicable.length, isBelow ? 0 : failing.size],
+    violations: isBelow ? [] : violations.map(violationToJson),
     evidence: evidence(eventsByIri, focusForEvidence),
-    sourceClassSatisfied: below.length === 0,
+    sourceClassSatisfied: !isBelow,
     evidenceStrength:
-      typeof control.raw.evidence_strength === "string" ? control.raw.evidence_strength : null,
+      !isBelow && typeof control.raw.evidence_strength === "string"
+        ? control.raw.evidence_strength
+        : null,
+    classGap: kinds,
   });
+}
+
+/** `make`, called at most once: on the first call, and its value returned from then on. */
+function lazy<T>(make: () => T): () => T {
+  let made: { value: T } | null = null;
+  return () => {
+    made ??= { value: make() };
+    return made.value;
+  };
 }
 
 /** Group `accepted` by subject id in one pass over the list. */
@@ -366,6 +371,9 @@ export function assessSubjects(
     const cfEvents = readable.length > 0 ? counterfactual(subjectEvents, readable) : [];
     const cfStore = cfEvents.length > 0 ? buildGraph(cfEvents, { domain }) : store;
     const cfByIri = eventsByIriOf(cfEvents);
+    // Each graph's judge is built once, on the first control whose minimum it may fall below.
+    const judge = lazy(() => new SourceClassJudge(store, eventsByIri));
+    const cfJudge = lazy(() => new SourceClassJudge(cfStore, cfByIri));
     for (const catalog of catalogs) {
       for (const control of catalog.controls) {
         let assertion = assertControl(
@@ -377,6 +385,7 @@ export function assessSubjects(
           subjectEvents,
           eventsByIri,
           win,
+          judge,
           applicabilityDeclared,
         );
         const flattered =
@@ -402,6 +411,7 @@ export function assessSubjects(
                 cfEvents,
                 cfByIri,
                 win,
+                cfJudge,
                 applicabilityDeclared,
               ).outcome;
         if ((unreadable && flattered) || withWithheld !== assertion.outcome) {

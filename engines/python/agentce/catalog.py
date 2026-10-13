@@ -141,12 +141,14 @@ def _min_source_class(control_id: str, evaluation: Any) -> str:
 
 
 def _source_class_from(evaluation: dict[str, Any]) -> list[str]:
+    """The named ``source_class_from`` links, distinct and sorted (each is ASCII, so code-point order is byte
+    order); anything else in the list is dropped."""
     value = evaluation.get("source_class_from")
     if not isinstance(value, list):
         return []
-    return [
-        name for name in value if isinstance(name, str) and name in SOURCE_CLASS_FROM
-    ]
+    return sorted(
+        {name for name in value if isinstance(name, str) and name in SOURCE_CLASS_FROM}
+    )
 
 
 def _control_from_dict(data: dict[str, Any]) -> ControlSpec:

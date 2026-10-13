@@ -8,6 +8,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * Assemble assertions by evaluating a catalog against each subject (SPEC §7, §9).
@@ -163,7 +164,8 @@ public final class Assess {
             Set<String> roles,
             List<JsonNode> events,
             Map<String, JsonNode> eventsByIri,
-            String[] win) {
+            String[] win,
+            Supplier<SourceClass.Judge> judge) {
         List<JsonNode> crosswalk = crosswalkFor(control);
         if (!roleApplies(roles, control.appliesToRoles)) {
             Assertions.Assertion a = Assertions.make(control.id, control.version, subject.id, "not_applicable", control.rung, control.mode, win, new int[] {0, 0}, control.severity, familyOf(control.id));
@@ -208,37 +210,53 @@ public final class Assess {
         // HR-5: a pass counts only when every focus's judged class meets the control's minimum (SPEC §6.4). The
         // rule never runs on a non-conformant verdict, which stays non-conformant.
         SourceClass.Below below = conformant
-                ? SourceClass.belowMinimum(new SourceClass.Judge(store, eventsByIri), result.applicable,
-                        control.minSourceClass, control.sourceClassFrom)
+                ? SourceClass.belowMinimum(judge, result.applicable, control.minSourceClass, control.sourceClassFrom)
                 : new SourceClass.Below(List.of(), List.of());
-        if (!below.foci().isEmpty()) {
-            Assertions.Assertion a = Assertions.make(control.id, control.version, subject.id, SourceClass.BELOW_MINIMUM_OUTCOME, control.rung, control.mode, win, new int[] {result.applicable.size(), 0}, control.severity, familyOf(control.id));
-            a.evidence = evidence(eventsByIri, below.foci());
-            a.crosswalk = crosswalk;
-            a.sourceClassSatisfied = false;
-            a.classGap = below.kinds();
-            return a;
-        }
+        boolean isBelow = !below.foci().isEmpty();
+        String outcome = isBelow ? SourceClass.BELOW_MINIMUM_OUTCOME : conformant ? "conformant" : "non-conformant";
+        // Below the minimum, the outcome rests on the below foci alone: none counts as failing, and no verdict is
+        // given.
         List<String> focusForEvidence;
-        if (!result.failing.isEmpty()) {
+        if (isBelow) {
+            focusForEvidence = below.foci();
+        } else if (!result.failing.isEmpty()) {
             focusForEvidence = new ArrayList<>(result.failing);
             focusForEvidence.sort(Json::byteCompare);
         } else {
             focusForEvidence = result.applicable;
         }
         Assertions.Assertion assertion = Assertions.make(
-                control.id, control.version, subject.id, conformant ? "conformant" : "non-conformant",
-                control.rung, control.mode, win, new int[] {result.applicable.size(), result.failing.size()},
+                control.id, control.version, subject.id, outcome,
+                control.rung, control.mode, win,
+                new int[] {result.applicable.size(), isBelow ? 0 : result.failing.size()},
                 control.severity, familyOf(control.id));
-        for (Structural.Violation v : result.violations) {
-            assertion.violations.add(Structural.violationToJson(v));
+        if (!isBelow) {
+            for (Structural.Violation v : result.violations) {
+                assertion.violations.add(Structural.violationToJson(v));
+            }
+            JsonNode strength = control.raw.get("evidence_strength");
+            assertion.evidenceStrength = strength != null && strength.isTextual() ? strength.textValue() : null;
         }
         assertion.evidence = evidence(eventsByIri, focusForEvidence);
         assertion.crosswalk = crosswalk;
-        assertion.sourceClassSatisfied = below.foci().isEmpty();
-        JsonNode strength = control.raw.get("evidence_strength");
-        assertion.evidenceStrength = strength != null && strength.isTextual() ? strength.textValue() : null;
+        assertion.sourceClassSatisfied = !isBelow;
+        assertion.classGap = below.kinds();
         return assertion;
+    }
+
+    /** {@code make}, called at most once: on the first {@code get}, and its value returned from then on. */
+    private static <T> Supplier<T> lazy(Supplier<T> make) {
+        return new Supplier<>() {
+            private T value;
+
+            @Override
+            public T get() {
+                if (value == null) {
+                    value = make.get();
+                }
+                return value;
+            }
+        };
     }
 
     /** Group {@code accepted} by subject id in one pass over the list. Package-private: shared with
@@ -364,10 +382,13 @@ public final class Assess {
             List<JsonNode> cfEvents = readable.isEmpty() ? List.of() : counterfactual(subjectEvents, readable);
             GraphStore cfStore = cfEvents.isEmpty() ? store : Graph.buildGraph(cfEvents, domain);
             Map<String, JsonNode> cfByIri = eventsByIriOf(cfEvents);
+            // Each graph's judge is built once, on the first control whose minimum it may fall below.
+            Supplier<SourceClass.Judge> judge = lazy(() -> new SourceClass.Judge(store, eventsByIri));
+            Supplier<SourceClass.Judge> cfJudge = lazy(() -> new SourceClass.Judge(cfStore, cfByIri));
             for (Catalog catalog : catalogs) {
                 for (Catalog.ControlSpec control : catalog.controls) {
                     Assertions.Assertion assertion =
-                            assertControl(store, catalog, control, subject, roles, subjectEvents, eventsByIri, win);
+                            assertControl(store, catalog, control, subject, roles, subjectEvents, eventsByIri, win, judge);
                     boolean flattered = !own.isEmpty()
                             && ("conformant".equals(assertion.outcome)
                                     || ("not_applicable".equals(assertion.outcome)
@@ -381,7 +402,8 @@ public final class Assess {
                     }
                     String withWithheld = readable.isEmpty()
                             ? assertion.outcome
-                            : assertControl(cfStore, catalog, control, subject, roles, cfEvents, cfByIri, win).outcome;
+                            : assertControl(cfStore, catalog, control, subject, roles, cfEvents, cfByIri, win, cfJudge)
+                                    .outcome;
                     if ((unreadable && flattered) || !assertion.outcome.equals(withWithheld)) {
                         assertion = notEnoughWithWithheld(assertion, own, "non-conformant".equals(withWithheld));
                     }

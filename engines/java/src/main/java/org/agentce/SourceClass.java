@@ -1,12 +1,20 @@
 package org.agentce;
 
+import static org.agentce.Graph.dataOf;
+import static org.agentce.Graph.refsOf;
+import static org.agentce.Graph.str;
+import static org.agentce.Graph.text;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Supplier;
 
 /**
  * The class a control's judgment rests on, against the control's minimum (SPEC §6.4, HR-5, §7.7.5). A port of
@@ -38,10 +46,6 @@ public final class SourceClass {
      * constant, so a later reading of single-source evidence (SPEC §10.4 {@code partial}) changes it in one place. */
     public static final String BELOW_MINIMUM_OUTCOME = "insufficient_evidence";
 
-    /** The Appendix F instruction source classes an agent may act on (the graph's trusted set, SPEC §7.7). */
-    private static final Set<String> TRUSTED_INSTRUCTION =
-            Set.of("user", "operator", "service", "agent_identified", "memory_trusted");
-
     /** Which witnesses may stand in for an instruction's own class at (iv): its own class only (a twin), its own
      * class or a twin (a parent: the PolicyDecision allows the action, which acts on the child only), or all. */
     private static final int OWN = 0;
@@ -53,32 +57,13 @@ public final class SourceClass {
         return value != null && value.isTextual() ? RANK.getOrDefault(value.textValue(), 0) : 0;
     }
 
-    private static JsonNode data(JsonNode event) {
-        JsonNode data = event.get("data");
-        return data != null && data.isObject() ? data : Json.nodes().objectNode();
-    }
-
-    private static JsonNode refs(JsonNode event) {
-        JsonNode refs = data(event).get("refs");
-        return refs != null && refs.isObject() ? refs : Json.nodes().objectNode();
-    }
-
     private static String type(JsonNode event) {
-        JsonNode t = data(event).get("@type");
-        return t != null && t.isTextual() ? t.textValue() : "";
-    }
-
-    /** A non-empty string, else null. */
-    private static String text(JsonNode value) {
-        return value != null && value.isTextual() && !value.textValue().isEmpty() ? value.textValue() : null;
+        String t = str(dataOf(event).get("@type"));
+        return t != null ? t : "";
     }
 
     private static String principalId(JsonNode value) {
         return value != null && value.isObject() ? text(value.get("id")) : null;
-    }
-
-    private static boolean isEnforcementPoint(JsonNode value) {
-        return value != null && value.isTextual() && ENFORCEMENT_POINT.equals(value.textValue());
     }
 
     /** Python's {@code a.get(k) == b.get(k)} over two JSON values: an absent member and null are both None. */
@@ -102,18 +87,36 @@ public final class SourceClass {
     public static final class Judge {
         private final GraphStore store;
         private final Map<String, JsonNode> events;
-        private final List<String> instructions = new ArrayList<>();
-        private final List<String> policyDecisions = new ArrayList<>();
+        /** Each enforcement-point Instruction with a content_ref and refs.task, by (content_ref, refs.task,
+         * principal id), in held order: the candidate twins of an instruction with those three. */
+        private final Map<List<String>, List<String>> twins = new HashMap<>();
+        /** (refs.request, principal id) of each enforcement-point PolicyDecision allow that names a principal. */
+        private final Set<List<String>> allows = new HashSet<>();
 
         public Judge(GraphStore store, Map<String, JsonNode> eventsByIri) {
             this.store = store;
             this.events = eventsByIri;
             for (Map.Entry<String, JsonNode> e : eventsByIri.entrySet()) {
-                String t = type(e.getValue());
+                JsonNode event = e.getValue();
+                if (!textEquals(event.get("agentcesourceclass"), ENFORCEMENT_POINT)) {
+                    continue;
+                }
+                JsonNode data = dataOf(event);
+                JsonNode refs = refsOf(event);
+                String t = type(event);
+                String principal = principalId(data.get("principal"));
                 if ("Instruction".equals(t)) {
-                    instructions.add(e.getKey());
-                } else if ("PolicyDecision".equals(t)) {
-                    policyDecisions.add(e.getKey());
+                    String content = text(data.get("content_ref"));
+                    String task = text(refs.get("task"));
+                    if (content != null && task != null) {
+                        twins.computeIfAbsent(Arrays.asList(content, task, principal), k -> new ArrayList<>())
+                                .add(e.getKey());
+                    }
+                } else if ("PolicyDecision".equals(t)
+                        && textEquals(data.get("decision"), "allow")
+                        && str(refs.get("request")) != null
+                        && principal != null) {
+                    allows.add(List.of(str(refs.get("request")), principal));
                 }
             }
         }
@@ -150,7 +153,7 @@ public final class SourceClass {
             }
             Set<String> inner = new HashSet<>(visiting);
             inner.add(node);
-            JsonNode refs = refs(event);
+            JsonNode refs = refsOf(event);
             if (refs.has("parent")) { // (ii) every parent held and itself attested
                 JsonNode parent = refs.get("parent");
                 if (!(parent.isTextual() && attested(focus, parent.textValue(), inner, Math.min(witnesses, TWIN)))) {
@@ -161,7 +164,7 @@ public final class SourceClass {
                 return false;
             }
             // (iv) by its own class, exactly enforcement_point (ruling 5); then the witnesses this hop allows.
-            if (isEnforcementPoint(event.get("agentcesourceclass"))) {
+            if (textEquals(event.get("agentcesourceclass"), ENFORCEMENT_POINT)) {
                 return true;
             }
             if (witnesses == OWN) {
@@ -178,32 +181,26 @@ public final class SourceClass {
             JsonNode event = origin != null && origin.isTextual() ? events.get(origin.textValue()) : null;
             return event != null
                     && "MemoryRead".equals(type(event))
-                    && isEnforcementPoint(event.get("agentcesourceclass"))
-                    && textEquals(data(event).get("trust_min"), "trusted");
+                    && textEquals(event.get("agentcesourceclass"), ENFORCEMENT_POINT)
+                    && textEquals(dataOf(event).get("trust_min"), "trusted");
         }
 
         /** (iv) by an enforcement-point twin: the same content_ref, refs.task, source_class and principal, held
          * under the subject, meeting (i)-(iv) by its own class, every instruction above it declaring a trusted
          * class. */
         private boolean twinWitnesses(String node, JsonNode event, Set<String> visiting) {
-            JsonNode data = data(event);
+            JsonNode data = dataOf(event);
             String content = text(data.get("content_ref"));
-            String task = text(refs(event).get("task"));
+            String task = text(refsOf(event).get("task"));
             if (content == null || task == null) {
                 return false;
             }
-            for (String twin : instructions) {
+            List<String> key = Arrays.asList(content, task, principalId(data.get("principal")));
+            for (String twin : twins.getOrDefault(key, List.of())) {
                 if (twin.equals(node) || visiting.contains(twin)) {
                     continue;
                 }
-                JsonNode other = events.get(twin);
-                JsonNode otherData = data(other);
-                if (isEnforcementPoint(other.get("agentcesourceclass"))
-                        && content.equals(text(otherData.get("content_ref")))
-                        && task.equals(text(refs(other).get("task")))
-                        && sameValue(otherData.get("source_class"), data.get("source_class"))
-                        && java.util.Objects.equals(
-                                principalId(otherData.get("principal")), principalId(data.get("principal")))
+                if (sameValue(dataOf(events.get(twin)).get("source_class"), data.get("source_class"))
                         && attested(twin, twin, visiting, OWN)
                         && lineageTrusted(twin)) {
                     return true;
@@ -215,18 +212,17 @@ public final class SourceClass {
         /** Every instruction above {@code node} through refs.parent declares a trusted Appendix F class. */
         private boolean lineageTrusted(String node) {
             Set<String> seen = new HashSet<>();
-            JsonNode parent = refs(events.get(node)).get("parent");
+            JsonNode parent = refsOf(events.get(node)).get("parent");
             while (parent != null && parent.isTextual() && seen.add(parent.textValue())) {
                 JsonNode event = heldInstruction(parent.textValue());
                 if (event == null) {
                     return false;
                 }
-                JsonNode sourceClass = data(event).get("source_class");
-                if (!(sourceClass != null && sourceClass.isTextual()
-                        && TRUSTED_INSTRUCTION.contains(sourceClass.textValue()))) {
+                String sourceClass = str(dataOf(event).get("source_class"));
+                if (sourceClass == null || !Graph.TRUSTED_INSTRUCTION.contains(sourceClass)) {
                     return false;
                 }
-                parent = refs(event).get("parent");
+                parent = refsOf(event).get("parent");
             }
             return true;
         }
@@ -234,21 +230,8 @@ public final class SourceClass {
         /** (iv) by an enforcement-point PolicyDecision allow whose refs.request is the focus and whose principal
          * is the instruction's (both present). */
         private boolean decisionWitnesses(String focus, JsonNode event) {
-            String principal = principalId(data(event).get("principal"));
-            if (principal == null) {
-                return false;
-            }
-            for (String decision : policyDecisions) {
-                JsonNode record = events.get(decision);
-                JsonNode data = data(record);
-                if (isEnforcementPoint(record.get("agentcesourceclass"))
-                        && textEquals(data.get("decision"), "allow")
-                        && textEquals(refs(record).get("request"), focus)
-                        && principal.equals(principalId(data.get("principal")))) {
-                    return true;
-                }
-            }
-            return false;
+            String principal = principalId(dataOf(event).get("principal"));
+            return principal != null && allows.contains(List.of(focus, principal));
         }
 
         /** A record one hop from the focus: an Instruction ranks enforcement_point only when attested; anything
@@ -266,20 +249,15 @@ public final class SourceClass {
         }
 
         /** The lowest class the judgment of {@code focus} rests on; null when nothing contributes (a Decision with
-         * no record through any named link: there is no record the judgment rests on to hold to a class). */
+         * no record through any named link: there is no record the judgment rests on to hold to a class).
+         * {@code sourceClassFrom} holds distinct {@link #FROM} names, sorted (as the catalog stores them). */
         public Judged judgedClass(String focus, List<String> sourceClassFrom) {
             List<Map.Entry<Integer, String>> contributors = new ArrayList<>();
             JsonNode event = events.get(focus);
             if (event == null || !"Decision".equals(type(event))) {
                 contributors.add(Map.entry(ownRank(focus), event != null ? type(event) : ""));
             }
-            Set<String> names = new TreeSet<>(Json::byteCompare);
             for (String name : sourceClassFrom) {
-                if (FROM.containsKey(name)) {
-                    names.add(name);
-                }
-            }
-            for (String name : names) {
                 for (String node : store.objects(focus, "agentce:" + name)) {
                     contributors.add(attestedRank(focus, node, FROM.get(name)));
                 }
@@ -298,15 +276,20 @@ public final class SourceClass {
         }
     }
 
-    /** The foci whose judged class is below {@code minimum}, sorted, and the record types that put them there. */
-    public static Below belowMinimum(Judge judge, List<String> foci, String minimum, List<String> sourceClassFrom) {
+    /** The foci whose judged class is below {@code minimum}, sorted, and the record types that put them there.
+     * {@code judge} builds (or returns) the subject's judge, called only when a focus can fall below the minimum. */
+    public static Below belowMinimum(
+            Supplier<Judge> judge, List<String> foci, String minimum, List<String> sourceClassFrom) {
         int floor = RANK.get(minimum);
+        if (floor == 0) { // nothing ranks below self_report
+            return new Below(List.of(), List.of());
+        }
         List<String> sorted = new ArrayList<>(foci);
         sorted.sort(Json::byteCompare);
         List<String> below = new ArrayList<>();
         Set<String> kinds = new TreeSet<>(Json::byteCompare);
         for (String focus : sorted) {
-            Judged judged = judge.judgedClass(focus, sourceClassFrom);
+            Judged judged = judge.get().judgedClass(focus, sourceClassFrom);
             if (judged != null && judged.rank() < floor) {
                 below.add(focus);
                 kinds.addAll(judged.lowest());

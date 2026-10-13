@@ -57,7 +57,7 @@ const GENERIC_REFS: Record<string, string> = {
 
 /** Instruction source classes an agent may act on without corroboration (SPEC §7.7, Appendix F). Any
  * other declared class is untrusted for the Conduct overlay's provenance and isolation controls. */
-const TRUSTED_INSTRUCTION = new Set([
+export const TRUSTED_INSTRUCTION: ReadonlySet<string> = new Set([
   "user",
   "operator",
   "service",
@@ -90,7 +90,7 @@ function untrustedSourceClass(value: unknown): boolean {
   return typeof value === "string" && !TRUSTED_INSTRUCTION.has(value);
 }
 
-function isOneOf(value: unknown, values: Set<string>): boolean {
+function isOneOf(value: unknown, values: ReadonlySet<string>): boolean {
   return typeof value === "string" && values.has(value);
 }
 
@@ -125,11 +125,11 @@ function isAbsent(value: unknown): boolean {
 
 export type Event = Record<string, unknown>;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function dataOf(event: Event): Record<string, unknown> {
+export function dataOf(event: Event): Record<string, unknown> {
   return isRecord(event.data) ? event.data : {};
 }
 
@@ -148,7 +148,7 @@ function afterEvery(time: string, actions: string[]): boolean {
   return actions.length > 0 && actions.every((action) => compareLiterals(time, action) === 1);
 }
 
-function refsOf(event: Event): Record<string, unknown> {
+export function refsOf(event: Event): Record<string, unknown> {
   const refs = dataOf(event).refs;
   return isRecord(refs) ? refs : {};
 }
@@ -214,7 +214,7 @@ function humanId(principal: unknown): string | null {
 
 /** Python's `==` over JSON values: a bool equals the number 0 or 1, objects compare by key set and
  * value whatever their key order, arrays element by element. */
-function pyEquals(a: unknown, b: unknown): boolean {
+export function pyEquals(a: unknown, b: unknown): boolean {
   const num = (v: unknown): unknown => (typeof v === "boolean" ? Number(v) : v);
   if (Array.isArray(a) || Array.isArray(b)) {
     return (
@@ -281,7 +281,7 @@ function mustOperate(kind: string | null): Family | null {
   return kind === "model" ? "model" : kind === "mcp_server" ? "tool" : null;
 }
 
-function text(value: unknown): string | null {
+export function text(value: unknown): string | null {
   return typeof value === "string" && value !== "" ? value : null;
 }
 
@@ -684,7 +684,7 @@ class Builder {
     const sourceClass = data.source_class;
     const untrusted = untrustedSourceClass(sourceClass);
     this.instructionUntrusted.set(node, untrusted);
-    if (!untrusted && !isOneOf(sourceClass, TRUSTED_INSTRUCTION)) {
+    if (typeof sourceClass !== "string") {
       // No class at all (or not a string): ROB-02 reads it as untrusted content (18.127).
       this.instructionUnclassed.add(node);
     }
@@ -912,24 +912,22 @@ class Builder {
     return tainted;
   }
 
-  /** ROB-02's two literals on each decision in `events` (see `robustToUntrusted`). */
-  private robustLiterals(events: Event[], tainted: Set<string>, unruled: Set<string>): void {
-    for (const event of events) {
-      if (this.ptype(event) === "Decision") {
-        const node = eventIri(String(event.id));
-        this.store.addLiteral(
-          node,
-          "agentce:robustToUntrustedContent",
-          tainted.has(node) ? "false" : "true",
-          BOOL,
-        );
-        this.store.addLiteral(
-          node,
-          "agentce:untrustedContentRuledOn",
-          unruled.has(node) ? "false" : "true",
-          BOOL,
-        );
-      }
+  /** ROB-02's two literals on each of `decisions` (see `robustToUntrusted`). */
+  private robustLiterals(decisions: Event[], tainted: Set<string>, unruled: Set<string>): void {
+    for (const event of decisions) {
+      const node = eventIri(String(event.id));
+      this.store.addLiteral(
+        node,
+        "agentce:robustToUntrustedContent",
+        tainted.has(node) ? "false" : "true",
+        BOOL,
+      );
+      this.store.addLiteral(
+        node,
+        "agentce:untrustedContentRuledOn",
+        unruled.has(node) ? "false" : "true",
+        BOOL,
+      );
     }
   }
 

@@ -25,6 +25,7 @@ import { InputError } from "./errors";
 import { parseJson } from "./json";
 import { QuarantineReason, type QuarantineRecord } from "./quarantine";
 import { eventTypes, validateEvent } from "./schema";
+import { SOURCE_CLASS_RANK } from "./sourceClass";
 import { compareInstants } from "./structural";
 import { byteCompare, decodeUtf8Strict } from "./util";
 import { MAX_JSON_DEPTH } from "./verify";
@@ -108,13 +109,6 @@ export function maxNesting(line: string): number {
 function trimJsonWhitespace(text: string): string {
   return text.replace(JSON_WHITESPACE_EDGES, "");
 }
-
-/** The evidence ladder (SPEC §6.4 classes, lowest first): of two records with one id, the lower class is quarantined. */
-const CLASS_RANK: Record<string, number> = {
-  self_report: 0,
-  enforcement_point: 1,
-  independent_system: 2,
-};
 
 /** A record that passed every per-record check, waiting for the id and time-order checks. */
 interface Candidate {
@@ -357,7 +351,8 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
       }
 
       const eventId = String(effectiveEvent.id);
-      const rank = CLASS_RANK[String(effectiveEvent.agentcesourceclass)];
+      // The evidence ladder (SPEC §6.4): of two records with one id, the lower class is quarantined.
+      const rank = SOURCE_CLASS_RANK.get(String(effectiveEvent.agentcesourceclass)) as number;
       ownerRank.set(eventId, Math.max(rank, ownerRank.get(eventId) ?? rank));
       records.push({ event: effectiveEvent, rawEvent, source, typeValue, rank });
     }

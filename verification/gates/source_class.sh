@@ -94,7 +94,7 @@ outcome() {
 # stops all three (the $work/.stop marker): the gate has already failed, and a seeded-fault run turns red without
 # assessing every case.
 check_cases() {
-  local engine="$1" status=0 dir name want want_exit out code got copy key
+  local engine="$1" dir name want want_exit out code got copy key
   for dir in "$work"/*/; do
     [ -e "$work/.stop" ] && return 1
     name="$(basename "$dir")"
@@ -113,18 +113,20 @@ check_cases() {
     fi
     if [ "$code" != "$want_exit" ]; then
       echo "source-class: $engine $name exited $code, expected $want_exit" >&2
-      status=1
+      touch "$work/.stop"
+      return 1
     fi
     if [ -s "$out/quarantine.jsonl" ]; then
       echo "source-class: $engine quarantined events of $name, so the case did not read its input" >&2
-      status=1
+      touch "$work/.stop"
+      return 1
     fi
     got="$(outcome "$(cat "$dir/control")" "$out/assertions.json")"
     if [ "$got" != "$want" ]; then
       echo "source-class: $engine $name gave $(cat "$dir/control") '$got', expected '$want'" >&2
-      status=1
+      touch "$work/.stop"
+      return 1
     fi
-    [ "$status" -eq 0 ] || { touch "$work/.stop"; return 1; }
   done
   # An unknown minimum is refused when the catalog loads, never read as no minimum. Python writes the refusal to
   # stderr, TypeScript and Java to stdout; either carries the key.
@@ -144,7 +146,6 @@ check_cases() {
       return 1
     fi
   done
-  return "$status"
 }
 
 status=0

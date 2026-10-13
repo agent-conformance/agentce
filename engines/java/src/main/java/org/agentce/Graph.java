@@ -73,7 +73,7 @@ public final class Graph {
     /** Instruction source classes an agent may act on without corroboration (SPEC §7.7, Appendix F).
      * Any other declared class is untrusted for the Conduct overlay's provenance and isolation
      * controls. */
-    private static final Set<String> TRUSTED_INSTRUCTION =
+    static final Set<String> TRUSTED_INSTRUCTION =
             Set.of("user", "operator", "service", "agent_identified", "memory_trusted");
 
     /** A memory record's trust, or a read's {@code trust_min}, that ROB-02 treats as untrusted, and
@@ -117,12 +117,12 @@ public final class Graph {
 
     // --- helpers ---
 
-    private static JsonNode dataOf(JsonNode event) {
+    static JsonNode dataOf(JsonNode event) {
         JsonNode data = event.get("data");
         return data != null && data.isObject() ? data : Json.nodes().objectNode();
     }
 
-    private static JsonNode refsOf(JsonNode event) {
+    static JsonNode refsOf(JsonNode event) {
         JsonNode refs = dataOf(event).get("refs");
         return refs != null && refs.isObject() ? refs : Json.nodes().objectNode();
     }
@@ -142,7 +142,7 @@ public final class Graph {
         return node == null || node.isNull();
     }
 
-    private static String str(JsonNode node) {
+    static String str(JsonNode node) {
         return node != null && node.isTextual() ? node.textValue() : null;
     }
 
@@ -178,7 +178,7 @@ public final class Graph {
     private static final Set<String> COMPONENT_RECORD_TYPES = Set.of("BundleLoaded", "ToolCall", "ModelCall");
 
     /** A non-empty string, else null. */
-    private static String text(JsonNode node) {
+    static String text(JsonNode node) {
         String value = str(node);
         return value == null || value.isEmpty() ? null : value;
     }
@@ -918,29 +918,29 @@ public final class Graph {
             Set<String> robustTainted = new LinkedHashSet<>(tainted);
             robustTainted.addAll(unclassed);
             Set<String> robustUnruled = new LinkedHashSet<>(unruled);
+            List<JsonNode> decisions = new ArrayList<>();
             for (JsonNode event : events) {
                 if ("Decision".equals(ptype(event))) {
+                    decisions.add(event);
                     String node = Iri.eventIri(event.get("id").asText());
                     if (!fed.contains(node)) {
                         robustUnruled.add(node);
                     }
                 }
             }
-            robustLiterals(events, robustTainted, robustUnruled);
+            robustLiterals(decisions, robustTainted, robustUnruled);
             tainted.addAll(unruled);
             return tainted;
         }
 
-        /** ROB-02's two literals on each decision in {@code events} (see {@link #robustToUntrusted}). */
-        private void robustLiterals(List<JsonNode> events, Set<String> tainted, Set<String> unruled) {
-            for (JsonNode event : events) {
-                if ("Decision".equals(ptype(event))) {
-                    String node = Iri.eventIri(event.get("id").asText());
-                    store.addLiteral(
-                            node, "agentce:robustToUntrustedContent", tainted.contains(node) ? "false" : "true", BOOL);
-                    store.addLiteral(
-                            node, "agentce:untrustedContentRuledOn", unruled.contains(node) ? "false" : "true", BOOL);
-                }
+        /** ROB-02's two literals on each of {@code decisions} (see {@link #robustToUntrusted}). */
+        private void robustLiterals(List<JsonNode> decisions, Set<String> tainted, Set<String> unruled) {
+            for (JsonNode event : decisions) {
+                String node = Iri.eventIri(event.get("id").asText());
+                store.addLiteral(
+                        node, "agentce:robustToUntrustedContent", tainted.contains(node) ? "false" : "true", BOOL);
+                store.addLiteral(
+                        node, "agentce:untrustedContentRuledOn", unruled.contains(node) ? "false" : "true", BOOL);
             }
         }
 
