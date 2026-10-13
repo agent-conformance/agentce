@@ -7,7 +7,7 @@ fails if a gate in `gates.json` is not named in this file.
 
 - `VG-DEMO-SHARD-COVERAGE` (18.71b, changed). The demo-fault shards were dealt round-robin, so at 18 lanes one shard
   carried 20 minutes of demos and hit the job timeout while others took 5. `shard.py` now gives the gates to the
-  shards longest first, each to the lightest shard, from the seconds in the new `demo-durations.json` (one CI run;
+  shards longest first, each to the lightest shard, from the seconds in the new `demo-durations.json` (the longest of three CI runs, at 24 lanes;
   an untimed gate counts as `default_seconds`), and `shard.py --balance-check <total>` prints each shard's estimate.
   The gate now checks that the balanced split places every gate once, that the balance check passes at the
   workflow's lane count, and that `shard.py --dry-run` prints the balanced slice for every lane. Four new seeded

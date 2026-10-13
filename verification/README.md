@@ -59,23 +59,25 @@ about twice the mean demo), so a new gate is treated as heavy until it is timed.
 count:
 
 ```
-python3 verification/shard.py --balance-check 18
+python3 verification/shard.py --balance-check 24
 ```
 
 It prints each shard's estimated minutes and exits 1 when a gate has no recorded seconds and no `default_seconds`
 is set, or when the heaviest shard is over the larger of 1.25 times the mean and the longest single gate.
 VG-DEMO-SHARD-COVERAGE runs the same check at the workflow's lane count.
 
-The estimates come from one CI run and leave out each job's setup (a minute or two). To refresh them, take a green
-`verification` run whose demo-fault jobs all finished, then:
+The estimates are the longest time each gate took in the CI runs named under `source` and leave out each job's setup (a minute or two).
+The same gate can take half or twice as long from one run to the next, depending on the machine a job gets, so
+read them as rough. To refresh them, take one or more green `verification` runs whose demo-fault jobs all
+finished, then:
 
 ```
 gh run view <run-id> --log > run.log
 ```
 
 For each demo-fault job, a gate's seconds are the gap between its `RED on the seeded fault` line and the previous
-one in the same job (the first gate from the start of the job's "This shard's seeded-fault demos" step). Write them
-under `gates` and set `source` to that run, attempt and commit.
+one in the same job (the first gate from the start of the job's "This shard's seeded-fault demos" step). Write the
+longest over the runs under `gates` and list each run, attempt and commit under `source`.
 
 ## Adding a gate
 
