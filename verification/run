@@ -35,7 +35,7 @@ TIERS = ("quick", "full")
 GATE_ID = re.compile(r"^VG-[A-Z0-9]+(-[A-Z0-9]+)*(@[0-9A-Za-z.]+)?$")
 CHANGELOG_VERSION = re.compile(r"^## ([0-9]+\.[0-9]+\.[0-9]+)", re.MULTILINE)
 TAIL_LINES = 20
-# "<gate id> <fault index>" of the fault a demo has applied, for the runs that demo makes
+# the id of the gate a demo has a seeded fault applied to, for the runs that demo makes
 DEMO_FAULT_ENV = "VERIFICATION_DEMO_FAULT"
 CLAIMS_REGISTER = Path("tools/claims/register.yaml")
 
@@ -72,6 +72,7 @@ def changelog_version(root: Path) -> str | None:
 def lint_registry(registry: dict[str, Any], root: Path) -> list[str]:
     """Return one ``<key>: <detail>`` line per problem; an empty list means the registry is accepted."""
     problems: list[str] = []
+    demoed = os.environ.get(DEMO_FAULT_ENV)
     gates = registry.get("gates")
     if registry.get("version") != 1 or not isinstance(gates, list) or not gates:
         return ["registry.malformed: expected version 1 and a non-empty gates list"]
@@ -125,19 +126,19 @@ def lint_registry(registry: dict[str, Any], root: Path) -> list[str]:
         if not (isinstance(faults, list) and faults):
             problems.append(f"registry.gate_without_fault: {gid}")
             faults = []
-        applied = os.environ.get(DEMO_FAULT_ENV, "")
-        for index, fault in enumerate(faults):
-            problems.extend(lint_fault(gid, fault, root, applied == f"{gid} {index}"))
+        for fault in faults:
+            problems.extend(lint_fault(gid, fault, root, gid == demoed))
         if gid not in changelog:
             problems.append(f"registry.gate_not_in_changelog: {gid}")
     return problems
 
 
 def lint_fault(
-    gid: str, fault: dict[str, Any], root: Path, applied: bool = False
+    gid: str, fault: dict[str, Any], root: Path, demoed: bool = False
 ) -> list[str]:
-    """``applied``: a demo has this fault in place, so a gate that calls the runner while it is
-    demoed sees the replace text where the search text was, and is judged on what it checks."""
+    """``demoed``: a demo has one of this gate's faults in place, which can move this fault's
+    search text, so a gate that calls the runner is judged on what it checks, not on the lint
+    (the demo's own runner linted the untouched tree before applying it)."""
     target = root / str(fault.get("file", ""))
     search, replace = fault.get("search"), fault.get("replace")
     if not (
@@ -149,17 +150,16 @@ def lint_fault(
         return [f"registry.bad_fault: {gid}"]
     if not target.is_file():
         return [f"registry.fault_target_missing: {gid} {fault.get('file')}"]
-    text = target.read_text(encoding="utf-8")
-    if applied and replace in text:
-        return []
-    if text.count(search) != 1:
+    if not demoed and target.read_text(encoding="utf-8").count(search) != 1:
         return [
             f"registry.fault_not_applicable: {gid} {fault.get('file')} (the search text must occur exactly once)"
         ]
     return []
 
 
-def run_gate(gate: dict[str, Any], root: Path) -> dict[str, Any]:
+def run_gate(
+    gate: dict[str, Any], root: Path, env: dict[str, str] | None = None
+) -> dict[str, Any]:
     gid = gate["id"]
     result: dict[str, Any] = {
         "id": gid,
@@ -187,6 +187,7 @@ def run_gate(gate: dict[str, Any], root: Path) -> dict[str, Any]:
             text=True,
             timeout=gate["timeout_s"],
             check=False,
+            env=env,
         )
     except subprocess.TimeoutExpired:
         return {**failed, "reason": f"timed out after {gate['timeout_s']} s"}
@@ -207,20 +208,19 @@ def demo_fault(
     faults = [gate["faults"][index] for index in indexes]
     red_on_fault = True
     restored = True
-    for index, fault in zip(indexes, faults):
+    demo_env = {**os.environ, DEMO_FAULT_ENV: gate["id"]}
+    for fault in faults:
         target = root / fault["file"]
         original = target.read_bytes()
-        os.environ[DEMO_FAULT_ENV] = f"{gate['id']} {index}"
         try:
             target.write_bytes(
                 original.decode("utf-8")
                 .replace(fault["search"], fault["replace"], 1)
                 .encode("utf-8")
             )
-            if run_gate(gate, root)["status"] != "fail":
+            if run_gate(gate, root, demo_env)["status"] != "fail":
                 red_on_fault = False
         finally:
-            del os.environ[DEMO_FAULT_ENV]
             target.write_bytes(original)
             restored = restored and target.read_bytes() == original
     return {
@@ -232,15 +232,29 @@ def demo_fault(
     }
 
 
-def repeat_refusal(argv: list[str]) -> str | None:
-    """The message key refusing a non-repeatable option given twice (argparse keeps the last)."""
-    seen = Counter(arg.split("=", 1)[0] for arg in argv if arg.startswith("--"))
-    repeated = sorted(
-        opt for opt, count in seen.items() if count > 1 and opt != "--fault"
-    )
-    if repeated:
-        return f"suite.repeated_option: {', '.join(repeated)} may be given once"
-    return None
+class Once(argparse.Action):
+    """Refuses an option's second use, which argparse would let overwrite the first."""
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: Any,
+        option_string: str | None = None,
+    ) -> None:
+        given = vars(namespace).setdefault("_given", set())
+        if self.dest in given:
+            parser.error(f"suite.repeated_option: {option_string} may be given once")
+        given.add(self.dest)
+        super().__call__(parser, namespace, values, option_string)
+
+
+class OnceStore(Once, argparse._StoreAction):
+    pass
+
+
+class OnceFlag(Once, argparse._StoreTrueAction):
+    pass
 
 
 def option_refusal(args: argparse.Namespace) -> str | None:
@@ -368,12 +382,13 @@ def parse(argv: list[str]) -> argparse.Namespace:
     # one command per call, so no command's value is silently dropped for another's
     command = parser.add_mutually_exclusive_group()
     command.add_argument(
-        "--quick", action="store_true", help="run the quick tier (offline)"
+        "--quick", action=OnceFlag, help="run the quick tier (offline)"
     )
-    command.add_argument("--full", action="store_true", help="run every tier")
-    command.add_argument("--gate", metavar="ID", help="run one gate")
+    command.add_argument("--full", action=OnceFlag, help="run every tier")
+    command.add_argument("--gate", action=OnceStore, metavar="ID", help="run one gate")
     command.add_argument(
         "--demo-fault",
+        action=OnceStore,
         metavar="ID",
         help="show a gate turn RED on a seeded fault, then GREEN",
     )
@@ -385,30 +400,37 @@ def parse(argv: list[str]) -> argparse.Namespace:
         help="with --demo-fault: demo only seeded fault N (0-based); repeatable",
     )
     command.add_argument(
-        "--lint-registry", action="store_true", help="check the gate registry"
+        "--lint-registry", action=OnceFlag, help="check the gate registry"
     )
     parser.add_argument(
         "--demo-reject",
-        action="store_true",
+        action=OnceFlag,
         help="with --lint-registry: reject bad registries",
     )
-    command.add_argument("--list", action="store_true", help="print the gate ids")
-    parser.add_argument("--json", action="store_true", help="machine-readable output")
+    command.add_argument("--list", action=OnceFlag, help="print the gate ids")
+    parser.add_argument("--json", action=OnceFlag, help="machine-readable output")
     parser.add_argument(
         "--registry",
+        action=OnceStore,
         type=path_value,
         default=HERE / "gates.json",
         help=argparse.SUPPRESS,
     )
     parser.add_argument(
-        "--root", type=path_value, default=DEFAULT_ROOT, help=argparse.SUPPRESS
+        "--root",
+        action=OnceStore,
+        type=path_value,
+        default=DEFAULT_ROOT,
+        help=argparse.SUPPRESS,
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    vars(args).pop("_given", None)
+    return args
 
 
 def main(argv: list[str]) -> int:
     args = parse(argv)
-    refused = repeat_refusal(argv) or option_refusal(args)
+    refused = option_refusal(args)
     if refused:
         print(refused, file=sys.stderr)
         return 2

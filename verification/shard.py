@@ -131,11 +131,12 @@ def balanced_partition(
     pairs: list[Pair], index: int, total: int, durations: dict[str, Any]
 ) -> list[Pair]:
     """The demo pairs of shard ``index`` of ``total`` (see ``balanced_shards()``)."""
-    return [
-        pair
-        for chunk in balanced_shards(pairs, total, durations)[index]
-        for pair in chunk
-    ]
+    return slice_pairs(balanced_shards(pairs, total, durations)[index])
+
+
+def slice_pairs(chunks: list[list[Pair]]) -> list[Pair]:
+    """A shard's chunks as one list of (gate, fault) pairs, in dealing order."""
+    return [pair for chunk in chunks for pair in chunk]
 
 
 def shard_minutes(
@@ -276,7 +277,7 @@ def main(argv: list[str]) -> int:
     # one slice for both paths, so the dry-run the gate judges is the slice CI runs
     chunks = balanced_shards(pairs, total, load_durations())[shard]
     if dry_run:
-        print("\n".join(f"{gate} {fault}" for chunk in chunks for gate, fault in chunk))
+        print("\n".join(f"{gate} {fault}" for gate, fault in slice_pairs(chunks)))
         return 0
     print(
         f"{label}: {len(chunks)} chunk(s): {[demo_args(c) for c in chunks]}",

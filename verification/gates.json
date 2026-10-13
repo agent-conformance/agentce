@@ -78,8 +78,8 @@
         {
           "description": "balanced_partition() leaves the last (gate, fault) pair out of every shard, so the last gate's last seeded fault is never demoed again",
           "file": "verification/shard.py",
-          "search": "        for chunk in balanced_shards(pairs, total, durations)[index]\n        for pair in chunk\n    ]\n",
-          "replace": "        for chunk in balanced_shards(pairs, total, durations)[index]\n        for pair in chunk\n        if pair != pairs[-1]\n    ]\n"
+          "search": "    return slice_pairs(balanced_shards(pairs, total, durations)[index])\n",
+          "replace": "    dealt = slice_pairs(balanced_shards(pairs, total, durations)[index])\n    return [pair for pair in dealt if pair != pairs[-1]]\n"
         },
         {
           "description": "balanced_shards() deals the chunks round-robin again instead of longest first to the lightest shard, so the heavy chunks pile onto a few demo shards and one runs past the lane bound against the job timeout",
@@ -119,14 +119,14 @@
         },
         {
           "file": "verification/run",
-          "search": "    if applied and replace in text:\n        return []\n",
-          "replace": "",
-          "description": "the registry lint no longer accepts the fault a demo has applied, so any gate that calls ./verification/run turns RED on every seeded fault for the lint's reason and its demo no longer shows what the gate checks"
+          "search": "    if not demoed and target.read_text(encoding=\"utf-8\").count(search) != 1:",
+          "replace": "    if target.read_text(encoding=\"utf-8\").count(search) != 1:",
+          "description": "the registry lint no longer exempts the gate a demo has a fault applied to, so any gate that calls ./verification/run turns RED on every seeded fault for the lint's reason and its demo no longer shows what the gate checks"
         },
         {
           "file": "verification/run",
-          "search": "    if repeated:\n        return f\"suite.repeated_option:",
-          "replace": "    if repeated and False:\n        return f\"suite.repeated_option:",
+          "search": "        if self.dest in given:\n",
+          "replace": "        if False:\n",
           "description": "./verification/run accepts a command option given twice and keeps the last, so --gate A --gate B silently runs only B"
         }
       ],
