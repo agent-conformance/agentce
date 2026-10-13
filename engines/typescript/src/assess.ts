@@ -241,7 +241,7 @@ function assertControl(
     population: [applicable.length, failing.size],
     violations: violations.map(violationToJson),
     evidence: evidence(eventsByIri, focusForEvidence),
-    sourceClassSatisfied: true,
+    sourceClassSatisfied: below.length === 0,
     evidenceStrength:
       typeof control.raw.evidence_strength === "string" ? control.raw.evidence_strength : null,
   });
