@@ -52,6 +52,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+import tempfile
 from collections.abc import Callable, Collection
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -248,7 +249,7 @@ def quick_wiring_problems(job: Any) -> list[str]:
 
 
 def _coverage_problems(
-    gates: list[str], assignments: dict[str, list[int]], total: int
+    gates: list[Any], assignments: dict[Any, list[int]], total: int
 ) -> list[str]:
     """Pure judging logic: every gate must appear in exactly one shard's assignment list."""
     problems = [
@@ -266,14 +267,14 @@ def _coverage_problems(
 
 
 def partition_problems(
-    gates: list[str],
+    gates: list[Any],
     total: int,
-    slice_of: Callable[[list[str], int, int], list[str]],
+    slice_of: Callable[[list[Any], int, int], list[Any]],
 ) -> list[str]:
     """Actually call one of the real, on-disk ``shard.py``'s partition functions for every index
     of ``total`` and confirm the union, against the real gate list, assigns every gate to exactly
     one shard -- catching a truncated or off-by-one edit that a wiring check alone cannot see."""
-    assignments: dict[str, list[int]] = {}
+    assignments: dict[Any, list[int]] = {}
     for index in range(total):
         for gate in slice_of(gates, index, total):
             assignments.setdefault(gate, []).append(index)
@@ -299,22 +300,42 @@ def _stdout_lines(root: Path, script: str, *args: str) -> list[str]:
 
 def _balanced(
     shard: ModuleType, durations: dict[str, Any]
-) -> Callable[[list[str], int, int], list[str]]:
+) -> Callable[[list[Any], int, int], list[Any]]:
     """``shard.balanced_partition`` with ``durations`` bound, in ``partition_problems``' shape."""
-    return lambda gates, index, total: shard.balanced_partition(
-        gates, index, total, durations
+    return lambda pairs, index, total: shard.balanced_partition(
+        pairs, index, total, durations
     )
 
 
+def _run_args(
+    shard: ModuleType, durations: dict[str, Any]
+) -> Callable[[list[Any], int, int], list[Any]]:
+    """The (gate, fault) pairs shard ``index`` actually hands ``./verification/run``: each of its
+    chunks' ``demo_args()`` parsed back, in ``partition_problems``' shape."""
+
+    def slice_of(pairs: list[Any], index: int, total: int) -> list[Any]:
+        got = []
+        for chunk in shard.balanced_shards(pairs, total, durations)[index]:
+            args = shard.demo_args(chunk)
+            got += [
+                (args[1], int(arg.removeprefix("--fault=")))
+                for arg in args[2:]
+                if arg.startswith("--fault=")
+            ]
+        return got
+
+    return slice_of
+
+
 def dry_run_problems(
-    gates: list[str],
+    pairs: list[Any],
     total: int,
-    slice_of: Callable[[list[str], int, int], list[str]],
+    slice_of: Callable[[list[Any], int, int], list[Any]],
     root: Path,
 ) -> list[str]:
     """The CI path itself: ``shard.py --dry-run <i> <total>`` run as the demo-fault job runs it
-    must print exactly ``balanced_partition()``'s slice for every shard, so main() cannot deal the
-    demos some other way than the one checked here."""
+    must print exactly ``balanced_partition()``'s pairs (``<gate> <fault>`` per line) for every
+    shard, so main() cannot deal the demos some other way than the one checked here."""
     with ThreadPoolExecutor() as pool:
         printed = list(
             pool.map(
@@ -327,8 +348,100 @@ def dry_run_problems(
     return [
         f"shard.py --dry-run {index} {total} printed {got}, not balanced_partition()'s {want}"
         for index, got in enumerate(printed)
-        if got != (want := slice_of(gates, index, total))
+        if got
+        != (
+            want := [f"{gate} {fault}" for gate, fault in slice_of(pairs, index, total)]
+        )
     ]
+
+
+def fault_selection_problems(scratch: Path) -> list[str]:
+    """``./verification/run --demo-fault <ID> --fault <N>`` runs only fault N, on a throwaway
+    registry whose fault 0 never turns its gate RED: selecting fault 1 alone must exit 0 and
+    report index 1 only, the whole gate must exit 1, and a bad selection must be refused (2)."""
+    (scratch / "verification").mkdir(parents=True, exist_ok=True)
+    (scratch / "AGENTS.md").write_text("an invariant\n", encoding="utf-8")
+    (scratch / "verification" / "CHANGELOG.md").write_text(
+        "## 1.0.0\n\nVG-PICK\n", encoding="utf-8"
+    )
+    (scratch / "a.txt").write_text("ok\n", encoding="utf-8")
+    (scratch / "b.txt").write_text("ok\n", encoding="utf-8")
+    fault = {"search": "ok", "replace": "no"}
+    registry = {
+        "version": 1,
+        "suite_version": "1.0.0",
+        "gates": [
+            {
+                "id": "VG-PICK",
+                "title": "b.txt says ok",
+                "tier": "quick",
+                "cmd": ["grep", "-q", "ok", "b.txt"],
+                "timeout_s": 30,
+                "invariant": "an invariant",
+                "rubric": {"pass": "ok", "fail": "not ok"},
+                "faults": [
+                    {**fault, "file": "a.txt", "description": "a.txt (not judged)"},
+                    {**fault, "file": "b.txt", "description": "b.txt (judged)"},
+                ],
+            }
+        ],
+    }
+    path = scratch / "gates.json"
+    path.write_text(json.dumps(registry), encoding="utf-8")
+
+    def run(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [
+                "python3",
+                str(REPO_ROOT / "verification" / "run"),
+                *args,
+                "--registry",
+                str(path),
+                "--root",
+                str(scratch),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    problems = []
+    picked = run("--demo-fault", "VG-PICK", "--fault", "1", "--json")
+    outcome = json.loads(picked.stdout) if picked.returncode in (0, 1) else {}
+    if (
+        picked.returncode != 0
+        or outcome.get("fault_indexes") != [1]
+        or outcome.get("faults") != ["b.txt (judged)"]
+    ):
+        problems.append(
+            f"--demo-fault VG-PICK --fault 1 exited {picked.returncode} with {outcome}, not 0 with fault 1 only"
+        )
+    whole = run("--demo-fault", "VG-PICK")
+    if whole.returncode != 1:
+        problems.append(
+            f"--demo-fault VG-PICK (fault 0 never RED) exited {whole.returncode}, not 1"
+        )
+    refusals = [
+        (["--fault", "1"], "suite.fault_without_demo"),
+        (["--list", "--fault", "1"], "suite.fault_without_demo"),
+        (["--lint-registry", "--fault", "1"], "suite.fault_without_demo"),
+        (["--demo-fault", "VG-PICK", "--fault", "2"], "suite.unknown_fault"),
+        (
+            ["--demo-fault", "VG-PICK", "--fault", "1", "--fault", "1"],
+            "suite.repeated_fault",
+        ),
+        (["--quick", "--demo-reject"], "suite.demo_reject_without_lint"),
+        (["--list", "--json"], "suite.json_not_supported"),
+        (["--lint-registry", "--json"], "suite.json_not_supported"),
+        (["--gate", "VG-PICK", "--demo-fault", "VG-PICK"], "not allowed with"),
+    ]
+    for args, key in refusals:
+        got = run(*args)
+        if got.returncode != 2 or key not in got.stderr:
+            problems.append(
+                f"{' '.join(args)} exited {got.returncode}, not 2 with {key}"
+            )
+    return problems
 
 
 def check_workflow(
@@ -356,21 +469,34 @@ def check_workflow(
         return problems + ["`verification/run --list` printed no gates"]
     shard = _load_shard_module(root)
     durations = shard.load_durations()
-    balanced = _balanced(shard, durations)
-    for total in PARTITION_TOTALS:
-        problems += partition_problems(gates, total, balanced)
-    lanes = demo_lane_total(jobs.get(DEMO_JOB))
-    if lanes:
-        problems += [
-            f"demo shards at {lanes} lanes: {p}"
-            for p in shard.balance_problems(gates, durations, lanes)
-        ]
-        problems += dry_run_problems(gates, lanes, balanced, root)
-    else:
-        problems.append(f"jobs.{DEMO_JOB} has no strategy.matrix.lane list")
     registry = json.loads(
         (root / "verification" / "gates.json").read_text(encoding="utf-8")
     )
+    # every registered fault of every listed gate, independent of shard.demo_pairs()
+    counts = {gate["id"]: len(gate["faults"]) for gate in registry["gates"]}
+    pairs = [(gate, fault) for gate in gates for fault in range(counts[gate])]
+    if shard.demo_pairs(gates, registry) != pairs:
+        problems.append(
+            "shard.py's demo_pairs() is not every registered fault in order"
+        )
+    balanced = _balanced(shard, durations)
+    lanes = demo_lane_total(jobs.get(DEMO_JOB))
+    for total in (*PARTITION_TOTALS, *([lanes] if lanes else [])):
+        problems += partition_problems(pairs, total, balanced)
+        problems += [
+            f"what shard.py runs: {p}"
+            for p in partition_problems(pairs, total, _run_args(shard, durations))
+        ]
+    if lanes:
+        problems += [
+            f"demo shards at {lanes} lanes: {p}"
+            for p in shard.balance_problems(pairs, durations, lanes)
+        ]
+        problems += dry_run_problems(pairs, lanes, balanced, root)
+    else:
+        problems.append(f"jobs.{DEMO_JOB} has no strategy.matrix.lane list")
+    with tempfile.TemporaryDirectory() as scratch:
+        problems += fault_selection_problems(Path(scratch))
     quick = [gate["id"] for gate in registry["gates"] if gate["tier"] == "quick"]
     from_shard = shard.quick_ids(registry)
     if from_shard != quick:
@@ -466,27 +592,39 @@ def _shard_quick_self_test(shard: ModuleType) -> list[str]:
 
 
 def _shard_balance_self_test(shard: ModuleType) -> list[str]:
-    """shard.py's demo balancing on synthetic durations: balanced_partition() places every gate
-    exactly once at two totals, and balance_problems() flags an untimed gate only when no default
-    applies and flags a heaviest shard over max(1.25 x mean, longest gate)."""
+    """shard.py's demo balancing on synthetic durations: balanced_partition() and the chunks
+    handed to ``./verification/run`` place every (gate, fault) pair exactly once at two totals,
+    a gate over max_chunk_seconds is cut into consecutive runs of its faults, and
+    balance_problems() flags an untimed gate only when no default applies, a heaviest shard over
+    max(1.25 x mean, longest chunk), and a shard over lane_bound_minutes."""
     failures = []
     gates = ["A", "B", "C", "D", "E", "F", "G"]
-    timed = {"gates": {g: s for g, s in zip(gates, [600, 60, 300, 120, 240, 30, 90])}}
+    faults = dict(zip(gates, [5, 1, 3, 2, 4, 1, 2]))
+    pairs = [(g, f) for g in gates for f in range(faults[g])]
+    timed: dict[str, Any] = {
+        "gates": dict(zip(gates, [600, 60, 300, 120, 240, 30, 90])),
+        "max_chunk_seconds": 250,
+    }
     for total in (6, 3):
-        failures += partition_problems(gates, total, _balanced(shard, timed))
+        failures += partition_problems(pairs, total, _balanced(shard, timed))
+        failures += partition_problems(pairs, total, _run_args(shard, timed))
+    # A (600 s, 5 faults) over 250 s cuts into three runs: faults 0-1, 2-3, 4
+    a_chunks = [c for c in shard.demo_chunks(pairs, timed) if c[0][0] == "A"]
+    if a_chunks != [[("A", 0), ("A", 1)], [("A", 2), ("A", 3)], [("A", 4)]]:
+        failures.append(f"demo_chunks cut A as {a_chunks}")
     untimed = {"gates": {"A": 60}}
-    five = ["A", "B", "C", "D", "E"]
-    cases: list[tuple[str, list[str], dict[str, Any], int, bool]] = [
-        ("every gate timed, 3 shards", gates, timed, 3, True),
-        ("a gate with no duration and no default", gates, untimed, 2, False),
+    five = [(g, 0) for g in ["A", "B", "C", "D", "E"]]
+    cases: list[tuple[str, list[Any], dict[str, Any], int, bool]] = [
+        ("every gate timed, 3 shards", pairs, timed, 3, True),
+        ("a gate with no duration and no default", pairs, untimed, 2, False),
         (
             "the same gate with a default",
-            gates,
+            pairs,
             {**untimed, "default_seconds": 60},
             2,
             True,
         ),
-        # five 100 s gates over 4 shards: one shard carries 200 s, over max(1.25 x 125, 100)
+        # five one-fault 100 s gates over 4 shards: one shard carries 200 s, over max(1.25 x 125, 100)
         (
             "heaviest shard over the bound",
             five,
@@ -494,9 +632,18 @@ def _shard_balance_self_test(shard: ModuleType) -> list[str]:
             4,
             False,
         ),
+        # the same at 5 shards is balanced, until a 1-minute lane bound applies to its 1.7-minute lanes
+        ("one gate per shard", five, {"gates": {}, "default_seconds": 100}, 5, True),
+        (
+            "a shard over lane_bound_minutes",
+            five,
+            {"gates": {}, "default_seconds": 100, "lane_bound_minutes": 1.0},
+            5,
+            False,
+        ),
     ]
-    for name, case_gates, durations, total, should_pass in cases:
-        got = shard.balance_problems(case_gates, durations, total)
+    for name, case_pairs, durations, total, should_pass in cases:
+        got = shard.balance_problems(case_pairs, durations, total)
         print(f"shard balance: {name}: {got or 'balanced'}")
         if bool(got) == should_pass:
             failures.append(f"balance_problems when {name} -> {got}")

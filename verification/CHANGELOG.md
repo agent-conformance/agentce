@@ -3,6 +3,18 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.102.0
+
+- `VG-DEMO-SHARD-COVERAGE` (18.71e, changed). The demo lanes were dealt one whole gate at a time, so the heaviest
+  gate (up to 14 minutes) set the floor on a lane against the 20-minute job timeout. `./verification/run
+  --demo-fault <ID> --fault <N>` now runs only the named faults, and `shard.py` deals (gate, fault) pairs: a gate over
+  `max_chunk_seconds` is cut into runs of consecutive faults, the chunks go longest first to the lightest shard, and
+  `--dry-run` prints one `<gate> <fault>` line per pair. `--balance-check` also fails a shard over
+  `lane_bound_minutes`. The gate now checks that every registered fault lands in exactly one shard, both in the dealt
+  pairs and in the arguments handed to the runner, and that the runner runs only the selected faults and refuses
+  options a command would ignore. Three new seeded faults: a pair dealt twice, a pair left off the runner's command
+  line, and the runner ignoring `--fault`.
+
 ## 0.101.0
 
 - `VG-DEMO-SHARD-COVERAGE` (18.71b, changed). The demo-fault shards were dealt round-robin, so at 18 lanes one shard

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.101.0",
+  "suite_version": "0.102.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -17,8 +17,8 @@
       "timeout_s": 60,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "tools/ci_demo_coverage_check.py's --self-test confirms its comparator discriminates correct job-index/job-total wiring from a matrix-value-keyed, swallowed, conditional or under-checked invocation on either the demo-fault step or the quick job, that shard.py's own partition() assigns every gate to exactly one shard at two different totals, that balanced_partition() places every gate exactly once and balance_problems() flags an untimed gate only when no default_seconds applies and a heaviest shard over the larger of 1.25 times the mean and the longest gate, then the real run confirms .github/workflows/verification.yml's demo-fault job's step invokes verification/shard.py with exactly strategy.job-index and strategy.job-total, that quick's step is an exact match for its canonical dependency-check run text with needs/if/continue-on-error wired correctly on both jobs, and that the workflow root carries only name, on, permissions and jobs (no root env: such as BASH_ENV, no defaults); and for the quick tier: the self-test shows shard.py's quick_ids() keeps only quick-tier gates in registry order and its run_slice() exits 1 when any gate's run exits non-zero (1 or 2) and 0 only when all exit 0, the real run confirms the quick-tier job is exactly checkout, the setup action and shard.py --quick with strategy.job-index and strategy.job-total, quick needs and checks quick-tier, no build step runs a whole tier, and the quick tier partition assigns every quick-tier gate to exactly one shard at two totals; and for the demo shards: balanced_partition() over the real --list and verification/demo-durations.json assigns every gate to exactly one shard at two totals, balance_problems() finds nothing at the workflow's demo-fault lane count, and shard.py --dry-run <i> <lanes>, run as a subprocess the way the demo-fault job runs it, prints exactly balanced_partition()'s slice for every shard",
-        "fail": "the self-test's comparator fails to discriminate any of the bad cases, shard.py's partition() drops or duplicates a gate, or the real run finds the demo-fault job's step not wired to strategy.job-index/strategy.job-total, quick's step not an exact match for its canonical run text, continue-on-error/a stray if: on either job or step, or a workflow-root key outside name, on, permissions and jobs, or for the quick tier: quick_ids() or run_slice() misjudges a self-test case, the quick-tier job's steps or wiring differ, quick does not need and check quick-tier, a build step runs a whole tier, or the quick tier partition drops or duplicates a gate, or for the demo shards: balanced_partition() drops or duplicates a gate, balance_problems() misjudges a self-test case or finds a problem at the workflow's lane count, or a --dry-run slice differs from balanced_partition()'s"
+        "pass": "tools/ci_demo_coverage_check.py's --self-test confirms its comparator discriminates correct job-index/job-total wiring from a matrix-value-keyed, swallowed, conditional or under-checked invocation on either the demo-fault step or the quick job, that shard.py's own partition() assigns every gate to exactly one shard at two different totals, that balanced_partition() places every gate exactly once and balance_problems() flags an untimed gate only when no default_seconds applies and a heaviest shard over the larger of 1.25 times the mean and the longest gate, then the real run confirms .github/workflows/verification.yml's demo-fault job's step invokes verification/shard.py with exactly strategy.job-index and strategy.job-total, that quick's step is an exact match for its canonical dependency-check run text with needs/if/continue-on-error wired correctly on both jobs, and that the workflow root carries only name, on, permissions and jobs (no root env: such as BASH_ENV, no defaults); and for the quick tier: the self-test shows shard.py's quick_ids() keeps only quick-tier gates in registry order and its run_slice() exits 1 when any gate's run exits non-zero (1 or 2) and 0 only when all exit 0, the real run confirms the quick-tier job is exactly checkout, the setup action and shard.py --quick with strategy.job-index and strategy.job-total, quick needs and checks quick-tier, no build step runs a whole tier, and the quick tier partition assigns every quick-tier gate to exactly one shard at two totals; and for the demo shards: every registered fault of every --list gate, as a (gate, fault) pair, lands in exactly one shard at two totals and at the workflow's lane count, both in balanced_partition() and in the --fault arguments demo_args() hands the runner, balance_problems() finds nothing at the workflow's demo-fault lane count, and shard.py --dry-run <i> <lanes>, run as a subprocess the way the demo-fault job runs it, prints exactly balanced_partition()'s slice for every shard; and ./verification/run --demo-fault <ID> --fault <N> on a throwaway registry runs only fault N and refuses a bad index, a repeated index, --fault without --demo-fault, --demo-reject without --lint-registry, --json with --list or --lint-registry, and two commands at once, each by its message key",
+        "fail": "the self-test's comparator fails to discriminate any of the bad cases, shard.py's partition() drops or duplicates a gate, or the real run finds the demo-fault job's step not wired to strategy.job-index/strategy.job-total, quick's step not an exact match for its canonical run text, continue-on-error/a stray if: on either job or step, or a workflow-root key outside name, on, permissions and jobs, or for the quick tier: quick_ids() or run_slice() misjudges a self-test case, the quick-tier job's steps or wiring differ, quick does not need and check quick-tier, a build step runs a whole tier, or the quick tier partition drops or duplicates a gate, or for the demo shards: balanced_partition() drops or duplicates a gate, balance_problems() misjudges a self-test case or finds a problem at the workflow's lane count, or a --dry-run slice differs from balanced_partition()'s, or a (gate, fault) pair is dropped or dealt twice in the dealt pairs or the runner's arguments, or the runner demos faults it was not asked for or accepts an option the command would ignore"
       },
       "faults": [
         {
@@ -60,8 +60,8 @@
         {
           "description": "shard.py's slice runner counts only exit code 1 as a failure, so a gate that exits 2 (a usage or unknown-gate error) passes its shard",
           "file": "verification/shard.py",
-          "search": "failed = [gate for gate in gates if run(gate) != 0]",
-          "replace": "failed = [gate for gate in gates if run(gate) == 1]"
+          "search": "failed = [item for item in items if run(item) != 0]",
+          "replace": "failed = [item for item in items if run(item) == 1]"
         },
         {
           "description": "shard.py's slice runner reports failures but exits 0, so a failing quick gate leaves its shard and the required check green",
@@ -76,28 +76,46 @@
           "replace": "return [gate[\"id\"] for gate in registry[\"gates\"]]"
         },
         {
-          "description": "balanced_partition() leaves the last gate in --list out of every shard, so that gate's seeded-fault demo never runs again",
+          "description": "balanced_partition() leaves the last (gate, fault) pair out of every shard, so the last gate's last seeded fault is never demoed again",
           "file": "verification/shard.py",
-          "search": "    return balanced_shards(gates, total, durations)[index]\n",
-          "replace": "    mine = balanced_shards(gates, total, durations)[index]\n    return [gate for gate in mine if gate != gates[-1]]\n"
+          "search": "        for chunk in balanced_shards(pairs, total, durations)[index]\n        for pair in chunk\n    ]\n",
+          "replace": "        for chunk in balanced_shards(pairs, total, durations)[index]\n        for pair in chunk\n        if pair != pairs[-1]\n    ]\n"
         },
         {
-          "description": "balanced_shards() deals the gates round-robin again instead of longest first to the lightest shard, so one demo shard carries 20 minutes against the job's 20-minute timeout",
+          "description": "balanced_shards() deals the chunks round-robin again instead of longest first to the lightest shard, so the heavy chunks pile onto a few demo shards and one runs past the lane bound against the job timeout",
           "file": "verification/shard.py",
-          "search": "    for gate in sorted(gates, key=lambda gate: -_seconds(gate, durations)):\n        lightest = loads.index(min(loads))\n",
-          "replace": "    for position, gate in enumerate(gates):\n        lightest = position % total\n"
+          "search": "    for chunk, seconds in sorted(_costed_chunks(pairs, durations), key=lambda c: -c[1]):\n        lightest = loads.index(min(loads))\n",
+          "replace": "    for position, (chunk, seconds) in enumerate(_costed_chunks(pairs, durations)):\n        lightest = position % total\n"
         },
         {
           "description": "balance_problems() never looks for an untimed gate, so a gate added with no recorded duration and no default_seconds counts as 0 seconds and the check still passes",
           "file": "verification/shard.py",
-          "search": "        untimed = [gate for gate in gates if gate not in durations[\"gates\"]]\n",
+          "search": "        untimed = sorted({gate for gate, _ in pairs if gate not in durations[\"gates\"]})\n",
           "replace": "        untimed: list[str] = []\n"
         },
         {
-          "description": "main()'s demo path deals with round-robin partition() while balanced_partition() stays correct, so every function-level check passes but CI runs unbalanced shards",
+          "description": "main()'s demo path deals the chunks round-robin while balanced_shards() stays correct, so every function-level check passes but CI runs unbalanced shards",
           "file": "verification/shard.py",
-          "search": "        else balanced_partition(gates, shard, total, load_durations())\n",
-          "replace": "        else partition(gates, shard, total)\n"
+          "search": "    chunks = balanced_shards(pairs, total, load_durations())[shard]\n",
+          "replace": "    chunks = demo_chunks(pairs, load_durations())[shard::total]\n"
+        },
+        {
+          "file": "verification/shard.py",
+          "search": "            chunks.append(faults[start:end])\n",
+          "replace": "            chunks.append(faults[max(start - 1, 0) : end])\n",
+          "description": "demo_chunks() starts each later chunk of a cut gate one fault early, so that fault is dealt to two shards and demoed twice while the coverage looks complete gate by gate"
+        },
+        {
+          "file": "verification/shard.py",
+          "search": "*(f\"--fault={fault}\" for _, fault in chunk)",
+          "replace": "*(f\"--fault={fault}\" for _, fault in chunk[:-1])",
+          "description": "demo_args() leaves each chunk's last fault off the ./verification/run command line, so the dry-run slices still cover every pair but CI never demos those faults"
+        },
+        {
+          "file": "verification/run",
+          "search": "faults = [gate[\"faults\"][index] for index in chosen or range(len(gate[\"faults\"]))]",
+          "replace": "faults = list(gate[\"faults\"])",
+          "description": "./verification/run --demo-fault ignores --fault and demos every fault of the gate, so each chunk of a cut gate repeats the whole gate's demo and the lanes run far past their estimates"
         }
       ],
       "fix_hint": "run verification/gates/ci_demo_coverage.sh and read which wiring problem it found; the step is .github/workflows/verification.yml's jobs.demo-fault's 'This shard's seeded-fault demos' step, checked by tools/ci_demo_coverage_check.py."

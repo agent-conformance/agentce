@@ -14,13 +14,16 @@ from `agentce verify`, which checks a report's signature and integrity.
 ./verification/run --full                   # every gate
 ./verification/run --gate VG-SUITE-SELFTEST # one gate
 ./verification/run --demo-fault VG-SUITE-SELFTEST
+./verification/run --demo-fault VG-SUITE-SELFTEST --fault 1   # only the gate's second seeded fault
 ./verification/run --lint-registry
 ./verification/run --quick --json           # machine-readable results (see results.schema.json)
 ```
 
 It needs Python 3 for the runner itself, plus whatever a gate lists under `requires` (for example `uv`). A gate
 whose tool is missing is reported as `skipped` with the reason, never as `pass`. Exit codes: 0 no gate failed,
-1 a gate failed or the registry was rejected, 2 the command named a gate that does not exist.
+1 a gate failed or the registry was rejected, 2 the command line was refused: a gate or fault that does not exist,
+two commands at once, or an option the command does not use (`--fault` without `--demo-fault`, `--json` with
+`--list` or `--lint-registry`, `--demo-reject` without `--lint-registry`). Each refusal names its message key.
 
 ## What a gate is
 
@@ -52,19 +55,24 @@ results are added as the suite grows, and every change to a gate is recorded in 
 
 ## Demo shard durations
 
-CI runs every gate's seeded-fault demo across the `demo-fault` matrix. `verification/shard.py` gives the gates to
-the shards longest first, each to the shard with the least work so far, using the seconds recorded per gate in
-[`demo-durations.json`](demo-durations.json). A gate with no recorded seconds counts as `default_seconds` (300,
-about twice the mean demo), so a new gate is treated as heavy until it is timed. To see the estimate for a lane
-count:
+CI runs every seeded fault of every gate across the `demo-fault` matrix. The unit of work is one (gate, fault) pair.
+`verification/shard.py` reads the seconds recorded per gate in [`demo-durations.json`](demo-durations.json) and
+splits them evenly over the gate's fault runs and its one restore run. A gate whose seconds are over
+`max_chunk_seconds` (240) is cut into runs of consecutive faults, each run costing its faults plus one restore. These
+chunks go to the shards longest first, each to the shard with the least work so far, and a shard runs
+`./verification/run --demo-fault <ID> --fault=<n> ...` once per chunk. A gate with no recorded seconds counts as
+`default_seconds` (300, about twice the mean demo), so a new gate is treated as heavy until it is timed. To see the
+estimate for a lane count, or the pairs one shard runs:
 
 ```
 python3 verification/shard.py --balance-check 24
+python3 verification/shard.py --dry-run 0 24      # one "<gate> <fault>" line per pair
 ```
 
-It prints each shard's estimated minutes and exits 1 when a gate has no recorded seconds and no `default_seconds`
-is set, or when the heaviest shard is over the larger of 1.25 times the mean and the longest single gate.
-VG-DEMO-SHARD-COVERAGE runs the same check at the workflow's lane count.
+The balance check prints each shard's estimated minutes. It exits 1 when a gate has no recorded seconds and no
+`default_seconds` is set, when the heaviest shard is over the larger of 1.25 times the mean and the longest chunk,
+or when any shard is over `lane_bound_minutes` (12.0). VG-DEMO-SHARD-COVERAGE runs the same check at the workflow's
+lane count.
 
 The estimates are the longest time each gate took in the CI runs named under `source` and leave out each job's setup (a minute or two).
 The same gate can take half or twice as long from one run to the next, depending on the machine a job gets, so
@@ -75,9 +83,11 @@ finished, then:
 gh run view <run-id> --log > run.log
 ```
 
-For each demo-fault job, a gate's seconds are the gap between its `RED on the seeded fault` line and the previous
-one in the same job (the first gate from the start of the job's "This shard's seeded-fault demos" step). Write the
-longest over the runs under `gates` and list each run, attempt and commit under `source`.
+For each demo-fault job, a chunk's seconds are the gap between its `RED on the seeded fault` line and the previous
+one in the same job (the first chunk from the start of the job's "This shard's seeded-fault demos" step). A gate cut
+into k chunks over n faults ran k restores instead of one, so its seconds are the sum of its chunks' times multiplied
+by (n + 1) / (n + k). Write the longest over the runs under `gates` and list each run, attempt and commit under
+`source`.
 
 ## Adding a gate
 

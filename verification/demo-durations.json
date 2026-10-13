@@ -1,5 +1,5 @@
 {
-  "_description": "Seconds each gate's seeded-fault demo took in CI, read by verification/shard.py to balance the demo-fault shards (longest first, to the lightest shard). Refresh steps: verification/README.md, 'Demo shard durations'.",
+  "_description": "Seconds each gate's seeded-fault demo took in CI, read by verification/shard.py to balance the demo-fault shards: each gate's seconds are split evenly over its fault runs and its restore run, a gate over max_chunk_seconds is cut into runs of consecutive faults, and the chunks go longest first to the lightest shard; balance-check fails a shard over lane_bound_minutes. Refresh steps: verification/README.md, 'Demo shard durations'.",
   "source": {
     "runs": [
       {
@@ -22,6 +22,8 @@
     "combined": "the longest of the runs, in whole seconds, so a gate's estimate covers the slowest job it has had (the same gate took half or twice as long from one run to the next); VG-BYO-CATALOG-PARITY and VG-BYO-CATALOG-WALK are timed from run 38382574593 only, the first after the split"
   },
   "default_seconds": 300,
+  "max_chunk_seconds": 240,
+  "lane_bound_minutes": 12.0,
   "gates": {
     "VG-DEMO-SHARD-COVERAGE": 4,
     "VG-CRYPTO-INTEL-WHEEL": 2,
