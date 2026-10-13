@@ -21,6 +21,7 @@ import { CATALOG_SIGNATURE_NAME } from "./verify";
 const EVIDENCE_SHAPE_UNRESOLVED = "catalog.evidence_shape.unresolved";
 const SHAPE_UNRESOLVED = "catalog.shape.unresolved";
 const MIN_SOURCE_CLASS_UNKNOWN = "catalog.control.min_source_class_unknown";
+const SOURCE_CLASS_FROM_UNKNOWN = "catalog.control.source_class_from_unknown";
 
 export interface ControlSpec {
   id: string;
@@ -109,16 +110,28 @@ function minSourceClass(controlId: string, evaluation: unknown): string {
   );
 }
 
-/** The named `source_class_from` links, distinct and byte-sorted; anything else in the list is dropped. */
-function sourceClassFrom(evaluation: Record<string, unknown>): string[] {
-  const value = evaluation.source_class_from;
-  if (!Array.isArray(value)) {
+/** The named `source_class_from` links, distinct and byte-sorted. A value that is not a list of known link
+ * names is refused when the catalog loads, never dropped: a dropped link would judge the control on the focus
+ * record alone. */
+function sourceClassFrom(controlId: string, evaluation: Record<string, unknown>): string[] {
+  if (!("source_class_from" in evaluation)) {
     return [];
   }
-  const names = value.filter(
-    (name): name is string => typeof name === "string" && SOURCE_CLASS_FROM.has(name),
+  const value = evaluation.source_class_from;
+  if (
+    Array.isArray(value) &&
+    value.every((name) => typeof name === "string" && SOURCE_CLASS_FROM.has(name))
+  ) {
+    return [...new Set(value as string[])].sort(byteCompare);
+  }
+  throw new InputError(
+    SOURCE_CLASS_FROM_UNKNOWN,
+    formatTemplate(errorCause(SOURCE_CLASS_FROM_UNKNOWN), {
+      control: controlId,
+      value: pyJsonDumps(value),
+    }),
+    errorFix(SOURCE_CLASS_FROM_UNKNOWN),
   );
-  return [...new Set(names)].sort(byteCompare);
 }
 
 function controlFromDict(data: Record<string, unknown>): ControlSpec {
@@ -160,7 +173,7 @@ function controlFromDict(data: Record<string, unknown>): ControlSpec {
       ? (data.test_cases as Array<Record<string, string>>)
       : [],
     raw: data,
-    sourceClassFrom: sourceClassFrom(evaluation),
+    sourceClassFrom: sourceClassFrom(id, evaluation),
   };
 }
 

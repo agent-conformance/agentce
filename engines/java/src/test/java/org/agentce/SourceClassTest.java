@@ -187,8 +187,24 @@ class SourceClassTest {
         // Its own independent_system class is not counted.
         assertEquals(0, judge(List.of(instruction(SR), decision)).judgedClass(iri("d1"), List.of("actsOn")).rank());
         assertEquals(1, judge(List.of(instruction(EP), decision)).judgedClass(iri("d1"), List.of("actsOn")).rank());
+    }
+
+    @Test
+    void aDecisionThatReachesNothingIsJudgedThroughItsCallsOrAsSelfReport() {
         ObjectNode lone = event("d2", "Decision", SR, "\"decision_type\": \"dom:CreditDecision\"");
-        assertNull(judge(List.of(lone)).judgedClass(iri("d2"), List.of("actsOn")));
+        SourceClass.Judged judged = judge(List.of(lone)).judgedClass(iri("d2"), List.of("actsOn"));
+        assertEquals(0, judged.rank());
+        assertEquals(List.of("Decision"), judged.lowest());
+        String tool = "\"agent\": {\"id\": \"" + SUBJECT + "\"}, "
+                + "\"tool\": {\"name\": \"lookup\", \"protocol\": \"native\"}, \"effect_class\": \"read\", ";
+        ObjectNode executes = event("tc1", "ToolCall", EP, tool
+                + "\"refs\": {\"instruction\": \"" + iri("i1") + "\", \"decision\": \"" + iri("d2") + "\"}");
+        assertEquals(1, judge(List.of(instruction(EP), lone, executes)).judgedClass(iri("d2"), List.of("actsOn")).rank());
+        assertEquals(0, judge(List.of(instruction(SR), lone, executes)).judgedClass(iri("d2"), List.of("actsOn")).rank());
+        ObjectNode bare = event("tc1", "ToolCall", EP, tool + "\"refs\": {\"decision\": \"" + iri("d2") + "\"}");
+        judged = judge(List.of(lone, bare)).judgedClass(iri("d2"), List.of("actsOn"));
+        assertEquals(0, judged.rank());
+        assertEquals(List.of("Decision"), judged.lowest());
     }
 
     @Test
@@ -353,6 +369,32 @@ class SourceClassTest {
         assertEquals("control CND-05 declares min_source_class " + shown + ", which is not a source class: the value "
                 + "must be exactly self_report, enforcement_point or independent_system (SPEC §6.4), so the engine "
                 + "could not tell which records the control accepts.", error.reason);
+    }
+
+    static Stream<Arguments> unknownSourceClassFrom() {
+        return Stream.of(
+                Arguments.of("case", "source_class_from: [actson]", "[\"actson\"]"),
+                Arguments.of("string", "source_class_from: actsOn", "\"actsOn\""),
+                Arguments.of("unknown", "source_class_from: [parent]", "[\"parent\"]"),
+                Arguments.of("null", "source_class_from: null", "null"),
+                Arguments.of("number", "source_class_from: [actsOn, 1]", "[\"actsOn\", 1]"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("unknownSourceClassFrom")
+    void anUnknownSourceClassFromIsRefusedAtLoad(String name, String line, String shown, @TempDir Path tmp)
+            throws IOException {
+        Path catalogDir = tmp.resolve("conduct");
+        copyTree(CATALOGS.resolve("overlays/conduct"), catalogDir);
+        Path control = catalogDir.resolve("controls/CND-05.yaml");
+        String text = Files.readString(control, StandardCharsets.UTF_8);
+        String changed = text.replace("  source_class_from: [actsOn]\n", "  " + line + "\n");
+        assertFalse(changed.equals(text));
+        Files.writeString(control, changed, StandardCharsets.UTF_8);
+        InputError error = assertThrows(InputError.class, () -> Catalog.load(catalogDir));
+        assertEquals("catalog.control.source_class_from_unknown", error.key);
+        assertEquals(3, error.exitCode);
+        assertTrue(error.reason.startsWith("control CND-05 declares source_class_from " + shown + ", "), error.reason);
     }
 
     @Test

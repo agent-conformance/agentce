@@ -251,22 +251,40 @@ export class SourceClassJudge {
     return [this.ownRank(node), typeOf(event) || kind];
   }
 
-  /** The lowest class the judgment of `focus` rests on; null when nothing contributes (a Decision with no
-   * record through any named link: there is no record the judgment rests on to hold to a class).
-   * `sourceClassFrom` holds distinct {@link SOURCE_CLASS_FROM} names, sorted (as the catalog stores them). */
-  judgedClass(focus: string, sourceClassFrom: Iterable<string>): Judged | null {
-    const contributors: Array<[number, string]> = [];
-    const event = this.events.get(focus);
-    if (event === undefined || typeOf(event) !== "Decision") {
-      contributors.push([this.ownRank(focus), event !== undefined ? typeOf(event) : ""]);
-    }
+  /** The ranks of the records one named link from `focus`. */
+  private reached(focus: string, sourceClassFrom: Iterable<string>): Array<[number, string]> {
+    const ranks: Array<[number, string]> = [];
     for (const name of sourceClassFrom) {
       for (const node of this.store.objects(focus, `agentce:${name}`)) {
-        contributors.push(this.attestedRank(focus, node, SOURCE_CLASS_FROM.get(name) as string));
+        ranks.push(this.attestedRank(focus, node, SOURCE_CLASS_FROM.get(name) as string));
       }
     }
-    if (contributors.length === 0) {
-      return null;
+    return ranks;
+  }
+
+  /** The lowest class the judgment of `focus` rests on. A Decision is self_report by nature (§7.7.5), so it
+   * rests on what it reaches through the named links, or failing those on what the ToolCalls executing it
+   * reach; a Decision that reaches nothing either way rests on its own record, self_report.
+   * `sourceClassFrom` holds distinct {@link SOURCE_CLASS_FROM} names, sorted (as the catalog stores them). */
+  judgedClass(focus: string, sourceClassFrom: readonly string[]): Judged {
+    const event = this.events.get(focus);
+    let contributors: Array<[number, string]>;
+    if (event !== undefined && typeOf(event) === "Decision") {
+      contributors = this.reached(focus, sourceClassFrom);
+      for (const call of [...this.store.subjects("agentce:executes", focus)].sort(byteCompare)) {
+        if (contributors.length > 0) {
+          break;
+        }
+        contributors = this.reached(call, sourceClassFrom);
+      }
+      if (contributors.length === 0) {
+        contributors = [[0, "Decision"]];
+      }
+    } else {
+      contributors = [
+        [this.ownRank(focus), event !== undefined ? typeOf(event) : ""],
+        ...this.reached(focus, sourceClassFrom),
+      ];
     }
     const rank = Math.min(...contributors.map(([r]) => r));
     const lowest = new Set(contributors.filter(([r]) => r === rank).map(([, t]) => t));
@@ -290,7 +308,7 @@ export function belowMinimum(
   }
   for (const focus of [...foci].sort(byteCompare)) {
     const judged = judge().judgedClass(focus, sourceClassFrom);
-    if (judged !== null && judged.rank < floor) {
+    if (judged.rank < floor) {
       below.push(focus);
       for (const kind of judged.lowest) {
         kinds.add(kind);

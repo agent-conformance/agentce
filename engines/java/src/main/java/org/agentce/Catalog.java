@@ -38,6 +38,7 @@ public final class Catalog {
     private static final String EVIDENCE_SHAPE_UNRESOLVED = "catalog.evidence_shape.unresolved";
     private static final String SHAPE_UNRESOLVED = "catalog.shape.unresolved";
     private static final String MIN_SOURCE_CLASS_UNKNOWN = "catalog.control.min_source_class_unknown";
+    private static final String SOURCE_CLASS_FROM_UNKNOWN = "catalog.control.source_class_from_unknown";
 
     private Catalog(
             String id,
@@ -160,17 +161,33 @@ public final class Catalog {
     }
 
     /** The named {@code source_class_from} links, distinct and byte-sorted; anything else in the list is dropped. */
-    private static List<String> sourceClassFrom(JsonNode evaluation) {
+    /** The named {@code source_class_from} links, distinct and byte-sorted. A value that is not a list of known
+     * link names is refused when the catalog loads, never dropped: a dropped link would judge the control on the
+     * focus record alone. */
+    private static List<String> sourceClassFrom(String controlId, JsonNode evaluation) {
         Set<String> names = new java.util.TreeSet<>(Json::byteCompare);
         JsonNode value = evaluation.get("source_class_from");
-        if (value != null && value.isArray()) {
+        if (value == null) {
+            return new ArrayList<>(names);
+        }
+        if (value.isArray()) {
             for (JsonNode name : value) {
-                if (name.isTextual() && SourceClass.FROM.containsKey(name.textValue())) {
-                    names.add(name.textValue());
+                if (!name.isTextual() || !SourceClass.FROM.containsKey(name.textValue())) {
+                    names = null;
+                    break;
                 }
+                names.add(name.textValue());
+            }
+            if (names != null) {
+                return new ArrayList<>(names);
             }
         }
-        return new ArrayList<>(names);
+        throw new InputError(
+                SOURCE_CLASS_FROM_UNKNOWN,
+                ErrorCatalogue.errorCause(SOURCE_CLASS_FROM_UNKNOWN)
+                        .replace("{control}", controlId)
+                        .replace("{value}", pyDumps(value)),
+                ErrorCatalogue.errorFix(SOURCE_CLASS_FROM_UNKNOWN));
     }
 
     private static ControlSpec controlFromDict(JsonNode data) {
@@ -197,7 +214,7 @@ public final class Catalog {
         control.rung = Integer.parseInt(text(evaluation, "rung", "0"));
         control.severity = text(data, "severity", "");
         control.minSourceClass = minSourceClass;
-        control.sourceClassFrom = sourceClassFrom(evaluation);
+        control.sourceClassFrom = sourceClassFrom(text(data, "id", ""), evaluation);
         JsonNode minEvidence = evaluation.get("minimum_evidence");
         if (minEvidence != null && minEvidence.isArray()) {
             minEvidence.forEach(control.minimumEvidence::add);

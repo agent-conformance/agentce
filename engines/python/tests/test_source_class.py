@@ -146,14 +146,14 @@ def test_the_class_order_is_the_spec_order_and_anything_else_ranks_lowest() -> N
 def test_judged_class_is_the_lowest_of_the_focus_and_what_it_acts_on() -> None:
     focus = event_iri("tc1")
     judged = _judge([_instruction(cls=SR), _call()]).judged_class(focus, ["actsOn"])
-    assert judged is not None and judged.rank == 0 and judged.lowest == ("Instruction",)
+    assert judged.rank == 0 and judged.lowest == ("Instruction",)
     judged = _judge([_instruction(), _call()]).judged_class(focus, ["actsOn"])
-    assert judged is not None and judged.rank == 1
+    assert judged.rank == 1
     judged = _judge([_instruction(), _call(cls=SR)]).judged_class(focus, ["actsOn"])
-    assert judged is not None and judged.rank == 0 and judged.lowest == ("ToolCall",)
+    assert judged.rank == 0 and judged.lowest == ("ToolCall",)
     # Without source_class_from only the focus's own class counts.
     judged = _judge([_instruction(cls=SR), _call()]).judged_class(focus, [])
-    assert judged is not None and judged.rank == 1
+    assert judged.rank == 1
 
 
 def test_a_decision_counts_only_what_it_rests_on() -> None:
@@ -166,22 +166,41 @@ def test_a_decision_counts_only_what_it_rests_on() -> None:
     )
     judge = _judge([_instruction(cls=SR), decision])
     judged = judge.judged_class(event_iri("d1"), ["actsOn"])
-    assert (
-        judged is not None and judged.rank == 0
-    )  # its own independent_system class is not counted
+    assert judged.rank == 0  # its own independent_system class is not counted
     judged = _judge([_instruction(), decision]).judged_class(
         event_iri("d1"), ["actsOn"]
     )
-    assert judged is not None and judged.rank == 1
+    assert judged.rank == 1
+
+
+def test_a_decision_that_reaches_nothing_is_judged_through_its_calls_or_as_self_report() -> (
+    None
+):
+    """A Decision naming no instruction rests on what the calls executing it act on; with none, on its own
+    self_report record, so leaving its link out never reads better than naming a self_report instruction."""
     lone = _event("d2", "Decision", SR, decision_type="dom:CreditDecision")
-    assert _judge([lone]).judged_class(event_iri("d2"), ["actsOn"]) is None
+    judged = _judge([lone]).judged_class(event_iri("d2"), ["actsOn"])
+    assert (judged.rank, judged.lowest) == (0, ("Decision",))
+    executes = _call(decision=event_iri("d2"))
+    judged = _judge([_instruction(), lone, executes]).judged_class(
+        event_iri("d2"), ["actsOn"]
+    )
+    assert judged.rank == 1
+    judged = _judge([_instruction(cls=SR), lone, executes]).judged_class(
+        event_iri("d2"), ["actsOn"]
+    )
+    assert judged.rank == 0
+    bare = _call(decision=event_iri("d2"))
+    del bare["data"]["refs"]["instruction"]
+    judged = _judge([lone, bare]).judged_class(event_iri("d2"), ["actsOn"])
+    assert (judged.rank, judged.lowest) == (0, ("Decision",))
 
 
 def test_an_unattested_independent_system_instruction_counts_as_self_report() -> None:
     judged = _judge([_instruction(cls=IS), _call()]).judged_class(
         event_iri("tc1"), ["actsOn"]
     )
-    assert judged is not None and judged.rank == 0
+    assert judged.rank == 0
 
 
 # --- attestation (i)-(iv) --------------------------------------------------------------------------------------
@@ -354,6 +373,35 @@ def test_an_unknown_minimum_is_refused_at_load_and_lint(
     assert int(excinfo.value.exit_code) == 3
     assert "CND-05" in excinfo.value.cause and shown in excinfo.value.cause
     assert [p.split(":")[0] for p in lint_catalog(catalog_dir)] == [key]
+
+
+@pytest.mark.parametrize(
+    ("line", "shown"),
+    [
+        ("source_class_from: [actson]", '["actson"]'),
+        ("source_class_from: actsOn", '"actsOn"'),
+        ("source_class_from: [parent]", '["parent"]'),
+        ("source_class_from: null", "null"),
+        ("source_class_from: [actsOn, 1]", '["actsOn", 1]'),
+    ],
+    ids=["case", "string", "unknown", "null", "number"],
+)
+def test_an_unknown_source_class_from_is_refused_at_load(
+    tmp_path: Path, line: str, shown: str
+) -> None:
+    catalog_dir = tmp_path / "conduct"
+    shutil.copytree(_CATALOGS / "overlays" / "conduct", catalog_dir)
+    control = catalog_dir / "controls" / "CND-05.yaml"
+    text = control.read_text(encoding="utf-8")
+    control.write_text(
+        text.replace("  source_class_from: [actsOn]\n", f"  {line}\n"),
+        encoding="utf-8",
+    )
+    with pytest.raises(InputError) as excinfo:
+        load_catalog(catalog_dir)
+    assert excinfo.value.key == "catalog.control.source_class_from_unknown"
+    assert int(excinfo.value.exit_code) == 3
+    assert "CND-05" in excinfo.value.cause and shown in excinfo.value.cause
 
 
 def test_every_bundled_and_spec_catalog_declares_a_known_minimum() -> None:

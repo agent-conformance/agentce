@@ -161,13 +161,13 @@ test("the judged class is the lowest of the focus and what it acts on", () => {
     rank: 0,
     lowest: ["Instruction"],
   });
-  assert.equal(judge([instruction(), call()]).judgedClass(focus, ["actsOn"])?.rank, 1);
+  assert.equal(judge([instruction(), call()]).judgedClass(focus, ["actsOn"]).rank, 1);
   assert.deepEqual(judge([instruction(), call(SR)]).judgedClass(focus, ["actsOn"]), {
     rank: 0,
     lowest: ["ToolCall"],
   });
   // Without source_class_from only the focus's own class counts.
-  assert.equal(judge([instruction({ cls: SR }), call()]).judgedClass(focus, [])?.rank, 1);
+  assert.equal(judge([instruction({ cls: SR }), call()]).judgedClass(focus, []).rank, 1);
 });
 
 test("a decision counts only what it rests on", () => {
@@ -177,17 +177,42 @@ test("a decision counts only what it rests on", () => {
   });
   // Its own independent_system class is not counted.
   assert.equal(
-    judge([instruction({ cls: SR }), decision]).judgedClass(eventIri("d1"), ["actsOn"])?.rank,
+    judge([instruction({ cls: SR }), decision]).judgedClass(eventIri("d1"), ["actsOn"]).rank,
     0,
   );
-  assert.equal(judge([instruction(), decision]).judgedClass(eventIri("d1"), ["actsOn"])?.rank, 1);
+  assert.equal(judge([instruction(), decision]).judgedClass(eventIri("d1"), ["actsOn"]).rank, 1);
+});
+
+test("a decision that reaches nothing is judged through its calls or as self_report", () => {
   const lone = event("d2", "Decision", SR, { decision_type: "dom:CreditDecision" });
-  assert.equal(judge([lone]).judgedClass(eventIri("d2"), ["actsOn"]), null);
+  assert.deepEqual(judge([lone]).judgedClass(eventIri("d2"), ["actsOn"]), {
+    rank: 0,
+    lowest: ["Decision"],
+  });
+  const executes = call(EP, { decision: eventIri("d2") });
+  assert.equal(
+    judge([instruction(), lone, executes]).judgedClass(eventIri("d2"), ["actsOn"]).rank,
+    1,
+  );
+  assert.equal(
+    judge([instruction({ cls: SR }), lone, executes]).judgedClass(eventIri("d2"), ["actsOn"]).rank,
+    0,
+  );
+  const bare = event("tc1", "ToolCall", EP, {
+    agent: { id: SUBJECT },
+    tool: { name: "lookup", protocol: "native" },
+    effect_class: "read",
+    refs: { decision: eventIri("d2") },
+  });
+  assert.deepEqual(judge([lone, bare]).judgedClass(eventIri("d2"), ["actsOn"]), {
+    rank: 0,
+    lowest: ["Decision"],
+  });
 });
 
 test("an unattested independent_system instruction counts as self_report", () => {
   assert.equal(
-    judge([instruction({ cls: IS }), call()]).judgedClass(eventIri("tc1"), ["actsOn"])?.rank,
+    judge([instruction({ cls: IS }), call()]).judgedClass(eventIri("tc1"), ["actsOn"]).rank,
     0,
   );
 });
@@ -338,6 +363,38 @@ test("an unknown minimum is refused at catalog load", () => {
           err.exitCode === 3 &&
           err.cause.includes("CND-05") &&
           err.cause.includes(`min_source_class ${shown},`),
+        name,
+      );
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("an unknown source_class_from is refused at load", () => {
+  const cases: Array<[string, string, string]> = [
+    ["case", "source_class_from: [actson]", '["actson"]'],
+    ["string", "source_class_from: actsOn", '"actsOn"'],
+    ["unknown", "source_class_from: [parent]", '["parent"]'],
+    ["null", "source_class_from: null", "null"],
+    ["number", "source_class_from: [actsOn, 1]", '["actsOn", 1]'],
+  ];
+  const root = mkdtempSync(join(tmpdir(), "agentce-class-from-"));
+  try {
+    for (const [name, line, shown] of cases) {
+      const dir = join(root, name);
+      cpSync(join(CATALOGS, "overlays", "conduct"), dir, { recursive: true });
+      const path = join(dir, "controls", "CND-05.yaml");
+      const text = readFileSync(path, "utf-8");
+      writeFileSync(path, text.replace("  source_class_from: [actsOn]\n", `  ${line}\n`));
+      assert.throws(
+        () => loadCatalog(dir),
+        (err: unknown) =>
+          err instanceof InputError &&
+          err.key === "catalog.control.source_class_from_unknown" &&
+          err.exitCode === 3 &&
+          err.cause.includes("CND-05") &&
+          err.cause.includes(`source_class_from ${shown},`),
         name,
       );
     }

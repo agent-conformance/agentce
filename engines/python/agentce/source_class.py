@@ -3,7 +3,8 @@
 Every control declares ``evaluation.min_source_class``. An assertion meets it only when every applicable focus
 does: :func:`judged_class` is the lowest class among the focus's own record (left out for a Decision, which is the
 agent's own account by nature, §7.7.5) and the records one hop away through each predicate the control names in
-``evaluation.source_class_from``. A record's class is its own ``agentcesourceclass``, except for an Instruction,
+``evaluation.source_class_from``; a Decision that reaches none is judged through the ToolCalls that execute it, and
+one that reaches nothing that way either is ``self_report``. A record's class is its own ``agentcesourceclass``, except for an Instruction,
 which counts as ``enforcement_point`` only when attested (:meth:`SourceClassJudge.attested`) and as
 ``self_report`` otherwise: an agent's own record that it was told something by the user is never taken as given.
 """
@@ -201,23 +202,33 @@ class SourceClassJudge:
             return (ep if self.attested(focus, node) else 0), "Instruction"
         return self._own_rank(node), _type(event) or kind
 
-    def judged_class(
+    def _reached(
         self, focus: str, source_class_from: Iterable[str]
-    ) -> Judged | None:
-        """The lowest class the judgment of ``focus`` rests on; ``None`` when nothing contributes (a Decision with
-        no record through any named link: there is no record the judgment rests on to hold to a class).
+    ) -> list[tuple[int, str]]:
+        """The ranks of the records one named link from ``focus``."""
+        return [
+            self._attested_rank(focus, node, SOURCE_CLASS_FROM[name])
+            for name in source_class_from
+            for node in self.store.objects(focus, f"agentce:{name}")
+        ]
+
+    def judged_class(self, focus: str, source_class_from: Iterable[str]) -> Judged:
+        """The lowest class the judgment of ``focus`` rests on. A Decision is self_report by nature (§7.7.5), so it
+        rests on what it reaches through the named links, or failing those on what the ToolCalls executing it
+        reach; a Decision that reaches nothing either way rests on its own record, self_report.
         ``source_class_from`` holds distinct :data:`SOURCE_CLASS_FROM` names, sorted (as the catalog stores them)."""
-        contributors: list[tuple[int, str]] = []
         event = self.events.get(focus)
-        if event is None or _type(event) != "Decision":
-            contributors.append((self._own_rank(focus), _type(event) if event else ""))
-        for name in source_class_from:
-            for node in self.store.objects(focus, f"agentce:{name}"):
-                contributors.append(
-                    self._attested_rank(focus, node, SOURCE_CLASS_FROM[name])
-                )
-        if not contributors:
-            return None
+        if event is not None and _type(event) == "Decision":
+            contributors = self._reached(focus, source_class_from)
+            for call in sorted(self.store.subjects("agentce:executes", focus)):
+                if contributors:
+                    break
+                contributors = self._reached(call, source_class_from)
+            if not contributors:
+                contributors = [(0, "Decision")]
+        else:
+            contributors = [(self._own_rank(focus), _type(event) if event else "")]
+            contributors += self._reached(focus, source_class_from)
         rank = min(r for r, _ in contributors)
         return Judged(rank, tuple(sorted({t for r, t in contributors if r == rank})))
 
@@ -237,7 +248,7 @@ def below_minimum(
         return below, ()
     for focus in sorted(foci):
         judged = judge().judged_class(focus, source_class_from)
-        if judged is not None and judged.rank < floor:
+        if judged.rank < floor:
             below.append(focus)
             kinds.update(judged.lowest)
     return below, tuple(sorted(kinds))

@@ -248,22 +248,41 @@ public final class SourceClass {
             return Map.entry(ownRank(node), t.isEmpty() ? kind : t);
         }
 
-        /** The lowest class the judgment of {@code focus} rests on; null when nothing contributes (a Decision with
-         * no record through any named link: there is no record the judgment rests on to hold to a class).
-         * {@code sourceClassFrom} holds distinct {@link #FROM} names, sorted (as the catalog stores them). */
-        public Judged judgedClass(String focus, List<String> sourceClassFrom) {
-            List<Map.Entry<Integer, String>> contributors = new ArrayList<>();
-            JsonNode event = events.get(focus);
-            if (event == null || !"Decision".equals(type(event))) {
-                contributors.add(Map.entry(ownRank(focus), event != null ? type(event) : ""));
-            }
+        /** The ranks of the records one named link from {@code focus}. */
+        private List<Map.Entry<Integer, String>> reached(String focus, List<String> sourceClassFrom) {
+            List<Map.Entry<Integer, String>> ranks = new ArrayList<>();
             for (String name : sourceClassFrom) {
                 for (String node : store.objects(focus, "agentce:" + name)) {
-                    contributors.add(attestedRank(focus, node, FROM.get(name)));
+                    ranks.add(attestedRank(focus, node, FROM.get(name)));
                 }
             }
-            if (contributors.isEmpty()) {
-                return null;
+            return ranks;
+        }
+
+        /** The lowest class the judgment of {@code focus} rests on. A Decision is self_report by nature (§7.7.5),
+         * so it rests on what it reaches through the named links, or failing those on what the ToolCalls executing
+         * it reach; a Decision that reaches nothing either way rests on its own record, self_report.
+         * {@code sourceClassFrom} holds distinct {@link #FROM} names, sorted (as the catalog stores them). */
+        public Judged judgedClass(String focus, List<String> sourceClassFrom) {
+            JsonNode event = events.get(focus);
+            List<Map.Entry<Integer, String>> contributors;
+            if (event != null && "Decision".equals(type(event))) {
+                contributors = reached(focus, sourceClassFrom);
+                List<String> calls = new ArrayList<>(store.subjects("agentce:executes", focus));
+                calls.sort(Json::byteCompare);
+                for (String call : calls) {
+                    if (!contributors.isEmpty()) {
+                        break;
+                    }
+                    contributors = reached(call, sourceClassFrom);
+                }
+                if (contributors.isEmpty()) {
+                    contributors = List.of(Map.entry(0, "Decision"));
+                }
+            } else {
+                contributors = new ArrayList<>();
+                contributors.add(Map.entry(ownRank(focus), event != null ? type(event) : ""));
+                contributors.addAll(reached(focus, sourceClassFrom));
             }
             int rank = contributors.stream().mapToInt(Map.Entry::getKey).min().getAsInt();
             Set<String> lowest = new TreeSet<>(Json::byteCompare);
@@ -290,7 +309,7 @@ public final class SourceClass {
         Set<String> kinds = new TreeSet<>(Json::byteCompare);
         for (String focus : sorted) {
             Judged judged = judge.get().judgedClass(focus, sourceClassFrom);
-            if (judged != null && judged.rank() < floor) {
+            if (judged.rank() < floor) {
                 below.add(focus);
                 kinds.addAll(judged.lowest());
             }

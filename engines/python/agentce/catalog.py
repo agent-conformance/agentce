@@ -37,6 +37,7 @@ _EVIDENCE_SHAPE_UNRESOLVED = "catalog.evidence_shape.unresolved"
 _SHAPE_UNRESOLVED = "catalog.shape.unresolved"
 _EVIDENCE_SHAPE_PASSED_CASE = "catalog.evidence_shape.passed_case_unjudged"
 _MIN_SOURCE_CLASS_UNKNOWN = "catalog.control.min_source_class_unknown"
+_SOURCE_CLASS_FROM_UNKNOWN = "catalog.control.source_class_from_unknown"
 
 #: Files left out of the provenance digest: the detached signature and ``catalog.yaml`` itself (which
 #: carries the provenance block), so the digest covers the catalog's rules and is non-circular.
@@ -140,14 +141,26 @@ def _min_source_class(control_id: str, evaluation: Any) -> str:
     )
 
 
-def _source_class_from(evaluation: dict[str, Any]) -> list[str]:
+def _source_class_from(control_id: str, evaluation: dict[str, Any]) -> list[str]:
     """The named ``source_class_from`` links, distinct and sorted (each is ASCII, so code-point order is byte
-    order); anything else in the list is dropped."""
-    value = evaluation.get("source_class_from")
-    if not isinstance(value, list):
+    order). A value that is not a list of known link names is refused when the catalog loads, never dropped: a
+    dropped link would judge the control on the focus record alone."""
+    if "source_class_from" not in evaluation:
         return []
-    return sorted(
-        {name for name in value if isinstance(name, str) and name in SOURCE_CLASS_FROM}
+    value = evaluation["source_class_from"]
+    if isinstance(value, list) and all(
+        isinstance(name, str) and name in SOURCE_CLASS_FROM for name in value
+    ):
+        return sorted(set(value))
+    entry = MESSAGE_KEYS[_SOURCE_CLASS_FROM_UNKNOWN]
+    raise InputError(
+        _SOURCE_CLASS_FROM_UNKNOWN,
+        format_message(
+            entry.cause,
+            control=control_id,
+            value=json.dumps(value, ensure_ascii=False),
+        ),
+        entry.fix,
     )
 
 
@@ -180,7 +193,7 @@ def _control_from_dict(data: dict[str, Any]) -> ControlSpec:
             if "evidence_shape" in evaluation
             else None
         ),
-        source_class_from=_source_class_from(evaluation),
+        source_class_from=_source_class_from(control_id, evaluation),
     )
 
 
