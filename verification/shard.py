@@ -59,10 +59,8 @@ def balanced_shards(
     same split."""
     shards: list[list[str]] = [[] for _ in range(total)]
     loads = [0.0] * total
-    ranked = sorted(
-        enumerate(gates), key=lambda pair: (-_seconds(pair[1], durations), pair[0])
-    )
-    for _, gate in ranked:
+    # sorted() is stable, so equal durations keep their ``gates`` order
+    for gate in sorted(gates, key=lambda gate: -_seconds(gate, durations)):
         lightest = loads.index(min(loads))
         shards[lightest].append(gate)
         loads[lightest] += _seconds(gate, durations)
@@ -145,19 +143,7 @@ USAGE = (
 )
 
 
-def balance_check(argv: list[str]) -> int:
-    try:
-        total = int(argv[0])
-    except ValueError:
-        print(f"shard total must be an integer, got {argv[0]!r}", file=sys.stderr)
-        return 2
-    if total <= 0:
-        print(f"shard total must be positive, got {total}", file=sys.stderr)
-        return 2
-    gates = _run_script("--list", capture=True).stdout.splitlines()
-    if not gates:
-        print("no gates to shard", file=sys.stderr)
-        return 1
+def balance_check(gates: list[str], total: int) -> int:
     durations = load_durations()
     for index, minutes in enumerate(shard_minutes(gates, total, durations)):
         print(f"shard {index}: {minutes:.1f} min")
@@ -170,20 +156,21 @@ def balance_check(argv: list[str]) -> int:
 def main(argv: list[str]) -> int:
     flags = [arg for arg in argv if arg.startswith("-")]
     argv = [arg for arg in argv if not arg.startswith("-")]
-    if "--balance-check" in flags:
-        if flags != ["--balance-check"] or len(argv) != 1:
-            print(USAGE, file=sys.stderr)
-            return 2
-        return balance_check(argv)
+    balance = "--balance-check" in flags
     dry_run, quick = "--dry-run" in flags, "--quick" in flags
-    if len(argv) != 2 or len(flags) != dry_run + quick:
+    if balance:
+        usable = flags == ["--balance-check"] and len(argv) == 1
+    else:
+        usable = len(argv) == 2 and len(flags) == dry_run + quick
+    if not usable:
         print(USAGE, file=sys.stderr)
         return 2
     try:
-        shard, total = int(argv[0]), int(argv[1])
+        numbers = [int(arg) for arg in argv]
     except ValueError:
         print(f"shard index and total must be integers, got {argv!r}", file=sys.stderr)
         return 2
+    shard, total = (0, numbers[0]) if balance else (numbers[0], numbers[1])
     if total <= 0 or not 0 <= shard < total:
         print(
             f"shard index {shard} is out of range for {total} shard(s)", file=sys.stderr
@@ -196,6 +183,8 @@ def main(argv: list[str]) -> int:
     if not gates:
         print("no gates to shard", file=sys.stderr)
         return 1
+    if balance:
+        return balance_check(gates, total)
     mine = (
         partition(gates, shard, total)
         if quick

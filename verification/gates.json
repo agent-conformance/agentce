@@ -84,7 +84,7 @@
         {
           "description": "balanced_shards() deals the gates round-robin again instead of longest first to the lightest shard, so one demo shard carries 20 minutes against the job's 20-minute timeout",
           "file": "verification/shard.py",
-          "search": "    for _, gate in ranked:\n        lightest = loads.index(min(loads))\n",
+          "search": "    for gate in sorted(gates, key=lambda gate: -_seconds(gate, durations)):\n        lightest = loads.index(min(loads))\n",
           "replace": "    for position, gate in enumerate(gates):\n        lightest = position % total\n"
         },
         {
