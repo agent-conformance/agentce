@@ -9,6 +9,7 @@ evaluation:
   mode: automated
   rung: 2
   min_source_class: enforcement_point
+  source_class_from: [actsOn]
   minimum_evidence:
     - {event: ToolCall, class: enforcement_point}
   shape: shapes/CND-05.ttl

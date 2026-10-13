@@ -211,6 +211,36 @@ def test_explain_suggests_the_adapter_a_support_matrix_names(tmp_path: Path) -> 
     assert report["root_causes"][0]["suggested_adapters"] == ["gateway"]
 
 
+def test_explain_names_a_source_class_below_the_minimum(tmp_path: Path) -> None:
+    # An assertion carries no min_source_class: --catalogs reads it from the control (SPEC 6.4, HR-5).
+    control = tmp_path / "conduct" / "controls" / "CND-05.yaml"
+    control.parent.mkdir(parents=True)
+    control.write_text(
+        "id: CND-05\nevaluation:\n  min_source_class: enforcement_point\n",
+        encoding="utf-8",
+    )
+    assertions = tmp_path / "assertions.json"
+    below = {
+        "control": "CND-05",
+        "outcome": "insufficient_evidence",
+        "source_class_satisfied": False,
+    }
+    assertions.write_text(json.dumps([below]), encoding="utf-8")
+    report = explain_insufficient.explain(
+        [below], {}, explain_insufficient._minimums(tmp_path)
+    )
+    cause = report["root_causes"][0]
+    assert cause["missing_member"] == "min_source_class=enforcement_point"
+    assert cause["min_source_class"] == "enforcement_point"
+    assert cause["controls"] == ["CND-05"]
+    assert (
+        explain_insufficient.main(
+            ["--assertions", str(assertions), "--catalogs", str(tmp_path), "--json"]
+        )
+        == explain_insufficient.FINDINGS
+    )
+
+
 def test_without_support_matrices_nothing_is_suggested(tmp_path: Path) -> None:
     # A standalone install has no adapters/ beside it: no suggestions, no error.
     assert explain_insufficient._adapters_supplying(tmp_path / "absent") == {}
@@ -239,7 +269,9 @@ def test_deviations_template_example_matches_the_real_register_shape() -> None:
 
     from agentce import readiness
 
-    template = (ROOT / "assets" / "deviations.template.yaml").read_text(encoding="utf-8")
+    template = (ROOT / "assets" / "deviations.template.yaml").read_text(
+        encoding="utf-8"
+    )
     example_lines = [
         line[2:] if line.startswith("# ") else line[1:]
         for line in template.splitlines()

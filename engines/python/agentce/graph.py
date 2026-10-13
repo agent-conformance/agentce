@@ -285,6 +285,8 @@ class _Builder:
         self.instruction_untrusted: dict[
             str, bool
         ] = {}  # Instruction IRI -> untrusted flag
+        # Instructions that declare no source class: ROB-02 taint seeds of their own (18.127).
+        self.instruction_unclassed: set[str] = set()
         self.outcome_decision: dict[
             str, str
         ] = {}  # Outcome IRI -> its refs.decision IRI, if any
@@ -545,6 +547,9 @@ class _Builder:
             source_class = data.get("source_class")
             untrusted = _untrusted_source_class(source_class)
             self.instruction_untrusted[node] = untrusted
+            if not untrusted and not _is_one_of(source_class, _TRUSTED_INSTRUCTION):
+                # No class at all (or not a string): ROB-02 reads it as untrusted content (18.127).
+                self.instruction_unclassed.add(node)
             self.store.add_literal(
                 node,
                 "agentce:instructionUntrusted",
@@ -663,7 +668,7 @@ class _Builder:
         guard verdict is quarantine or block, or which carries no trust and no verdict but an
         untrusted Appendix F ``provenance_origin_class``; a MemoryRead whose ``trust_min`` is
         untrusted or quarantined; and an instruction with an untrusted Appendix F source class
-        (CND-05's rule). Content the guard never ruled on starts at a MemoryRead not reported by
+        (CND-05's rule), or with none (ROB-02 only). Content the guard never ruled on starts at a MemoryRead not reported by
         an enforcement point, a record no ruled enforcement-point write and no enforcement-point
         read with a ``trust_min`` covers, and a ref the bundle does not hold. Both flow along
         every edge that carries content into an event (``_CONTENT_IN``, ``_CONTENT_OUT``, a read
@@ -731,8 +736,26 @@ class _Builder:
             iri for iri, untrusted in self.instruction_untrusted.items() if untrusted
         }
         unruled |= (records - guarded) | (set(flows) - held - records)
+        fed = {target for targets in flows.values() for target in targets}
         _reach(tainted, flows)
         _reach(unruled, flows)
+        # An instruction that declares no source class cannot show its content came from a trusted source, so
+        # ROB-02 reads it as untrusted content (18.127); CND-05's own chain rule already fails it, so it stays out
+        # of the closures returned to that rule.
+        unclassed = set(self.instruction_unclassed)
+        _reach(unclassed, flows)
+        decisions = [e for e in events if self._ptype(e) == "Decision"]
+        # A decision nothing recorded flows into used nothing the guard could have ruled on, so ROB-02 cannot
+        # judge it (ruling 15): it reads untrustedContentRuledOn false itself, and taints nothing downstream.
+        unfed = {event_iri(str(e["id"])) for e in decisions} - fed
+        self._robust_literals(decisions, tainted | unclassed, unruled | unfed)
+        tainted |= unruled
+        return tainted
+
+    def _robust_literals(
+        self, events: list[dict[str, Any]], tainted: set[str], unruled: set[str]
+    ) -> None:
+        """ROB-02's two literals on each decision in ``events`` (see :meth:`_robust_to_untrusted`)."""
         for event in events:
             if self._ptype(event) == "Decision":
                 node = event_iri(str(event["id"]))
@@ -748,8 +771,6 @@ class _Builder:
                     "false" if node in unruled else "true",
                     BOOL,
                 )
-        tainted |= unruled
-        return tainted
 
     # --- materialised (glue) edges (SPEC §7.2) ---
 

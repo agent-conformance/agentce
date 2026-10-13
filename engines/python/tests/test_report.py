@@ -171,7 +171,7 @@ def _minimum_evidence_control(
         mode="automated",
         rung=2,
         severity="high",
-        min_source_class="any",
+        min_source_class="self_report",
         minimum_evidence=[{"event": event, "class": cls}],
         shape_path=None,
         tolerance={"kind": "count", "max": 0},

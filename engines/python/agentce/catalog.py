@@ -29,12 +29,14 @@ from .errors import InputError, catalog_unreadable
 from .graph import build_graph
 from .i18n_format import format_message
 from .psp import PropertyShape, Shape, load_shapes
+from .source_class import SOURCE_CLASS_FROM, SOURCE_CLASS_RANK
 from .structural import evaluate_control, evaluate_shape
 
 _EXPECTED_TO_CHECK = {"passed", "failed", "inapplicable"}
 _EVIDENCE_SHAPE_UNRESOLVED = "catalog.evidence_shape.unresolved"
 _SHAPE_UNRESOLVED = "catalog.shape.unresolved"
 _EVIDENCE_SHAPE_PASSED_CASE = "catalog.evidence_shape.passed_case_unjudged"
+_MIN_SOURCE_CLASS_UNKNOWN = "catalog.control.min_source_class_unknown"
 
 #: Files left out of the provenance digest: the detached signature and ``catalog.yaml`` itself (which
 #: carries the provenance block), so the digest covers the catalog's rules and is non-circular.
@@ -87,6 +89,8 @@ class ControlSpec:
     test_cases: list[dict[str, str]]
     raw: dict[str, Any] = field(default_factory=dict)
     evidence_shape_path: str | None = None
+    #: ``evaluation.source_class_from``: the graph links to the records the judged class also rests on.
+    source_class_from: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -119,12 +123,40 @@ class Catalog:
         return self.shapes[self.evidence_shape_iris[control.evidence_shape_path]]
 
 
+def _min_source_class(control_id: str, evaluation: Any) -> str:
+    """The control's ``evaluation.min_source_class``, exactly one of the SPEC §6.4 classes. Anything else
+    (missing, null, empty, not a string, ``any``, another case or another word) is refused when the catalog
+    loads, never read as no minimum."""
+    present = isinstance(evaluation, dict) and "min_source_class" in evaluation
+    value = evaluation["min_source_class"] if present else None
+    if isinstance(value, str) and value in SOURCE_CLASS_RANK:
+        return value
+    entry = MESSAGE_KEYS[_MIN_SOURCE_CLASS_UNKNOWN]
+    shown = json.dumps(value, ensure_ascii=False) if present else "(missing)"
+    raise InputError(
+        _MIN_SOURCE_CLASS_UNKNOWN,
+        format_message(entry.cause, control=control_id, value=shown),
+        entry.fix,
+    )
+
+
+def _source_class_from(evaluation: dict[str, Any]) -> list[str]:
+    value = evaluation.get("source_class_from")
+    if not isinstance(value, list):
+        return []
+    return [
+        name for name in value if isinstance(name, str) and name in SOURCE_CLASS_FROM
+    ]
+
+
 def _control_from_dict(data: dict[str, Any]) -> ControlSpec:
     evaluation = data.get("evaluation", {})
+    control_id = str(data.get("id", ""))
+    min_source_class = _min_source_class(control_id, evaluation)
     # A non-string shape is kept as "" (not a covered file), which load refuses; null stays "no shape".
     shape = evaluation.get("shape")
     return ControlSpec(
-        id=str(data.get("id", "")),
+        id=control_id,
         version=str(data.get("version", "")),
         title=str(data.get("title", "")),
         applies_to_roles=list(
@@ -133,7 +165,7 @@ def _control_from_dict(data: dict[str, Any]) -> ControlSpec:
         mode=str(evaluation.get("mode", "")),
         rung=int(evaluation.get("rung", 0)),
         severity=str(data.get("severity", "")),
-        min_source_class=str(evaluation.get("min_source_class", "any")),
+        min_source_class=min_source_class,
         minimum_evidence=list(evaluation.get("minimum_evidence", [])),
         shape_path=shape if shape is None or isinstance(shape, str) else "",
         tolerance=data.get("tolerance", {"kind": "count", "max": 0}),
@@ -146,6 +178,7 @@ def _control_from_dict(data: dict[str, Any]) -> ControlSpec:
             if "evidence_shape" in evaluation
             else None
         ),
+        source_class_from=_source_class_from(evaluation),
     )
 
 

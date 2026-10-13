@@ -11,7 +11,7 @@ applicability:
 evaluation:
   mode: automated
   rung: 2
-  min_source_class: any
+  min_source_class: self_report
   minimum_evidence:
     - {event: ToolCall, class: self_report}
     - {event: ModelCall, class: self_report}

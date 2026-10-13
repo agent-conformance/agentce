@@ -598,7 +598,8 @@ def _self_report(event: dict[str, Any]) -> dict[str, Any]:
 def test_ruled_on_when_the_guard_ruled_on_every_input() -> None:
     write = _event("w1", "MemoryWrite", {"record_ref": "mem:r1", "trust": "trusted"})
     assert _ruled([write, _with_inputs(decision("d1", "t"), ["mem:r1"])]) == ["true"]
-    assert _ruled([decision("d1", "t")]) == ["true"]
+    # A decision nothing recorded flows into used nothing the guard could rule on (ruling 15, 18.127).
+    assert _ruled([decision("d1", "t")]) == ["false"]
 
 
 def test_not_ruled_on_through_a_read_only_the_agent_reported() -> None:
@@ -639,7 +640,9 @@ def test_not_ruled_on_a_ref_the_bundle_does_not_hold() -> None:
         used = _with_inputs(decision("d1", "t"), [ref])
         assert _ruled([used]) == ["false"], ref
     other = _with_inputs(decision("d2", "t"), ["mem:missing"])
-    assert _ruled([decision("d1", "t"), other]) == ["true"]
+    write = _event("w1", "MemoryWrite", {"record_ref": "mem:r1", "trust": "trusted"})
+    used = _with_inputs(decision("d1", "t"), ["mem:r1"])
+    assert _ruled([write, used, other]) == ["true"]
 
 
 def test_ruled_on_is_independent_of_event_order() -> None:

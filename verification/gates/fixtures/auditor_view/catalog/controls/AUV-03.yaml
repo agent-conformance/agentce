@@ -11,7 +11,7 @@ applicability:
 evaluation:
   mode: manual
   rung: 0
-  min_source_class: any
+  min_source_class: self_report
   minimum_evidence:
     - {event: Decision, class: any}
 expectations:

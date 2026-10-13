@@ -87,7 +87,16 @@
           "maximum": 4,
           "description": "0 coverage, 1 integrity, 2 structural, 3 statistical, 4 semantic (SPEC 8.3)."
         },
-        "min_source_class": {"$ref": "#/$defs/source_class"},
+        "min_source_class": {
+          "$ref": "#/$defs/source_class",
+          "description": "The lowest source class the control accepts (HR-5). The classes are ordered self_report < enforcement_point < independent_system (SPEC §6.4); a focus whose judged class is below this minimum makes a conformant verdict insufficient_evidence. Required, and exactly one of the three values: anything else (any, another case, another word, empty or missing) is refused when the catalog loads (catalog.control.min_source_class_unknown)."
+        },
+        "source_class_from": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "enum": ["actsOn", "delegatedVia", "approvedBy"]},
+          "description": "`source_class_from` (optional): the graph links, one hop from each focus, to the records whose source class the judgment rests on; the focus's own class counts too unless it is a Decision (§7.7.5). The assertion meets `min_source_class` only when every applicable focus does (§6.4 class order)."
+        },
         "minimum_evidence": {
           "type": "array",
           "minItems": 1,

@@ -1,8 +1,11 @@
 """explain_insufficient (SPEC 13.3.3 step C.3): explain each insufficient_evidence outcome.
 
 For every assertion whose outcome is ``insufficient_evidence``, this reports the control, the missing
-event member, the minimum source class required versus the best available, and -- by consulting the
-adapters' support matrices (SPEC 12.3) -- which adapter could supply the missing member. Findings are
+event member, the minimum source class the control requires (read from its catalog with ``--catalogs``;
+an assertion does not carry it), and -- by consulting the adapters' support matrices (SPEC 12.3) --
+which adapter could supply the missing member. An assertion whose ``source_class_satisfied`` is false
+had the records it needed, but from a source below the control's minimum (SPEC 6.4, HR-5): its root
+cause is ``min_source_class=<class>``, a record of that class, not a member. Findings are
 grouped by root cause (the missing member) so an operator fixes collection once, not control by
 control. Deterministic, offline, model-free (rule S-4). Exit 0 when nothing is insufficient, 1 when
 something is, 2 on input error, 3 on version mismatch.
@@ -39,23 +42,45 @@ def _adapters_supplying(support_dir: Path) -> dict[str, list[str]]:
     return {member: sorted(adapters) for member, adapters in supplies.items()}
 
 
+def _minimums(catalogs_dir: Path) -> dict[str, str]:
+    """Map control id -> its evaluation.min_source_class, from every controls/*.yaml under the folder."""
+    minimums: dict[str, str] = {}
+    for path in sorted(catalogs_dir.rglob("controls/*.yaml")):
+        control = yaml.safe_load(path.read_text(encoding="utf-8"))
+        evaluation = control.get("evaluation") if isinstance(control, dict) else None
+        if isinstance(evaluation, dict) and isinstance(
+            evaluation.get("min_source_class"), str
+        ):
+            minimums[str(control.get("id"))] = evaluation["min_source_class"]
+    return minimums
+
+
 def explain(
-    assertions: list[dict[str, Any]], supplies: dict[str, list[str]]
+    assertions: list[dict[str, Any]],
+    supplies: dict[str, list[str]],
+    minimums: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Group insufficient_evidence assertions by the missing member and suggest adapters."""
+    minimums = minimums or {}
     by_cause: dict[str, dict[str, Any]] = {}
     for assertion in assertions:
         if str(assertion.get("outcome")) != "insufficient_evidence":
             continue
         control = str(assertion.get("control", assertion.get("id", "<control>")))
-        missing = assertion.get("missing_members") or assertion.get("missing") or []
-        for member in [str(m) for m in missing] or ["<unspecified>"]:
+        minimum = minimums.get(control, assertion.get("min_source_class"))
+        missing = [
+            str(m)
+            for m in assertion.get("missing_members") or assertion.get("missing") or []
+        ]
+        if assertion.get("source_class_satisfied") is False:
+            missing.append(f"min_source_class={minimum or '<unknown>'}")
+        for member in missing or ["<unspecified>"]:
             cause = by_cause.setdefault(
                 member,
                 {
                     "missing_member": member,
                     "controls": [],
-                    "min_source_class": assertion.get("min_source_class"),
+                    "min_source_class": minimum,
                     "suggested_adapters": supplies.get(member, []),
                 },
             )
@@ -96,7 +121,15 @@ def _body(argv: list[str]) -> int:
         if support_arg and Path(support_arg).is_dir()
         else {}
     )
-    report = explain(assertions if isinstance(assertions, list) else [], supplies)
+    catalogs_arg = arg_value(argv, "--catalogs")
+    minimums = (
+        _minimums(Path(catalogs_arg))
+        if catalogs_arg and Path(catalogs_arg).is_dir()
+        else {}
+    )
+    report = explain(
+        assertions if isinstance(assertions, list) else [], supplies, minimums
+    )
     human = (
         "EXPLAIN INSUFFICIENT: none"
         if report["insufficient"] == 0

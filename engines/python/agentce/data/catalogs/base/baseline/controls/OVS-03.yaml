@@ -19,6 +19,7 @@ evaluation:
   mode: automated
   rung: 2
   min_source_class: enforcement_point
+  source_class_from: [delegatedVia]
   minimum_evidence:
     - {event: ToolCall, class: enforcement_point}
     - {event: Decision, class: self_report}

@@ -76,6 +76,10 @@ class Assertion:
     #: held ones reads non-conformant (18.149): assess exits as for a non-conformant outcome. Run state for
     #: the exit code only; never written to assertions.json.
     withheld_non_conformant: bool = False
+    #: The record types whose class put a focus below the control's ``min_source_class`` when that alone made
+    #: this outcome insufficient_evidence (HR-5): what is missing is a record of those types at the minimum.
+    #: Run state for the missing-evidence text; never written to assertions.json.
+    class_gap: tuple[str, ...] = ()
 
     def to_json(self) -> dict[str, Any]:
         record: dict[str, Any] = {

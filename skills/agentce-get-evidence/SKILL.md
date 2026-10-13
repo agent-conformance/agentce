@@ -76,7 +76,7 @@ un-hookable chokepoint in `docs/agentce/gaps.md` (S-1: never simulate it).
 
 **C — Validate and iterate** (`references/validate-iterate.md`). Run `bundle_preflight --bundle <b>
 --profile agentce/applicability.yaml`; run `agentce assess` (never touch its outputs);
-`explain_insufficient --assertions <report>/assertions.json --support-matrices <adapters>` groups
+`explain_insufficient --assertions <report>/assertions.json --support-matrices <adapters> [--catalogs <dir>]` groups
 every `insufficient_evidence` outcome by root cause and names the adapter that could supply the missing
 member. Apply techniques by coverage gained, re-emit, and repeat until every applicable target control
 has its minimum evidence or the gap is documented as organisational.
@@ -100,7 +100,7 @@ declared as anything else.
 - `linkml_validate.py --events <jsonl> | --profile <file>` — validate against the generated schemas.
 - `bundle_preflight.py --bundle <dir> [--profile <file>]` — quarantines, per-source counts, trust-class
   consistency, dangling refs (read-only).
-- `explain_insufficient.py --assertions <file> --support-matrices <adapters>` — explain and group.
+- `explain_insufficient.py --assertions <file> --support-matrices <adapters> [--catalogs <dir>]` — explain and group.
 
 ## Assets
 

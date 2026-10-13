@@ -1142,9 +1142,9 @@
       ]
     },
     "decision-used-nothing": {
-      "why": "a decision that used no recorded content, with a memory guard present; the old rule read non-conformant",
+      "why": "a decision that used no recorded content, with a memory guard present: nothing the guard could rule on reached it, so ROB-02 cannot judge it (ruling 15, 18.127); the old rule read non-conformant, the next one conformant",
       "expected": {
-        "outcome": "conformant",
+        "outcome": "insufficient_evidence",
         "failing": [],
         "exit": 0
       },

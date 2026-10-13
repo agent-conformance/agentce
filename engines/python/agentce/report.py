@@ -43,7 +43,12 @@ from . import (
 )
 from .activity import DENIED_KINDS, RECORDER_CLASSES, summarize_activity
 from .assertions import Assertion, aggregate, check_dc5
-from .assess import deviations_by_control, index_by_subject, requirement_met
+from .assess import (
+    deviations_by_control,
+    index_by_subject,
+    missing_evidence,
+    requirement_met,
+)
 from .auditor_view import compute_auditor_view
 from .buyer_view import (
     BUYER_FRAMEWORKS,
@@ -2589,17 +2594,20 @@ def _requirement_list(minimum: list[dict[str, str]]) -> list[dict[str, str]]:
 
 
 def _remediation_evidence_gap(
-    spec: ControlSpec | None, outcome: str, subject_events: list[dict[str, Any]]
+    spec: ControlSpec | None, a: Assertion, subject_events: list[dict[str, Any]]
 ) -> dict[str, Any]:
     """What this control's own `minimum_evidence` requires, and which of those requirements this
     subject's own events did and did not satisfy -- the exact rule the assessment itself used to
-    reach `outcome` (:func:`agentce.assess.requirement_met`). Reaching a structural verdict
+    reach the outcome (:func:`agentce.assess.requirement_met`). Reaching a structural verdict
     (`non-conformant`/`partial`) means every requirement was already met; only `insufficient_evidence`
-    can have a real gap."""
+    can have a real gap, which also names a record of each type whose class held a focus below the
+    control's `min_source_class` (:func:`agentce.assess.missing_evidence`)."""
     required = _requirement_list(spec.minimum_evidence if spec else [])
-    if outcome == "insufficient_evidence":
+    if a.outcome == "insufficient_evidence":
         observed = [r for r in required if requirement_met(subject_events, r)]
-        missing = [r for r in required if not requirement_met(subject_events, r)]
+        missing = (
+            _requirement_list(missing_evidence(spec, subject_events, a)) if spec else []
+        )
     else:
         observed, missing = list(required), []
     return {"required": required, "observed": observed, "missing": missing}
@@ -2661,7 +2669,7 @@ def _remediation_finding(
         "title": _finding_title(a, spec),
         "clauses": _remediation_clauses(spec),
         "expectations": _remediation_expectations(spec, a.outcome),
-        "evidence_gap": _remediation_evidence_gap(spec, a.outcome, subject_events),
+        "evidence_gap": _remediation_evidence_gap(spec, a, subject_events),
         "violations": list(a.violations),
         "evidence": [e.to_json() for e in a.evidence],
         "remediation": _remediation_techniques(spec),

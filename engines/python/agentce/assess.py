@@ -24,6 +24,7 @@ from .ingest import Withheld
 from .iri import event_iri
 from .profile import Profile, Subject
 from .readiness import parse_date
+from .source_class import BELOW_MINIMUM_OUTCOME, SourceClassJudge, below_minimum
 from .store import GraphStore
 from .structural import evaluate_shape, within_tolerance
 
@@ -65,6 +66,20 @@ def _has_minimum_evidence(
     events: list[dict[str, Any]], minimum: list[dict[str, str]]
 ) -> bool:
     return all(requirement_met(events, requirement) for requirement in minimum)
+
+
+def missing_evidence(
+    control: ControlSpec, events: list[dict[str, Any]], assertion: Assertion
+) -> list[dict[str, str]]:
+    """What an insufficient_evidence ``assertion`` lacks: each ``minimum_evidence`` entry ``events`` do not meet,
+    then a record of each type whose class held a focus below the control's ``min_source_class`` (HR-5), at that
+    minimum. The one reading the remediation package and the blind spots both name the gap with."""
+    missing = [r for r in control.minimum_evidence if not requirement_met(events, r)]
+    missing += [
+        {"event": kind, "class": control.min_source_class}
+        for kind in assertion.class_gap
+    ]
+    return missing
 
 
 def _event_type(event: dict[str, Any]) -> str:
@@ -191,6 +206,27 @@ def _assert_control(
                 evidence=_evidence(events_by_iri, sorted(unjudged)),
                 **base,
             )
+    # HR-5: a pass counts only when every focus's judged class meets the control's minimum (SPEC §6.4). The
+    # rule never runs on a non-conformant verdict, which stays non-conformant.
+    below, kinds = (
+        below_minimum(
+            SourceClassJudge(store, events_by_iri),
+            applicable,
+            control.min_source_class,
+            control.source_class_from,
+        )
+        if conformant
+        else ([], ())
+    )
+    if below:
+        return Assertion(
+            outcome=BELOW_MINIMUM_OUTCOME,
+            population=(len(applicable), 0),
+            evidence=_evidence(events_by_iri, below),
+            source_class_satisfied=False,
+            class_gap=kinds,
+            **base,
+        )
     outcome = "conformant" if conformant else "non-conformant"
     focus_for_evidence = sorted(failing) if failing else applicable
     return Assertion(
@@ -198,7 +234,7 @@ def _assert_control(
         population=(len(applicable), len(failing)),
         violations=[v.to_json() for v in violations],
         evidence=_evidence(events_by_iri, focus_for_evidence),
-        source_class_satisfied=True,
+        source_class_satisfied=not below,
         evidence_strength=control.raw.get("evidence_strength"),
         **base,
     )
@@ -261,6 +297,7 @@ def _not_enough_with_withheld(
         source_class_satisfied=None,
         evidence_strength=None,
         withheld_non_conformant=non_conformant,
+        class_gap=(),
     )
 
 

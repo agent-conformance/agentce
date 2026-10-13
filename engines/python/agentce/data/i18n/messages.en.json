@@ -175,6 +175,8 @@
   "errors.catalog.shape.unresolved.fix": "name the shape file by its exact path inside the catalog folder (for example shapes/<control>.ttl), outside any dot-named or __pycache__ folder, or remove evaluation.shape from the control.",
   "errors.catalog.shape.parse_error.cause": "the shape file {path} is not valid Turtle: {detail}",
   "errors.catalog.shape.parse_error.fix": "fix the Turtle syntax at the position named.",
+  "errors.catalog.control.min_source_class_unknown.cause": "control {control} declares min_source_class {value}, which is not a source class: the value must be exactly self_report, enforcement_point or independent_system (SPEC §6.4), so the engine could not tell which records the control accepts.",
+  "errors.catalog.control.min_source_class_unknown.fix": "set evaluation.min_source_class to self_report, enforcement_point or independent_system, written in lowercase as here; any is not a source class, and self_report is the lowest minimum a control can declare.",
   "errors.catalog.evidence_shape.unresolved.cause": "control {control} names '{path}' as its evidence shape, but that is not a file inside the catalog folder holding exactly one node shape with a target, so the control could not tell which records it can judge.",
   "errors.catalog.evidence_shape.unresolved.fix": "name a file inside the catalog folder that holds exactly one node shape with a target (sh:targetClass, sh:targetNode or agentce:targetWhere), or remove evaluation.evidence_shape from the control.",
   "errors.catalog.evidence_shape.passed_case_unjudged.cause": "control {control}'s test case {case} expects passed, but its evidence shape targets nothing in that fixture or finds a record it cannot judge, so assess would never read it conformant.",

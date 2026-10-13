@@ -38,7 +38,7 @@ def _control(
         mode=mode,
         rung=rung,
         severity="high",
-        min_source_class="any",
+        min_source_class="self_report",
         minimum_evidence=minimum_evidence,
         shape_path=None,
         tolerance={"kind": "count", "max": 0},
