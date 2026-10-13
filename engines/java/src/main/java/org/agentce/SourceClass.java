@@ -260,21 +260,18 @@ public final class SourceClass {
         }
 
         /** The lowest class the judgment of {@code focus} rests on. A Decision is self_report by nature (§7.7.5),
-         * so it rests on what it reaches through the named links, or failing those on what the ToolCalls executing
-         * it reach; a Decision that reaches nothing either way rests on its own record, self_report.
+         * so it rests on what it reaches through the named links, or failing those on what every ToolCall
+         * executing it reaches; a Decision that reaches nothing either way rests on its own record, self_report.
          * {@code sourceClassFrom} holds distinct {@link #FROM} names, sorted (as the catalog stores them). */
         public Judged judgedClass(String focus, List<String> sourceClassFrom) {
             JsonNode event = events.get(focus);
             List<Map.Entry<Integer, String>> contributors;
             if (event != null && "Decision".equals(type(event))) {
                 contributors = reached(focus, sourceClassFrom);
-                List<String> calls = new ArrayList<>(store.subjects("agentce:executes", focus));
-                calls.sort(Json::byteCompare);
-                for (String call : calls) {
-                    if (!contributors.isEmpty()) {
-                        break;
+                if (contributors.isEmpty()) {
+                    for (String call : store.subjects("agentce:executes", focus)) {
+                        contributors.addAll(reached(call, sourceClassFrom));
                     }
-                    contributors = reached(call, sourceClassFrom);
                 }
                 if (contributors.isEmpty()) {
                     contributors = List.of(Map.entry(0, "Decision"));

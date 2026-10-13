@@ -160,27 +160,22 @@ public final class Catalog {
         out.append('"');
     }
 
-    /** The named {@code source_class_from} links, distinct and byte-sorted; anything else in the list is dropped. */
     /** The named {@code source_class_from} links, distinct and byte-sorted. A value that is not a list of known
      * link names is refused when the catalog loads, never dropped: a dropped link would judge the control on the
      * focus record alone. */
     private static List<String> sourceClassFrom(String controlId, JsonNode evaluation) {
-        Set<String> names = new java.util.TreeSet<>(Json::byteCompare);
         JsonNode value = evaluation.get("source_class_from");
         if (value == null) {
-            return new ArrayList<>(names);
+            return new ArrayList<>();
         }
-        if (value.isArray()) {
-            for (JsonNode name : value) {
-                if (!name.isTextual() || !SourceClass.FROM.containsKey(name.textValue())) {
-                    names = null;
-                    break;
-                }
-                names.add(name.textValue());
-            }
-            if (names != null) {
-                return new ArrayList<>(names);
-            }
+        Set<String> names = new java.util.TreeSet<>(Json::byteCompare);
+        boolean known = value.isArray();
+        for (JsonNode name : value) {
+            known &= name.isTextual() && SourceClass.FROM.containsKey(name.textValue());
+            names.add(name.asText());
+        }
+        if (known) {
+            return new ArrayList<>(names);
         }
         throw new InputError(
                 SOURCE_CLASS_FROM_UNKNOWN,

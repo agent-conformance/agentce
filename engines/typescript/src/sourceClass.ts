@@ -263,19 +263,18 @@ export class SourceClassJudge {
   }
 
   /** The lowest class the judgment of `focus` rests on. A Decision is self_report by nature (§7.7.5), so it
-   * rests on what it reaches through the named links, or failing those on what the ToolCalls executing it
-   * reach; a Decision that reaches nothing either way rests on its own record, self_report.
+   * rests on what it reaches through the named links, or failing those on what every ToolCall executing it
+   * reaches; a Decision that reaches nothing either way rests on its own record, self_report.
    * `sourceClassFrom` holds distinct {@link SOURCE_CLASS_FROM} names, sorted (as the catalog stores them). */
   judgedClass(focus: string, sourceClassFrom: readonly string[]): Judged {
     const event = this.events.get(focus);
     let contributors: Array<[number, string]>;
     if (event !== undefined && typeOf(event) === "Decision") {
       contributors = this.reached(focus, sourceClassFrom);
-      for (const call of [...this.store.subjects("agentce:executes", focus)].sort(byteCompare)) {
-        if (contributors.length > 0) {
-          break;
+      if (contributors.length === 0) {
+        for (const call of this.store.subjects("agentce:executes", focus)) {
+          contributors.push(...this.reached(call, sourceClassFrom));
         }
-        contributors = this.reached(call, sourceClassFrom);
       }
       if (contributors.length === 0) {
         contributors = [[0, "Decision"]];

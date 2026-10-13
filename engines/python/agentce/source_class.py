@@ -4,14 +4,14 @@ Every control declares ``evaluation.min_source_class``. An assertion meets it on
 does: :func:`judged_class` is the lowest class among the focus's own record (left out for a Decision, which is the
 agent's own account by nature, §7.7.5) and the records one hop away through each predicate the control names in
 ``evaluation.source_class_from``; a Decision that reaches none is judged through the ToolCalls that execute it, and
-one that reaches nothing that way either is ``self_report``. A record's class is its own ``agentcesourceclass``, except for an Instruction,
-which counts as ``enforcement_point`` only when attested (:meth:`SourceClassJudge.attested`) and as
+one that reaches nothing that way either is ``self_report``. A record's class is its own ``agentcesourceclass``,
+except for an Instruction, which counts as ``enforcement_point`` only when attested (:meth:`SourceClassJudge.attested`) and as
 ``self_report`` otherwise: an agent's own record that it was told something by the user is never taken as given.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -203,7 +203,7 @@ class SourceClassJudge:
         return self._own_rank(node), _type(event) or kind
 
     def _reached(
-        self, focus: str, source_class_from: Iterable[str]
+        self, focus: str, source_class_from: Sequence[str]
     ) -> list[tuple[int, str]]:
         """The ranks of the records one named link from ``focus``."""
         return [
@@ -212,18 +212,18 @@ class SourceClassJudge:
             for node in self.store.objects(focus, f"agentce:{name}")
         ]
 
-    def judged_class(self, focus: str, source_class_from: Iterable[str]) -> Judged:
+    def judged_class(self, focus: str, source_class_from: Sequence[str]) -> Judged:
         """The lowest class the judgment of ``focus`` rests on. A Decision is self_report by nature (§7.7.5), so it
-        rests on what it reaches through the named links, or failing those on what the ToolCalls executing it
-        reach; a Decision that reaches nothing either way rests on its own record, self_report.
+        rests on what it reaches through the named links, or failing those on what every ToolCall executing it
+        reaches; a Decision that reaches nothing either way rests on its own record, self_report.
         ``source_class_from`` holds distinct :data:`SOURCE_CLASS_FROM` names, sorted (as the catalog stores them)."""
         event = self.events.get(focus)
         if event is not None and _type(event) == "Decision":
-            contributors = self._reached(focus, source_class_from)
-            for call in sorted(self.store.subjects("agentce:executes", focus)):
-                if contributors:
-                    break
-                contributors = self._reached(call, source_class_from)
+            contributors = self._reached(focus, source_class_from) or [
+                reached
+                for call in self.store.subjects("agentce:executes", focus)
+                for reached in self._reached(call, source_class_from)
+            ]
             if not contributors:
                 contributors = [(0, "Decision")]
         else:
