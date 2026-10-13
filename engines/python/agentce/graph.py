@@ -623,7 +623,6 @@ class _Builder:
         untrusted = set(tainted)
         derived: dict[str, set[str]] = {}
         held: set[str] = set()
-        instructions: set[str] = set()
         for event in events:
             ptype = self._ptype(event)
             node = event_iri(str(event["id"]))
@@ -631,7 +630,6 @@ class _Builder:
             if ptype in ("ToolCall", "ResourceAccess"):
                 untrusted.add(node)
             elif ptype == "Instruction":
-                instructions.add(node)
                 source_class = _data(event).get("source_class")
                 if not _is_one_of(source_class, _TRUSTED_INSTRUCTION):
                     untrusted.add(node)
@@ -647,7 +645,8 @@ class _Builder:
                 continue
             instruction = _refs(event).get("instruction")
             acts = isinstance(instruction, str) and (
-                instruction in untrusted or instruction not in instructions
+                instruction in untrusted
+                or instruction not in self.instruction_untrusted
             )
             self.store.add_literal(
                 event_iri(str(event["id"])),

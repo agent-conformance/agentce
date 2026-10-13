@@ -3271,20 +3271,20 @@
         {
           "description": "Python reads only the acted-on instruction's own source class, so a user instruction derived from a tool_output instruction passes CND-05",
           "file": "engines/python/agentce/graph.py",
-          "search": "                instruction in untrusted or instruction not in instructions\n",
-          "replace": "                self.instruction_untrusted.get(instruction, False) or instruction not in instructions\n"
+          "search": "                instruction in untrusted\n                or instruction not in self.instruction_untrusted\n",
+          "replace": "                self.instruction_untrusted.get(instruction, False)\n                or instruction not in self.instruction_untrusted\n"
         },
         {
           "description": "TypeScript reads only the acted-on instruction's own source class, so a user instruction derived from a tool_output instruction passes CND-05",
           "file": "engines/typescript/src/graph.ts",
-          "search": "(untrusted.has(instruction) || !instructions.has(instruction))",
-          "replace": "((this.instructionUntrusted.get(instruction) ?? false) || !instructions.has(instruction))"
+          "search": "(untrusted.has(instruction) || !this.instructionUntrusted.has(instruction))",
+          "replace": "((this.instructionUntrusted.get(instruction) ?? false) || !this.instructionUntrusted.has(instruction))"
         },
         {
           "description": "Java reads only the acted-on instruction's own source class, so a user instruction derived from a tool_output instruction passes CND-05",
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
-          "search": "(untrusted.contains(instruction) || !instructions.contains(instruction))",
-          "replace": "(instructionUntrusted.getOrDefault(instruction, false) || !instructions.contains(instruction))"
+          "search": "(untrusted.contains(instruction) || !instructionUntrusted.containsKey(instruction))",
+          "replace": "(instructionUntrusted.getOrDefault(instruction, false) || !instructionUntrusted.containsKey(instruction))"
         },
         {
           "description": "Python's PSP parser reads one sh:targetClass per shape, so CND-05 judges either its ToolCalls or its Decisions, not both",
@@ -3343,23 +3343,23 @@
         {
           "description": "Python counts any held event or record a refs.instruction names as an instruction, so a tool call or decision acting on a ModelCall, a SessionStart, a MemoryWrite or a memory record reads CND-05 conformant",
           "file": "engines/python/agentce/graph.py",
-          "search": "                instruction in untrusted or instruction not in instructions\n",
+          "search": "                instruction in untrusted\n                or instruction not in self.instruction_untrusted\n",
           "replace": "                instruction in untrusted\n"
         },
         {
           "description": "TypeScript counts any held event or record a refs.instruction names as an instruction, so a tool call or decision acting on a ModelCall, a SessionStart, a MemoryWrite or a memory record reads CND-05 conformant",
           "file": "engines/typescript/src/graph.ts",
-          "search": "(untrusted.has(instruction) || !instructions.has(instruction))",
+          "search": "(untrusted.has(instruction) || !this.instructionUntrusted.has(instruction))",
           "replace": "untrusted.has(instruction)"
         },
         {
           "description": "Java counts any held event or record a refs.instruction names as an instruction, so a tool call or decision acting on a ModelCall, a SessionStart, a MemoryWrite or a memory record reads CND-05 conformant",
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
-          "search": "(untrusted.contains(instruction) || !instructions.contains(instruction))",
+          "search": "(untrusted.contains(instruction) || !instructionUntrusted.containsKey(instruction))",
           "replace": "untrusted.contains(instruction)"
         }
       ],
-      "fix_hint": "Run verification/gates/cnd05_chain.sh; it names the engine, the case, the CND-05 outcome and failing events it gave and the ones expected. The rule is actsOnUntrusted in each engine's graph builder: the refs.parent / refs.origin closure over instructions, seeded with tool calls, resource accesses, instructions that declare no trusted source class and ROB-02's two closures (tainted, and never ruled on by the guard); an action also fails when its refs.instruction names no held Instruction event (the `instructions` set). A decision case that reads conformant points at the PSP parser (psp.py, psp.ts, Psp.java): every sh:targetClass of a shape is read, as a union."
+      "fix_hint": "Run verification/gates/cnd05_chain.sh; it names the engine, the case, the CND-05 outcome and failing events it gave and the ones expected. The rule is actsOnUntrusted in each engine's graph builder: the refs.parent / refs.origin closure over instructions, seeded with tool calls, resource accesses, instructions that declare no trusted source class and ROB-02's two closures (tainted, and never ruled on by the guard); an action also fails when its refs.instruction names no held Instruction event (a key of the builder's instruction-trust map). A decision case that reads conformant points at the PSP parser (psp.py, psp.ts, Psp.java): every sh:targetClass of a shape is read, as a union."
     },
     {
       "id": "VG-EUAIACT-CLUSTER1",

@@ -739,7 +739,6 @@ class Builder {
     const untrusted = new Set(tainted);
     const derived = new Map<string, Set<string>>();
     const held = new Set<string>();
-    const instructions = new Set<string>();
     for (const event of events) {
       const ptype = this.ptype(event);
       const node = eventIri(String(event.id));
@@ -747,7 +746,6 @@ class Builder {
       if (ptype === "ToolCall" || ptype === "ResourceAccess") {
         untrusted.add(node);
       } else if (ptype === "Instruction") {
-        instructions.add(node);
         if (!isOneOf(dataOf(event).source_class, TRUSTED_INSTRUCTION)) {
           untrusted.add(node);
         }
@@ -772,7 +770,7 @@ class Builder {
       const instruction = refsOf(event).instruction;
       const acts =
         typeof instruction === "string" &&
-        (untrusted.has(instruction) || !instructions.has(instruction));
+        (untrusted.has(instruction) || !this.instructionUntrusted.has(instruction));
       this.store.addLiteral(
         eventIri(String(event.id)),
         "agentce:actsOnUntrusted",

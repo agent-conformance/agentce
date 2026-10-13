@@ -760,7 +760,6 @@ public final class Graph {
             Set<String> untrusted = new LinkedHashSet<>(tainted);
             Map<String, Set<String>> derived = new LinkedHashMap<>();
             Set<String> held = new LinkedHashSet<>();
-            Set<String> instructions = new LinkedHashSet<>();
             for (JsonNode event : events) {
                 String ptype = ptype(event);
                 String node = Iri.eventIri(event.get("id").asText());
@@ -768,7 +767,6 @@ public final class Graph {
                 if ("ToolCall".equals(ptype) || "ResourceAccess".equals(ptype)) {
                     untrusted.add(node);
                 } else if ("Instruction".equals(ptype)) {
-                    instructions.add(node);
                     if (!isOneOf(dataOf(event).get("source_class"), TRUSTED_INSTRUCTION)) {
                         untrusted.add(node);
                     }
@@ -788,7 +786,7 @@ public final class Graph {
                 }
                 String instruction = str(refsOf(event).get("instruction"));
                 boolean acts = instruction != null
-                        && (untrusted.contains(instruction) || !instructions.contains(instruction));
+                        && (untrusted.contains(instruction) || !instructionUntrusted.containsKey(instruction));
                 store.addLiteral(
                         Iri.eventIri(event.get("id").asText()),
                         "agentce:actsOnUntrusted",
