@@ -6,8 +6,10 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.FileSystemLoopException;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
@@ -265,19 +267,40 @@ public final class Catalog {
 
     /** A folder's identity: its file key (device and inode on Unix), never a path string, which a
      * case-insensitive filesystem spells many ways; its real path where the filesystem gives no key. */
-    private static Object folderIdentity(Path dir) {
+    private static Object folderIdentity(Path dir, BasicFileAttributes attrs) {
+        Object key = attrs.fileKey();
+        if (key != null) {
+            return key;
+        }
         try {
-            Object key = Files.readAttributes(dir, BasicFileAttributes.class).fileKey();
-            return key != null ? key : dir.toRealPath();
+            return dir.toRealPath();
         } catch (IOException e) {
             throw new IllegalStateException("cannot read " + dir + ": " + e.getMessage(), e);
         }
     }
 
+    /** {@code path}'s attributes, following links, or null when there is nothing to walk: a missing entry,
+     * or a link that dangles or loops, which Python's {@code signing.is_directory} reads as absent. Any other
+     * error (an entry in a folder that can be listed but not entered) is thrown naming the path, as Python
+     * and TypeScript raise it, so the walk refuses what it cannot see instead of walking past it (18.170). */
+    private static BasicFileAttributes statFollowing(Path path) {
+        try {
+            return Files.readAttributes(path, BasicFileAttributes.class);
+        } catch (NoSuchFileException e) {
+            return null;
+        } catch (IOException e) {
+            if (!(e instanceof AccessDeniedException) && Files.isSymbolicLink(path)) {
+                return null;
+            }
+            throw new IllegalStateException("cannot read " + path + ": " + e.getMessage(), e);
+        }
+    }
+
     /** Every file's POSIX relpath under {@code dir}. As Python's {@code signing._walk_files}: a
      * symlinked folder is descended like a real one and a symlinked file is followed (18.164), a broken
-     * link is skipped, and a folder entered a second time (a cycle, or two names for one folder) is
-     * refused naming the second name, so each folder is entered once. */
+     * or looping link is skipped, an entry it cannot stat is refused ({@link #statFollowing}), and a
+     * folder entered a second time (a cycle, or two names for one folder) is refused naming the second
+     * name, so each folder is entered once. */
     private static void collectFiles(Path dir, String base, List<String> out, Set<Object> entered) {
         List<String> names = new ArrayList<>();
         try (Stream<Path> stream = Files.list(dir)) {
@@ -289,14 +312,18 @@ public final class Catalog {
         for (String name : names) {
             Path full = dir.resolve(name);
             String rel = base.isEmpty() ? name : base + "/" + name;
-            if (Files.isDirectory(full)) {
-                if (!entered.add(folderIdentity(full))) {
+            BasicFileAttributes attrs = statFollowing(full);
+            if (attrs == null) {
+                continue;
+            }
+            if (attrs.isDirectory()) {
+                if (!entered.add(folderIdentity(full, attrs))) {
                     throw new IllegalStateException(
                             "folder reached twice: " + full,
                             new FileSystemLoopException(full.toString()));
                 }
                 collectFiles(full, rel, out, entered);
-            } else if (Files.isRegularFile(full)) {
+            } else if (attrs.isRegularFile()) {
                 out.add(rel);
             }
         }
@@ -313,9 +340,10 @@ public final class Catalog {
      * a loader reads can change without changing the digest. */
     public static List<String> coveredFiles(Path dir, Set<String> exclude) {
         List<String> rels = new ArrayList<>();
-        if (Files.isDirectory(dir)) {
+        BasicFileAttributes attrs = statFollowing(dir);
+        if (attrs != null && attrs.isDirectory()) {
             Set<Object> entered = new HashSet<>();
-            entered.add(folderIdentity(dir));
+            entered.add(folderIdentity(dir, attrs));
             collectFiles(dir, "", rels, entered);
         }
         rels.sort(Json::byteCompare);
