@@ -27,15 +27,17 @@ work, overlay = Path(sys.argv[2]), Path(sys.argv[3])
 for name, case in cases.items():
     expected = case["expected"]
     if "catalog" in case:
-        # A copy of the Conduct overlay whose control declares the given min_source_class, or none.
+        # A copy of the Conduct overlay whose control declares the given source_class_from, or the given
+        # min_source_class, or no min_source_class.
         target = case["catalog"]
+        field = "source_class_from" if "source_class_from" in target else "min_source_class"
         copy = work / ".catalogs" / name
         shutil.copytree(overlay, copy)
         control = copy / "controls" / f"{target['control']}.yaml"
         text = control.read_text(encoding="utf-8")
-        line = re.compile(r"^  min_source_class: .*\n", re.MULTILINE)
-        assert len(line.findall(text)) == 1, f"{control} has no single min_source_class line"
-        value = f"  min_source_class: {json.dumps(target['min_source_class'])}\n" if "min_source_class" in target else ""
+        line = re.compile(rf"^  {field}: .*\n", re.MULTILINE)
+        assert len(line.findall(text)) == 1, f"{control} has no single {field} line"
+        value = f"  {field}: {json.dumps(target[field])}\n" if field in target else ""
         control.write_text(line.sub(lambda _: value, text), encoding="utf-8")
         refusals = work / ".refusals"
         refusals.mkdir(exist_ok=True)
@@ -128,7 +130,7 @@ check_cases() {
       return 1
     fi
   done
-  # An unknown minimum is refused when the catalog loads, never read as no minimum. Python writes the refusal to
+  # An unknown minimum or source_class_from is refused when the catalog loads, never read as none. Python writes the refusal to
   # stderr, TypeScript and Java to stdout; either carries the key.
   for copy in "$work"/.catalogs/*/; do
     [ -e "$work/.stop" ] && return 1
@@ -161,7 +163,7 @@ if [ "$status" -ne 0 ]; then
   echo "source-class: stopped at the first case an engine got wrong (above)" >&2
   exit 1
 fi
-# Catalog lint (Python only; TypeScript and Java do not implement it) refuses every unknown minimum with the same key.
+# Catalog lint (Python only; TypeScript and Java do not implement it) refuses every unknown minimum and source_class_from with the same key.
 for copy in "$work"/.catalogs/*/; do
   name="$(basename "$copy")"
   read -r key _ <"$work/.refusals/$name"
@@ -174,5 +176,5 @@ for copy in "$work"/.catalogs/*/; do
 done
 cases="$(ls -d "$work"/*/ | wc -l | tr -d ' ')"
 catalogs="$(ls -d "$work"/.catalogs/*/ | wc -l | tr -d ' ')"
-[ "$status" -eq 0 ] && echo "source-class: $cases cases and $catalogs unknown minimums, three engines agree with the expected outcome"
+[ "$status" -eq 0 ] && echo "source-class: $cases cases and $catalogs unknown catalog values, three engines agree with the expected outcome"
 exit "$status"

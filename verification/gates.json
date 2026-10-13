@@ -3444,7 +3444,7 @@
     },
     {
       "id": "VG-SOURCE-CLASS",
-      "title": "Every control's min_source_class holds per assertion in all three engines: a focus whose judged class is below the control's minimum reads insufficient_evidence, never conformant, and an agent's own record of where an instruction came from is not taken as given: CND-04 and CND-05 judge the acted-on instruction, which counts as enforcement_point only when an enforcement-point record attests it (its own class, an attested enforcement-point twin with the same content, task, class and principal, or an enforcement-point PolicyDecision allowing the acting call for the instruction's principal); a min_source_class that is not a source class is refused when the catalog loads (18.127)",
+      "title": "Every control's min_source_class holds per assertion in all three engines: a focus whose judged class is below the control's minimum reads insufficient_evidence, never conformant, and an agent's own record of where an instruction came from is not taken as given: CND-04 and CND-05 judge the acted-on instruction, which counts as enforcement_point only when an enforcement-point record attests it (its own class, an attested enforcement-point twin with the same content, task, class and principal, or an enforcement-point PolicyDecision allowing the acting call for the instruction's principal); a min_source_class that is not a source class, or a source_class_from that is not a list of known links, is refused when the catalog loads (18.127)",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -3461,27 +3461,27 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every event case in verification/gates/fixtures/source_class/cases.json (the audit probes A to J: a self_report user instruction behind one enforcement-point call; instruction and call all self_report; an ingress tool_output instruction the agent's twin calls user; self_report call, decision and instruction beside an unrelated enforcement-point call and read; an instruction the bundle does not hold; a bare event id; a self_report memory_trusted instruction with no origin; a consequential decision with no instruction; a delegation whose verification failed with no principal; an instruction with no source_class, for CND-04, CND-05 and ROB-02; each beside an enforcement-point-attested twin that stays conformant; and eleven hostile corroborations, each one field away from a conformant attested case: a twin with another content_ref, task, subject, authorised class or principal, a twin whose parent is self_report or tool_output, a twin whose origin read is trust_min untrusted, a PolicyDecision for another call, a self_report PolicyDecision, and a PolicyDecision behind a self_report parent) gives the expected outcome of its control, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined; and assess in all three engines refuses, with catalog.control.min_source_class_unknown and exit 3, a Conduct overlay copy whose CND-05 min_source_class is independent, missing, null, empty, a number, wrongly cased or any, as Python's catalog lint does",
-        "fail": "any case gives another outcome, another set of failing events or another exit code in any engine, quarantines a record, or an unknown min_source_class is not refused with its key and exit"
+        "pass": "every event case in verification/gates/fixtures/source_class/cases.json (the audit probes A to J: a self_report user instruction behind one enforcement-point call; instruction and call all self_report; an ingress tool_output instruction the agent's twin calls user; self_report call, decision and instruction beside an unrelated enforcement-point call and read; an instruction the bundle does not hold; a bare event id; a self_report memory_trusted instruction with no origin; a consequential decision with no instruction; a delegation whose verification failed with no principal; an instruction with no source_class, for CND-04, CND-05 and ROB-02; each beside an enforcement-point-attested twin that stays conformant; and eleven hostile corroborations, each one field away from a conformant attested case: a twin with another content_ref, task, subject, authorised class or principal, a twin whose parent is self_report or tool_output, a twin whose origin read is trust_min untrusted, a PolicyDecision for another call, a self_report PolicyDecision, and a PolicyDecision behind a self_report parent; and an agent's own consequential decision that names no instruction, judged self_report when nothing executes it or the call executing it names none, and judged through the executing call when that call acts on an enforcement-point instruction) gives the expected outcome of its control, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined; and assess in all three engines refuses, with catalog.control.min_source_class_unknown and exit 3, a Conduct overlay copy whose CND-05 min_source_class is independent, missing, null, empty, a number, wrongly cased or any, or whose CND-05 source_class_from is a string, null, holds a wrongly cased or unknown link or a number (with catalog.control.source_class_from_unknown and exit 3), as Python's catalog lint does",
+        "fail": "any case gives another outcome, another set of failing events or another exit code in any engine, quarantines a record, or an unknown min_source_class or source_class_from is not refused with its key and exit"
       },
       "faults": [
         {
           "description": "Python's judged-class comparison always passes, so a self_report instruction behind an enforcement-point call reads CND-05 conformant",
           "file": "engines/python/agentce/source_class.py",
-          "search": "        if judged is not None and judged.rank < floor:\n",
-          "replace": "        if judged is not None and judged.rank < 0:\n"
+          "search": "        if judged.rank < floor:\n",
+          "replace": "        if judged.rank < 0:\n"
         },
         {
           "description": "TypeScript's judged-class comparison always passes, so a self_report instruction behind an enforcement-point call reads CND-05 conformant",
           "file": "engines/typescript/src/sourceClass.ts",
-          "search": "if (judged !== null && judged.rank < floor) {",
-          "replace": "if (judged !== null && judged.rank < 0) {"
+          "search": "if (judged.rank < floor) {",
+          "replace": "if (judged.rank < 0) {"
         },
         {
           "description": "Java's judged-class comparison always passes, so a self_report instruction behind an enforcement-point call reads CND-05 conformant",
           "file": "engines/java/src/main/java/org/agentce/SourceClass.java",
-          "search": "if (judged != null && judged.rank() < floor) {",
-          "replace": "if (judged != null && judged.rank() < 0) {"
+          "search": "if (judged.rank() < floor) {",
+          "replace": "if (judged.rank() < 0) {"
         }
       ],
       "fix_hint": "Run verification/gates/source_class.sh; it names the engine, the case, the outcome and failing events it gave and the ones expected. The rule is below_minimum and judged_class in each engine's source-class module (source_class.py, sourceClass.ts, SourceClass.java), applied after the shape verdict in assess; attestation of an instruction is SourceClassJudge.attested. A refused catalog points at the min_source_class check of each engine's catalog loader."

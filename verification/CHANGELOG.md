@@ -13,10 +13,13 @@ fails if a gate in `gates.json` is not named in this file.
   acted-on instruction's (`evaluation.source_class_from`), which counts as enforcement-point evidence only when an
   enforcement-point record attests it: its own class, an enforcement-point twin with the same content, task, class and
   principal, or an enforcement-point PolicyDecision allowing the acting call for the instruction's principal. The gate
-  runs 41 cases: the audit probes A to J, each with an attested twin that stays conformant, and eleven hostile
-  corroborations, each one field away from a conformant case. It also checks that a `min_source_class` that is not a
-  source class (seven values, among them `any`, a missing member and `Enforcement_Point`) is refused at catalog load
-  with `catalog.control.min_source_class_unknown` and exit 3 in every engine. Three seeded faults, one per engine,
+  runs 44 cases: the audit probes A to J, each with an attested twin that stays conformant, eleven hostile
+  corroborations, each one field away from a conformant case, and three consequential decisions that name no
+  instruction (judged as the agent's own record unless the enforcement-point call executing it acts on an attested
+  instruction). It also checks that a `min_source_class` that is not a source class (seven values, among them `any`, a
+  missing member and `Enforcement_Point`) is refused at catalog load with `catalog.control.min_source_class_unknown`
+  and exit 3 in every engine, and a `source_class_from` that is not a list of known links (five values) with
+  `catalog.control.source_class_from_unknown`. Three seeded faults, one per engine,
   make the judged-class comparison always pass.
 - `VG-CND05-CHAIN` (18.127, changed) now runs 53 cases. A self_report user instruction and a self_report
   memory_trusted one with no origin, each acted on by an enforcement-point call, read `insufficient_evidence`; an

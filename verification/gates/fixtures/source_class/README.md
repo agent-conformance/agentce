@@ -8,7 +8,7 @@ acted-on instruction, which counts as enforcement-point evidence only when an en
 §10.4 (the twin and PolicyDecision witnesses), §6.2.3 (a Ref resolves only by its graph IRI) and Appendix F (the
 authorised instruction classes).
 
-`cases.json` holds three kinds of case:
+`cases.json` holds five kinds of case:
 
 - `probe-*`: the audit probes A to J, each beside an `*-attested-*` twin that an enforcement-point record attests and
   that stays conformant. `control` names the control judged; `expected` is its outcome, failing event ids and the
@@ -18,6 +18,11 @@ authorised instruction classes).
 - `unknown-class-*`: no events. The gate copies `spec/catalogs/overlays/conduct`, sets CND-05's `min_source_class` to
   the value given (or removes it), and every engine must refuse the catalog at load with
   `catalog.control.min_source_class_unknown` and exit 3; Python's `catalog lint` must refuse it too.
+- `decision-no-instruction-*`: the agent's own consequential decision names no instruction. It is judged through the
+  enforcement-point calls that execute it, and as the self_report record it is when none of them acts on an attested
+  instruction; it is never left unjudged.
+- `source-class-from-unknown-*`: no events. As `unknown-class-*`, but CND-05's `source_class_from` is set to the value
+  given, and the refusal key is `catalog.control.source_class_from_unknown`.
 
 `applicability.yaml` names the baseline catalog and the Conduct overlay and two subjects (the other one holds the
 twin recorded under another subject); `domain.linkml.yaml` makes `dom:CreditDecision` consequential.
