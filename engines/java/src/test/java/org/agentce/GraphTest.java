@@ -186,10 +186,11 @@ class GraphTest {
     }
 
     @Test
-    void rob02RuledOnWhenTheGuardRuledOnEveryInputOrThereWereNone() {
+    void rob02RuledOnWhenTheGuardRuledOnEveryInputAndNotWhenThereWereNone() {
         JsonNode write = event("w1", "MemoryWrite", "\"record_ref\": \"mem:r1\", \"trust\": \"trusted\"");
         assertEquals(List.of("true"), ruled(List.of(write, decisionWith("d1", "\"inputs\": [\"mem:r1\"]"))));
-        assertEquals(List.of("true"), ruled(List.of(decisionEvent("d1"))));
+        // A decision nothing recorded flows into used nothing the guard could rule on (ruling 15, 18.127).
+        assertEquals(List.of("false"), ruled(List.of(decisionEvent("d1"))));
     }
 
     @Test
@@ -224,7 +225,9 @@ class GraphTest {
             assertEquals(List.of("false"), ruled(List.of(decisionWith("d1", "\"inputs\": [\"" + ref + "\"]"))), ref);
         }
         JsonNode other = decisionWith("d2", "\"inputs\": [\"mem:missing\"]");
-        assertEquals(List.of("true"), ruled(List.of(decisionEvent("d1"), other)));
+        JsonNode write = event("w1", "MemoryWrite", "\"record_ref\": \"mem:r1\", \"trust\": \"trusted\"");
+        JsonNode used = decisionWith("d1", "\"inputs\": [\"mem:r1\"]");
+        assertEquals(List.of("true"), ruled(List.of(write, used, other)));
     }
 
     @Test

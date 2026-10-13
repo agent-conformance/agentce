@@ -235,8 +235,17 @@ public final class BlindSpots {
                 String cls = normalizeClass(r.has("class") ? r.get("class").asText() : "any");
                 normalizedByKey.add(new GroupKey(event, cls));
             }
+            // A focus below the control's min_source_class (HR-5) misses a record of that type at the minimum.
+            // Never provably sufficient alone: it only ever lands in needed_by.
+            Set<GroupKey> classKeys = new HashSet<>();
+            for (String kind : a.classGap) {
+                classKeys.add(new GroupKey(kind, normalizeClass(t.control().minSourceClass)));
+            }
             CheckRef checkRef = new CheckRef(t.subjectId(), t.catalogId(), t.control().id, t.control().version);
-            if (normalizedByKey.isEmpty()) {
+            for (GroupKey key : classKeys) {
+                groups.computeIfAbsent(key, k -> new Group(k.event(), k.cls())).needed.add(checkRef);
+            }
+            if (normalizedByKey.isEmpty() && classKeys.isEmpty()) {
                 // Every minimum_evidence entry is actually satisfied, yet the shape's own structural
                 // population was still empty (RFC 0008 Sec.4) -- checked regardless of population[0].
                 noPopulation.add(checkRef);
@@ -246,7 +255,7 @@ public final class BlindSpots {
             // exactly one key is missing (no partial credit); the empty-population branch's non-empty
             // missing set is informative but never provably sufficient on its own, so it always lands
             // in needed_by.
-            boolean unlocked = a.population[0] > 0 && normalizedByKey.size() == 1;
+            boolean unlocked = a.population[0] > 0 && normalizedByKey.size() == 1 && classKeys.isEmpty();
             for (GroupKey key : normalizedByKey) {
                 Group group = groups.computeIfAbsent(key, k -> new Group(k.event(), k.cls()));
                 (unlocked ? group.unlocked : group.needed).add(checkRef);

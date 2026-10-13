@@ -205,6 +205,20 @@ public final class Assess {
                 return a;
             }
         }
+        // HR-5: a pass counts only when every focus's judged class meets the control's minimum (SPEC §6.4). The
+        // rule never runs on a non-conformant verdict, which stays non-conformant.
+        SourceClass.Below below = conformant
+                ? SourceClass.belowMinimum(new SourceClass.Judge(store, eventsByIri), result.applicable,
+                        control.minSourceClass, control.sourceClassFrom)
+                : new SourceClass.Below(List.of(), List.of());
+        if (!below.foci().isEmpty()) {
+            Assertions.Assertion a = Assertions.make(control.id, control.version, subject.id, SourceClass.BELOW_MINIMUM_OUTCOME, control.rung, control.mode, win, new int[] {result.applicable.size(), 0}, control.severity, familyOf(control.id));
+            a.evidence = evidence(eventsByIri, below.foci());
+            a.crosswalk = crosswalk;
+            a.sourceClassSatisfied = false;
+            a.classGap = below.kinds();
+            return a;
+        }
         List<String> focusForEvidence;
         if (!result.failing.isEmpty()) {
             focusForEvidence = new ArrayList<>(result.failing);
@@ -221,7 +235,7 @@ public final class Assess {
         }
         assertion.evidence = evidence(eventsByIri, focusForEvidence);
         assertion.crosswalk = crosswalk;
-        assertion.sourceClassSatisfied = Boolean.TRUE;
+        assertion.sourceClassSatisfied = below.foci().isEmpty();
         JsonNode strength = control.raw.get("evidence_strength");
         assertion.evidenceStrength = strength != null && strength.isTextual() ? strength.textValue() : null;
         return assertion;
@@ -294,6 +308,7 @@ public final class Assess {
         copy.sourceClassSatisfied = null;
         copy.evidenceStrength = null;
         copy.withheldNonConformant = nonConformant;
+        copy.classGap = List.of();
         return copy;
     }
 

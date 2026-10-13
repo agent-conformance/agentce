@@ -37,6 +37,7 @@ public final class Catalog {
 
     private static final String EVIDENCE_SHAPE_UNRESOLVED = "catalog.evidence_shape.unresolved";
     private static final String SHAPE_UNRESOLVED = "catalog.shape.unresolved";
+    private static final String MIN_SOURCE_CLASS_UNKNOWN = "catalog.control.min_source_class_unknown";
 
     private Catalog(
             String id,
@@ -62,6 +63,8 @@ public final class Catalog {
         public int rung;
         public String severity;
         public String minSourceClass;
+        /** {@code evaluation.source_class_from}: the graph links to the records the judged class also rests on. */
+        public List<String> sourceClassFrom = new ArrayList<>();
         public List<JsonNode> minimumEvidence = new ArrayList<>();
         public String shapePath;
         public String evidenceShapePath;
@@ -75,11 +78,106 @@ public final class Catalog {
         return v != null && !v.isNull() ? v.asText() : dflt;
     }
 
+    /** The control's {@code evaluation.min_source_class}, exactly one of the SPEC §6.4 classes. Anything else
+     * (missing, null, empty, not a string, {@code any}, another case or another word) is refused when the catalog
+     * loads, never read as no minimum. */
+    private static String minSourceClass(String controlId, JsonNode evaluation) {
+        JsonNode value = evaluation.get("min_source_class");
+        if (value != null && value.isTextual() && SourceClass.RANK.containsKey(value.textValue())) {
+            return value.textValue();
+        }
+        String shown = value == null ? "(missing)" : pyDumps(value);
+        throw new InputError(
+                MIN_SOURCE_CLASS_UNKNOWN,
+                ErrorCatalogue.errorCause(MIN_SOURCE_CLASS_UNKNOWN)
+                        .replace("{control}", controlId)
+                        .replace("{value}", shown),
+                ErrorCatalogue.errorFix(MIN_SOURCE_CLASS_UNKNOWN));
+    }
+
+    /** Python's {@code json.dumps(value, ensure_ascii=False)}: ", " and ": " separators, members in their
+     * order, non-ASCII text as is. */
+    static String pyDumps(JsonNode value) {
+        StringBuilder out = new StringBuilder();
+        pyDumps(value, out);
+        return out.toString();
+    }
+
+    private static void pyDumps(JsonNode value, StringBuilder out) {
+        if (value == null || value.isNull()) {
+            out.append("null");
+        } else if (value.isBoolean()) {
+            out.append(value.booleanValue() ? "true" : "false");
+        } else if (value.isIntegralNumber()) {
+            out.append(value.bigIntegerValue());
+        } else if (value.isNumber()) {
+            out.append(Double.toString(value.doubleValue()).replace("E", "e"));
+        } else if (value.isTextual()) {
+            pyString(value.textValue(), out);
+        } else if (value.isArray()) {
+            out.append('[');
+            for (int i = 0; i < value.size(); i++) {
+                out.append(i > 0 ? ", " : "");
+                pyDumps(value.get(i), out);
+            }
+            out.append(']');
+        } else {
+            out.append('{');
+            boolean first = true;
+            for (Map.Entry<String, JsonNode> e : (Iterable<Map.Entry<String, JsonNode>>) value::fields) {
+                out.append(first ? "" : ", ");
+                first = false;
+                pyString(e.getKey(), out);
+                out.append(": ");
+                pyDumps(e.getValue(), out);
+            }
+            out.append('}');
+        }
+    }
+
+    private static void pyString(String text, StringBuilder out) {
+        out.append('"');
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            switch (ch) {
+                case '"' -> out.append("\\\"");
+                case '\\' -> out.append("\\\\");
+                case '\b' -> out.append("\\b");
+                case '\t' -> out.append("\\t");
+                case '\n' -> out.append("\\n");
+                case '\f' -> out.append("\\f");
+                case '\r' -> out.append("\\r");
+                default -> {
+                    if (ch < 0x20) {
+                        out.append(String.format("\\u%04x", (int) ch));
+                    } else {
+                        out.append(ch);
+                    }
+                }
+            }
+        }
+        out.append('"');
+    }
+
+    private static List<String> sourceClassFrom(JsonNode evaluation) {
+        List<String> names = new ArrayList<>();
+        JsonNode value = evaluation.get("source_class_from");
+        if (value != null && value.isArray()) {
+            for (JsonNode name : value) {
+                if (name.isTextual() && SourceClass.FROM.containsKey(name.textValue())) {
+                    names.add(name.textValue());
+                }
+            }
+        }
+        return names;
+    }
+
     private static ControlSpec controlFromDict(JsonNode data) {
         JsonNode evaluation = data.get("evaluation");
         if (evaluation == null || !evaluation.isObject()) {
             evaluation = Json.nodes().objectNode();
         }
+        String minSourceClass = minSourceClass(text(data, "id", ""), evaluation);
         JsonNode applicability = data.get("applicability");
         if (applicability == null || !applicability.isObject()) {
             applicability = Json.nodes().objectNode();
@@ -97,7 +195,8 @@ public final class Catalog {
         control.mode = text(evaluation, "mode", "");
         control.rung = Integer.parseInt(text(evaluation, "rung", "0"));
         control.severity = text(data, "severity", "");
-        control.minSourceClass = text(evaluation, "min_source_class", "any");
+        control.minSourceClass = minSourceClass;
+        control.sourceClassFrom = sourceClassFrom(evaluation);
         JsonNode minEvidence = evaluation.get("minimum_evidence");
         if (minEvidence != null && minEvidence.isArray()) {
             minEvidence.forEach(control.minimumEvidence::add);
@@ -256,7 +355,12 @@ public final class Catalog {
     /** A synthetic catalog carrying only {@code controls}, for tests that need specific
      * {@code minimum_evidence} shapes without a fixture directory on disk. */
     static Catalog forTest(String id, String version, List<ControlSpec> controls) {
-        return new Catalog(id, version, null, controls, Map.of(), Map.of());
+        return forTest(id, version, null, controls);
+    }
+
+    /** As {@link #forTest(String, String, List)}, read from {@code directory} for its digest only. */
+    static Catalog forTest(String id, String version, Path directory, List<ControlSpec> controls) {
+        return new Catalog(id, version, directory, controls, Map.of(), Map.of());
     }
 
     /** Files left out of a catalog's provenance digest: the detached signature and {@code catalog.yaml}

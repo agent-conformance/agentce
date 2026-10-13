@@ -29,7 +29,7 @@ class BlindSpotsTest {
         c.mode = "automated";
         c.rung = 2;
         c.severity = "medium";
-        c.minSourceClass = "any";
+        c.minSourceClass = "self_report";
         c.minimumEvidence = minimumEvidence;
         c.tolerance = Json.parse("{\"kind\":\"count\",\"max\":0}");
         return c;

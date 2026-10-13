@@ -387,6 +387,8 @@ public final class Graph {
         private final Map<String, Set<String>> decisionNotice = new LinkedHashMap<>(); // Decision IRI -> every notifying Notice IRI (order-independent)
         private final Set<String> danglingNodes = new LinkedHashSet<>(); // event IRI -> has >=1 agentce:danglingRef literal
         private final Map<String, Boolean> instructionUntrusted = new LinkedHashMap<>(); // Instruction IRI -> untrusted flag
+        // Instructions that declare no source class: ROB-02 taint seeds of their own (18.127).
+        private final Set<String> instructionUnclassed = new LinkedHashSet<>();
         // DOC-01: family -> declared name -> the union of its declared pins over every BundleLoaded manifest in the
         // subject's records (empty: any version matches), so event order does not matter.
         private final Map<String, Map<String, Set<String>>> declared =
@@ -706,6 +708,10 @@ public final class Graph {
             String sourceClass = str(data.get("source_class"));
             boolean untrusted = untrustedSourceClass(sourceClass);
             instructionUntrusted.put(node, untrusted);
+            if (sourceClass == null) {
+                // No class at all (or not a string): ROB-02 reads it as untrusted content (18.127).
+                instructionUnclassed.add(node);
+            }
             store.addLiteral(node, "agentce:instructionUntrusted", untrusted ? "true" : "false", BOOL);
         }
 
@@ -802,7 +808,7 @@ public final class Graph {
          * guard verdict is quarantine or block, or which carries no trust and no verdict but an
          * untrusted Appendix F {@code provenance_origin_class}; a MemoryRead whose {@code trust_min}
          * is untrusted or quarantined; and an instruction with an untrusted Appendix F source class
-         * (CND-05's rule). Content the guard never ruled on starts at a MemoryRead not reported by an
+         * (CND-05's rule), or with none (ROB-02 only). Content the guard never ruled on starts at a MemoryRead not reported by an
          * enforcement point, a record no ruled enforcement-point write and no enforcement-point read
          * with a {@code trust_min} covers, and a ref the bundle does not hold. Both flow along every
          * edge that carries content into an event (CONTENT_IN, CONTENT_OUT, a read to its consumer, a
@@ -898,8 +904,35 @@ public final class Graph {
                     unruled.add(ref);
                 }
             }
+            Set<String> fed = new LinkedHashSet<>();
+            flows.values().forEach(fed::addAll);
             reach(tainted, flows);
             reach(unruled, flows);
+            // An instruction that declares no source class cannot show its content came from a trusted source, so
+            // ROB-02 reads it as untrusted content (18.127); CND-05's own chain rule already fails it, so it stays
+            // out of the closures returned to that rule.
+            Set<String> unclassed = new LinkedHashSet<>(instructionUnclassed);
+            reach(unclassed, flows);
+            // A decision nothing recorded flows into used nothing the guard could have ruled on, so ROB-02 cannot
+            // judge it (ruling 15): it reads untrustedContentRuledOn false itself, and taints nothing downstream.
+            Set<String> robustTainted = new LinkedHashSet<>(tainted);
+            robustTainted.addAll(unclassed);
+            Set<String> robustUnruled = new LinkedHashSet<>(unruled);
+            for (JsonNode event : events) {
+                if ("Decision".equals(ptype(event))) {
+                    String node = Iri.eventIri(event.get("id").asText());
+                    if (!fed.contains(node)) {
+                        robustUnruled.add(node);
+                    }
+                }
+            }
+            robustLiterals(events, robustTainted, robustUnruled);
+            tainted.addAll(unruled);
+            return tainted;
+        }
+
+        /** ROB-02's two literals on each decision in {@code events} (see {@link #robustToUntrusted}). */
+        private void robustLiterals(List<JsonNode> events, Set<String> tainted, Set<String> unruled) {
             for (JsonNode event : events) {
                 if ("Decision".equals(ptype(event))) {
                     String node = Iri.eventIri(event.get("id").asText());
@@ -909,8 +942,6 @@ public final class Graph {
                             node, "agentce:untrustedContentRuledOn", unruled.contains(node) ? "false" : "true", BOOL);
                 }
             }
-            tainted.addAll(unruled);
-            return tainted;
         }
 
         private static void flow(Map<String, Set<String>> flows, String source, String target) {

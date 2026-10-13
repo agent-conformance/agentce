@@ -479,7 +479,9 @@ class ReportTest {
 
     @Test
     void buildManifestCarriesTheCatalogsRealContentDigestNeverTheAllZeroConstant() throws IOException {
-        Catalog fixture = Catalog.load(DIGEST_FIXTURE);
+        // The fixture tree is a digest vector, not a loadable catalog: its controls/catalog.yaml declares no
+        // min_source_class, which a load refuses (18.127), so only its folder is read, for the digest.
+        Catalog fixture = Catalog.forTest("fixture", "1", DIGEST_FIXTURE, List.of());
         ObjectNode manifest = Report.buildManifest(
                 "sha256:abc", List.of("fixture@1"), Map.of(), "test", List.of(), List.of(), "en", List.of(fixture));
         JsonNode ref = manifest.get("inputs").get("catalogs").get(0);

@@ -72,6 +72,7 @@ public final class Assertions {
         c.deviation = a.deviation;
         c.crosswalk = new ArrayList<>(a.crosswalk);
         c.withheldNonConformant = a.withheldNonConformant;
+        c.classGap = a.classGap;
         return c;
     }
 
@@ -98,6 +99,10 @@ public final class Assertions {
          * ones reads non-conformant (18.149): assess exits as for a non-conformant outcome. Run state for the exit
          * code only; never written to assertions.json. */
         public boolean withheldNonConformant;
+        /** The record types whose class put a focus below the control's {@code min_source_class} when that alone
+         * made this outcome insufficient_evidence (HR-5): what is missing is a record of those types at the minimum.
+         * Run state for the missing-evidence text; never written to assertions.json. */
+        public List<String> classGap = List.of();
 
         public ObjectNode toJson() {
             ObjectNode record = Json.nodes().objectNode();
