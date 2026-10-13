@@ -5,6 +5,8 @@
     ./verification/run --full                   run every gate (quick and full tiers)
     ./verification/run --gate <ID> [--json]     run one gate
     ./verification/run --demo-fault <ID>        break the gate's target on purpose, show RED, restore, show GREEN
+    ./verification/run --demo-fault <ID> --fault <N> [--fault <N> ...]
+                                                the same for the gate's seeded faults N only (0-based)
     ./verification/run --lint-registry          check the gate registry itself
     ./verification/run --lint-registry --demo-reject
                                                 show the lint rejecting deliberately bad registries
@@ -185,9 +187,12 @@ def run_gate(gate: dict[str, Any], root: Path) -> dict[str, Any]:
     return {**failed, "reason": f"exit code {proc.returncode}", "output_tail": tail}
 
 
-def demo_fault(gate: dict[str, Any], root: Path) -> dict[str, Any]:
-    """Apply each seeded fault in place, expect RED, restore the exact bytes, expect GREEN."""
-    faults = gate["faults"]
+def demo_fault(
+    gate: dict[str, Any], root: Path, chosen: list[int] | None = None
+) -> dict[str, Any]:
+    """Apply each seeded fault in place (or only the ``chosen`` indexes), expect RED, restore the
+    exact bytes, expect GREEN."""
+    faults = [gate["faults"][index] for index in chosen or range(len(gate["faults"]))]
     red_on_fault = True
     restored = True
     for fault in faults:
@@ -207,9 +212,34 @@ def demo_fault(gate: dict[str, Any], root: Path) -> dict[str, Any]:
     return {
         "id": gate["id"],
         "faults": [fault["description"] for fault in faults],
+        "fault_indexes": list(chosen or range(len(gate["faults"]))),
         "red_on_fault": red_on_fault,
         "green_after_restore": restored and run_gate(gate, root)["status"] == "pass",
     }
+
+
+def option_refusal(args: argparse.Namespace) -> str | None:
+    """The message key refusing an option the chosen command would otherwise ignore."""
+    if args.fault is not None and not args.demo_fault:
+        return "suite.fault_without_demo: --fault needs --demo-fault <ID>"
+    if args.demo_reject and not args.lint_registry:
+        return "suite.demo_reject_without_lint: --demo-reject needs --lint-registry"
+    if args.demo_reject and args.registry != HERE / "gates.json":
+        return "suite.registry_with_demo_reject: --demo-reject lints its own bad registries"
+    if args.json and (args.list or args.lint_registry):
+        return "suite.json_not_supported: --json applies to --quick, --full, --gate and --demo-fault"
+    return None
+
+
+def fault_refusal(chosen: list[int] | None, count: int) -> str | None:
+    """The message key refusing ``--fault`` values that are not distinct indexes below ``count``."""
+    if chosen is None:
+        return None
+    if any(not 0 <= index < count for index in chosen):
+        return f"suite.unknown_fault: {chosen}"
+    if len(set(chosen)) != len(chosen):
+        return f"suite.repeated_fault: {chosen}"
+    return None
 
 
 def summarise(
@@ -299,19 +329,30 @@ def bad_registries(root: Path) -> dict[str, tuple[dict[str, Any], str]]:
 
 def parse(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        prog="verification/run", description=__doc__.split("\n\n")[0]
+        prog="verification/run",
+        description=__doc__.split("\n\n")[0],
+        allow_abbrev=False,
     )
-    parser.add_argument(
+    # one command per call, so no command's value is silently dropped for another's
+    command = parser.add_mutually_exclusive_group()
+    command.add_argument(
         "--quick", action="store_true", help="run the quick tier (offline)"
     )
-    parser.add_argument("--full", action="store_true", help="run every tier")
-    parser.add_argument("--gate", metavar="ID", help="run one gate")
-    parser.add_argument(
+    command.add_argument("--full", action="store_true", help="run every tier")
+    command.add_argument("--gate", metavar="ID", help="run one gate")
+    command.add_argument(
         "--demo-fault",
         metavar="ID",
         help="show a gate turn RED on a seeded fault, then GREEN",
     )
     parser.add_argument(
+        "--fault",
+        metavar="N",
+        type=int,
+        action="append",
+        help="with --demo-fault: demo only seeded fault N (0-based); repeatable",
+    )
+    command.add_argument(
         "--lint-registry", action="store_true", help="check the gate registry"
     )
     parser.add_argument(
@@ -319,7 +360,7 @@ def parse(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="with --lint-registry: reject bad registries",
     )
-    parser.add_argument("--list", action="store_true", help="print the gate ids")
+    command.add_argument("--list", action="store_true", help="print the gate ids")
     parser.add_argument("--json", action="store_true", help="machine-readable output")
     parser.add_argument(
         "--registry", type=Path, default=HERE / "gates.json", help=argparse.SUPPRESS
@@ -332,6 +373,10 @@ def parse(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str]) -> int:
     args = parse(argv)
+    refused = option_refusal(args)
+    if refused:
+        print(refused, file=sys.stderr)
+        return 2
     root = args.root.resolve()
     if args.lint_registry and args.demo_reject:
         caught = True
@@ -363,12 +408,22 @@ def main(argv: list[str]) -> int:
             print(f"suite.unknown_gate: {chosen}", file=sys.stderr)
             return 2
         if args.demo_fault:
-            outcome = demo_fault(gates[chosen], root)
+            count = len(gates[chosen]["faults"])
+            refused = fault_refusal(args.fault, count)
+            if refused:
+                print(f"{refused}: {chosen} has {count} fault(s)", file=sys.stderr)
+                return 2
+            outcome = demo_fault(gates[chosen], root, args.fault)
+            which = (
+                f" faults {','.join(map(str, args.fault))} of {count}"
+                if args.fault
+                else ""
+            )
             emit(
                 outcome,
                 args.json,
                 [
-                    f"{chosen}: RED on the seeded fault: {outcome['red_on_fault']}; GREEN after restore: {outcome['green_after_restore']}"
+                    f"{chosen}{which}: RED on the seeded fault: {outcome['red_on_fault']}; GREEN after restore: {outcome['green_after_restore']}"
                 ],
             )
             return (
