@@ -192,7 +192,8 @@ def demo_fault(
 ) -> dict[str, Any]:
     """Apply each seeded fault in place (or only the ``chosen`` indexes), expect RED, restore the
     exact bytes, expect GREEN."""
-    faults = [gate["faults"][index] for index in chosen or range(len(gate["faults"]))]
+    indexes = chosen or list(range(len(gate["faults"])))
+    faults = [gate["faults"][index] for index in indexes]
     red_on_fault = True
     restored = True
     for fault in faults:
@@ -212,7 +213,7 @@ def demo_fault(
     return {
         "id": gate["id"],
         "faults": [fault["description"] for fault in faults],
-        "fault_indexes": list(chosen or range(len(gate["faults"]))),
+        "fault_indexes": indexes,
         "red_on_fault": red_on_fault,
         "green_after_restore": restored and run_gate(gate, root)["status"] == "pass",
     }

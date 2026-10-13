@@ -96,8 +96,8 @@
         {
           "description": "main()'s demo path deals the chunks round-robin while balanced_shards() stays correct, so every function-level check passes but CI runs unbalanced shards",
           "file": "verification/shard.py",
-          "search": "    chunks = balanced_shards(pairs, total, load_durations())[shard]\n",
-          "replace": "    chunks = demo_chunks(pairs, load_durations())[shard::total]\n"
+          "search": "    chunks = balanced_shards(pairs, total, durations)[shard]\n",
+          "replace": "    chunks = demo_chunks(pairs, durations)[shard::total]\n"
         },
         {
           "file": "verification/shard.py",
@@ -113,7 +113,7 @@
         },
         {
           "file": "verification/run",
-          "search": "faults = [gate[\"faults\"][index] for index in chosen or range(len(gate[\"faults\"]))]",
+          "search": "faults = [gate[\"faults\"][index] for index in indexes]",
           "replace": "faults = list(gate[\"faults\"])",
           "description": "./verification/run --demo-fault ignores --fault and demos every fault of the gate, so each chunk of a cut gate repeats the whole gate's demo and the lanes run far past their estimates"
         }

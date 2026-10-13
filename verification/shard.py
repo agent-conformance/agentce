@@ -103,13 +103,13 @@ def _costed_chunks(
     ]
 
 
-def balanced_shards(
+def _deal(
     pairs: list[Pair], total: int, durations: dict[str, Any]
-) -> list[list[list[Pair]]]:
-    """Every shard's chunks: longest estimate first (ties in ``pairs`` order), each to the shard
-    with the least load so far (ties to the lowest index). Each chunk is placed once and the chunks
-    partition ``pairs``, so every pair lands in exactly one shard; no clock or randomness, so every
-    job computes the same split."""
+) -> tuple[list[list[list[Pair]]], list[float]]:
+    """Every shard's chunks and estimated seconds: longest estimate first (ties in ``pairs``
+    order), each to the shard with the least load so far (ties to the lowest index). Each chunk is
+    placed once and the chunks partition ``pairs``, so every pair lands in exactly one shard; no
+    clock or randomness, so every job computes the same split."""
     shards: list[list[list[Pair]]] = [[] for _ in range(total)]
     loads = [0.0] * total
     # sorted() is stable, so equal estimates keep their ``pairs`` order
@@ -117,7 +117,14 @@ def balanced_shards(
         lightest = loads.index(min(loads))
         shards[lightest].append(chunk)
         loads[lightest] += seconds
-    return shards
+    return shards, loads
+
+
+def balanced_shards(
+    pairs: list[Pair], total: int, durations: dict[str, Any]
+) -> list[list[list[Pair]]]:
+    """Every shard's chunks (see ``_deal()``)."""
+    return _deal(pairs, total, durations)[0]
 
 
 def balanced_partition(
@@ -135,11 +142,7 @@ def shard_minutes(
     pairs: list[Pair], total: int, durations: dict[str, Any]
 ) -> list[float]:
     """Each demo shard's estimated minutes at ``total`` shards."""
-    faults = Counter(gate for gate, _ in pairs)
-    return [
-        sum(chunk_seconds(chunk, durations, faults[chunk[0][0]]) for chunk in mine) / 60
-        for mine in balanced_shards(pairs, total, durations)
-    ]
+    return [seconds / 60 for seconds in _deal(pairs, total, durations)[1]]
 
 
 def balance_problems(
@@ -270,10 +273,12 @@ def main(argv: list[str]) -> int:
     pairs = demo_pairs(gates, registry)
     if balance:
         return balance_check(pairs, total)
-    chunks = balanced_shards(pairs, total, load_durations())[shard]
+    durations = load_durations()
     if dry_run:
-        print("\n".join(f"{gate} {fault}" for chunk in chunks for gate, fault in chunk))
+        dealt = balanced_partition(pairs, shard, total, durations)
+        print("\n".join(f"{gate} {fault}" for gate, fault in dealt))
         return 0
+    chunks = balanced_shards(pairs, total, durations)[shard]
     print(
         f"{label}: {len(chunks)} chunk(s): {[demo_args(c) for c in chunks]}",
         file=sys.stderr,
