@@ -752,12 +752,15 @@ public final class Graph {
          * anything ROB-02's closures reached ({@code tainted}: an untrusted memory read or write, content
          * the memory guard never ruled on, or content that used either). An instruction whose source
          * class is not a declared trusted one (none given, say) cannot show a trusted root either, so it
-         * fails closed. A closure over all events, so the acting event may precede its instruction and
+         * fails closed. So does an action whose {@code refs.instruction} names no held Instruction (nothing
+         * the bundle holds, or an event or record of another type: SPEC §6.2.3 types the ref
+         * Ref→Instruction). A closure over all events, so the acting event may precede its instruction and
          * cycles end. */
         private void actsOnUntrusted(List<JsonNode> events, Set<String> tainted) {
             Set<String> untrusted = new LinkedHashSet<>(tainted);
             Map<String, Set<String>> derived = new LinkedHashMap<>();
             Set<String> held = new LinkedHashSet<>();
+            Set<String> instructions = new LinkedHashSet<>();
             for (JsonNode event : events) {
                 String ptype = ptype(event);
                 String node = Iri.eventIri(event.get("id").asText());
@@ -765,6 +768,7 @@ public final class Graph {
                 if ("ToolCall".equals(ptype) || "ResourceAccess".equals(ptype)) {
                     untrusted.add(node);
                 } else if ("Instruction".equals(ptype)) {
+                    instructions.add(node);
                     if (!isOneOf(dataOf(event).get("source_class"), TRUSTED_INSTRUCTION)) {
                         untrusted.add(node);
                     }
@@ -783,7 +787,8 @@ public final class Graph {
                     continue;
                 }
                 String instruction = str(refsOf(event).get("instruction"));
-                boolean acts = instruction != null && untrusted.contains(instruction);
+                boolean acts = instruction != null
+                        && (untrusted.contains(instruction) || !instructions.contains(instruction));
                 store.addLiteral(
                         Iri.eventIri(event.get("id").asText()),
                         "agentce:actsOnUntrusted",

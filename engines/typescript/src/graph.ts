@@ -731,12 +731,15 @@ class Builder {
    * bundle does not hold, and at anything ROB-02's closures reached (`tainted`: an untrusted memory
    * read or write, content the memory guard never ruled on, or content that used either). An instruction
    * whose source class is not a declared trusted one (none given, say) cannot show a trusted root
-   * either, so it fails closed. A closure over all events, so the acting event may precede its
-   * instruction and cycles end. */
+   * either, so it fails closed. So does an action whose `refs.instruction` names no held Instruction
+   * (nothing the bundle holds, or an event or record of another type: SPEC §6.2.3 types the ref
+   * Ref→Instruction). A closure over all events, so the acting event may precede its instruction and
+   * cycles end. */
   private actsOnUntrusted(events: Event[], tainted: Set<string>): void {
     const untrusted = new Set(tainted);
     const derived = new Map<string, Set<string>>();
     const held = new Set<string>();
+    const instructions = new Set<string>();
     for (const event of events) {
       const ptype = this.ptype(event);
       const node = eventIri(String(event.id));
@@ -744,6 +747,7 @@ class Builder {
       if (ptype === "ToolCall" || ptype === "ResourceAccess") {
         untrusted.add(node);
       } else if (ptype === "Instruction") {
+        instructions.add(node);
         if (!isOneOf(dataOf(event).source_class, TRUSTED_INSTRUCTION)) {
           untrusted.add(node);
         }
@@ -766,7 +770,9 @@ class Builder {
         continue;
       }
       const instruction = refsOf(event).instruction;
-      const acts = typeof instruction === "string" && untrusted.has(instruction);
+      const acts =
+        typeof instruction === "string" &&
+        (untrusted.has(instruction) || !instructions.has(instruction));
       this.store.addLiteral(
         eventIri(String(event.id)),
         "agentce:actsOnUntrusted",

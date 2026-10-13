@@ -616,11 +616,14 @@ class _Builder:
         anything ROB-02's closures reached (``tainted``: an untrusted memory read or write, content
         the memory guard never ruled on, or content that used either). An instruction whose source
         class is not a declared trusted one (none given, say) cannot show a trusted root either, so
-        it fails closed. A closure over all events, so the acting event may precede its instruction
+        it fails closed. So does an action whose ``refs.instruction`` names no held Instruction
+        (nothing the bundle holds, or an event or record of another type: SPEC §6.2.3 types the ref
+        Ref→Instruction). A closure over all events, so the acting event may precede its instruction
         and cycles end."""
         untrusted = set(tainted)
         derived: dict[str, set[str]] = {}
         held: set[str] = set()
+        instructions: set[str] = set()
         for event in events:
             ptype = self._ptype(event)
             node = event_iri(str(event["id"]))
@@ -628,6 +631,7 @@ class _Builder:
             if ptype in ("ToolCall", "ResourceAccess"):
                 untrusted.add(node)
             elif ptype == "Instruction":
+                instructions.add(node)
                 source_class = _data(event).get("source_class")
                 if not _is_one_of(source_class, _TRUSTED_INSTRUCTION):
                     untrusted.add(node)
@@ -642,7 +646,9 @@ class _Builder:
             if ptype not in ("ToolCall", "Decision"):
                 continue
             instruction = _refs(event).get("instruction")
-            acts = isinstance(instruction, str) and instruction in untrusted
+            acts = isinstance(instruction, str) and (
+                instruction in untrusted or instruction not in instructions
+            )
             self.store.add_literal(
                 event_iri(str(event["id"])),
                 "agentce:actsOnUntrusted",
