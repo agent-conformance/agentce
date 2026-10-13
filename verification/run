@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -34,6 +35,8 @@ TIERS = ("quick", "full")
 GATE_ID = re.compile(r"^VG-[A-Z0-9]+(-[A-Z0-9]+)*(@[0-9A-Za-z.]+)?$")
 CHANGELOG_VERSION = re.compile(r"^## ([0-9]+\.[0-9]+\.[0-9]+)", re.MULTILINE)
 TAIL_LINES = 20
+# "<gate id> <fault index>" of the fault a demo has applied, for the runs that demo makes
+DEMO_FAULT_ENV = "VERIFICATION_DEMO_FAULT"
 CLAIMS_REGISTER = Path("tools/claims/register.yaml")
 
 
@@ -122,14 +125,19 @@ def lint_registry(registry: dict[str, Any], root: Path) -> list[str]:
         if not (isinstance(faults, list) and faults):
             problems.append(f"registry.gate_without_fault: {gid}")
             faults = []
-        for fault in faults:
-            problems.extend(lint_fault(gid, fault, root))
+        applied = os.environ.get(DEMO_FAULT_ENV, "")
+        for index, fault in enumerate(faults):
+            problems.extend(lint_fault(gid, fault, root, applied == f"{gid} {index}"))
         if gid not in changelog:
             problems.append(f"registry.gate_not_in_changelog: {gid}")
     return problems
 
 
-def lint_fault(gid: str, fault: dict[str, Any], root: Path) -> list[str]:
+def lint_fault(
+    gid: str, fault: dict[str, Any], root: Path, applied: bool = False
+) -> list[str]:
+    """``applied``: a demo has this fault in place, so a gate that calls the runner while it is
+    demoed sees the replace text where the search text was, and is judged on what it checks."""
     target = root / str(fault.get("file", ""))
     search, replace = fault.get("search"), fault.get("replace")
     if not (
@@ -141,7 +149,10 @@ def lint_fault(gid: str, fault: dict[str, Any], root: Path) -> list[str]:
         return [f"registry.bad_fault: {gid}"]
     if not target.is_file():
         return [f"registry.fault_target_missing: {gid} {fault.get('file')}"]
-    if target.read_text(encoding="utf-8").count(search) != 1:
+    text = target.read_text(encoding="utf-8")
+    if applied and replace in text:
+        return []
+    if text.count(search) != 1:
         return [
             f"registry.fault_not_applicable: {gid} {fault.get('file')} (the search text must occur exactly once)"
         ]
@@ -196,9 +207,10 @@ def demo_fault(
     faults = [gate["faults"][index] for index in indexes]
     red_on_fault = True
     restored = True
-    for fault in faults:
+    for index, fault in zip(indexes, faults):
         target = root / fault["file"]
         original = target.read_bytes()
+        os.environ[DEMO_FAULT_ENV] = f"{gate['id']} {index}"
         try:
             target.write_bytes(
                 original.decode("utf-8")
@@ -208,6 +220,7 @@ def demo_fault(
             if run_gate(gate, root)["status"] != "fail":
                 red_on_fault = False
         finally:
+            del os.environ[DEMO_FAULT_ENV]
             target.write_bytes(original)
             restored = restored and target.read_bytes() == original
     return {
@@ -217,6 +230,17 @@ def demo_fault(
         "red_on_fault": red_on_fault,
         "green_after_restore": restored and run_gate(gate, root)["status"] == "pass",
     }
+
+
+def repeat_refusal(argv: list[str]) -> str | None:
+    """The message key refusing a non-repeatable option given twice (argparse keeps the last)."""
+    seen = Counter(arg.split("=", 1)[0] for arg in argv if arg.startswith("--"))
+    repeated = sorted(
+        opt for opt, count in seen.items() if count > 1 and opt != "--fault"
+    )
+    if repeated:
+        return f"suite.repeated_option: {', '.join(repeated)} may be given once"
+    return None
 
 
 def option_refusal(args: argparse.Namespace) -> str | None:
@@ -328,6 +352,13 @@ def bad_registries(root: Path) -> dict[str, tuple[dict[str, Any], str]]:
     }
 
 
+def path_value(value: str) -> Path:
+    """A path option's value; an empty one would quietly mean the working folder."""
+    if not value:
+        raise argparse.ArgumentTypeError("suite.empty_value: a path is needed")
+    return Path(value)
+
+
 def parse(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="verification/run",
@@ -364,17 +395,20 @@ def parse(argv: list[str]) -> argparse.Namespace:
     command.add_argument("--list", action="store_true", help="print the gate ids")
     parser.add_argument("--json", action="store_true", help="machine-readable output")
     parser.add_argument(
-        "--registry", type=Path, default=HERE / "gates.json", help=argparse.SUPPRESS
+        "--registry",
+        type=path_value,
+        default=HERE / "gates.json",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
-        "--root", type=Path, default=DEFAULT_ROOT, help=argparse.SUPPRESS
+        "--root", type=path_value, default=DEFAULT_ROOT, help=argparse.SUPPRESS
     )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str]) -> int:
     args = parse(argv)
-    refused = option_refusal(args)
+    refused = repeat_refusal(argv) or option_refusal(args)
     if refused:
         print(refused, file=sys.stderr)
         return 2

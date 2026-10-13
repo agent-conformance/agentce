@@ -22,8 +22,9 @@ from `agentce verify`, which checks a report's signature and integrity.
 It needs Python 3 for the runner itself, plus whatever a gate lists under `requires` (for example `uv`). A gate
 whose tool is missing is reported as `skipped` with the reason, never as `pass`. Exit codes: 0 no gate failed,
 1 a gate failed or the registry was rejected, 2 the command line was refused: a gate or fault that does not exist,
-two commands at once, or an option the command does not use (`--fault` without `--demo-fault`, `--json` with
-`--list` or `--lint-registry`, `--demo-reject` without `--lint-registry`). Each refusal names its message key.
+two commands at once, an option given twice (only `--fault` repeats), or an option the command does not use
+(`--fault` without `--demo-fault`, `--json` with `--list` or `--lint-registry`, `--demo-reject` without
+`--lint-registry`). Each refusal names its message key.
 
 ## What a gate is
 

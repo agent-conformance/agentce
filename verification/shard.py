@@ -273,12 +273,11 @@ def main(argv: list[str]) -> int:
     pairs = demo_pairs(gates, registry)
     if balance:
         return balance_check(pairs, total)
-    durations = load_durations()
+    # one slice for both paths, so the dry-run the gate judges is the slice CI runs
+    chunks = balanced_shards(pairs, total, load_durations())[shard]
     if dry_run:
-        dealt = balanced_partition(pairs, shard, total, durations)
-        print("\n".join(f"{gate} {fault}" for gate, fault in dealt))
+        print("\n".join(f"{gate} {fault}" for chunk in chunks for gate, fault in chunk))
         return 0
-    chunks = balanced_shards(pairs, total, durations)[shard]
     print(
         f"{label}: {len(chunks)} chunk(s): {[demo_args(c) for c in chunks]}",
         file=sys.stderr,

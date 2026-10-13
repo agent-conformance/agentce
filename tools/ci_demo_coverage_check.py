@@ -358,42 +358,61 @@ def dry_run_problems(
 def fault_selection_problems(scratch: Path) -> list[str]:
     """``./verification/run --demo-fault <ID> --fault <N>`` runs only fault N, on a throwaway
     registry whose fault 0 never turns its gate RED: selecting fault 1 alone must exit 0 and
-    report index 1 only, the whole gate must exit 1, and a bad selection must be refused (2)."""
+    report index 1 only, the whole gate must exit 1, and a bad selection must be refused (2).
+    VG-NEST calls the runner itself and does not judge c.txt, so its demo must exit 1: the runner
+    it calls accepts the fault the demo applied instead of turning it RED for any fault."""
     (scratch / "verification").mkdir(parents=True, exist_ok=True)
     (scratch / "AGENTS.md").write_text("an invariant\n", encoding="utf-8")
     (scratch / "verification" / "CHANGELOG.md").write_text(
-        "## 1.0.0\n\nVG-PICK\n", encoding="utf-8"
+        "## 1.0.0\n\nVG-PICK VG-NEST\n", encoding="utf-8"
     )
     (scratch / "a.txt").write_text("ok\n", encoding="utf-8")
     (scratch / "b.txt").write_text("ok\n", encoding="utf-8")
+    (scratch / "c.txt").write_text("ok\n", encoding="utf-8")
     fault = {"search": "ok", "replace": "no"}
+    path = scratch / "gates.json"
+    runner = ["python3", str(REPO_ROOT / "verification" / "run")]
+    pick = {"tier": "quick", "timeout_s": 30, "invariant": "an invariant"}
     registry = {
         "version": 1,
         "suite_version": "1.0.0",
         "gates": [
             {
+                **pick,
                 "id": "VG-PICK",
                 "title": "b.txt says ok",
-                "tier": "quick",
                 "cmd": ["grep", "-q", "ok", "b.txt"],
-                "timeout_s": 30,
-                "invariant": "an invariant",
                 "rubric": {"pass": "ok", "fail": "not ok"},
                 "faults": [
                     {**fault, "file": "a.txt", "description": "a.txt (not judged)"},
                     {**fault, "file": "b.txt", "description": "b.txt (judged)"},
                 ],
-            }
+            },
+            {
+                **pick,
+                "id": "VG-NEST",
+                "title": "the runner lists the gates",
+                "cmd": [
+                    *runner,
+                    "--list",
+                    "--registry",
+                    str(path),
+                    "--root",
+                    str(scratch),
+                ],
+                "rubric": {"pass": "listed", "fail": "not listed"},
+                "faults": [
+                    {**fault, "file": "c.txt", "description": "c.txt (not judged)"}
+                ],
+            },
         ],
     }
-    path = scratch / "gates.json"
     path.write_text(json.dumps(registry), encoding="utf-8")
 
     def run(*args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [
-                "python3",
-                str(REPO_ROOT / "verification" / "run"),
+                *runner,
                 *args,
                 "--registry",
                 str(path),
@@ -421,6 +440,11 @@ def fault_selection_problems(scratch: Path) -> list[str]:
         problems.append(
             f"--demo-fault VG-PICK (fault 0 never RED) exited {whole.returncode}, not 1"
         )
+    nested = run("--demo-fault", "VG-NEST")
+    if nested.returncode != 1:
+        problems.append(
+            f"--demo-fault VG-NEST (calls the runner, c.txt never judged) exited {nested.returncode}, not 1"
+        )
     refusals = [
         (["--fault", "1"], "suite.fault_without_demo"),
         (["--list", "--fault", "1"], "suite.fault_without_demo"),
@@ -434,6 +458,12 @@ def fault_selection_problems(scratch: Path) -> list[str]:
         (["--list", "--json"], "suite.json_not_supported"),
         (["--lint-registry", "--json"], "suite.json_not_supported"),
         (["--gate", "VG-PICK", "--demo-fault", "VG-PICK"], "not allowed with"),
+        (["--gate", "VG-PICK", "--gate", "VG-PICK"], "suite.repeated_option"),
+        (
+            ["--demo-fault", "VG-PICK", "--demo-fault", "VG-NEST", "--fault", "0"],
+            "suite.repeated_option",
+        ),
+        (["--root=", "--list"], "suite.empty_value"),
     ]
     for args, key in refusals:
         got = run(*args)

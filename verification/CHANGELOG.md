@@ -12,8 +12,12 @@ fails if a gate in `gates.json` is not named in this file.
   `--dry-run` prints one `<gate> <fault>` line per pair. `--balance-check` also fails a shard over
   `lane_bound_minutes`. The gate now checks that every registered fault lands in exactly one shard, both in the dealt
   pairs and in the arguments handed to the runner, and that the runner runs only the selected faults and refuses
-  options a command would ignore. Three new seeded faults: a pair dealt twice, a pair left off the runner's command
-  line, and the runner ignoring `--fault`.
+  options a command would ignore, a command option given twice (`suite.repeated_option`) and an empty `--root` or
+  `--registry` (`suite.empty_value`). `--dry-run` prints the same slice the run hands the runner. While a demo has a
+  fault applied, a runner the gate calls accepts that one fault in the registry lint, so a gate that calls the runner
+  turns RED for what it checks, not for the lint. Five new seeded faults: a pair dealt twice, a pair left off the
+  runner's command line, the runner ignoring `--fault`, the lint refusing the applied fault, and a repeated option
+  accepted.
 
 ## 0.101.0
 
