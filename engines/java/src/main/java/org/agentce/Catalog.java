@@ -288,8 +288,10 @@ public final class Catalog {
             return Files.readAttributes(path, BasicFileAttributes.class);
         } catch (NoSuchFileException e) {
             return null;
+        } catch (AccessDeniedException e) {
+            throw new IllegalStateException("cannot read " + path + ": " + e.getMessage(), e);
         } catch (IOException e) {
-            if (!(e instanceof AccessDeniedException) && Files.isSymbolicLink(path)) {
+            if (Files.isSymbolicLink(path)) {
                 return null;
             }
             throw new IllegalStateException("cannot read " + path + ": " + e.getMessage(), e);

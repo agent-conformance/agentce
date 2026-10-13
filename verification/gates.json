@@ -2103,8 +2103,8 @@
         {
           "description": "Java's catalog walk reads an entry it is denied as absent, so a signed catalog that gains a folder it cannot enter is assessed",
           "file": "engines/java/src/main/java/org/agentce/Catalog.java",
-          "search": "        } catch (NoSuchFileException e) {\n            return null;",
-          "replace": "        } catch (NoSuchFileException | AccessDeniedException e) {\n            return null;"
+          "search": "        } catch (AccessDeniedException e) {\n            throw new IllegalStateException(",
+          "replace": "        } catch (AccessDeniedException e) {\n            if (path != null) {\n                return null;\n            }\n            throw new IllegalStateException("
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/commands/__init__.py's _effective_trust_root, _verify_catalog_dirs and _resolve_catalogs plus signing.load_trust_root, ported in engines/typescript/src/cli.ts + verify.ts and engines/java/src/main/java/org/agentce/Cli.java + Verify.java."
