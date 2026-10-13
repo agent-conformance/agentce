@@ -26,7 +26,7 @@ cat > rc/events/incidents.jsonl <<'EOF'
 EOF
 DIGEST=$(shasum -a 256 rc/events/incidents.jsonl | cut -d' ' -f1)
 cat > rc/manifest.json <<EOF
-{"agentce_bundle_version": 1, "domain": "runtime-conformance-example", "sources": [{"id": "urn:example:incidents"}], "files": [{"path": "events/incidents.jsonl", "sha256": "$DIGEST"}]}
+{"agentce_bundle_version": 1, "domain": "runtime-conformance-example", "sources": [{"id": "urn:example:incidents", "class": "independent_system"}], "files": [{"path": "events/incidents.jsonl", "sha256": "$DIGEST"}]}
 EOF
 cat > rc/profile.yaml <<'EOF'
 profile_version: 1
@@ -59,7 +59,7 @@ cat > rc0/events/incidents.jsonl <<'EOF'
 EOF
 DIGEST=$(shasum -a 256 rc0/events/incidents.jsonl | cut -d' ' -f1)
 cat > rc0/manifest.json <<EOF
-{"agentce_bundle_version": 1, "domain": "runtime-conformance-example", "sources": [{"id": "urn:example:incidents"}], "files": [{"path": "events/incidents.jsonl", "sha256": "$DIGEST"}]}
+{"agentce_bundle_version": 1, "domain": "runtime-conformance-example", "sources": [{"id": "urn:example:incidents", "class": "independent_system"}], "files": [{"path": "events/incidents.jsonl", "sha256": "$DIGEST"}]}
 EOF
 cat > rc0/profile.yaml <<'EOF'
 profile_version: 1
@@ -97,7 +97,7 @@ cat > rc2/events/incidents.jsonl <<'EOF'
 EOF
 DIGEST=$(shasum -a 256 rc2/events/incidents.jsonl | cut -d' ' -f1)
 cat > rc2/manifest.json <<EOF
-{"agentce_bundle_version": 1, "domain": "runtime-conformance-example", "sources": [{"id": "urn:example:incidents"}], "files": [{"path": "events/incidents.jsonl", "sha256": "$DIGEST"}]}
+{"agentce_bundle_version": 1, "domain": "runtime-conformance-example", "sources": [{"id": "urn:example:incidents", "class": "independent_system"}], "files": [{"path": "events/incidents.jsonl", "sha256": "$DIGEST"}]}
 EOF
 cat > rc2/profile.yaml <<'EOF'
 profile_version: 1
@@ -121,7 +121,7 @@ cat >> rc2/events/incidents.jsonl <<'EOF'
 EOF
 DIGEST2=$(shasum -a 256 rc2/events/incidents.jsonl | cut -d' ' -f1)
 cat > rc2/manifest.json <<EOF
-{"agentce_bundle_version": 1, "domain": "runtime-conformance-example", "sources": [{"id": "urn:example:incidents"}], "files": [{"path": "events/incidents.jsonl", "sha256": "$DIGEST2"}]}
+{"agentce_bundle_version": 1, "domain": "runtime-conformance-example", "sources": [{"id": "urn:example:incidents", "class": "independent_system"}], "files": [{"path": "events/incidents.jsonl", "sha256": "$DIGEST2"}]}
 EOF
 uv run --project engines/python agentce assess --bundle rc2 --profile rc2/profile.yaml --catalog "eu-ai-act@2026.09" --catalog-dir spec/catalogs/base/eu-ai-act --out rc2/out-2 --state rc2/state --json > /dev/null || true # exit 1: the run now has a non-conformant finding
 
@@ -144,7 +144,7 @@ cat > rc3/events/incidents.jsonl <<'EOF'
 EOF
 DIGEST=$(shasum -a 256 rc3/events/incidents.jsonl | cut -d' ' -f1)
 cat > rc3/manifest.json <<EOF
-{"agentce_bundle_version": 1, "domain": "runtime-conformance-example", "sources": [{"id": "urn:example:incidents"}], "files": [{"path": "events/incidents.jsonl", "sha256": "$DIGEST"}]}
+{"agentce_bundle_version": 1, "domain": "runtime-conformance-example", "sources": [{"id": "urn:example:incidents", "class": "independent_system"}], "files": [{"path": "events/incidents.jsonl", "sha256": "$DIGEST"}]}
 EOF
 cat > rc3/profile.yaml <<'EOF'
 profile_version: 1
@@ -174,7 +174,7 @@ cat >> rc3/events/incidents.jsonl <<'EOF'
 EOF
 DIGEST2=$(shasum -a 256 rc3/events/incidents.jsonl | cut -d' ' -f1)
 cat > rc3/manifest.json <<EOF
-{"agentce_bundle_version": 1, "domain": "runtime-conformance-example", "sources": [{"id": "urn:example:incidents"}], "files": [{"path": "events/incidents.jsonl", "sha256": "$DIGEST2"}]}
+{"agentce_bundle_version": 1, "domain": "runtime-conformance-example", "sources": [{"id": "urn:example:incidents", "class": "independent_system"}], "files": [{"path": "events/incidents.jsonl", "sha256": "$DIGEST2"}]}
 EOF
 uv run --project engines/python agentce assess --bundle rc3 --profile rc3/profile.yaml --catalog "eu-ai-act@2026.09" --catalog-dir spec/catalogs/base/eu-ai-act --out rc3/out-2 --state rc3/state --json > /dev/null || true # exit 1: agent a now has a non-conformant finding
 python3 -c "import json; d = [json.loads(l) for l in open('rc3/out-2/runtime_drift.jsonl')]; print([e['subject'] for e in d])"

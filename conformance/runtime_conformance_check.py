@@ -104,7 +104,7 @@ def _write_bundle(bundle: Path, events: list[dict[str, Any]]) -> None:
     manifest = {
         "agentce_bundle_version": 1,
         "domain": "runtime-conformance",
-        "sources": [{"id": SOURCE}],
+        "sources": [{"id": SOURCE, "class": "independent_system"}],
         "files": [{"path": rel, "sha256": digest}],
     }
     (bundle / "manifest.json").write_text(
