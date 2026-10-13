@@ -52,7 +52,7 @@ import importlib.util
 import json
 import subprocess
 import sys
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -264,15 +264,50 @@ def _coverage_problems(
     return problems
 
 
-def partition_problems(gates: list[str], total: int, shard: ModuleType) -> list[str]:
-    """Actually call the real, on-disk ``shard.py``'s ``partition()`` for every index of ``total``
-    and confirm the union, against the real gate list, assigns every gate to exactly one shard --
-    catching a truncated or off-by-one edit to ``partition()`` that a wiring check alone cannot see."""
+def partition_problems(
+    gates: list[str],
+    total: int,
+    slice_of: Callable[[list[str], int, int], list[str]],
+) -> list[str]:
+    """Actually call one of the real, on-disk ``shard.py``'s partition functions for every index
+    of ``total`` and confirm the union, against the real gate list, assigns every gate to exactly
+    one shard -- catching a truncated or off-by-one edit that a wiring check alone cannot see."""
     assignments: dict[str, list[int]] = {}
     for index in range(total):
-        for gate in shard.partition(gates, index, total):
+        for gate in slice_of(gates, index, total):
             assignments.setdefault(gate, []).append(index)
     return _coverage_problems(gates, assignments, total)
+
+
+def demo_lane_total(job: Any) -> int:
+    """The number of jobs the demo-fault matrix creates (its one ``lane`` list), or 0."""
+    matrix = job.get("strategy", {}).get("matrix", {}) if isinstance(job, dict) else {}
+    lanes = matrix.get("lane") if isinstance(matrix, dict) else None
+    return len(lanes) if isinstance(lanes, list) else 0
+
+
+def dry_run_problems(
+    gates: list[str], total: int, shard: ModuleType, root: Path
+) -> list[str]:
+    """The CI path itself: ``shard.py --dry-run <i> <total>`` run as the demo-fault job runs it
+    must print exactly ``balanced_partition()``'s slice for every shard, so main() cannot deal the
+    demos some other way than the one checked here."""
+    durations = shard.load_durations()
+    problems = []
+    for index in range(total):
+        printed = subprocess.run(
+            ["python3", str(root / SHARD_SCRIPT), "--dry-run", str(index), str(total)],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=root,
+        ).stdout.splitlines()
+        want = shard.balanced_partition(gates, index, total, durations)
+        if printed != want:
+            problems.append(
+                f"shard.py --dry-run {index} {total} printed {printed}, not balanced_partition()'s {want}"
+            )
+    return problems
 
 
 def check_workflow(
@@ -306,8 +341,22 @@ def check_workflow(
     if not gates:
         return problems + ["`verification/run --list` printed no gates"]
     shard = _load_shard_module(root)
+    durations = shard.load_durations()
     for total in PARTITION_TOTALS:
-        problems += partition_problems(gates, total, shard)
+        problems += partition_problems(
+            gates,
+            total,
+            lambda g, i, t: shard.balanced_partition(g, i, t, durations),
+        )
+    lanes = demo_lane_total(jobs.get(DEMO_JOB))
+    if lanes:
+        problems += [
+            f"demo shards at {lanes} lanes: {p}"
+            for p in shard.balance_problems(gates, durations, lanes)
+        ]
+        problems += dry_run_problems(gates, lanes, shard, root)
+    else:
+        problems.append(f"jobs.{DEMO_JOB} has no strategy.matrix.lane list")
     registry = json.loads(
         (root / "verification" / "gates.json").read_text(encoding="utf-8")
     )
@@ -319,7 +368,8 @@ def check_workflow(
         )
     for total in PARTITION_TOTALS:
         problems += [
-            f"quick tier: {p}" for p in partition_problems(quick, total, shard)
+            f"quick tier: {p}"
+            for p in partition_problems(quick, total, shard.partition)
         ]
     return problems
 
@@ -401,6 +451,46 @@ def _shard_quick_self_test(shard: ModuleType) -> list[str]:
         print(f"shard quick: run_slice when {name}: exit {got_code} (want {want})")
         if got_code != want:
             failures.append(f"run_slice when {name} -> {got_code}")
+    return failures
+
+
+def _shard_balance_self_test(shard: ModuleType) -> list[str]:
+    """shard.py's demo balancing on synthetic durations: balanced_partition() places every gate
+    exactly once at two totals, and balance_problems() flags an untimed gate only when no default
+    applies and flags a heaviest shard over max(1.25 x mean, longest gate)."""
+    failures = []
+    gates = ["A", "B", "C", "D", "E", "F", "G"]
+    timed = {"gates": {g: s for g, s in zip(gates, [600, 60, 300, 120, 240, 30, 90])}}
+    for total in PARTITION_TOTALS[:1] + (3,):
+        failures += partition_problems(
+            gates, total, lambda g, i, t: shard.balanced_partition(g, i, t, timed)
+        )
+    untimed = {"gates": {"A": 60}}
+    five = ["A", "B", "C", "D", "E"]
+    cases: list[tuple[str, list[str], dict[str, Any], int, bool]] = [
+        ("every gate timed, 3 shards", gates, timed, 3, True),
+        ("a gate with no duration and no default", gates, untimed, 2, False),
+        (
+            "the same gate with a default",
+            gates,
+            {**untimed, "default_seconds": 60},
+            2,
+            True,
+        ),
+        # five 100 s gates over 4 shards: one shard carries 200 s, over max(1.25 x 125, 100)
+        (
+            "heaviest shard over the bound",
+            five,
+            {"gates": {}, "default_seconds": 100},
+            4,
+            False,
+        ),
+    ]
+    for name, case_gates, durations, total, should_pass in cases:
+        got = shard.balance_problems(case_gates, durations, total)
+        print(f"shard balance: {name}: {got or 'balanced'}")
+        if bool(got) == should_pass:
+            failures.append(f"balance_problems when {name} -> {got}")
     return failures
 
 
@@ -588,6 +678,7 @@ def self_test() -> int:
         lambda assignments: _coverage_problems(gates, assignments, len(gates)),
     )
     failures += _shard_quick_self_test(_load_shard_module(REPO_ROOT))
+    failures += _shard_balance_self_test(_load_shard_module(REPO_ROOT))
     build_cases: list[tuple[str, Any, bool]] = [
         (
             "build with lint steps only",

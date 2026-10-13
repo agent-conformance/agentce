@@ -3,6 +3,17 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.101.0
+
+- `VG-DEMO-SHARD-COVERAGE` (18.71b, changed). The demo-fault shards were dealt round-robin, so at 18 lanes one shard
+  carried 20 minutes of demos and hit the job timeout while others took 5. `shard.py` now gives the gates to the
+  shards longest first, each to the lightest shard, from the seconds in the new `demo-durations.json` (one CI run;
+  an untimed gate counts as `default_seconds`), and `shard.py --balance-check <total>` prints each shard's estimate.
+  The gate now checks that the balanced split places every gate once, that the balance check passes at the
+  workflow's lane count, and that `shard.py --dry-run` prints the balanced slice for every lane. Four new seeded
+  faults: a dropped gate, round-robin dealing, an untimed gate not reported, and a demo path that ignores the
+  balanced split.
+
 ## 0.100.0
 
 - `VG-CND05-CHAIN` (18.124, changed) now runs 49 cases. SPEC §6.2.3 says a tool call's or a decision's
