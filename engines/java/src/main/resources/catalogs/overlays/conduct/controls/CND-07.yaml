@@ -8,7 +8,7 @@ applicability:
 evaluation:
   mode: automated
   rung: 2
-  min_source_class: enforcement_point
+  min_source_class: independent_system
   minimum_evidence:
     - {event: ToolCall, class: enforcement_point}
   shape: shapes/CND-07.ttl

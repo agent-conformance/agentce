@@ -122,6 +122,17 @@ def test_default_catalog_severities_come_from_the_bundled_catalogs() -> None:
     }
 
 
+def test_conduct_minimum_source_classes_match_spec_7_7_3() -> None:
+    # SPEC §7.7.3: approvals and budgets need an independent record; a refusal is the agent's own record.
+    from agentce.catalog import load_catalog
+
+    catalog = load_catalog(bundled.catalogs_dir() / "overlays" / "conduct")
+    minimums = {c.id: c.min_source_class for c in catalog.controls}
+    assert minimums["CND-02"] == "independent_system"
+    assert minimums["CND-06"] == "self_report"
+    assert minimums["CND-07"] == "independent_system"
+
+
 def test_vendored_psp_terms_match_spec_rules() -> None:
     # The engine refuses exactly the shapes spec/rules/psp_check.py refuses only while both read the
     # same term list (18.78).
