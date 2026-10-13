@@ -171,7 +171,10 @@ def main(argv: list[str]) -> int:
         print(f"shard index and total must be integers, got {argv!r}", file=sys.stderr)
         return 2
     shard, total = (0, numbers[0]) if balance else (numbers[0], numbers[1])
-    if total <= 0 or not 0 <= shard < total:
+    if total <= 0:
+        print(f"shard total must be positive, got {total}", file=sys.stderr)
+        return 2
+    if not 0 <= shard < total:
         print(
             f"shard index {shard} is out of range for {total} shard(s)", file=sys.stderr
         )
