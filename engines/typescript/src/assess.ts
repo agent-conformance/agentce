@@ -19,6 +19,7 @@ import type { Withheld } from "./ingest";
 import { eventIri } from "./iri";
 import type { Profile, Subject } from "./profile";
 import { compareDate, parseDate } from "./readiness";
+import { BELOW_MINIMUM_OUTCOME, SourceClassJudge, belowMinimum } from "./sourceClass";
 import type { GraphStore } from "./store";
 import { evaluateShape, violationToJson, withinTolerance } from "./structural";
 import { byteCompare, pyStr } from "./util";
@@ -74,6 +75,20 @@ export function requirementMet(events: Event[], requirement: Record<string, stri
 
 function hasMinimumEvidence(events: Event[], minimum: Array<Record<string, string>>): boolean {
   return minimum.every((requirement) => requirementMet(events, requirement));
+}
+
+/** What an insufficient_evidence `assertion` lacks: each `minimum_evidence` entry `events` do not meet,
+ * then a record of each type whose class held a focus below the control's `min_source_class` (HR-5), at
+ * that minimum. The one reading the blind spots name the gap with. */
+export function missingEvidence(
+  control: ControlSpec,
+  events: Event[],
+  assertion: Assertion,
+): Array<Record<string, string>> {
+  return [
+    ...control.minimumEvidence.filter((r) => !requirementMet(events, r)),
+    ...(assertion.classGap ?? []).map((kind) => ({ event: kind, class: control.minSourceClass })),
+  ];
 }
 
 function window(profile: Profile, events: Event[]): [string, string] {
@@ -199,6 +214,26 @@ function assertControl(
       });
     }
   }
+  // HR-5: a pass counts only when every focus's judged class meets the control's minimum (SPEC §6.4). The
+  // rule never runs on a non-conformant verdict, which stays non-conformant.
+  const [below, kinds] = conformant
+    ? belowMinimum(
+        new SourceClassJudge(store, eventsByIri),
+        applicable,
+        control.minSourceClass,
+        control.sourceClassFrom,
+      )
+    : [[], []];
+  if (below.length > 0) {
+    return makeAssertion({
+      ...base,
+      outcome: BELOW_MINIMUM_OUTCOME,
+      population: [applicable.length, 0],
+      evidence: evidence(eventsByIri, below),
+      sourceClassSatisfied: false,
+      classGap: kinds,
+    });
+  }
   const focusForEvidence = failing.size > 0 ? [...failing].sort(byteCompare) : applicable;
   return makeAssertion({
     ...base,
@@ -293,6 +328,7 @@ function notEnoughWithWithheld(
     sourceClassSatisfied: null,
     evidenceStrength: null,
     withheldNonConformant: nonConformant,
+    classGap: [],
   };
 }
 

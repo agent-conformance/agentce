@@ -209,10 +209,11 @@ function selfReport<T extends Record<string, unknown>>(event: T): T {
   return { ...event, agentcesourceclass: "self_report" };
 }
 
-test("ROB-02: ruled on when the guard ruled on every input, or there were none", () => {
+test("ROB-02: ruled on when the guard ruled on every input", () => {
   const write = memoryEvent("w1", "MemoryWrite", { record_ref: "mem:r1", trust: "trusted" });
   assert.deepEqual(ruled([write, withInputs(decisionEvent("d1"), ["mem:r1"])]), ["true"]);
-  assert.deepEqual(ruled([decisionEvent("d1")]), ["true"]);
+  // A decision nothing recorded flows into used nothing the guard could rule on (ruling 15, 18.127).
+  assert.deepEqual(ruled([decisionEvent("d1")]), ["false"]);
 });
 
 test("ROB-02: not ruled on through a read only the agent reported", () => {
@@ -251,7 +252,9 @@ test("ROB-02: not ruled on a ref the bundle does not hold", () => {
     assert.deepEqual(ruled([withInputs(decisionEvent("d1"), [ref])]), ["false"], ref);
   }
   const other = withInputs(decisionEvent("d2"), ["mem:missing"]);
-  assert.deepEqual(ruled([decisionEvent("d1"), other]), ["true"]);
+  const write = memoryEvent("w1", "MemoryWrite", { record_ref: "mem:r1", trust: "trusted" });
+  const used = withInputs(decisionEvent("d1"), ["mem:r1"]);
+  assert.deepEqual(ruled([write, used, other]), ["true"]);
 });
 
 test("ROB-02: ruled on is independent of event order", () => {

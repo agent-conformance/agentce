@@ -187,6 +187,15 @@ export function computeBlindSpots(
     string,
     { key: [string, string]; unlocked: CheckRef[]; needed: CheckRef[] }
   >();
+  const groupFor = (event: string, cls: string) => {
+    const groupKey = JSON.stringify([event, cls]);
+    let group = groups.get(groupKey);
+    if (group === undefined) {
+      group = { key: [event, cls], unlocked: [], needed: [] };
+      groups.set(groupKey, group);
+    }
+    return group;
+  };
   const noPopulation: CheckRef[] = [];
 
   for (let i = 0; i < triples.length; i++) {
@@ -218,7 +227,15 @@ export function computeBlindSpots(
       control: control.id,
       control_version: control.version,
     };
-    if (normalizedKeys.length === 0) {
+    // A focus below the control's min_source_class (HR-5) misses a record of that type at the minimum
+    // (assess.missingEvidence). Never provably sufficient alone: it only ever lands in needed_by.
+    const classKeys = [...new Set(a.classGap ?? [])]
+      .sort(byteCompare)
+      .map((kind): [string, string] => [kind, normalizeClass(control.minSourceClass)]);
+    for (const [event, cls] of classKeys) {
+      groupFor(event, cls).needed.push(checkRef);
+    }
+    if (normalizedKeys.length === 0 && classKeys.length === 0) {
       // Every minimum_evidence entry is actually satisfied, yet the shape's own structural
       // population was still empty (RFC 0008 Sec.4) -- checked regardless of population[0].
       noPopulation.push(checkRef);
@@ -227,14 +244,9 @@ export function computeBlindSpots(
     // The minimum-evidence branch's non-empty missing set is provably sufficient only when exactly
     // one key is missing (no partial credit); the empty-population branch's non-empty missing set
     // is informative but never provably sufficient on its own, so it always lands in needed_by.
-    const unlocked = a.population[0] > 0 && normalizedKeys.length === 1;
+    const unlocked = a.population[0] > 0 && normalizedKeys.length === 1 && classKeys.length === 0;
     for (const [event, cls] of normalizedKeys) {
-      const groupKey = JSON.stringify([event, cls]);
-      let group = groups.get(groupKey);
-      if (group === undefined) {
-        group = { key: [event, cls], unlocked: [], needed: [] };
-        groups.set(groupKey, group);
-      }
+      const group = groupFor(event, cls);
       (unlocked ? group.unlocked : group.needed).push(checkRef);
     }
   }

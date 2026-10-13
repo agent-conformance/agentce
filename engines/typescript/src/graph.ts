@@ -327,6 +327,8 @@ class Builder {
   private readonly decisionNotice = new Map<string, Set<string>>(); // Decision IRI -> every notifying Notice IRI (order-independent)
   private readonly danglingNodes = new Set<string>(); // event IRI -> has >=1 agentce:danglingRef literal
   private readonly instructionUntrusted = new Map<string, boolean>(); // Instruction IRI -> untrusted flag
+  // Instructions that declare no source class: ROB-02 taint seeds of their own (18.127).
+  private readonly instructionUnclassed = new Set<string>();
   // DOC-01: family -> declared name -> the union of its declared pins over every BundleLoaded manifest in
   // the subject's records (empty: any version matches), so event order does not matter and an unpinned
   // declaration never cancels another manifest's pin (18.37j).
@@ -682,6 +684,10 @@ class Builder {
     const sourceClass = data.source_class;
     const untrusted = untrustedSourceClass(sourceClass);
     this.instructionUntrusted.set(node, untrusted);
+    if (!untrusted && !isOneOf(sourceClass, TRUSTED_INSTRUCTION)) {
+      // No class at all (or not a string): ROB-02 reads it as untrusted content (18.127).
+      this.instructionUnclassed.add(node);
+    }
     this.store.addLiteral(node, "agentce:instructionUntrusted", untrusted ? "true" : "false", BOOL);
   }
 
@@ -876,8 +882,38 @@ class Builder {
         unruled.add(ref);
       }
     }
+    const fed = new Set<string>();
+    for (const targets of flows.values()) {
+      for (const target of targets) {
+        fed.add(target);
+      }
+    }
     reach(tainted, flows);
     reach(unruled, flows);
+    // An instruction that declares no source class cannot show its content came from a trusted source, so
+    // ROB-02 reads it as untrusted content (18.127); CND-05's own chain rule already fails it, so it stays out
+    // of the closures returned to that rule.
+    const unclassed = new Set(this.instructionUnclassed);
+    reach(unclassed, flows);
+    const decisions = events.filter((e) => this.ptype(e) === "Decision");
+    // A decision nothing recorded flows into used nothing the guard could have ruled on, so ROB-02 cannot
+    // judge it (ruling 15): it reads untrustedContentRuledOn false itself, and taints nothing downstream.
+    const unfed = new Set(
+      decisions.map((e) => eventIri(String(e.id))).filter((iri) => !fed.has(iri)),
+    );
+    this.robustLiterals(
+      decisions,
+      new Set([...tainted, ...unclassed]),
+      new Set([...unruled, ...unfed]),
+    );
+    for (const node of unruled) {
+      tainted.add(node);
+    }
+    return tainted;
+  }
+
+  /** ROB-02's two literals on each decision in `events` (see `robustToUntrusted`). */
+  private robustLiterals(events: Event[], tainted: Set<string>, unruled: Set<string>): void {
     for (const event of events) {
       if (this.ptype(event) === "Decision") {
         const node = eventIri(String(event.id));
@@ -895,10 +931,6 @@ class Builder {
         );
       }
     }
-    for (const node of unruled) {
-      tainted.add(node);
-    }
-    return tainted;
   }
 
   private materialise(events: Event[]): void {

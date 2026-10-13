@@ -31,13 +31,14 @@ function control(
     mode: "automated",
     rung: 2,
     severity: "medium",
-    minSourceClass: "any",
+    minSourceClass: "self_report",
     minimumEvidence,
     shapePath: null,
     evidenceShapePath: null,
     tolerance: { kind: "count", max: 0 },
     testCases: [],
     raw: {},
+    sourceClassFrom: [],
   };
 }
 

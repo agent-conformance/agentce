@@ -14,11 +14,13 @@ import { errorCause, errorFix } from "./errorCatalogue";
 import { AgentceError, InputError, catalogUnreadable } from "./errors";
 import { type Shape, loadShapes } from "./psp";
 import { coveredFiles } from "./report";
+import { SOURCE_CLASS_FROM, SOURCE_CLASS_RANK } from "./sourceClass";
 import { byteCompare, formatTemplate } from "./util";
 import { CATALOG_SIGNATURE_NAME } from "./verify";
 
 const EVIDENCE_SHAPE_UNRESOLVED = "catalog.evidence_shape.unresolved";
 const SHAPE_UNRESOLVED = "catalog.shape.unresolved";
+const MIN_SOURCE_CLASS_UNKNOWN = "catalog.control.min_source_class_unknown";
 
 export interface ControlSpec {
   id: string;
@@ -35,6 +37,8 @@ export interface ControlSpec {
   tolerance: Record<string, unknown>;
   testCases: Array<Record<string, string>>;
   raw: Record<string, unknown>;
+  /** `evaluation.source_class_from`: the graph links to the records the judged class also rests on. */
+  sourceClassFrom: string[];
 }
 
 export interface Catalog {
@@ -73,11 +77,54 @@ function refuseUncovered(key: string, control: ControlSpec, path: string): Input
   );
 }
 
+/** `value` as Python's `json.dumps(value, ensure_ascii=False)` writes a decoded YAML scalar or
+ * collection: `", "` and `": "` separators, keys in their own order. */
+function pyJsonDumps(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(pyJsonDumps).join(", ")}]`;
+  }
+  if (isRecord(value)) {
+    const members = Object.entries(value).map(
+      ([k, v]) => `${JSON.stringify(k)}: ${pyJsonDumps(v)}`,
+    );
+    return `{${members.join(", ")}}`;
+  }
+  return value === undefined ? "null" : JSON.stringify(value);
+}
+
+/** The control's `evaluation.min_source_class`, exactly one of the SPEC §6.4 classes. Anything else
+ * (missing, null, empty, not a string, `any`, another case or another word) is refused when the
+ * catalog loads, never read as no minimum. */
+function minSourceClass(controlId: string, evaluation: unknown): string {
+  const present = isRecord(evaluation) && "min_source_class" in evaluation;
+  const value = present ? evaluation.min_source_class : null;
+  if (typeof value === "string" && SOURCE_CLASS_RANK.has(value)) {
+    return value;
+  }
+  const shown = present ? pyJsonDumps(value) : "(missing)";
+  throw new InputError(
+    MIN_SOURCE_CLASS_UNKNOWN,
+    formatTemplate(errorCause(MIN_SOURCE_CLASS_UNKNOWN), { control: controlId, value: shown }),
+    errorFix(MIN_SOURCE_CLASS_UNKNOWN),
+  );
+}
+
+function sourceClassFrom(evaluation: Record<string, unknown>): string[] {
+  const value = evaluation.source_class_from;
+  return Array.isArray(value)
+    ? value.filter(
+        (name): name is string => typeof name === "string" && SOURCE_CLASS_FROM.has(name),
+      )
+    : [];
+}
+
 function controlFromDict(data: Record<string, unknown>): ControlSpec {
   const evaluation = isRecord(data.evaluation) ? data.evaluation : {};
   const applicability = isRecord(data.applicability) ? data.applicability : {};
+  const id = String(data.id ?? "");
+  const minimum = minSourceClass(id, data.evaluation ?? {});
   return {
-    id: String(data.id ?? ""),
+    id,
     version: String(data.version ?? ""),
     title: String(data.title ?? ""),
     appliesToRoles: Array.isArray(applicability.applies_to_roles)
@@ -86,7 +133,7 @@ function controlFromDict(data: Record<string, unknown>): ControlSpec {
     mode: String(evaluation.mode ?? ""),
     rung: Number.parseInt(String(evaluation.rung ?? 0), 10),
     severity: String(data.severity ?? ""),
-    minSourceClass: String(evaluation.min_source_class ?? "any"),
+    minSourceClass: minimum,
     minimumEvidence: Array.isArray(evaluation.minimum_evidence)
       ? (evaluation.minimum_evidence as Array<Record<string, string>>)
       : [],
@@ -110,6 +157,7 @@ function controlFromDict(data: Record<string, unknown>): ControlSpec {
       ? (data.test_cases as Array<Record<string, string>>)
       : [],
     raw: data,
+    sourceClassFrom: sourceClassFrom(evaluation),
   };
 }
 
