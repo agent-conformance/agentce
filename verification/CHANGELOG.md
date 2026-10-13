@@ -3,6 +3,36 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.103.0
+
+- `VG-SOURCE-CLASS` (18.127, added). A control declares the least source class its verdict may rest on
+  (`min_source_class`), but no engine applied it: `source_class_satisfied` was always true, so an agent's own log
+  saying an instruction came from the user, plus one gateway record of the tool call, read CND-04, CND-05 and ROB-02
+  conformant. All three engines now hold every assertion to its control's minimum after the shape verdict: a focus
+  whose judged class is below it reads `insufficient_evidence`. For CND-04 and CND-05 the judged class includes the
+  acted-on instruction's (`evaluation.source_class_from`), which counts as enforcement-point evidence only when an
+  enforcement-point record attests it: its own class, an enforcement-point twin with the same content, task, class and
+  principal, or an enforcement-point PolicyDecision allowing the acting call for the instruction's principal. The gate
+  runs 41 cases: the audit probes A to J, each with an attested twin that stays conformant, and eleven hostile
+  corroborations, each one field away from a conformant case. It also checks that a `min_source_class` that is not a
+  source class (seven values, among them `any`, a missing member and `Enforcement_Point`) is refused at catalog load
+  with `catalog.control.min_source_class_unknown` and exit 3 in every engine. Three seeded faults, one per engine,
+  make the judged-class comparison always pass.
+- `VG-CND05-CHAIN` (18.127, changed) now runs 53 cases. A self_report user instruction and a self_report
+  memory_trusted one with no origin, each acted on by an enforcement-point call, read `insufficient_evidence`; an
+  enforcement-point ingress twin and an enforcement-point memory_trusted instruction read conformant.
+- `VG-ROB02-UNTRUSTED` (18.127, changed) now runs 51 cases. A decision acting on an instruction that declares no
+  `source_class` is non-conformant, as one declaring `tool_output` is: leaving the member out never reads better.
+  `decision-used-nothing` (a consequential decision that used nothing recorded) now reads `insufficient_evidence`.
+- `VG-HELD-DECISION-EVERYWHERE` (18.127, changed). In `cnd04-bareid-toolcall-acts-on-instruction` the instruction the
+  call acts on was an independent_system record, which does not attest an instruction for CND-04 (only an
+  enforcement-point record does), so the case read `insufficient_evidence`. The instruction is now an enforcement
+  point's record and the case still reads conformant: it checks the call's decision scope, not the class.
+- Gate fixture catalogs whose controls declared `min_source_class: any` (under `fixtures/`: audience_presets,
+  auditor_view, blind_spots, buyer_view, golden_loop, project_view, project_view_deviations, quick_path,
+  records_exit_code and self_approval) declare `self_report`, the lowest minimum, since `any` is not a source class
+  and is now refused at load. No gate outcome changes (18.127).
+
 ## 0.102.0
 
 - `VG-DEMO-SHARD-COVERAGE` (18.71e, changed). The demo lanes were dealt one whole gate at a time, so the heaviest

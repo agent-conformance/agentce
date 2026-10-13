@@ -458,11 +458,11 @@
         {
           "specversion": "1.0",
           "id": "r1",
-          "source": "urn:src:independent_system",
+          "source": "urn:src:enforcement_point",
           "subject": "spiffe://corp/agents/approval-outcome",
           "type": "org.agent-conformance.evidence.Instruction.v1",
           "datacontenttype": "application/ld+json",
-          "agentcesourceclass": "independent_system",
+          "agentcesourceclass": "enforcement_point",
           "time": "2026-01-10T00:00:00Z",
           "data": {
             "@context": "https://agent-conformance.org/contexts/evidence/v1",

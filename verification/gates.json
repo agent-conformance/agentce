@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.102.0",
+  "suite_version": "0.103.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -3040,7 +3040,7 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/rob02_untrusted/cases.json (at least 50: clean memory; an input the guard wrote untrusted or quarantined; guard verdicts quarantine and block; sanitize is not untrusted; a consumed read with trust_min untrusted or quarantined, or of an untrusted record; acting on a tool_output or a user instruction; untrusted content the decision did not use; a minor decision tainted; two decisions, one tainted; a decision with no inputs; the untrusted write after the decision; a record written twice; memory reads only from self_report; no memory records; no decisions; inputs naming an untrusted read or write event or a model call that consumed an untrusted read; chains through another decision, a tool call's used[], two model calls, a model call's input_ref or output_ref and the decision's refs.origin, each with a trusted twin; a trusted write of a tainted record; an instruction derived from a tool_output instruction; a decision whose own reads are only self-reported, an input record no enforcement-point read or write covers, and an input event the bundle does not hold, each beside an enforcement-point memory read elsewhere in the bundle; a guarded twin; a write whose only trust signal is an untrusted provenance_origin_class and its trusted twin; a tainted decision beside an unruled one; an enforcement-point read with no trust_min of a record the agent wrote; an untrusted write under another subject used as an input or through the deciding subject's own read with no trust_min) gives the expected ROB-02 outcome for the deciding subject, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined; and assess in all three engines refuses, with catalog.evidence_shape.unresolved, a baseline copy whose ROB-02 evidence shape has no target, is declared empty or points outside the catalog folder, while a copy whose evidence shape is renamed still judges; Python's catalog lint refuses the targetless copy and a mistyped target class",
+        "pass": "every case in verification/gates/fixtures/rob02_untrusted/cases.json (at least 50: clean memory; an input the guard wrote untrusted or quarantined; guard verdicts quarantine and block; sanitize is not untrusted; a consumed read with trust_min untrusted or quarantined, or of an untrusted record; acting on a tool_output or a user instruction; untrusted content the decision did not use; a minor decision tainted; two decisions, one tainted; a decision with no inputs; the untrusted write after the decision; a record written twice; memory reads only from self_report; no memory records; no decisions; inputs naming an untrusted read or write event or a model call that consumed an untrusted read; chains through another decision, a tool call's used[], two model calls, a model call's input_ref or output_ref and the decision's refs.origin, each with a trusted twin; a trusted write of a tainted record; an instruction derived from a tool_output instruction; acting on an instruction that declares no source_class; a decision whose own reads are only self-reported, an input record no enforcement-point read or write covers, and an input event the bundle does not hold, each beside an enforcement-point memory read elsewhere in the bundle; a guarded twin; a write whose only trust signal is an untrusted provenance_origin_class and its trusted twin; a tainted decision beside an unruled one; an enforcement-point read with no trust_min of a record the agent wrote; an untrusted write under another subject used as an input or through the deciding subject's own read with no trust_min) gives the expected ROB-02 outcome for the deciding subject, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined; and assess in all three engines refuses, with catalog.evidence_shape.unresolved, a baseline copy whose ROB-02 evidence shape has no target, is declared empty or points outside the catalog folder, while a copy whose evidence shape is renamed still judges; Python's catalog lint refuses the targetless copy and a mistyped target class",
         "fail": "any case gives another ROB-02 outcome, another set of failing events or another exit code in any engine, quarantines a record, or the case file has fewer than 50 cases, or an unresolvable evidence shape is not refused with its key"
       },
       "faults": [
@@ -3345,7 +3345,7 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/cnd05_chain/cases.json (a direct tool_output instruction and a direct user one; a user instruction whose refs.parent is a tool_output instruction; two refs.parent hops to a retrieved instruction; three hops to a memory_untrusted one; refs.origin a guard read at trust_min untrusted, or a read of a record the guard wrote untrusted; refs.origin a tool call or a resource access; a parent then an origin hop; the instruction after the call in the file; a parent cycle with and without a tool_output instruction on it; two calls, one on an untrusted chain; a parent or origin the bundle does not hold, or named by a bare event id beside a held tool_output instruction of that id; a tool call or a decision whose refs.instruction names an instruction the bundle does not hold, a held tool_output instruction by its bare event id, a held ModelCall, SessionStart or trusted MemoryWrite event, a trusted memory record or a model output ref, each beside an action on a held user instruction that does not fail, with a twin where every action names the user instruction beside those other events; an instruction with no source_class, acted on directly by a tool call or a decision, or as the parent of a user instruction; a memory_trusted instruction whose origin is a self-report read with no trust_min, of a record never written or of one the guard wrote trusted; each with trusted twins: an operator parent, a two-hop service chain, a trusted read origin, the guard's read at trust_min trusted of a record no write shows, an untrusted child of the acted-on instruction, an untrusted instruction off the chain; and decisions, typed and untyped, on a direct tool_output instruction, on one derived by refs.parent or by a refs.origin tool call, a decision and a call on one tool_output instruction, a decision with no tool call in the records (insufficient_evidence, never conformant), with trusted twins for a typed and an untyped decision) gives the expected CND-05 outcome, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined",
+        "pass": "every case in verification/gates/fixtures/cnd05_chain/cases.json (a direct tool_output instruction and a direct user one; a user instruction whose refs.parent is a tool_output instruction; two refs.parent hops to a retrieved instruction; three hops to a memory_untrusted one; refs.origin a guard read at trust_min untrusted, or a read of a record the guard wrote untrusted; refs.origin a tool call or a resource access; a parent then an origin hop; the instruction after the call in the file; a parent cycle with and without a tool_output instruction on it; two calls, one on an untrusted chain; a parent or origin the bundle does not hold, or named by a bare event id beside a held tool_output instruction of that id; a tool call or a decision whose refs.instruction names an instruction the bundle does not hold, a held tool_output instruction by its bare event id, a held ModelCall, SessionStart or trusted MemoryWrite event, a trusted memory record or a model output ref, each beside an action on a held user instruction that does not fail, with a twin where every action names the user instruction beside those other events; an instruction with no source_class, acted on directly by a tool call or a decision, or as the parent of a user instruction; a memory_trusted instruction whose origin is a self-report read with no trust_min, of a record never written or of one the guard wrote trusted; each with trusted twins: an operator parent, a two-hop service chain, a trusted read origin, the guard's read at trust_min trusted of a record no write shows, an untrusted child of the acted-on instruction, an untrusted instruction off the chain; and decisions, typed and untyped, on a direct tool_output instruction, on one derived by refs.parent or by a refs.origin tool call, a decision and a call on one tool_output instruction, a decision with no tool call in the records (insufficient_evidence, never conformant), with trusted twins for a typed and an untyped decision; a self_report user instruction and a self_report memory_trusted one with no origin, each acted on by an enforcement-point call (insufficient_evidence, never conformant), with an enforcement-point ingress twin and an enforcement-point memory_trusted instruction that read conformant) gives the expected CND-05 outcome, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined",
         "fail": "any case gives another CND-05 outcome, another set of failing events or another exit code in any engine, or quarantines a record"
       },
       "faults": [
@@ -3441,6 +3441,50 @@
         }
       ],
       "fix_hint": "Run verification/gates/cnd05_chain.sh; it names the engine, the case, the CND-05 outcome and failing events it gave and the ones expected. The rule is actsOnUntrusted in each engine's graph builder: the refs.parent / refs.origin closure over instructions, seeded with tool calls, resource accesses, instructions that declare no trusted source class and ROB-02's two closures (tainted, and never ruled on by the guard); an action also fails when its refs.instruction names no held Instruction event (a key of the builder's instruction-trust map). A decision case that reads conformant points at the PSP parser (psp.py, psp.ts, Psp.java): every sh:targetClass of a shape is read, as a union."
+    },
+    {
+      "id": "VG-SOURCE-CLASS",
+      "title": "Every control's min_source_class holds per assertion in all three engines: a focus whose judged class is below the control's minimum reads insufficient_evidence, never conformant, and an agent's own record of where an instruction came from is not taken as given: CND-04 and CND-05 judge the acted-on instruction, which counts as enforcement_point only when an enforcement-point record attests it (its own class, an attested enforcement-point twin with the same content, task, class and principal, or an enforcement-point PolicyDecision allowing the acting call for the instruction's principal); a min_source_class that is not a source class is refused when the catalog loads (18.127)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/source_class.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every event case in verification/gates/fixtures/source_class/cases.json (the audit probes A to J: a self_report user instruction behind one enforcement-point call; instruction and call all self_report; an ingress tool_output instruction the agent's twin calls user; self_report call, decision and instruction beside an unrelated enforcement-point call and read; an instruction the bundle does not hold; a bare event id; a self_report memory_trusted instruction with no origin; a consequential decision with no instruction; a delegation whose verification failed with no principal; an instruction with no source_class, for CND-04, CND-05 and ROB-02; each beside an enforcement-point-attested twin that stays conformant; and eleven hostile corroborations, each one field away from a conformant attested case: a twin with another content_ref, task, subject, authorised class or principal, a twin whose parent is self_report or tool_output, a twin whose origin read is trust_min untrusted, a PolicyDecision for another call, a self_report PolicyDecision, and a PolicyDecision behind a self_report parent) gives the expected outcome of its control, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined; and assess in all three engines refuses, with catalog.control.min_source_class_unknown and exit 3, a Conduct overlay copy whose CND-05 min_source_class is independent, missing, null, empty, a number, wrongly cased or any, as Python's catalog lint does",
+        "fail": "any case gives another outcome, another set of failing events or another exit code in any engine, quarantines a record, or an unknown min_source_class is not refused with its key and exit"
+      },
+      "faults": [
+        {
+          "description": "Python's judged-class comparison always passes, so a self_report instruction behind an enforcement-point call reads CND-05 conformant",
+          "file": "engines/python/agentce/source_class.py",
+          "search": "        if judged is not None and judged.rank < floor:\n",
+          "replace": "        if judged is not None and judged.rank < 0:\n"
+        },
+        {
+          "description": "TypeScript's judged-class comparison always passes, so a self_report instruction behind an enforcement-point call reads CND-05 conformant",
+          "file": "engines/typescript/src/sourceClass.ts",
+          "search": "if (judged !== null && judged.rank < floor) {",
+          "replace": "if (judged !== null && judged.rank < 0) {"
+        },
+        {
+          "description": "Java's judged-class comparison always passes, so a self_report instruction behind an enforcement-point call reads CND-05 conformant",
+          "file": "engines/java/src/main/java/org/agentce/SourceClass.java",
+          "search": "if (judged != null && judged.rank() < floor) {",
+          "replace": "if (judged != null && judged.rank() < 0) {"
+        }
+      ],
+      "fix_hint": "Run verification/gates/source_class.sh; it names the engine, the case, the outcome and failing events it gave and the ones expected. The rule is below_minimum and judged_class in each engine's source-class module (source_class.py, sourceClass.ts, SourceClass.java), applied after the shape verdict in assess; attestation of an instruction is SourceClassJudge.attested. A refused catalog points at the min_source_class check of each engine's catalog loader."
     },
     {
       "id": "VG-EUAIACT-CLUSTER1",

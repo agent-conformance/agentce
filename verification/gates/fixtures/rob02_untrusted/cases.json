@@ -3837,6 +3837,93 @@
           }
         }
       ]
+    },
+    "acts-on-instruction-no-source-class": {
+      "why": "an instruction that declares no source_class is not shown to be trusted: omitting the member never reads better than declaring tool_output (twin: acts-on-trusted-instruction)",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "d1"
+        ],
+        "exit": 1
+      },
+      "events": [
+        {
+          "id": "w0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:00Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "g0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:other"
+            ],
+            "trust_min": "trusted"
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:26Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1"
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:27Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": [
+              "mem:r1"
+            ],
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ]
     }
   }
 }

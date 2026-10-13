@@ -1,0 +1,6 @@
+# Domain ontology binding for the VG-SOURCE-CLASS gate fixture: dom:CreditDecision is consequential, so a tool call
+# executing one is in CND-04's population and the decision is in ROB-02's.
+decision_types:
+  - id: "dom:CreditDecision"
+    subclass_of: "agentce:ConsequentialDecision"
+    consequential: true

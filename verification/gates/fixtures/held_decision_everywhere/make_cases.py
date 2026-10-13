@@ -84,13 +84,14 @@ case(
     [dec(), ev("o1", "Outcome", refs={"decision": IRI}), tool("o1")],
     NA,
 )
-# Positive twin: the bare-id ToolCall acting on an instruction the bundle holds passes CND-04.
+# Positive twin: the bare-id ToolCall acting on an instruction the bundle holds passes CND-04. The instruction is
+# an enforcement point's record, so it meets CND-04's minimum class (SPEC HR-5, §7.7.5; 18.127).
 case(
     "cnd04-bareid-toolcall-acts-on-instruction",
     "CND-04",
     [
         dec(),
-        ev("r1", "Instruction", instruction_id="r1", source_class="tool_output"),
+        ev("r1", "Instruction", cls="enforcement_point", instruction_id="r1", source_class="tool_output"),
         tool("d1", instruction=ref("r1")),
     ],
     "conformant",

@@ -1,0 +1,4180 @@
+{
+  "_description": "VG-SOURCE-CLASS cases (18.127): each case is one bundle for the fixture subject, judged against the baseline catalog and the Conduct overlay; expected is the named control's outcome, its failing event ids and the assess exit code, with nothing quarantined, the same in Python, TypeScript and Java. A control's min_source_class holds per assertion (SPEC HR-5, §6.4): a focus whose judged class is below the minimum reads insufficient_evidence, never conformant. CND-04 and CND-05 judge the acted-on instruction (evaluation.source_class_from actsOn), which counts as enforcement_point only when attested: held by graph IRI, every parent attested, any origin an enforcement-point read at trust_min trusted, and its own class enforcement_point or witnessed by an attested enforcement-point twin (same content_ref, refs.task, source_class and principal, every instruction above it of a trusted class) or by an enforcement-point PolicyDecision allow for the acting call and the instruction's principal (SPEC §7.7.5, §10.4, §6.2.3, Appendix F). probe-* are the audit probes A to J, each beside an attested twin that stays conformant; hostile-* each differ by one field from a hostile-base-attested-* case; unknown-class-* hold no events: CND-05's min_source_class in a copy of the Conduct overlay is set to the value given (or removed), and every engine must refuse the catalog at load with the key and exit given.",
+  "cases": {
+    "hostile-base-attested-policy-decision": {
+      "why": "base: an enforcement-point PolicyDecision allows the acting call for the instruction's principal",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "tcx",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "ping",
+              "protocol": "native"
+            },
+            "effect_class": "read"
+          }
+        },
+        {
+          "id": "pd1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "PolicyDecision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "engine": "custom",
+            "policy_id": "ingress",
+            "policy_version": "1",
+            "policy_digest": "sha256:30ff089db407da34522928c1587a99e449a450801eaa2a70758c347855424837",
+            "decision": "allow",
+            "reasons": [],
+            "obligations": [],
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "request": "agentce:event/tc1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "hostile-base-attested-policy-decision-ep-parent": {
+      "why": "base: the acted-on instruction's parent is an enforcement-point user instruction",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "p1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1",
+              "parent": "agentce:event/p1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "tcx",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "ping",
+              "protocol": "native"
+            },
+            "effect_class": "read"
+          }
+        },
+        {
+          "id": "pd1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "PolicyDecision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "engine": "custom",
+            "policy_id": "ingress",
+            "policy_version": "1",
+            "policy_digest": "sha256:30ff089db407da34522928c1587a99e449a450801eaa2a70758c347855424837",
+            "decision": "allow",
+            "reasons": [],
+            "obligations": [],
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "request": "agentce:event/tc1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "hostile-base-attested-twin": {
+      "why": "base: the agent's user instruction and an enforcement-point twin with the same content, task, class, principal",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1-ingress",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "hostile-base-attested-twin-ep-parent": {
+      "why": "base: the twin's parent is an enforcement-point user instruction",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "p1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1-ingress",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1",
+              "parent": "agentce:event/p1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "hostile-base-attested-twin-trusted-origin": {
+      "why": "base: the twin's origin is an enforcement-point memory read at trust_min trusted",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "w1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "trust_min": "trusted"
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1-ingress",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1",
+              "origin": "agentce:event/m1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "hostile-pd-other-request": {
+      "why": "the PolicyDecision's refs.request names another tool call",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "tcx",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "ping",
+              "protocol": "native"
+            },
+            "effect_class": "read"
+          }
+        },
+        {
+          "id": "pd1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "PolicyDecision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "engine": "custom",
+            "policy_id": "ingress",
+            "policy_version": "1",
+            "policy_digest": "sha256:30ff089db407da34522928c1587a99e449a450801eaa2a70758c347855424837",
+            "decision": "allow",
+            "reasons": [],
+            "obligations": [],
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "request": "agentce:event/tcx"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "hostile-pd-self-report": {
+      "why": "the PolicyDecision is the agent's own record",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "tcx",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "ping",
+              "protocol": "native"
+            },
+            "effect_class": "read"
+          }
+        },
+        {
+          "id": "pd1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "PolicyDecision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "engine": "custom",
+            "policy_id": "ingress",
+            "policy_version": "1",
+            "policy_digest": "sha256:30ff089db407da34522928c1587a99e449a450801eaa2a70758c347855424837",
+            "decision": "allow",
+            "reasons": [],
+            "obligations": [],
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "request": "agentce:event/tc1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "hostile-pd-sr-parent": {
+      "why": "the acted-on instruction's parent is the agent's own record",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "p1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1",
+              "parent": "agentce:event/p1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "tcx",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "ping",
+              "protocol": "native"
+            },
+            "effect_class": "read"
+          }
+        },
+        {
+          "id": "pd1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "PolicyDecision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "engine": "custom",
+            "policy_id": "ingress",
+            "policy_version": "1",
+            "policy_digest": "sha256:30ff089db407da34522928c1587a99e449a450801eaa2a70758c347855424837",
+            "decision": "allow",
+            "reasons": [],
+            "obligations": [],
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "request": "agentce:event/tc1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "hostile-twin-other-authorised-class": {
+      "why": "the twin declares operator where the agent says user",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1-ingress",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "operator",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "hostile-twin-other-content": {
+      "why": "the twin records another content_ref",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1-ingress",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "hostile-twin-other-principal": {
+      "why": "the twin names another principal",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1-ingress",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:mallory",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "hostile-twin-other-subject": {
+      "why": "the twin is recorded under another subject",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1-ingress",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/other",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "hostile-twin-other-task": {
+      "why": "the twin names another refs.task",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1-ingress",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-2"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "hostile-twin-sr-parent": {
+      "why": "the twin's parent is the agent's own record",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "p1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1-ingress",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1",
+              "parent": "agentce:event/p1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "hostile-twin-tool_output-parent": {
+      "why": "the twin's parent is an enforcement-point tool_output instruction",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "p1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "tool_output",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1-ingress",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1",
+              "parent": "agentce:event/p1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "hostile-twin-untrusted-origin": {
+      "why": "the twin's origin is an enforcement-point memory read at trust_min untrusted",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "w1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "trust_min": "untrusted"
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1-ingress",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1",
+              "origin": "agentce:event/m1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-a-attested-ingress-twin": {
+      "why": "twin of A: an enforcement-point ingress record of the same instruction (content, task, class, principal)",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1-ingress",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-a-attested-policy-decision": {
+      "why": "twin of A: an enforcement-point PolicyDecision allows the call for the instruction's principal",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "pd1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "PolicyDecision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "engine": "custom",
+            "policy_id": "ingress",
+            "policy_version": "1",
+            "policy_digest": "sha256:30ff089db407da34522928c1587a99e449a450801eaa2a70758c347855424837",
+            "decision": "allow",
+            "reasons": [],
+            "obligations": [],
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "request": "agentce:event/tc1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-a-self-report-user": {
+      "why": "A: the agent's own record says the instruction came from the user; one enforcement-point call acts on it",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-b-all-self-report": {
+      "why": "B: instruction and call are both the agent's own records",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-b-attested-enforcement-point": {
+      "why": "twin of B: instruction and call both recorded by enforcement points",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-c-attested-ingress-agrees": {
+      "why": "twin of C: the ingress record of the same content says user too, for the same principal",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-c-ingress-tool-output-relabelled": {
+      "why": "C: the ingress recorded tool_output; the agent's twin of the same content says user and the call acts on it",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "tool_output",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-d-attested-enforcement-point": {
+      "why": "twin of D: the instruction and the acting call recorded by enforcement points",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "w0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r0",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "g0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r0"
+            ],
+            "trust_min": "trusted"
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1",
+              "decision": "agentce:event/d1"
+            }
+          }
+        },
+        {
+          "id": "tcx",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:06Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "ping",
+              "protocol": "native"
+            },
+            "effect_class": "read"
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-d-self-report-beside-unrelated-ep": {
+      "why": "D: acting call, decision and instruction all self_report, beside an unrelated enforcement-point call and read",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "w0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r0",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "g0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r0"
+            ],
+            "trust_min": "trusted"
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1",
+              "decision": "agentce:event/d1"
+            }
+          }
+        },
+        {
+          "id": "tcx",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:06Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "ping",
+              "protocol": "native"
+            },
+            "effect_class": "read"
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-e1-attested-held": {
+      "why": "twin of E1: the instruction is held, recorded by the ingress",
+      "control": "CND-04",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "acted_for": [
+              "user:alice"
+            ]
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1",
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-e1-instruction-not-held": {
+      "why": "E1: a consequential call names an instruction the bundle does not hold",
+      "control": "CND-04",
+      "events": [
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "acted_for": [
+              "user:alice"
+            ]
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/gone",
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-e2-attested-graph-iri": {
+      "why": "twin of E2: the call names the instruction by its graph IRI",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-e2-bare-id": {
+      "why": "E2: the call names the held enforcement-point instruction by its bare event id, not its graph IRI",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ],
+        "exit": 2
+      }
+    },
+    "probe-f-attested-enforcement-point": {
+      "why": "twin of F: the ingress recorded the memory_trusted instruction",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "memory_trusted",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-f-self-report-memory-trusted-no-origin": {
+      "why": "F: the agent says the instruction came from trusted memory and names no read",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "memory_trusted",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-h-attested-instruction": {
+      "why": "twin of H: the call acts on an instruction the ingress recorded",
+      "control": "CND-04",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "acted_for": [
+              "user:alice"
+            ]
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1",
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-h-decision-no-instruction": {
+      "why": "H: a consequential decision acts on no instruction, and the enforcement-point call executing it names none",
+      "control": "CND-04",
+      "events": [
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "acted_for": [
+              "user:alice"
+            ]
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ],
+        "exit": 2
+      }
+    },
+    "probe-i-attested-verified-delegation": {
+      "why": "twin of I: the instruction recorded by the ingress, the delegation verified",
+      "control": "CND-04",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "acted_for": [
+              "user:alice"
+            ]
+          }
+        },
+        {
+          "id": "dl1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "DelegationIssued",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "token_ref": "jti-1",
+            "issuer": "https://idp.example",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/source-class-fixture",
+                "kind": "agent"
+              }
+            ],
+            "subject_principal": "user:alice",
+            "actor_principal": "spiffe://corp/agents/source-class-fixture",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "verification": {
+              "status": "verified",
+              "method": "rfc8693"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1",
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-i-unverified-delegation-no-principal": {
+      "why": "I: a consequential call under a delegation whose verification failed, acting on a self_report instruction with no principal",
+      "control": "CND-04",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "acted_for": [
+              "user:alice"
+            ]
+          }
+        },
+        {
+          "id": "dl1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "DelegationIssued",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "token_ref": "jti-1",
+            "issuer": "https://idp.example",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/source-class-fixture",
+                "kind": "agent"
+              }
+            ],
+            "subject_principal": "user:alice",
+            "actor_principal": "spiffe://corp/agents/source-class-fixture",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "verification": {
+              "status": "failed",
+              "method": "rfc8693"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1",
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-j-cnd-04-attested-user": {
+      "why": "twin of J (CND-04): the ingress recorded the instruction as user",
+      "control": "CND-04",
+      "events": [
+        {
+          "id": "w0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r0",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "g0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r0"
+            ],
+            "trust_min": "trusted"
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "inputs": [
+              "mem:r0"
+            ],
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1",
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-j-cnd-04-no-source-class": {
+      "why": "J (CND-04): the acted-on instruction declares no source_class and is the agent's own record",
+      "control": "CND-04",
+      "events": [
+        {
+          "id": "w0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r0",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "g0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r0"
+            ],
+            "trust_min": "trusted"
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "inputs": [
+              "mem:r0"
+            ],
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1",
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-j-cnd-05-attested-user": {
+      "why": "twin of J (CND-05): the ingress recorded the instruction as user",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "w0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r0",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "g0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r0"
+            ],
+            "trust_min": "trusted"
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "inputs": [
+              "mem:r0"
+            ],
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1",
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-j-cnd-05-no-source-class": {
+      "why": "J (CND-05): the acted-on instruction declares no source_class and is the agent's own record",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "w0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r0",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "g0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r0"
+            ],
+            "trust_min": "trusted"
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "inputs": [
+              "mem:r0"
+            ],
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1",
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "d1",
+          "tc1"
+        ],
+        "exit": 2
+      }
+    },
+    "probe-j-rob-02-attested-user": {
+      "why": "twin of J (ROB-02): the ingress recorded the instruction as user",
+      "control": "ROB-02",
+      "events": [
+        {
+          "id": "w0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r0",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "g0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r0"
+            ],
+            "trust_min": "trusted"
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "inputs": [
+              "mem:r0"
+            ],
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1",
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-j-rob-02-no-source-class": {
+      "why": "J (ROB-02): the acted-on instruction declares no source_class and is the agent's own record",
+      "control": "ROB-02",
+      "events": [
+        {
+          "id": "w0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r0",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "g0",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r0"
+            ],
+            "trust_min": "trusted"
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "inputs": [
+              "mem:r0"
+            ],
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1",
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "d1"
+        ],
+        "exit": 2
+      }
+    },
+    "unknown-class-any": {
+      "why": "CND-05 declares min_source_class \"any\"",
+      "catalog": {
+        "control": "CND-05",
+        "min_source_class": "any"
+      },
+      "expected": {
+        "refusal": "catalog.control.min_source_class_unknown",
+        "exit": 3
+      }
+    },
+    "unknown-class-case": {
+      "why": "CND-05 declares min_source_class \"Enforcement_Point\"",
+      "catalog": {
+        "control": "CND-05",
+        "min_source_class": "Enforcement_Point"
+      },
+      "expected": {
+        "refusal": "catalog.control.min_source_class_unknown",
+        "exit": 3
+      }
+    },
+    "unknown-class-empty": {
+      "why": "CND-05 declares min_source_class \"\"",
+      "catalog": {
+        "control": "CND-05",
+        "min_source_class": ""
+      },
+      "expected": {
+        "refusal": "catalog.control.min_source_class_unknown",
+        "exit": 3
+      }
+    },
+    "unknown-class-independent": {
+      "why": "CND-05 declares min_source_class \"independent\"",
+      "catalog": {
+        "control": "CND-05",
+        "min_source_class": "independent"
+      },
+      "expected": {
+        "refusal": "catalog.control.min_source_class_unknown",
+        "exit": 3
+      }
+    },
+    "unknown-class-missing": {
+      "why": "CND-05 declares no min_source_class",
+      "catalog": {
+        "control": "CND-05"
+      },
+      "expected": {
+        "refusal": "catalog.control.min_source_class_unknown",
+        "exit": 3
+      }
+    },
+    "unknown-class-null": {
+      "why": "CND-05 declares min_source_class null",
+      "catalog": {
+        "control": "CND-05",
+        "min_source_class": null
+      },
+      "expected": {
+        "refusal": "catalog.control.min_source_class_unknown",
+        "exit": 3
+      }
+    },
+    "unknown-class-number": {
+      "why": "CND-05 declares min_source_class 1",
+      "catalog": {
+        "control": "CND-05",
+        "min_source_class": 1
+      },
+      "expected": {
+        "refusal": "catalog.control.min_source_class_unknown",
+        "exit": 3
+      }
+    }
+  }
+}
