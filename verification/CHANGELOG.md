@@ -3,6 +3,17 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.100.0
+
+- `VG-CND05-CHAIN` (18.124, changed) now runs 49 cases. SPEC §6.2.3 says a tool call's or a decision's
+  `refs.instruction` names an Instruction. When it named a held event of another type (a ModelCall, a SessionStart, a
+  MemoryWrite) or a trusted memory record or model output, CND-05 read conformant in all three engines, though no
+  record showed who gave the instruction. Each engine now passes an action only when its ref names a held
+  Instruction whose chain is trusted. The new cases cover those five targets, an instruction the bundle does not hold,
+  and a bare event id, for tool calls and decisions. Each new case also holds an action on a user instruction that
+  must not fail, and a twin holds those other events with nothing acting on them. Three new seeded faults, one per
+  engine, let any held event or record count as an instruction again.
+
 ## 0.99.0
 
 - `VG-BYO-CATALOG-PARITY` (18.168, changed) now runs 18 scenarios. A catalog's signature left out dot-named files
