@@ -13,6 +13,11 @@ fails if a gate in `gates.json` is not named in this file.
   workflow's lane count, and that `shard.py --dry-run` prints the balanced slice for every lane. Four new seeded
   faults: a dropped gate, round-robin dealing, an untimed gate not reported, and a demo path that ignores the
   balanced split.
+- `VG-BYO-CATALOG-PARITY` (18.71b, changed) and `VG-BYO-CATALOG-WALK` (18.71b, added). One gate's demo ran 16
+  minutes on its own, too long for one demo shard. The gate now runs scenarios 1 to 11, on signatures, catalog
+  identity and the trust root, with those six seeded faults. The new `VG-BYO-CATALOG-WALK` runs scenarios 12 to 18,
+  on what the catalog walk and the loaders read, with the other twelve. Same script, same checks: one argument picks
+  the half.
 
 ## 0.100.0
 

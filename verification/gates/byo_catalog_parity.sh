@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# Build gate helper for VG-BYO-CATALOG-PARITY: `assess --catalog-dir` treats an operator's own catalog
-# as untrusted input in all three engines (SPEC §8.7). Each engine runs the same scenarios as the
+# Build gate helper for VG-BYO-CATALOG-PARITY (`trust`) and VG-BYO-CATALOG-WALK (`walk`): `assess
+# --catalog-dir` treats an operator's own catalog as untrusted input in all three engines (SPEC §8.7).
+# `trust` runs the signature, identity and trust-root scenarios (1 to 11); `walk` runs the scenarios on
+# what the catalog walk and the loaders read (12 to 18). They are two gates so that each one's
+# seeded-fault demo fits one CI demo shard (18.71b). Each engine runs the same scenarios as the
 # Python reference capture for item 18.36 -- an untrusted, unsigned, trusted, rebranded catalog and a
 # missing, malformed or non-object trust root, plus quickstart under AGENTCE_TRUST_ROOT -- and must
 # give Python's exit code, error key, cause and fix, and the same limitation string under
@@ -9,6 +12,14 @@
 # Fixtures live under a mktemp directory outside the repository and $HOME, so every engine reduces a
 # catalog path to the same basename. Keys and signatures come from the real `agentce catalog sign`.
 set -euo pipefail
+part="${1:-}"
+case "$part" in
+  trust | walk) ;;
+  *)
+    echo "usage: byo_catalog_parity.sh trust|walk" >&2
+    exit 2
+    ;;
+esac
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 quick="$root/corpus/quickstart"
 work="$(mktemp -d)"
@@ -25,14 +36,17 @@ sign_catalog() {
 
 cp -R "$root/spec/catalogs/base/eu-ai-act" "$work/unsigned-cat"
 rm "$work/unsigned-cat/catalog.sig.json"
-cp -R "$work/unsigned-cat" "$work/untrusted-cat"
-sign_catalog "$work/untrusted-cat" stranger
 cp -R "$work/unsigned-cat" "$work/trusted-cat"
 sign_catalog "$work/trusted-cat" signer "$work/trust-root.json"
+if [ "$part" = trust ]; then
+cp -R "$work/unsigned-cat" "$work/untrusted-cat"
+sign_catalog "$work/untrusted-cat" stranger
 cp -R "$work/unsigned-cat" "$work/rebrand-cat"
 sed -i.bak 's/^id: eu-ai-act$/id: eu-ai-act-rebrand/' "$work/rebrand-cat/catalog.yaml"
 rm "$work/rebrand-cat/catalog.yaml.bak"
 sign_catalog "$work/rebrand-cat" rebrand "$work/rebrand-trust-root.json"
+fi
+if [ "$part" = walk ]; then
 # 18.164: a catalog whose controls/ is a symlink, signed, then edited behind the link; and one with a link
 # back to an ancestor folder.
 cp -R "$work/unsigned-cat" "$work/linked-cat"
@@ -86,6 +100,7 @@ cp -R "$work/trusted-cat" "$work/unenterable-cat"
 mkdir "$work/unenterable-cat/controls/extra"
 printf 'x' > "$work/unenterable-cat/controls/extra/x.txt"
 chmod 400 "$work/unenterable-cat/controls/extra"
+fi
 printf '{not json' > "$work/bad-root.json"
 printf '[]' > "$work/array-root.json"
 
@@ -169,6 +184,7 @@ base=(assess --bundle "$quick/evidence" --profile "$quick/applicability.yaml" \
   --domain "$quick/domain.linkml.yaml" --catalog eu-ai-act@2026.09)
 unset AGENTCE_TRUST_ROOT
 
+if [ "$part" = trust ]; then
 scenario "1 untrusted catalog" 3 input.catalog_unverified - -- \
   "${base[@]}" --catalog-dir "$work/untrusted-cat"
 scenario "2 unsigned catalog" 3 input.catalog_unverified - -- \
@@ -192,6 +208,12 @@ scenario "9 bad --trust-root with no --catalog-dir" 3 input.trust_root_not_a_fil
 scenario "11 trust root that is not an object" 3 input.trust_root_invalid - -- \
   "${base[@]}" --catalog-dir "$work/unsigned-cat" --allow-unverified-catalog \
   --trust-root "$work/array-root.json"
+export AGENTCE_TRUST_ROOT="$work/bad-root.json"
+scenario "10 quickstart under AGENTCE_TRUST_ROOT" 3 input.trust_root_invalid "is not readable JSON: " -- \
+  quickstart
+unset AGENTCE_TRUST_ROOT
+
+else
 scenario "12 catalog signed with controls/ linked" 0 - - -- \
   "${base[@]}" --catalog-dir "$work/linked-cat" --trust-root "$work/linked-trust-root.json"
 scenario "13 linked catalog edited behind the link" 3 input.catalog_unverified - -- \
@@ -210,10 +232,7 @@ if [ "$(id -u)" -ne 0 ]; then
 else
   echo "byo-catalog: scenario 18 skipped: running as root, which enters any folder" >&2
 fi
-export AGENTCE_TRUST_ROOT="$work/bad-root.json"
-scenario "10 quickstart under AGENTCE_TRUST_ROOT" 3 input.trust_root_invalid "is not readable JSON: " -- \
-  quickstart
-unset AGENTCE_TRUST_ROOT
+fi
 
-[ "$status" -eq 0 ] && echo "byo-catalog: all three engines verify --catalog-dir signatures identically across 19 scenarios"
+[ "$status" -eq 0 ] && echo "byo-catalog ($part): all three engines verify --catalog-dir signatures identically across $((n / 3)) scenarios"
 exit "$status"
