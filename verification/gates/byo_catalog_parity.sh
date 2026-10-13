@@ -12,7 +12,8 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 quick="$root/corpus/quickstart"
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+# Scenario 18 leaves a folder that cannot be entered: restore every mode before removing the work folder.
+trap 'chmod -R u+rwx "$work" 2>/dev/null; rm -rf "$work"' EXIT
 
 sign_catalog() {
   # sign_catalog <dir> <key name> [trust-root path]
@@ -79,6 +80,12 @@ shape_elsewhere() {
 }
 shape_elsewhere "$work/dot-shape-cat" shapes/.DOC-01.ttl shapes/.DOC-01.ttl
 shape_elsewhere "$work/pycache-shape-cat" shapes/__pycache__/DOC-01.ttl shapes/__PYCACHE__/DOC-01.ttl
+# 18.170: a trusted signed catalog that gains a folder, holding a file, which can be listed but not entered;
+# every engine's walk must refuse what it cannot stat rather than walk past it.
+cp -R "$work/trusted-cat" "$work/unenterable-cat"
+mkdir "$work/unenterable-cat/controls/extra"
+printf 'x' > "$work/unenterable-cat/controls/extra/x.txt"
+chmod 400 "$work/unenterable-cat/controls/extra"
 printf '{not json' > "$work/bad-root.json"
 printf '[]' > "$work/array-root.json"
 
@@ -197,10 +204,16 @@ scenario "16 shape named as a dot-named file the digest skips" 3 catalog.shape.u
   "${base[@]}" --catalog-dir "$work/dot-shape-cat" --trust-root "$work/dot-shape-cat-trust-root.json"
 scenario "17 shape named through __PYCACHE__, a folder the digest skips on any host" 3 catalog.shape.unresolved - -- \
   "${base[@]}" --catalog-dir "$work/pycache-shape-cat" --trust-root "$work/pycache-shape-cat-trust-root.json"
+if [ "$(id -u)" -ne 0 ]; then
+  scenario "18 signed catalog that gains a folder no engine can enter" 3 input.catalog_unreadable - -- \
+    "${base[@]}" --catalog-dir "$work/unenterable-cat" --trust-root "$work/trust-root.json"
+else
+  echo "byo-catalog: scenario 18 skipped: running as root, which enters any folder" >&2
+fi
 export AGENTCE_TRUST_ROOT="$work/bad-root.json"
 scenario "10 quickstart under AGENTCE_TRUST_ROOT" 3 input.trust_root_invalid "is not readable JSON: " -- \
   quickstart
 unset AGENTCE_TRUST_ROOT
 
-[ "$status" -eq 0 ] && echo "byo-catalog: all three engines verify --catalog-dir signatures identically across 18 scenarios"
+[ "$status" -eq 0 ] && echo "byo-catalog: all three engines verify --catalog-dir signatures identically across 19 scenarios"
 exit "$status"

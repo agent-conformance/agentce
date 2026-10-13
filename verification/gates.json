@@ -1978,7 +1978,7 @@
     },
     {
       "id": "VG-BYO-CATALOG-PARITY",
-      "title": "An operator's own --catalog-dir is checked against the trust root the same way in all three engines: refused when unsigned, untrusted, rebranded, edited behind a symlinked folder, looping back to an ancestor folder or naming a shape its signature does not cover, and never reading a dot-named control file, recorded as a limitation under --allow-unverified-catalog, with Python's exit code, error key, cause and fix",
+      "title": "An operator's own --catalog-dir is checked against the trust root the same way in all three engines: refused when unsigned, untrusted, rebranded, edited behind a symlinked folder, looping back to an ancestor folder or naming a shape its signature does not cover or holding a folder no engine can enter, and never reading a dot-named control file, recorded as a limitation under --allow-unverified-catalog, with Python's exit code, error key, cause and fix",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -1994,8 +1994,8 @@
       "timeout_s": 900,
       "invariant": "An attestation is reported as verified only after its signature verifies against a trusted key.",
       "rubric": {
-        "pass": "for each of 18 scenarios (untrusted, unsigned, unsigned with the override, trusted with --trust-root, missing/malformed/non-object --trust-root, a bad --trust-root with no --catalog-dir, a rebranded catalog with and without the override, an ordinary run, quickstart under AGENTCE_TRUST_ROOT, a catalog signed with controls/ symlinked, the same catalog edited behind the link, a catalog with a link back to an ancestor folder, a signed catalog given a dot-named control file after signing, which assesses because no engine reads it, and a control whose shape is a dot-named file or sits under __PYCACHE__, refused as catalog.shape.unresolved) Python gives the expected exit code and key, and TypeScript and Java give the same exit code, error key, cause (up to the JSON parser's own message for a malformed trust root), fix, envelope limitations and manifest.json limitations",
-        "fail": "any engine assesses a catalog Python refuses, refuses one Python assesses, or differs from Python in exit code, error key, cause, fix or the recorded limitation"
+        "pass": "for each of 19 scenarios (untrusted, unsigned, unsigned with the override, trusted with --trust-root, missing/malformed/non-object --trust-root, a bad --trust-root with no --catalog-dir, a rebranded catalog with and without the override, an ordinary run, quickstart under AGENTCE_TRUST_ROOT, a catalog signed with controls/ symlinked, the same catalog edited behind the link, a catalog with a link back to an ancestor folder, a signed catalog given a dot-named control file after signing, which assesses because no engine reads it, and a control whose shape is a dot-named file or sits under __PYCACHE__, refused as catalog.shape.unresolved, and a trusted signed catalog that gains a folder that can be listed but not entered, refused as input.catalog_unreadable; that one is skipped, with a line saying so, when the gate runs as root) Python gives the expected exit code and key, and TypeScript and Java give the same exit code, error key, cause (up to the JSON parser's own message for a malformed trust root), fix, envelope limitations and manifest.json limitations",
+        "fail": "any engine assesses a catalog Python refuses, refuses one Python assesses, walks past a folder it cannot enter, or differs from Python in exit code, error key, cause, fix or the recorded limitation"
       },
       "faults": [
         {
@@ -2049,8 +2049,8 @@
         {
           "description": "Java's catalog walk no longer descends a symlinked folder, so its digest leaves out the files behind the link",
           "file": "engines/java/src/main/java/org/agentce/Catalog.java",
-          "search": "            if (Files.isDirectory(full)) {\n                if (!entered.add(folderIdentity(full))) {",
-          "replace": "            if (Files.isDirectory(full, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {\n                if (!entered.add(folderIdentity(full))) {"
+          "search": "            if (attrs.isDirectory()) {\n                if (!entered.add(folderIdentity(full, attrs))) {",
+          "replace": "            if (attrs.isDirectory() && !Files.isSymbolicLink(full)) {\n                if (!entered.add(folderIdentity(full, attrs))) {"
         },
         {
           "description": "Python's loader lists the controls folder instead of the files the digest covers, so a dot-named control file added after signing is read",
@@ -2087,6 +2087,24 @@
           "file": "engines/java/src/main/java/org/agentce/Catalog.java",
           "search": "                if (!files.contains(control.shapePath)) {",
           "replace": "                if (false) {"
+        },
+        {
+          "description": "Python's catalog walk skips the entries of a folder it can list but not enter, so a signed catalog that gains such a folder is assessed",
+          "file": "engines/python/agentce/signing.py",
+          "search": "        for name in sorted(os.listdir(folder)):\n            path = folder / name\n            if is_directory(path):",
+          "replace": "        for name in sorted(os.listdir(folder)):\n            path = folder / name\n            if not os.access(folder, os.X_OK):\n                continue\n            if is_directory(path):"
+        },
+        {
+          "description": "TypeScript's catalog walk skips an entry it cannot stat, so a signed catalog that gains a folder it cannot enter is assessed",
+          "file": "engines/typescript/src/report.ts",
+          "search": "    const rel = base === \"\" ? name : `${base}/${name}`;\n    if (isDirFollowingLinks(full)) {",
+          "replace": "    const rel = base === \"\" ? name : `${base}/${name}`;\n    try {\n      statSync(full);\n    } catch {\n      continue;\n    }\n    if (isDirFollowingLinks(full)) {"
+        },
+        {
+          "description": "Java's catalog walk reads an entry it is denied as absent, so a signed catalog that gains a folder it cannot enter is assessed",
+          "file": "engines/java/src/main/java/org/agentce/Catalog.java",
+          "search": "        } catch (NoSuchFileException e) {\n            return null;",
+          "replace": "        } catch (NoSuchFileException | AccessDeniedException e) {\n            return null;"
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/commands/__init__.py's _effective_trust_root, _verify_catalog_dirs and _resolve_catalogs plus signing.load_trust_root, ported in engines/typescript/src/cli.ts + verify.ts and engines/java/src/main/java/org/agentce/Cli.java + Verify.java."
