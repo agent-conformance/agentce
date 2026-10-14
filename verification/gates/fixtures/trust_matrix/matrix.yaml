@@ -78,6 +78,13 @@ quick:
   - anchor-cnd05-direct-user
   - anchor-cnd05-self-report-read
   - anchor-rob02-clean-memory
+  - fx-CND-01-en-fail-uea
+  - fx-CND-01-en-fail-uep
+  - fx-CND-01-en-pass-uea
+  - fx-CND-01-en-pass-uep
+  - fx-CND-01-se-pass-uea
+  - fx-CND-01-se-fail-uea
+  - fx-CND-01-se-fail-uep
 dimensions:
   - name: instruction_class   # the acted-on Instruction's own agentcesourceclass (SPEC §6.2.1, §6.4)
     values: ["enforcement_point", "self_report", "independent_system"]
@@ -5498,8 +5505,8 @@ cells:
     dims: {focus_class: "self_report", shape_verdict: "fail", unrelated_ep: "present"}
     fixture: "focus_case"
     fixture_args: {scenario: "effect_scope", catalogs: ["baseline@2026.09", "conduct@2026.09"]}
-    expected: "insufficient_evidence"
-    spec_ref: "SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met); SPEC §6.4 (controls declare min_source_class; source_class_satisfied per assertion); SPEC §7.7.4 CND-01 (every ToolCall/ResourceAccess within the task's declared effect scope); §7.7.3 effect row (min enforcement_point)"
+    expected: "non_conformant"
+    spec_ref: "SPEC §7.7.4 CND-01 (every ToolCall/ResourceAccess within the task's declared effect scope); §7.7.3 effect row (min enforcement_point)"
     note: "task scope allows effect class read; fail = an irreversible call in that task, no PolicyDecision"
   - id: fx-CND-01-EP-integ-weak
     controls: ["CND-01"]

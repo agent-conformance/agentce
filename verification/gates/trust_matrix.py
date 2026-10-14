@@ -67,7 +67,7 @@ TIER_ENV, ONLY_ENV, OUT_ENV = (
     "AGENTCE_TRUST_MATRIX_OUT",
 )
 #: SHA-256 of fixtures/trust_matrix/matrix.yaml: a matrix edit is deliberate.
-DIGEST = "7c4c637224bb804c8d8507f7330c634d6f2d4a440a3875dfb4d2cf76341900a1"
+DIGEST = "77fed1184a6e805d4476253d04586709ede18b3fc43320651bcb89627280fda7"
 #: The cell ids open.json may hold. Closing a cell removes it here and from open.json in one commit; nothing is added.
 OPEN_PINNED: frozenset[str] = frozenset(
     {
@@ -124,8 +124,6 @@ OPEN_PINNED: frozenset[str] = frozenset(
         "c06-ep-deny-no-refusal",
         "c06-ep-deny-sr-refusal",
         "fx-CND-01-EP-integ-weak",
-        "fx-CND-01-en-fail-uea",
-        "fx-CND-01-en-fail-uep",
         "fx-CND-02-in-loginin-pass",
         "fx-DOC-03-en-pass-uea",
         "fx-DOC-03-en-pass-uep",
@@ -174,8 +172,8 @@ OPEN_PINNED: frozenset[str] = frozenset(
         "r02-other-subject-sr_untrusted-ep_trusted",
     }
 )
-#: The cells the quick tier must run: the witness, principal and timing cells of 18.176 and the CND-05 cells the
-#: seeded faults turn red.
+#: The cells the quick tier must run: the witness, principal and timing cells of 18.176, the CND-05 cells the
+#: seeded faults turn red, and CND-01's declared task-scope cells (18.174).
 REQUIRED_QUICK: frozenset[str] = frozenset(
     {
         "c05-acted-Decision_only-se-user",
@@ -233,6 +231,13 @@ REQUIRED_QUICK: frozenset[str] = frozenset(
         "c05-twin-principal-string",
         "c05-twin-same-instant",
         "c05-twin-same-instant-offset",
+        "fx-CND-01-en-fail-uea",
+        "fx-CND-01-en-fail-uep",
+        "fx-CND-01-en-pass-uea",
+        "fx-CND-01-en-pass-uep",
+        "fx-CND-01-se-fail-uea",
+        "fx-CND-01-se-fail-uep",
+        "fx-CND-01-se-pass-uea",
     }
 )
 RULING_CEILING = 1

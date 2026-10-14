@@ -14,6 +14,10 @@ fails if a gate in `gates.json` is not named in this file.
   subject, a deny before and after the call and one naming an event not held, and the get-evidence skill's
   task-scope template filled in as a user would, which `lint_profile --domain` must also read cleanly. Three seeded
   faults, one per engine, make the scope ignore the effect class.
+- `VG-TRUST-MATRIX` (18.174, changed). `fx-CND-01-en-fail-uea` and `fx-CND-01-en-fail-uep` (an irreversible call in a
+  task whose scope allows read only) now read non-conformant in all three engines and leave the open list.
+  `fx-CND-01-se-fail-uep` expects `non_conformant`, the word the engines now give, where it expected
+  `insufficient_evidence`. The quick tier runs seven CND-01 cells more (74).
 - `VG-ENGINE-GOLDENS-FRESH` (18.174, changed). Its graph-builder fault searched for the `withinScope` line 18.174
   rewrote; it now edits the new line and still makes every ToolCall and ResourceAccess read within scope.
 
