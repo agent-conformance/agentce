@@ -13,6 +13,10 @@ export const RDF_TYPE = "rdf:type";
 const SEP = "";
 
 export class GraphStore {
+  /** The focus IRIs a record failing the SPEC §10.4 human-actor rule touches: each such ApprovalDecided, Override
+   * and Interrupt, and the held decision a failing ApprovalDecided names. Filled by the graph builder; run state for
+   * `applyDeviations` (the register cannot waive this rule), never a triple. */
+  readonly humanActorFailed = new Set<string>();
   /** key `s\x1fp` -> set of objects */
   private readonly spo = new Map<string, Set<string>>();
   /** key `p\x1fo` -> set of subjects */

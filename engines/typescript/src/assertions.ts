@@ -63,6 +63,9 @@ export interface Assertion {
    * this outcome insufficient_evidence (HR-5): what is missing is a record of those types at the minimum.
    * Run state for the missing-evidence text; never written to assertions.json. */
   classGap?: string[];
+  /** True when this non-conformant outcome rests on a record failing the SPEC §10.4 human-actor rule, which the
+   * deviation register cannot waive (18.186). Run state for `applyDeviations`; never written to assertions.json. */
+  humanActorFailed?: boolean;
 }
 
 /** Build an assertion, defaulting the optional collections and nullable fields (mirrors the dataclass). */

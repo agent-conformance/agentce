@@ -1103,6 +1103,15 @@ class Builder {
       const key = this.verifiedActor(node, event);
       byHuman.set(node, key !== null);
       const ref = refsOf(event).decision;
+      if (key === null) {
+        // What the deviation register cannot waive (SPEC §10.4): the failing record, and the held decision a failing
+        // approval names.
+        this.store.humanActorFailed.add(node);
+        const held = ptype === "ApprovalDecided" ? this.heldDecision(ref) : null;
+        if (held !== null) {
+          this.store.humanActorFailed.add(held);
+        }
+      }
       if (ptype !== "ApprovalDecided" || typeof ref !== "string") {
         continue;
       }

@@ -1081,6 +1081,10 @@ function runAssess(options: AssessOptions): CommandResult {
         formatTemplate(template, { control, expiry: pyStr(byControl.get(control)?.expiry ?? "") }),
       );
     }
+    const notWaivable = messages["readiness.deviation_not_waivable"] as string;
+    for (const control of new Set(applied.notWaivable)) {
+      limitations.push(formatTemplate(notWaivable, { control }));
+    }
     deviationRegisterDigest = digestOf(deviationFile);
   }
 

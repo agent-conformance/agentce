@@ -52,6 +52,16 @@ function roleApplies(roles: Set<string>, appliesToRoles: string[]): boolean {
  * `blindSpots.ts`'s `normalizeClass`, which groups both onto the same blind-spot key). */
 export const SELF_REPORT_EQUIVALENT_CLASSES = new Set(["any", "self_report"]);
 
+/** The predicates whose value the SPEC §10.4 human-actor rule decides: a human's approval or review of a decision,
+ * enough human approvers, a human intervention, and the review half of a risk review (18.186). */
+export const HUMAN_ACTOR_PATHS = new Set([
+  "agentce:approvedBy",
+  "agentce:reviewedBy",
+  "agentce:oversightCoverageComplete",
+  "agentce:interventionByHuman",
+  "agentce:riskReviewed",
+]);
+
 export function classOk(observed: string, required: string): boolean {
   return SELF_REPORT_EQUIVALENT_CLASSES.has(required) || observed === required;
 }
@@ -240,7 +250,15 @@ function assertControl(
         ? control.raw.evidence_strength
         : null,
     classGap: kinds,
+    humanActorFailed:
+      outcome === "non-conformant" &&
+      violations.some((v) => store.humanActorFailed.has(v.focus) && readsHumanActor(v.path)),
   });
+}
+
+/** Whether a rendered shape path passes through a predicate whose value the SPEC §10.4 human-actor rule decides. */
+export function readsHumanActor(path: string): boolean {
+  return path.split(/[\s()|^]+/).some((token) => HUMAN_ACTOR_PATHS.has(token));
 }
 
 /** `make`, called at most once: on the first call, and its value returned from then on. */
@@ -456,14 +474,20 @@ export function applyDeviations(
   assertions: Assertion[],
   deviations: Record<string, unknown>[],
   asOf: string,
-): { assertions: Assertion[]; expired: string[] } {
+): { assertions: Assertion[]; expired: string[]; notWaivable: string[] } {
   const byControl = deviationsByControl(deviations);
   const asOfDate = parseDate(asOf);
   const expired: string[] = [];
+  const notWaivable: string[] = [];
   const applied = assertions.map((assertion) => {
     const entry =
       assertion.outcome === "non-conformant" ? byControl.get(assertion.control) : undefined;
     if (entry === undefined) {
+      return assertion;
+    }
+    // SPEC §10.4: the deviation register cannot waive the human-actor rule, expired or not (18.186).
+    if (assertion.humanActorFailed === true) {
+      notWaivable.push(assertion.control);
       return assertion;
     }
     const expiry = typeof entry.expiry === "string" ? parseDate(entry.expiry) : null;
@@ -473,5 +497,5 @@ export function applyDeviations(
     }
     return { ...assertion, outcome: "partial", deviation: assertion.control };
   });
-  return { assertions: applied, expired };
+  return { assertions: applied, expired, notWaivable };
 }
