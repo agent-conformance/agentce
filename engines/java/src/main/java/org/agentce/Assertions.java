@@ -73,6 +73,7 @@ public final class Assertions {
         c.crosswalk = new ArrayList<>(a.crosswalk);
         c.withheldNonConformant = a.withheldNonConformant;
         c.classGap = a.classGap;
+        c.humanActorFailed = a.humanActorFailed;
         return c;
     }
 
@@ -103,6 +104,10 @@ public final class Assertions {
          * made this outcome insufficient_evidence (HR-5): what is missing is a record of those types at the minimum.
          * Run state for the missing-evidence text; never written to assertions.json. */
         public List<String> classGap = List.of();
+        /** True when this non-conformant outcome rests on a record failing the SPEC §10.4 human-actor rule, which the
+         * deviation register cannot waive (18.186). Run state for {@link Assess#applyDeviations}; never written to
+         * assertions.json. */
+        public boolean humanActorFailed;
 
         public ObjectNode toJson() {
             ObjectNode record = Json.nodes().objectNode();

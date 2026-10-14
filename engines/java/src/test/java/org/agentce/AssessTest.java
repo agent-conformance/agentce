@@ -177,4 +177,106 @@ class AssessTest {
         assertEquals("conformant", benign.outcome);
         assertTrue(!benign.withheldNonConformant);
     }
+
+    // --- 18.186: the deviation register cannot waive the SPEC §10.4 human-actor rule. ---
+
+    private static final Path HUMAN_ACTOR =
+            TestPaths.repoRoot().resolve("verification/gates/fixtures/deviations_human_actor");
+
+    /** The case's assertions by control for its fixture subject. */
+    private static Map<String, Assertions.Assertion> humanActorCase(String name, String... drop) {
+        Path kase = HUMAN_ACTOR.resolve(name);
+        List<String> dropped = List.of(drop);
+        List<JsonNode> accepted = Ingest.ingest(Bundle.load(kase.resolve("bundle"))).accepted.stream()
+                .filter(e -> !dropped.contains(e.get("id").asText()))
+                .toList();
+        Profile profile = Profile.fromDict(
+                Json.parse("{\"subjects\":[{\"id\":\"spiffe://corp/agents/cnd05-fixture\",\"role\":\"both\"}]}"));
+        DomainBinding domain = DomainBinding.load(kase.resolve("domain.linkml.yaml"));
+        Map<String, Assertions.Assertion> byControl = new LinkedHashMap<>();
+        for (Assertions.Assertion a : Assess.assessSubjects(accepted, profile,
+                List.of(Catalog.load(Fixtures.BASE), Catalog.load(Fixtures.CONDUCT)), domain, List.of())) {
+            byControl.put(a.control, a);
+        }
+        return byControl;
+    }
+
+    private static List<JsonNode> register(String name) {
+        return Readiness.loadDeviationRegister(HUMAN_ACTOR.resolve(name).resolve("deviations.yaml"));
+    }
+
+    @Test
+    void aFailingApprovalIsNotWaivableOnTheControlsThatReadIt() {
+        Map<String, Assertions.Assertion> byControl = humanActorCase("approval");
+        List<String> readers = List.of("CND-02", "OVS-01", "OVS-08", "RSK-02");
+        List<Assertions.Assertion> chosen = new ArrayList<>();
+        for (String control : List.of("CND-02", "OVS-01", "OVS-08", "RSK-02", "OVS-05")) {
+            chosen.add(byControl.get(control));
+        }
+        Assess.Applied applied = Assess.applyDeviations(chosen, register("approval"), chosen.get(0).window[1]);
+        assertEquals(List.of(), applied.expired());
+        assertEquals(readers, applied.notWaivable());
+        for (Assertions.Assertion a : applied.assertions().subList(0, 4)) {
+            assertEquals("non-conformant", a.outcome, a.control);
+            assertNull(a.deviation, a.control);
+        }
+        // The decision's missing authorization is no §10.4 failure: the register still waives it.
+        assertEquals("partial", applied.assertions().get(4).outcome);
+        assertEquals("OVS-05", applied.assertions().get(4).deviation);
+    }
+
+    @Test
+    void anExpiredEntryOnAFailingApprovalIsReportedNotWaivable() {
+        Assertions.Assertion cnd02 = humanActorCase("approval").get("CND-02");
+        ObjectNode entry = register("approval").stream()
+                .filter(d -> "CND-02".equals(d.get("control").asText()))
+                .findFirst().orElseThrow().deepCopy();
+        entry.put("expiry", "2020-01-01");
+        Assess.Applied applied = Assess.applyDeviations(List.of(cnd02), List.of(entry), cnd02.window[1]);
+        assertEquals(List.of(), applied.expired());
+        assertEquals(List.of("CND-02"), applied.notWaivable());
+        assertEquals("non-conformant", applied.assertions().get(0).outcome);
+    }
+
+    @Test
+    void aDecisionWithNoApprovalIsWaivableNotNotWaivable() {
+        Assertions.Assertion cnd02 = humanActorCase("approval", "ap1").get("CND-02");
+        assertEquals("non-conformant", cnd02.outcome);
+        assertTrue(!cnd02.humanActorFailed);
+        Assess.Applied applied = Assess.applyDeviations(List.of(cnd02), register("approval"), cnd02.window[1]);
+        assertEquals(List.of(), applied.notWaivable());
+        assertEquals("partial", applied.assertions().get(0).outcome);
+        assertEquals("CND-02", applied.assertions().get(0).deviation);
+    }
+
+    @Test
+    void anOverrideByTheAgentItselfIsNotWaivableOnOvs07() {
+        Assertions.Assertion ovs07 = humanActorCase("override").get("OVS-07");
+        Assess.Applied applied = Assess.applyDeviations(List.of(ovs07), register("override"), ovs07.window[1]);
+        assertEquals(List.of("OVS-07"), applied.notWaivable());
+        assertEquals("non-conformant", applied.assertions().get(0).outcome);
+        assertNull(applied.assertions().get(0).deviation);
+    }
+
+    @Test
+    void notWaivableIsPerAssertionAcrossSubjects() {
+        Assertions.Assertion failing = humanActorCase("approval").get("CND-02");
+        Assertions.Assertion clean = Assertions.copyOf(failing);
+        clean.subject = "spiffe://corp/agents/other";
+        clean.humanActorFailed = false;
+        Assess.Applied applied =
+                Assess.applyDeviations(List.of(failing, clean), register("approval"), failing.window[1]);
+        assertEquals(List.of("CND-02"), applied.notWaivable());
+        assertEquals(List.of("non-conformant", "partial"),
+                applied.assertions().stream().map(a -> a.outcome).toList());
+    }
+
+    @Test
+    void notWaivablePathsMatchByPredicateToken() {
+        assertTrue(Assess.readsHumanActor("agentce:approvedBy"));
+        assertTrue(Assess.readsHumanActor("(agentce:decidedBy ^agentce:reviewedBy)"));
+        assertTrue(Assess.readsHumanActor("(agentce:x | agentce:interventionByHuman)"));
+        assertTrue(!Assess.readsHumanActor("agentce:approvedByProxy"));
+        assertTrue(!Assess.readsHumanActor("agentce:authorizedBy"));
+    }
 }

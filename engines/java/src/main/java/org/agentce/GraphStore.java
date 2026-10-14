@@ -25,6 +25,10 @@ public final class GraphStore {
     private final Map<String, Set<String>> pos = new TreeMap<>();
     /** key {@code s\x1fp} -> {@code val\x1fdatatype} literals. */
     private final Map<String, Set<String>> lit = new TreeMap<>();
+    /** The focus IRIs a record failing the SPEC §10.4 human-actor rule touches: each such ApprovalDecided, Override
+     * and Interrupt, and the held decision a failing ApprovalDecided names. Filled by the graph builder; run state
+     * for {@link Assess#applyDeviations} (the register cannot waive this rule), never a triple. */
+    final Set<String> humanActorFailed = new LinkedHashSet<>();
     /** {@code descendant\x1fancestor} pairs. */
     private final Set<String> closure = new LinkedHashSet<>();
     /** ancestor -> descendants. */

@@ -44,6 +44,26 @@ public final class Assess {
      * blind-spot key). Package-private: shared with {@link BlindSpots} rather than duplicated. */
     static final Set<String> SELF_REPORT_EQUIVALENT_CLASSES = Set.of("any", "self_report");
 
+    /** The predicates whose value the SPEC §10.4 human-actor rule decides: a human's approval or review of a
+     * decision, enough human approvers, a human intervention, and the review half of a risk review (18.186). */
+    static final Set<String> HUMAN_ACTOR_PATHS = Set.of(
+            "agentce:approvedBy",
+            "agentce:reviewedBy",
+            "agentce:oversightCoverageComplete",
+            "agentce:interventionByHuman",
+            "agentce:riskReviewed");
+
+    /** Whether a rendered shape path passes through a predicate whose value the SPEC §10.4 human-actor rule
+     * decides. */
+    static boolean readsHumanActor(String path) {
+        for (String token : path.split("[\\s()|^]+")) {
+            if (HUMAN_ACTOR_PATHS.contains(token)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     static boolean classOk(String observed, String required) {
         return SELF_REPORT_EQUIVALENT_CLASSES.contains(required) || observed.equals(required);
     }
@@ -233,6 +253,8 @@ public final class Assess {
         if (!isBelow) {
             for (Structural.Violation v : result.violations) {
                 assertion.violations.add(Structural.violationToJson(v));
+                assertion.humanActorFailed |= "non-conformant".equals(outcome)
+                        && store.humanActorFailed.contains(v.focus) && readsHumanActor(v.path);
             }
             JsonNode strength = control.raw.get("evidence_strength");
             assertion.evidenceStrength = strength != null && strength.isTextual() ? strength.textValue() : null;
@@ -429,24 +451,33 @@ public final class Assess {
         return byControl;
     }
 
-    /** {@link #applyDeviations}' result: the new assertion list and the control ids whose entry had
-     * expired by {@code asOf}, in assertion order. */
-    record Applied(List<Assertions.Assertion> assertions, List<String> expired) {}
+    /** {@link #applyDeviations}' result: the new assertion list, the control ids whose entry had expired by
+     * {@code asOf}, and the control ids whose entry the SPEC §10.4 human-actor rule kept from applying, each in
+     * assertion order. */
+    record Applied(List<Assertions.Assertion> assertions, List<String> expired, List<String> notWaivable) {}
 
     /** Apply an already-linted deviation register to {@code assertions} (SPEC §13.3.4 Stage 2; a port of
      * {@code assess.apply_deviations}): every {@code non-conformant} assertion whose control has a
      * matching, unexpired entry becomes {@code partial} and carries that control's id as {@code
      * deviation}. Pure: never mutates its inputs and never reads a clock ({@code asOf} is the caller's
      * window end). An entry whose {@code expiry} is before {@code asOf} is never applied; its control id
-     * is returned in {@code expired} so the caller reports it as a limitation. */
+     * is returned in {@code expired} so the caller reports it as a limitation. An entry is never applied to an
+     * assertion that rests on a record failing the SPEC §10.4 human-actor rule, expired or not: "the deviation
+     * register cannot waive this rule"; its control is returned in {@code notWaivable} (18.186). */
     static Applied applyDeviations(List<Assertions.Assertion> assertions, List<JsonNode> deviations, String asOf) {
         Map<String, JsonNode> byControl = deviationsByControl(deviations);
         Readiness.CalendarDate asOfDate = Readiness.parseDate(asOf);
         List<Assertions.Assertion> applied = new ArrayList<>();
         List<String> expired = new ArrayList<>();
+        List<String> notWaivable = new ArrayList<>();
         for (Assertions.Assertion a : assertions) {
             JsonNode entry = "non-conformant".equals(a.outcome) ? byControl.get(a.control) : null;
             if (entry == null) {
+                applied.add(a);
+                continue;
+            }
+            if (a.humanActorFailed) {
+                notWaivable.add(a.control);
                 applied.add(a);
                 continue;
             }
@@ -463,7 +494,7 @@ public final class Assess {
             copy.deviation = a.control;
             applied.add(copy);
         }
-        return new Applied(applied, expired);
+        return new Applied(applied, expired, notWaivable);
     }
 
     /** Python's {@code str(entry.get(field, ""))}: an absent field is the empty string, any present

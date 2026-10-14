@@ -787,4 +787,25 @@ class GraphTest {
         reordered.add(decision);
         assertEquals(List.of("true"), flag(reordered, "d1", cover));
     }
+
+    /** 18.186: the store lists what the deviation register cannot waive (SPEC §10.4): each failing ApprovalDecided,
+     * Override and Interrupt, and the held decision a failing approval names; a passing approval adds nothing. */
+    @Test
+    void theNotWaivableSetListsFailingOversightRecordsAndTheDecisionTheyName() {
+        java.util.function.Function<List<JsonNode>, List<String>> failed = events -> {
+            List<String> out = new ArrayList<>(Graph.buildGraph(events, DomainBinding.fromDict(CREDIT_DOMAIN)).humanActorFailed);
+            Collections.sort(out);
+            return out;
+        };
+        assertEquals(List.of("agentce:event/a1", "agentce:event/d1"),
+                failed.apply(List.of(decisionEvent("d1"), approval("a1", "d1", "alice"))));
+        assertEquals(List.of(), failed.apply(withLogins(List.of(decisionEvent("d1"), approval("a1", "d1", "alice")))));
+        String service = "\"actor\": {\"kind\": \"service\", \"id\": \"svc\"}";
+        assertEquals(List.of("agentce:event/i1", "agentce:event/o1"), failed.apply(List.of(decisionEvent("d1"),
+                event("o1", "Override", decisionRef("d1") + ", " + service),
+                event("i1", "Interrupt", decisionRef("d1") + ", " + service))));
+        // A failing approval naming no held decision adds only itself.
+        assertEquals(List.of("agentce:event/a1"),
+                failed.apply(List.of(decisionEvent("d1"), approval("a1", "nowhere", "alice"))));
+    }
 }

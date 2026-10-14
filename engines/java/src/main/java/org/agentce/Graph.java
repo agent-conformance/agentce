@@ -1130,6 +1130,15 @@ public final class Graph {
                 byHuman.put(node, human != null);
                 JsonNode refNode = refsOf(event).get("decision");
                 String ref = str(refNode);
+                if (human == null) {
+                    // What the deviation register cannot waive (SPEC §10.4): the failing record, and the held
+                    // decision a failing approval names.
+                    store.humanActorFailed.add(node);
+                    String held = "ApprovalDecided".equals(ptype) ? heldDecision(refNode) : null;
+                    if (held != null) {
+                        store.humanActorFailed.add(held);
+                    }
+                }
                 if (!"ApprovalDecided".equals(ptype) || ref == null) {
                     continue;
                 }

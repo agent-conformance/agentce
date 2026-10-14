@@ -1218,6 +1218,10 @@ global options:
                         .replace("{control}", control)
                         .replace("{expiry}", Assess.fieldStr(byControl.get(control), "expiry")));
             }
+            String notWaivable = catalogue.get("readiness.deviation_not_waivable");
+            for (String control : new LinkedHashSet<>(applied.notWaivable())) {
+                limitations.add(notWaivable.replace("{control}", control));
+            }
             deviationRegisterDigest = digestOf(deviationFile);
         }
 
