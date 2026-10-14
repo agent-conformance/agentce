@@ -3647,9 +3647,9 @@
       },
       "faults": [
         {
-          "description": "a Python-only graph-builder change: every ToolCall and ResourceAccess reads withinScope true even when an authorization denied it, which the conduct-overlay golden (CND-01) captured before; the TypeScript and Java tests would stay green on the old snapshot",
+          "description": "a Python-only graph-builder change: every ToolCall and ResourceAccess reads withinScope true even when an authorization denied it or its task's declared scope does not allow it, which the conduct-overlay golden (CND-01) captured before; the TypeScript and Java tests would stay green on the old snapshot",
           "file": "engines/python/agentce/graph.py",
-          "search": "node, \"agentce:withinScope\", \"false\" if node in denied else \"true\", BOOL",
+          "search": "node, \"agentce:withinScope\", \"true\" if in_scope else \"false\", BOOL",
           "replace": "node, \"agentce:withinScope\", \"true\", BOOL"
         },
         {
