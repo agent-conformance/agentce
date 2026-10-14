@@ -45,10 +45,12 @@ def _role_applies(roles: set[str], applies_to_roles: list[str]) -> bool:
 SELF_REPORT_EQUIVALENT_CLASSES = frozenset({"any", "self_report"})
 
 #: The predicates whose value the SPEC §10.4 human-actor rule decides: a human's approval or review of a decision,
-#: enough human approvers, a human intervention, and the review half of a risk review (18.186).
+#: enough human approvers, a human intervention, the review half of a risk review (18.186), and an action's CND-02 gate,
+#: which a human's approval releases (18.187).
 HUMAN_ACTOR_PATHS = frozenset(
     {
         "agentce:approvedBy",
+        "agentce:gateMet",
         "agentce:reviewedBy",
         "agentce:oversightCoverageComplete",
         "agentce:interventionByHuman",

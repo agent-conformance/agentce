@@ -94,7 +94,7 @@
         "source_class_from": {
           "type": "array",
           "uniqueItems": true,
-          "items": {"type": "string", "enum": ["actsOn", "delegatedVia", "approvedBy"]},
+          "items": {"type": "string", "enum": ["actsOn", "delegatedVia", "approvedBy", "releasedBy"]},
           "description": "`source_class_from` (optional): the graph links, one hop from each focus, to the records whose source class the judgment rests on; the focus's own class counts too unless it is a Decision (§7.7.5). The assertion meets `min_source_class` only when every applicable focus does (§6.4 class order)."
         },
         "minimum_evidence": {

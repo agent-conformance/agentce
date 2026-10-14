@@ -1411,3 +1411,190 @@ def test_task_scope_within_scope() -> None:
         "differ": "false",
         "untasked": "true",
     }
+
+
+# --- CND-02: actions are the population, and each one's gate (SPEC §7.7.4; 18.187) ---------------------------------
+
+_GATED = DomainBinding.from_dict(
+    {
+        "decision_types": [
+            {
+                "id": CREDIT,
+                "subclass_of": "agentce:ConsequentialDecision",
+                "consequential": True,
+            },
+            {"id": MINOR, "subclass_of": "agentce:Decision", "consequential": False},
+        ],
+        "task_scopes": [
+            {
+                "task_type": "review",
+                "allowed_effect_classes": ["read", "write"],
+                "requires_approval": ["irreversible", "write"],
+            },
+            {"task_type": "payout", "allowed_effect_classes": ["spend"]},
+        ],
+    }
+)
+
+
+def _gate_events(
+    effect: str | None = "irreversible",
+    policy: str | None = "require_approval",
+    *,
+    approved: bool = True,
+    dtype: str = CREDIT,
+    task: str | None = "review",
+    decision_ref: Any = "agentce:event/d1",
+    policy_class: str = "enforcement_point",
+    request: str = "tc1",
+    ptype: str = "ToolCall",
+) -> list[dict[str, Any]]:
+    events = [_event("d1", "Decision", {"decision_type": dtype})]
+    events[0]["time"] = "2026-01-01T00:00:00Z"
+    if approved:
+        events += [_login("login-alice"), _approval("ap1", ALICE)]
+        events[-1]["time"] = "2026-01-01T00:00:01Z"
+    if policy is not None:
+        pd = _event(
+            "pd1",
+            "PolicyDecision",
+            {"decision": policy, "refs": {"request": event_iri(request)}},
+        )
+        pd["agentcesourceclass"] = policy_class
+        events.append(pd)
+    data: dict[str, Any] = {
+        "tool": {"name": "book"},
+        "refs": {"decision": decision_ref},
+    }
+    if effect is not None:
+        data["effect_class"] = effect
+    action = _event("tc1", ptype, data)
+    action["time"] = "2026-01-01T00:00:02Z"
+    if task is not None:
+        action["agentcetask"] = task
+    return events + [action]
+
+
+def _gate(
+    events: list[dict[str, Any]], node: str = "tc1"
+) -> tuple[bool, str | None, str | None]:
+    store = build_graph(events, domain=_GATED)
+    iri = event_iri(node)
+    met = store.literal_values(iri, "agentce:gateMet")
+    judged = store.literal_values(iri, "agentce:gateJudged")
+    return (
+        store.is_a(iri, "agentce:GatedAction"),
+        met[0] if met else None,
+        judged[0] if judged else None,
+    )
+
+
+def test_cnd02_requires_approval_action_needs_an_enforcement_point_decision_and_an_approval() -> (
+    None
+):
+    assert _gate(_gate_events()) == (True, "true", "true")
+    assert _gate(_gate_events(policy="allow")) == (True, "true", "true")
+    assert _gate(_gate_events(approved=False)) == (True, "false", "true")
+    # the agent's own allow, an allow naming another call, and no PolicyDecision at all are no gate
+    assert _gate(_gate_events(policy_class="self_report")) == (True, "false", "true")
+    assert _gate(_gate_events(request="tcx")) == (True, "false", "true")
+    assert _gate(_gate_events(policy=None)) == (True, "false", "true")
+
+
+def test_cnd02_a_deny_closes_the_gate_whatever_was_approved() -> None:
+    assert _gate(_gate_events(policy="deny")) == (True, "false", "true")
+    assert _gate(_gate_events("external_communication", "deny")) == (
+        True,
+        "false",
+        "true",
+    )
+
+
+def test_cnd02_the_approval_is_tied_to_the_decision_the_action_names() -> None:
+    for ref in (None, "agentce:event/d-missing", "agentce:event/d2"):
+        assert _gate(_gate_events(decision_ref=ref)) == (True, "false", "true")
+    events = _gate_events()
+    events[-1]["data"]["refs"].pop("decision")
+    assert _gate(events) == (True, "false", "true")
+
+
+def test_cnd02_other_high_effect_classes_need_an_allow_or_a_released_require_approval() -> (
+    None
+):
+    for effect in ("external_communication", "spend", "physical"):
+        assert _gate(_gate_events(effect, "allow", approved=False)) == (
+            True,
+            "true",
+            "true",
+        )
+        assert _gate(_gate_events(effect, "require_approval")) == (True, "true", "true")
+        assert _gate(_gate_events(effect, "require_approval", approved=False)) == (
+            True,
+            "false",
+            "true",
+        )
+        assert _gate(_gate_events(effect, "allow", policy_class="self_report")) == (
+            True,
+            "false",
+            "true",
+        )
+
+
+def test_cnd02_the_scope_marks_the_population_and_read_stays_outside() -> None:
+    assert _gate(_gate_events("read", None, approved=False)) == (False, None, None)
+    # write is no high-effect class, but this scope marks it requires_approval
+    assert _gate(_gate_events("write", "allow", approved=False)) == (
+        True,
+        "false",
+        "true",
+    )
+    assert _gate(_gate_events("write", "allow")) == (True, "true", "true")
+    # the decision's own type does not matter: the action is what CND-02 counts
+    assert _gate(_gate_events(dtype=MINOR)) == (True, "true", "true")
+
+
+def test_cnd02_a_high_effect_action_in_no_declared_scope_is_held_to_the_approval_path() -> (
+    None
+):
+    for task in (None, "unknown-task"):
+        assert _gate(
+            _gate_events("external_communication", "allow", approved=False, task=task)
+        ) == (
+            True,
+            "false",
+            "true",
+        )
+        assert _gate(_gate_events("write", "allow", approved=False, task=task)) == (
+            False,
+            None,
+            None,
+        )
+
+
+def test_cnd02_an_action_with_no_effect_class_and_an_unexecuted_decision_are_unjudged() -> (
+    None
+):
+    assert _gate(_gate_events(None)) == (True, "true", "false")
+    events = _gate_events()[:-1]
+    assert _gate(events, "d1") == (True, "true", "false")
+    # a minor decision no action executes is not in the population
+    assert _gate(_gate_events(dtype=MINOR)[:-1], "d1") == (False, None, None)
+
+
+def test_cnd02_a_resource_access_counts_only_with_an_effect_class() -> None:
+    assert _gate(_gate_events(ptype="ResourceAccess")) == (True, "true", "true")
+    assert _gate(_gate_events(None, ptype="ResourceAccess")) == (False, None, None)
+
+
+def test_cnd02_released_by_links_the_approvals_the_gate_rests_on() -> None:
+    def released(events: list[dict[str, Any]]) -> list[str]:
+        return build_graph(events, domain=_GATED).objects(
+            event_iri("tc1"), "agentce:releasedBy"
+        )
+
+    assert released(_gate_events()) == [event_iri("ap1")]
+    # an allow-path action passed on the enforcement point's allow rests on no approval
+    assert released(_gate_events("external_communication", "allow")) == []
+    assert released(_gate_events("external_communication", "require_approval")) == [
+        event_iri("ap1")
+    ]

@@ -34,6 +34,7 @@ SOURCE_CLASS_FROM: dict[str, str] = {
     "actsOn": "Instruction",
     "delegatedVia": "DelegationIssued",
     "approvedBy": "ApprovalDecided",
+    "releasedBy": "ApprovalDecided",
 }
 
 #: The outcome an assertion takes when a focus's judged class is below the control's minimum (HR-5). One
@@ -271,9 +272,31 @@ class SourceClassJudge:
             ]
             if not contributors:
                 contributors = [(0, "Decision")]
+        elif "releasedBy" in source_class_from:
+            return self._released_class(focus, event)
         else:
             contributors = [(self._own_rank(focus), _type(event) if event else "")]
             contributors += self._reached(focus, source_class_from)
+        rank = min(r for r, _ in contributors)
+        return Judged(rank, tuple(sorted({t for r, t in contributors if r == rank})))
+
+    def _released_class(self, focus: str, event: dict[str, Any] | None) -> Judged:
+        """CND-02's reading (SPEC §7.7.3, §7.7.4): the minimum governs the approvals that release an action's gate, so
+        the action rests on the best of them (one approval meeting the minimum releases it beside a weaker one), and
+        on its own record only when that is below enforcement_point. An action whose gate no approval releases passes
+        only on an enforcement-point allow, which the control itself holds to enforcement_point: it is not below."""
+        own = self._own_rank(focus)
+        contributors = (
+            [(own, _type(event) if event else "")]
+            if own < SOURCE_CLASS_RANK[ENFORCEMENT_POINT]
+            else []
+        )
+        released = self._reached(focus, ("releasedBy",))
+        if released:
+            best = max(r for r, _ in released)
+            contributors += [(r, t) for r, t in released if r == best]
+        if not contributors:
+            return Judged(max(SOURCE_CLASS_RANK.values()), ())
         rank = min(r for r, _ in contributors)
         return Judged(rank, tuple(sorted({t for r, t in contributors if r == rank})))
 

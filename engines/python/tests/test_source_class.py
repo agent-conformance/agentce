@@ -597,3 +597,70 @@ def test_iv_a_twin_of_a_user_instruction_needs_a_principal_on_both_sides() -> No
         assert not _attested(
             [_instruction(cls=SR, principal=blank), _twin(principal=blank), _call()]
         )
+
+
+# --- CND-02: the minimum governs the approvals that release an action's gate (SPEC §7.7.4; 18.187) ------------------
+
+
+def _cnd02_events(
+    approvals: tuple[str, ...] = (IS,), call: str = EP, policy: str = "require_approval"
+) -> list[dict[str, Any]]:
+    events = [_event("d1", "Decision", SR, decision_type="dom:CreditDecision")]
+    for n, cls in enumerate(approvals, 1):
+        human = {"id": f"user:approver-{n}", "kind": "human"}
+        login = _event(
+            f"login{n}",
+            "SessionStart",
+            IS,
+            agent={"id": "urn:example:service:identity-provider"},
+            environment="idp-login",
+            principal=human,
+        )
+        approval = _event(
+            f"ap{n}",
+            "ApprovalDecided",
+            cls,
+            outcome="approve",
+            refs={"decision": event_iri("d1")},
+            actor=human,
+            session_ref=event_iri(f"login{n}"),
+        )
+        events += [login, approval]
+    events.append(_policy(decision=policy, principal={"id": SUBJECT, "kind": "agent"}))
+    events.append(
+        _event(
+            "tc1",
+            "ToolCall",
+            call,
+            agent={"id": SUBJECT},
+            tool={"name": "book", "protocol": "native"},
+            effect_class="irreversible",
+            refs={"decision": event_iri("d1"), "authorization": event_iri("pd1")},
+        )
+    )
+    for n, event in enumerate(events):
+        event["time"] = f"2026-01-02T00:00:{n:02d}Z"
+    return events
+
+
+def test_cnd02_an_action_rests_on_the_best_approval_that_releases_it() -> None:
+    focus = event_iri("tc1")
+    judged = _judge(_cnd02_events()).judged_class(focus, ["releasedBy"])
+    assert (judged.rank, judged.lowest) == (SOURCE_CLASS_RANK[IS], ("ApprovalDecided",))
+    judged = _judge(_cnd02_events((EP,))).judged_class(focus, ["releasedBy"])
+    assert (judged.rank, judged.lowest) == (SOURCE_CLASS_RANK[EP], ("ApprovalDecided",))
+    # one approval meeting the minimum releases the gate beside a weaker one
+    judged = _judge(_cnd02_events((EP, IS))).judged_class(focus, ["releasedBy"])
+    assert judged.rank == SOURCE_CLASS_RANK[IS]
+    # an action only the agent recorded stays self_report, whatever approved it
+    judged = _judge(_cnd02_events(call=SR)).judged_class(focus, ["releasedBy"])
+    assert (judged.rank, judged.lowest) == (SOURCE_CLASS_RANK[SR], ("ToolCall",))
+
+
+def test_cnd02_outcomes_through_assess() -> None:
+    assert _assess(_cnd02_events(), "CND-02").outcome == "conformant"
+    assert _assess(_cnd02_events((EP,)), "CND-02").outcome == "insufficient_evidence"
+    assert _assess(_cnd02_events((SR, IS)), "CND-02").outcome == "conformant"
+    assert _assess(_cnd02_events(call=SR), "CND-02").outcome == "insufficient_evidence"
+    assert _assess(_cnd02_events(()), "CND-02").outcome == "non-conformant"
+    assert _assess(_cnd02_events(policy="deny"), "CND-02").outcome == "non-conformant"

@@ -25,6 +25,8 @@ from .store import GraphStore
 from .structural import compare_literals
 
 BOOL = "xsd:boolean"
+#: CND-02's population (SPEC §7.7.4), materialised by :meth:`_Builder._conduct_gate`.
+GATED_ACTION = "agentce:GatedAction"
 DATETIME = "xsd:dateTime"
 INTEGER = "xsd:integer"
 
@@ -99,6 +101,10 @@ _INTERRUPT_MECHANISMS: frozenset[str] = frozenset(
 )
 #: The stream classes an identity-provider login record must come from (SPEC §6.2 ApprovalDecided.session_ref, §10.4).
 _LOGIN_CLASSES: frozenset[str] = frozenset({"independent_system", "enforcement_point"})
+#: The effect classes SPEC §7.7.4 holds to CND-02 whatever the task scope marks (ruling Q6).
+_HIGH_EFFECT: frozenset[str] = frozenset(
+    {"irreversible", "external_communication", "spend", "physical"}
+)
 #: The characters the human-actor rule trims from each end of a principal id: Unicode White_Space plus U+FEFF, written
 #: out because Python's strip, JavaScript's trim and Java's strip each trim a different set (SPEC §10.4).
 _ID_PAD = (
@@ -326,6 +332,7 @@ class _Builder:
             "prov:Agent",
             "prov:Activity",
             "prov:Entity",
+            GATED_ACTION,
         }
         for event in events:
             node = event_iri(str(event["id"]))
@@ -619,20 +626,108 @@ class _Builder:
         ``refs.task`` or the ``agentcetask`` attribute (SPEC §7.7.4 CND-01, §7.7.6): each scope
         the domain binding holds the task to (:meth:`DomainBinding.scopes_for`) allows its tool and
         its effect class. A task held to no scope, or a call with no effect class, is out of scope."""
-        tasks = {
-            t
-            for t in (_refs(event).get("task"), event.get("agentcetask"))
-            if isinstance(t, str)
-        }
         data = _data(event)
         tool = data.get("tool")
         name = tool.get("name") if isinstance(tool, dict) else None
         effect = data.get("effect_class")
-        for task in tasks:
+        for task in self._action_tasks(event):
             scopes = self.domain.scopes_for(task)
             if not scopes or not all(s.allows(name, effect) for s in scopes):
                 return False
         return True
+
+    def _action_tasks(self, event: dict[str, Any]) -> set[str]:
+        """The tasks an action names, by ``refs.task`` or the ``agentcetask`` attribute."""
+        return {
+            t
+            for t in (_refs(event).get("task"), event.get("agentcetask"))
+            if isinstance(t, str)
+        }
+
+    def _conduct_gate(self, events: list[dict[str, Any]]) -> None:
+        """Materialise CND-02's population and gate (SPEC §7.7.4, rulings Q5 to Q10). An action (a ToolCall, or a
+        ResourceAccess carrying an effect class) is a ``GatedAction`` when a scope of a task it names marks its effect
+        class ``requires_approval``, or when its class is high-effect (:data:`_HIGH_EFFECT`); a high-effect action in
+        no task, or in a task held to no scope, is held to the approval path (fails closed). The approval path needs an
+        enforcement-point PolicyDecision naming the action (its ``refs.request`` or the action's
+        ``refs.authorization``) that allows it or asks for approval, and an approval of the held decision the action's
+        ``refs.decision`` names (``agentce:approvedBy``, already held to SPEC §6.3 and §10.4); any other high-effect
+        action needs an enforcement-point allow, or a ``require_approval`` such an approval released (Q10). A deny
+        naming the action closes its gate (Q9). The approvals a gate rests on are linked ``agentce:releasedBy``, which
+        CND-02's minimum source class reads. A ToolCall with no effect class, and a consequential decision no ToolCall
+        executes, are in the population but unjudged (``agentce:gateJudged`` false; Q7, Q8)."""
+        policies = {
+            event_iri(str(e["id"])): e
+            for e in events
+            if self._ptype(e) == "PolicyDecision"
+        }
+        named: dict[str, list[dict[str, Any]]] = {}
+        for iri, policy in policies.items():
+            request = _refs(policy).get("request")
+            if isinstance(request, str):
+                named.setdefault(request, []).append(policy)
+        executed: set[str] = set()
+        for event in events:
+            ptype = self._ptype(event)
+            if ptype not in ("ToolCall", "ResourceAccess"):
+                continue
+            node = event_iri(str(event["id"]))
+            refs = _refs(event)
+            if ptype == "ToolCall":
+                decision = self._held_decision(refs.get("decision"))
+                if decision is not None:
+                    executed.add(decision)
+            effect = _data(event).get("effect_class")
+            if not isinstance(effect, str):
+                if ptype == "ToolCall":
+                    self._gate(node, met=True, judged=False)
+                continue
+            scopes = [self.domain.scopes_for(t) for t in self._action_tasks(event)]
+            approval = any(effect in s.requires_approval for ss in scopes for s in ss)
+            if effect in _HIGH_EFFECT and (not scopes or not all(scopes)):
+                approval = True
+            if not approval and effect not in _HIGH_EFFECT:
+                continue
+            gating = list(named.get(node, ()))
+            authorization = refs.get("authorization")
+            if isinstance(authorization, str) and authorization in policies:
+                gating.append(policies[authorization])
+            rulings = {
+                _data(p).get("decision")
+                for p in gating
+                if p.get("agentcesourceclass") in _LOGIN_CLASSES
+            }
+            denied = any(_data(p).get("decision") == "deny" for p in gating)
+            decision = self._held_decision(refs.get("decision"))
+            approvals = (
+                sorted(self.store.objects(decision, "agentce:approvedBy"))
+                if decision is not None
+                else []
+            )
+            if approval:
+                released = bool(rulings & {"allow", "require_approval"})
+            else:
+                released = "allow" not in rulings and "require_approval" in rulings
+            if released or approval:
+                for approved in approvals:
+                    self.store.add_edge(node, "agentce:releasedBy", approved)
+            met = not denied and (
+                ("allow" in rulings and not approval) or (released and bool(approvals))
+            )
+            self._gate(node, met=met, judged=True)
+            if not met and decision in self.store.human_actor_failed:
+                # An approval that fails SPEC §10.4 left the gate shut: the deviation register cannot waive it.
+                self.store.human_actor_failed.add(node)
+        for decision in sorted(self.decision_time):
+            if decision not in executed and self.store.is_a(
+                decision, "agentce:ConsequentialDecision"
+            ):
+                self._gate(decision, met=True, judged=False)
+
+    def _gate(self, node: str, *, met: bool, judged: bool) -> None:
+        self.store.add_type(node, GATED_ACTION)
+        self._literal(node, "agentce:gateMet", met)
+        self._literal(node, "agentce:gateJudged", judged)
 
     def _acts_on_untrusted(
         self, events: list[dict[str, Any]], tainted: set[str]
@@ -842,6 +937,7 @@ class _Builder:
             self._chain_terminus(node, data)
         self._acts_on_untrusted(events, self._robust_to_untrusted(events))
         self._conduct_scope_budget(events)
+        self._conduct_gate(events)
         self._preceded_by()
 
     @staticmethod
