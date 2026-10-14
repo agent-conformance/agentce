@@ -316,7 +316,124 @@
       }
     },
     "hostile-base-attested-policy-decision": {
-      "why": "base: an enforcement-point PolicyDecision allows the acting call for the instruction's principal",
+      "why": "base: an enforcement-point PolicyDecision allows the acting call for the instruction's principal, recorded before the call",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "pd1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "PolicyDecision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "engine": "custom",
+            "policy_id": "ingress",
+            "policy_version": "1",
+            "policy_digest": "sha256:30ff089db407da34522928c1587a99e449a450801eaa2a70758c347855424837",
+            "decision": "allow",
+            "reasons": [],
+            "obligations": [],
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "request": "agentce:event/tc1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "tcx",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "ping",
+              "protocol": "native"
+            },
+            "effect_class": "read"
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "hostile-base-attested-policy-decision-after-call": {
+      "why": "base: an enforcement-point PolicyDecision allows the acting call for the instruction's principal, but recorded after the call: it cannot have gated it (18.176)",
       "control": "CND-05",
       "events": [
         {
@@ -427,13 +544,155 @@
         }
       ],
       "expected": {
-        "outcome": "conformant",
+        "outcome": "insufficient_evidence",
         "failing": [],
         "exit": 2
       }
     },
     "hostile-base-attested-policy-decision-ep-parent": {
-      "why": "base: the acted-on instruction's parent is an enforcement-point user instruction",
+      "why": "base: the acted-on instruction's parent is an enforcement-point user instruction, recorded before the call",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "p1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1",
+              "parent": "agentce:event/p1"
+            }
+          }
+        },
+        {
+          "id": "pd1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "PolicyDecision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "engine": "custom",
+            "policy_id": "ingress",
+            "policy_version": "1",
+            "policy_digest": "sha256:30ff089db407da34522928c1587a99e449a450801eaa2a70758c347855424837",
+            "decision": "allow",
+            "reasons": [],
+            "obligations": [],
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "request": "agentce:event/tc1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "tcx",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "ping",
+              "protocol": "native"
+            },
+            "effect_class": "read"
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "hostile-base-attested-policy-decision-ep-parent-after-call": {
+      "why": "base: the acted-on instruction's parent is an enforcement-point user instruction, but recorded after the call: it cannot have gated it (18.176)",
       "control": "CND-05",
       "events": [
         {
@@ -569,7 +828,7 @@
         }
       ],
       "expected": {
-        "outcome": "conformant",
+        "outcome": "insufficient_evidence",
         "failing": [],
         "exit": 2
       }
@@ -2145,8 +2404,264 @@
         "exit": 2
       }
     },
+    "probe-a-attested-ingress-twin-after-call": {
+      "why": "twin of A: an enforcement-point ingress record of the same instruction (content, task, class, principal), but recorded after the call: ingress records the instruction at entry, so it cannot attest what the call already acted on (18.176)",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "i1-ingress",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:04Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-a-attested-ingress-twin-no-principal": {
+      "why": "twin of A: the agent's user instruction and the enforcement-point ingress record of it both name no principal; a user instruction needs one (SPEC §6.2.3), so the twin attests nothing (18.176)",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "i1-ingress",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
     "probe-a-attested-policy-decision": {
-      "why": "twin of A: an enforcement-point PolicyDecision allows the call for the instruction's principal",
+      "why": "twin of A: an enforcement-point PolicyDecision allows the call for the instruction's principal, recorded before the call",
+      "control": "CND-05",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "pd1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "PolicyDecision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "engine": "custom",
+            "policy_id": "ingress",
+            "policy_version": "1",
+            "policy_digest": "sha256:30ff089db407da34522928c1587a99e449a450801eaa2a70758c347855424837",
+            "decision": "allow",
+            "reasons": [],
+            "obligations": [],
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "request": "agentce:event/tc1"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "probe-a-attested-policy-decision-after-call": {
+      "why": "twin of A: an enforcement-point PolicyDecision allows the call for the instruction's principal, but recorded after the call: it cannot have gated it (18.176)",
       "control": "CND-05",
       "events": [
         {
@@ -2232,7 +2747,7 @@
         }
       ],
       "expected": {
-        "outcome": "conformant",
+        "outcome": "insufficient_evidence",
         "failing": [],
         "exit": 2
       }
