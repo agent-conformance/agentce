@@ -4,7 +4,8 @@
 # register (S0), the auditor-view fixture's register (S1), lint and shape refusals (S2-S9, S12),
 # unquoted dates (S10), an empty register (S11), only an expired entry (S13), two subjects (S14), the
 # `--deviations=<path>` spelling (S15), a missing value (S16, S23), hostile and mistaken register bytes
-# (S17-S21), a `.` segment in the register path (S2D, S6D) and the flag given twice (S22, S22b) -- and must give Python's exit code, error key, cause
+# (S17-S21), a `.` segment in the register path (S2D, S6D), the flag given twice (S22, S22b) and an entry on a
+# control that fails the SPEC §10.4 human-actor rule, which the register cannot waive (S24, S25) -- and must give Python's exit code, error key, cause
 # and fix, or write byte-identical assertions, OSCAL, activity and blind-spot files with the same
 # limitations and register digest. Each engine's test-only `auditor-view` seam must also print the
 # bytes Python's compute_auditor_view gives over the same assertions and register, in either order.
@@ -15,6 +16,7 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 F="$root/verification/gates/fixtures/auditor_view"
 P="$root/verification/gates/fixtures/project_view_deviations"
+H="$root/verification/gates/fixtures/deviations_human_actor"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 regs="$work/regs"
@@ -97,6 +99,11 @@ scenario S6D "${base[@]}" --deviations "$regs/./s6.yaml"
 scenario S2D "${base[@]}" --deviations "$regs/./s2.yaml"
 scenario S22 "${base[@]}" --deviations "$F/deviations.yaml" --deviations "$regs/s11.yaml"
 scenario S22b "${base[@]}" --deviations "$regs/s11.yaml" --deviations "$F/deviations.yaml"
+for kase in S24:approval S25:override; do
+  d="$H/${kase#*:}"
+  scenario "${kase%%:*}" --bundle "$d/bundle" --profile "$d/applicability.yaml" --domain "$d/domain.linkml.yaml" \
+    --deviations "$d/deviations.yaml"
+done
 scenario S23 --bundle "$F/evidence" --deviations --profile "$F/applicability.yaml" \
   --domain "$F/domain.linkml.yaml" --catalog-dir "$F/catalog" --allow-unverified-catalog
 
@@ -169,6 +176,11 @@ REFUSALS = ["S2", "S2D", "S3", "S4", "S5", "S6", "S6D", "S7", "S8", "S9", "S12",
 SUCCESSES = ["S0", "S1", "S10", "S11", "S13", "S14", "S15", "S22", "S22b"]
 FILES = ("assertions.json", "oscal-ar.json", "activity.json", "blind-spots.json")
 DIGEST = {"S22": "sha256:1c8bd1ab", "S22b": "sha256:ec70a21e"}
+# SPEC §10.4: the register cannot waive the human-actor rule. Per scenario, the controls whose entry is not applied
+# (non-conformant, no deviation, one limitation each) and the ones it still waives (partial, the control's id).
+HUMAN_ACTOR = {"S24": (["CND-02", "OVS-01", "OVS-08", "RSK-02"], ["OVS-05"]), "S25": (["OVS-07"], [])}
+NOT_WAIVABLE = (": deviation not applied because an approval, override or interrupt in these records fails the"
+                " human-actor rule (SPEC §10.4), which no deviation can waive; the control remains non-conformant")
 failures = []
 
 
@@ -247,6 +259,29 @@ for s in SUCCESSES:
     if s in DIGEST:
         check(str(digest).startswith(DIGEST[s]), f"{s}: digest {digest} is not the last register's")
 
+for s, (kept, waived) in HUMAN_ACTOR.items():
+    for engine in ENGINES:
+        check(code(engine, s) == 2, f"{s}: {engine} exited {code(engine, s)}, not 2: {read(f'{work}/{engine}/{s}.err')[-400:]}")
+        if not os.path.exists(f"{work}/{engine}/{s}/manifest.json"):
+            check(False, f"{s}: {engine} wrote no manifest.json")
+            continue
+        by_control = {a["control"]: a for a in json.loads(read(f"{work}/{engine}/{s}/assertions.json"))
+                      if a["subject"] == "spiffe://corp/agents/cnd05-fixture"}
+        for c in kept:
+            got = (by_control.get(c, {}).get("outcome"), by_control.get(c, {}).get("deviation"))
+            check(got == ("non-conformant", None), f"{s}: {engine} {c} reads {got}, not non-conformant without a deviation")
+        for c in waived:
+            got = (by_control.get(c, {}).get("outcome"), by_control.get(c, {}).get("deviation"))
+            check(got == ("partial", c), f"{s}: {engine} {c} reads {got}, not partial with its deviation")
+        lines = [x for x in manifest(engine, s)[0] or [] if x.endswith(NOT_WAIVABLE)]
+        check(lines == [c + NOT_WAIVABLE for c in sorted(kept, key=lambda c: list(by_control).index(c))],
+              f"{s}: {engine} not-applied limitations are {lines}")
+        if engine != "python":
+            for n in FILES:
+                a, b = f"{work}/python/{s}/{n}", f"{work}/{engine}/{s}/{n}"
+                check(os.path.exists(b) and read(a, "rb") == read(b, "rb"), f"{s}: {engine} {n} differs from python's")
+            check(manifest(engine, s) == manifest("python", s), f"{s}: {engine} manifest limitations/digest differ from python's")
+
 for engine in ENGINES:
     check(read(f"{work}/{engine}/S15/assertions.json", "rb") == read(f"{work}/{engine}/S1/assertions.json", "rb")
           and manifest(engine, "S15") == manifest(engine, "S1"),
@@ -270,7 +305,7 @@ check(os.path.exists(f"{work}/auditor/auditor.json") and read(f"{work}/auditor/a
 
 for f in failures:
     print(f"FAIL {f}")
-total = len(REFUSALS) + 2 + len(SUCCESSES)
+total = len(REFUSALS) + 2 + len(SUCCESSES) + len(HUMAN_ACTOR)
 if failures:
     sys.exit(1)
 print(f"deviations parity: {total} scenarios and the auditor-view seam agree across python, typescript and java")
