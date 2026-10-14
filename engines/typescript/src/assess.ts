@@ -59,9 +59,11 @@ function roleApplies(roles: Set<string>, appliesToRoles: string[]): boolean {
 export const SELF_REPORT_EQUIVALENT_CLASSES = new Set(["any", "self_report"]);
 
 /** The predicates whose value the SPEC §10.4 human-actor rule decides: a human's approval or review of a decision,
- * enough human approvers, a human intervention, and the review half of a risk review (18.186). */
+ * enough human approvers, a human intervention, the review half of a risk review (18.186), and an action's CND-02
+ * gate, which a human's approval releases (18.187). */
 const HUMAN_ACTOR_PATHS = new Set([
   "agentce:approvedBy",
+  "agentce:gateMet",
   "agentce:reviewedBy",
   "agentce:oversightCoverageComplete",
   "agentce:interventionByHuman",

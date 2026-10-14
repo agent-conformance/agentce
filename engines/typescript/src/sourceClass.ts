@@ -30,6 +30,7 @@ export const SOURCE_CLASS_FROM: ReadonlyMap<string, string> = new Map([
   ["actsOn", "Instruction"],
   ["delegatedVia", "DelegationIssued"],
   ["approvedBy", "ApprovalDecided"],
+  ["releasedBy", "ApprovalDecided"],
 ]);
 
 /** The outcome an assertion takes when a focus's judged class is below the control's minimum (HR-5). One
@@ -352,11 +353,35 @@ export class SourceClassJudge {
       if (contributors.length === 0) {
         contributors = [[0, "Decision"]];
       }
+    } else if (sourceClassFrom.includes("releasedBy")) {
+      return this.releasedClass(focus, event);
     } else {
       contributors = [
         [this.ownRank(focus), event !== undefined ? typeOf(event) : ""],
         ...this.reached(focus, sourceClassFrom),
       ];
+    }
+    const rank = Math.min(...contributors.map(([r]) => r));
+    const lowest = new Set(contributors.filter(([r]) => r === rank).map(([, t]) => t));
+    return { rank, lowest: [...lowest].sort(byteCompare) };
+  }
+
+  /** CND-02's reading (SPEC §7.7.3, §7.7.4): the action rests on the best approval that releases its gate,
+   * and on its own record only when that is below enforcement_point; an action no approval releases passed
+   * only on an enforcement-point allow, which the control itself holds to enforcement_point. */
+  private releasedClass(focus: string, event: Event | undefined): Judged {
+    const own = this.ownRank(focus);
+    const contributors: Array<[number, string]> =
+      own < (SOURCE_CLASS_RANK.get(ENFORCEMENT_POINT) as number)
+        ? [[own, event !== undefined ? typeOf(event) : ""]]
+        : [];
+    const released = this.reached(focus, ["releasedBy"]);
+    if (released.length > 0) {
+      const best = Math.max(...released.map(([r]) => r));
+      contributors.push(...released.filter(([r]) => r === best));
+    }
+    if (contributors.length === 0) {
+      return { rank: Math.max(...SOURCE_CLASS_RANK.values()), lowest: [] };
     }
     const rank = Math.min(...contributors.map(([r]) => r));
     const lowest = new Set(contributors.filter(([r]) => r === rank).map(([, t]) => t));

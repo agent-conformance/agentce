@@ -1003,3 +1003,184 @@ test("task scope: a tasked ToolCall is within scope only when every named task's
     untasked: "true",
   });
 });
+
+// --- CND-02: actions are the population, and each one's gate (SPEC §7.7.4; 18.187) ------------------
+
+const GATED_DOMAIN = DomainBinding.fromDict({
+  decision_types: [
+    {
+      id: "agentce:CreditDecision",
+      subclass_of: "agentce:ConsequentialDecision",
+      consequential: true,
+    },
+    { id: "agentce:MinorDecision", subclass_of: "agentce:Decision", consequential: false },
+  ],
+  task_scopes: [
+    {
+      task_type: "review",
+      allowed_effect_classes: ["read", "write"],
+      requires_approval: ["irreversible", "write"],
+    },
+    { task_type: "payout", allowed_effect_classes: ["spend"] },
+  ],
+});
+
+interface GateOpts {
+  approved?: boolean;
+  dtype?: string;
+  task?: string | null;
+  decisionRef?: unknown;
+  policyClass?: string;
+  request?: string;
+  ptype?: string;
+}
+
+function gateEvents(
+  effect: string | null = "irreversible",
+  policy: string | null = "require_approval",
+  opts: GateOpts = {},
+): Record<string, unknown>[] {
+  const events: Record<string, unknown>[] = [
+    memoryEvent("d1", "Decision", { decision_type: opts.dtype ?? "agentce:CreditDecision" }),
+  ];
+  if (opts.approved ?? true) {
+    events.push(login("login-alice"), {
+      ...refEvent(
+        "ap1",
+        "ApprovalDecided",
+        { outcome: "approve", actor: HUMAN_A, session_ref: sessionOf(HUMAN_A) },
+        "d1",
+      ),
+      time: "2026-01-01T00:00:01Z",
+    });
+  }
+  if (policy !== null) {
+    events.push({
+      ...memoryEvent("pd1", "PolicyDecision", {
+        decision: policy,
+        refs: { request: `agentce:event/${opts.request ?? "tc1"}` },
+      }),
+      agentcesourceclass: opts.policyClass ?? "enforcement_point",
+    });
+  }
+  const data: Record<string, unknown> = {
+    tool: { name: "book" },
+    refs: { decision: opts.decisionRef === undefined ? "agentce:event/d1" : opts.decisionRef },
+  };
+  if (effect !== null) {
+    data.effect_class = effect;
+  }
+  const task = opts.task === undefined ? "review" : opts.task;
+  events.push({
+    ...memoryEvent("tc1", opts.ptype ?? "ToolCall", data),
+    time: "2026-01-01T00:00:02Z",
+    ...(task === null ? {} : { agentcetask: task }),
+  });
+  return events;
+}
+
+function gate(events: Record<string, unknown>[], node = "tc1"): [boolean, unknown, unknown] {
+  const store = buildGraph(events, { domain: GATED_DOMAIN });
+  const iri = `agentce:event/${node}`;
+  return [
+    store.isA(iri, "agentce:GatedAction"),
+    store.literalValues(iri, "agentce:gateMet")[0] ?? null,
+    store.literalValues(iri, "agentce:gateJudged")[0] ?? null,
+  ];
+}
+
+const SHUT = [true, "false", "true"];
+const OPEN = [true, "true", "true"];
+const OUTSIDE = [false, null, null];
+
+test("CND-02: a requires_approval action needs an enforcement-point decision and an approval", () => {
+  assert.deepEqual(gate(gateEvents()), OPEN);
+  assert.deepEqual(gate(gateEvents("irreversible", "allow")), OPEN);
+  assert.deepEqual(gate(gateEvents("irreversible", "require_approval", { approved: false })), SHUT);
+  // the agent's own allow, an allow naming another call, and no PolicyDecision at all are no gate
+  assert.deepEqual(
+    gate(gateEvents("irreversible", "require_approval", { policyClass: "self_report" })),
+    SHUT,
+  );
+  assert.deepEqual(gate(gateEvents("irreversible", "require_approval", { request: "tcx" })), SHUT);
+  assert.deepEqual(gate(gateEvents("irreversible", null)), SHUT);
+});
+
+test("CND-02: a deny closes the gate whatever was approved", () => {
+  assert.deepEqual(gate(gateEvents("irreversible", "deny")), SHUT);
+  assert.deepEqual(gate(gateEvents("external_communication", "deny")), SHUT);
+});
+
+test("CND-02: the approval is tied to the decision the action names", () => {
+  for (const ref of [null, "agentce:event/d-missing", "agentce:event/d2"]) {
+    assert.deepEqual(
+      gate(gateEvents("irreversible", "require_approval", { decisionRef: ref })),
+      SHUT,
+    );
+  }
+  const events = gateEvents();
+  const action = events[events.length - 1] as { data: { refs: Record<string, unknown> } };
+  action.data.refs = {};
+  assert.deepEqual(gate(events), SHUT);
+});
+
+test("CND-02: other high-effect classes need an allow or a released require_approval", () => {
+  for (const effect of ["external_communication", "spend", "physical"]) {
+    assert.deepEqual(gate(gateEvents(effect, "allow", { approved: false })), OPEN);
+    assert.deepEqual(gate(gateEvents(effect, "require_approval")), OPEN);
+    assert.deepEqual(gate(gateEvents(effect, "require_approval", { approved: false })), SHUT);
+    assert.deepEqual(gate(gateEvents(effect, "allow", { policyClass: "self_report" })), SHUT);
+  }
+});
+
+test("CND-02: the scope marks the population and read stays outside", () => {
+  assert.deepEqual(gate(gateEvents("read", null, { approved: false })), OUTSIDE);
+  // write is no high-effect class, but this scope marks it requires_approval
+  assert.deepEqual(gate(gateEvents("write", "allow", { approved: false })), SHUT);
+  assert.deepEqual(gate(gateEvents("write", "allow")), OPEN);
+  // the decision's own type does not matter: the action is what CND-02 counts
+  assert.deepEqual(
+    gate(gateEvents("irreversible", "require_approval", { dtype: "agentce:MinorDecision" })),
+    OPEN,
+  );
+});
+
+test("CND-02: a high-effect action in no declared scope is held to the approval path", () => {
+  for (const task of [null, "unknown-task"]) {
+    assert.deepEqual(
+      gate(gateEvents("external_communication", "allow", { approved: false, task })),
+      SHUT,
+    );
+    assert.deepEqual(gate(gateEvents("write", "allow", { approved: false, task })), OUTSIDE);
+  }
+});
+
+test("CND-02: an action with no effect class and an unexecuted decision are unjudged", () => {
+  assert.deepEqual(gate(gateEvents(null)), [true, "true", "false"]);
+  assert.deepEqual(gate(gateEvents().slice(0, -1), "d1"), [true, "true", "false"]);
+  // a minor decision no action executes is not in the population
+  const minor = gateEvents("irreversible", "require_approval", { dtype: "agentce:MinorDecision" });
+  assert.deepEqual(gate(minor.slice(0, -1), "d1"), OUTSIDE);
+});
+
+test("CND-02: a resource access counts only with an effect class", () => {
+  assert.deepEqual(
+    gate(gateEvents("irreversible", "require_approval", { ptype: "ResourceAccess" })),
+    OPEN,
+  );
+  assert.deepEqual(
+    gate(gateEvents(null, "require_approval", { ptype: "ResourceAccess" })),
+    OUTSIDE,
+  );
+});
+
+test("CND-02: releasedBy links the approvals the gate rests on", () => {
+  const released = (events: Record<string, unknown>[]) =>
+    buildGraph(events, { domain: GATED_DOMAIN }).objects("agentce:event/tc1", "agentce:releasedBy");
+  assert.deepEqual(released(gateEvents()), ["agentce:event/ap1"]);
+  // an allow-path action passed on the enforcement point's allow rests on no approval
+  assert.deepEqual(released(gateEvents("external_communication", "allow")), []);
+  assert.deepEqual(released(gateEvents("external_communication", "require_approval")), [
+    "agentce:event/ap1",
+  ]);
+});

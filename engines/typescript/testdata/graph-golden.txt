@@ -17,6 +17,7 @@ C	agentce:Decision	prov:Activity
 C	agentce:DelegationIssued	agentce:Activity
 C	agentce:DelegationIssued	agentce:DelegationIssued
 C	agentce:DelegationIssued	prov:Activity
+C	agentce:GatedAction	agentce:GatedAction
 C	agentce:HumanPrincipal	agentce:HumanPrincipal
 C	agentce:HumanPrincipal	agentce:Principal
 C	agentce:HumanPrincipal	prov:Agent
@@ -85,6 +86,7 @@ E	agentce:event/dec-2	agentce:chainTerminus	agentce:principal/4f9618842a3b141eae
 E	agentce:event/dec-2	agentce:precededBy	agentce:event/dec-1
 E	agentce:event/dec-2	prov:wasAssociatedWith	spiffe://corp/agent-a
 E	agentce:event/dec-2	rdf:type	agentce:Decision
+E	agentce:event/dec-2	rdf:type	agentce:GatedAction
 E	agentce:event/dec-2	rdf:type	credit:LoanApproval
 E	agentce:event/del-1	agentce:sourceClass	agentce:enforcement_point
 E	agentce:event/del-1	prov:wasAssociatedWith	spiffe://corp/agent-a
@@ -94,8 +96,10 @@ E	agentce:event/login-1	prov:wasAssociatedWith	urn:example:service:identity-prov
 E	agentce:event/login-1	rdf:type	agentce:SessionStart
 E	agentce:event/out-1	rdf:type	agentce:Outcome
 E	agentce:event/tc-1	agentce:executes	agentce:event/dec-1
+E	agentce:event/tc-1	agentce:releasedBy	agentce:event/appr-1
 E	agentce:event/tc-1	prov:wasAssociatedWith	spiffe://corp/agent-a
 E	agentce:event/tc-1	rdf:type	agentce:ComponentRecord
+E	agentce:event/tc-1	rdf:type	agentce:GatedAction
 E	agentce:event/tc-1	rdf:type	agentce:ToolCall
 E	agentce:principal/4f9618842a3b141eae7bfb7cd81ee43b2ba78b2eef1a7c1d0c13c7ea559ab534	rdf:type	agentce:HumanPrincipal
 E	agentce:principal/ae09877c4f2f6fab64bf06beb9aa698fba9fe36828b1b24970b101a580e068c8	rdf:type	agentce:HumanPrincipal
@@ -119,6 +123,8 @@ L	agentce:event/dec-1	agentce:untrustedContentRuledOn	false	xsd:boolean
 L	agentce:event/dec-1	prov:atTime	2026-06-01T09:00:00.000Z	xsd:dateTime
 L	agentce:event/dec-2	agentce:actsOnUntrusted	false	xsd:boolean
 L	agentce:event/dec-2	agentce:explanationReconstructable	false	xsd:boolean
+L	agentce:event/dec-2	agentce:gateJudged	false	xsd:boolean
+L	agentce:event/dec-2	agentce:gateMet	true	xsd:boolean
 L	agentce:event/dec-2	agentce:oversightCoverageComplete	false	xsd:boolean
 L	agentce:event/dec-2	agentce:oversightModalityMatchesDeclared	false	xsd:boolean
 L	agentce:event/dec-2	agentce:riskReviewed	false	xsd:boolean
@@ -134,6 +140,8 @@ L	agentce:event/out-1	prov:atTime	2026-06-01T09:10:00.000Z	xsd:dateTime
 L	agentce:event/tc-1	agentce:actsOnUntrusted	false	xsd:boolean
 L	agentce:event/tc-1	agentce:componentDeclared	false	xsd:boolean
 L	agentce:event/tc-1	agentce:executesConsequential	true	xsd:boolean
+L	agentce:event/tc-1	agentce:gateJudged	true	xsd:boolean
+L	agentce:event/tc-1	agentce:gateMet	false	xsd:boolean
 L	agentce:event/tc-1	agentce:withinBudget	true	xsd:boolean
 L	agentce:event/tc-1	agentce:withinScope	true	xsd:boolean
 L	agentce:event/tc-1	prov:atTime	2026-06-01T09:05:00.000Z	xsd:dateTime

@@ -582,3 +582,72 @@ test("ROB-02: a decision that used nothing recorded reads insufficient_evidence"
   const nothing = event("d1", "Decision", SR, { decision_type: "dom:CreditDecision" });
   assert.equal(rob02([...memory(), nothing]).outcome, "insufficient_evidence");
 });
+
+// --- CND-02: the minimum governs the approvals that release an action's gate (SPEC §7.7.4; 18.187) ------
+
+function cnd02Events(
+  approvals: string[] = [IS],
+  callClass = EP,
+  decision = "require_approval",
+): Event[] {
+  const events: Event[] = [event("d1", "Decision", SR, { decision_type: "dom:CreditDecision" })];
+  approvals.forEach((cls, i) => {
+    const n = i + 1;
+    const human = { id: `user:approver-${n}`, kind: "human" };
+    events.push(
+      event(`login${n}`, "SessionStart", IS, {
+        agent: { id: "urn:example:service:identity-provider" },
+        environment: "idp-login",
+        principal: human,
+      }),
+      event(`ap${n}`, "ApprovalDecided", cls, {
+        outcome: "approve",
+        refs: { decision: eventIri("d1") },
+        actor: human,
+        session_ref: eventIri(`login${n}`),
+      }),
+    );
+  });
+  events.push(policy({ decision, principal: { id: SUBJECT, kind: "agent" } }));
+  events.push(
+    event("tc1", "ToolCall", callClass, {
+      agent: { id: SUBJECT },
+      tool: { name: "book", protocol: "native" },
+      effect_class: "irreversible",
+      refs: { decision: eventIri("d1"), authorization: eventIri("pd1") },
+    }),
+  );
+  events.forEach((e, n) => {
+    e.time = `2026-01-02T00:00:${String(n).padStart(2, "0")}Z`;
+  });
+  return events;
+}
+
+test("CND-02: an action rests on the best approval that releases it", () => {
+  const focus = eventIri("tc1");
+  const rank = (cls: string) => SOURCE_CLASS_RANK.get(cls);
+  assert.deepEqual(judge(cnd02Events()).judgedClass(focus, ["releasedBy"]), {
+    rank: rank(IS),
+    lowest: ["ApprovalDecided"],
+  });
+  assert.deepEqual(judge(cnd02Events([EP])).judgedClass(focus, ["releasedBy"]), {
+    rank: rank(EP),
+    lowest: ["ApprovalDecided"],
+  });
+  // one approval meeting the minimum releases the gate beside a weaker one
+  assert.equal(judge(cnd02Events([EP, IS])).judgedClass(focus, ["releasedBy"]).rank, rank(IS));
+  // an action only the agent recorded stays self_report, whatever approved it
+  assert.deepEqual(judge(cnd02Events([IS], SR)).judgedClass(focus, ["releasedBy"]), {
+    rank: rank(SR),
+    lowest: ["ToolCall"],
+  });
+});
+
+test("CND-02: outcomes through assess", () => {
+  assert.equal(assess(cnd02Events(), "CND-02").outcome, "conformant");
+  assert.equal(assess(cnd02Events([EP]), "CND-02").outcome, "insufficient_evidence");
+  assert.equal(assess(cnd02Events([SR, IS]), "CND-02").outcome, "conformant");
+  assert.equal(assess(cnd02Events([IS], SR), "CND-02").outcome, "insufficient_evidence");
+  assert.equal(assess(cnd02Events([]), "CND-02").outcome, "non-conformant");
+  assert.equal(assess(cnd02Events([IS], EP, "deny"), "CND-02").outcome, "non-conformant");
+});

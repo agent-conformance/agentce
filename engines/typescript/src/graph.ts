@@ -20,6 +20,8 @@ import { compareLiterals } from "./structural";
 import { byteCompare } from "./util";
 
 const BOOL = "xsd:boolean";
+/** CND-02's population (SPEC §7.7.4), materialised by `conductGate`. */
+export const GATED_ACTION = "agentce:GatedAction";
 const DATETIME = "xsd:dateTime";
 const INTEGER = "xsd:integer";
 
@@ -242,6 +244,8 @@ const INTERRUPT_STOPS = new Set(["halted", "paused"]);
 const INTERRUPT_MECHANISMS = new Set(["stop_button", "kill_switch", "circuit_breaker", "manual"]);
 /** The stream classes an identity-provider login record must come from (SPEC §6.2 ApprovalDecided.session_ref, §10.4). */
 const LOGIN_CLASSES = new Set(["independent_system", "enforcement_point"]);
+/** The effect classes SPEC §7.7.4 holds to CND-02 whatever the task scope marks (ruling Q6). */
+const HIGH_EFFECT = new Set(["irreversible", "external_communication", "spend", "physical"]);
 /** The records the SPEC §10.4 human-actor rule applies to. */
 const OVERSIGHT_TYPES = new Set(["ApprovalDecided", "Override", "Interrupt"]);
 /** The Incident members that record a response after detection (SPEC §6.2; ROB-07). */
@@ -374,6 +378,7 @@ class Builder {
     usedClasses.add("prov:Agent");
     usedClasses.add("prov:Activity");
     usedClasses.add("prov:Entity");
+    usedClasses.add(GATED_ACTION);
     for (const event of events) {
       const node = eventIri(String(event.id));
       this.eventIris.add(node);
@@ -698,19 +703,109 @@ class Builder {
    * task held to no scope, or a call with no effect class, is out of scope.
    */
   private withinTaskScope(event: Event): boolean {
-    const tasks = new Set(
-      [refsOf(event).task, event.agentcetask].filter((t): t is string => typeof t === "string"),
-    );
     const data = dataOf(event);
     const tool = data.tool;
     const name = isRecord(tool) ? tool.name : undefined;
-    for (const task of tasks) {
+    for (const task of this.actionTasks(event)) {
       const scopes = this.domain.scopesFor(task);
       if (scopes.length === 0 || !scopes.every((s) => s.allows(name, data.effect_class))) {
         return false;
       }
     }
     return true;
+  }
+
+  /** The tasks an action names, by `refs.task` or the `agentcetask` attribute. */
+  private actionTasks(event: Event): Set<string> {
+    return new Set(
+      [refsOf(event).task, event.agentcetask].filter((t): t is string => typeof t === "string"),
+    );
+  }
+
+  /** Materialise CND-02's population and gate (SPEC §7.7.4, rulings Q5 to Q10); the Python engine's
+   * `_conduct_gate` documents the reading. An action whose effect class a scope of its task marks
+   * `requires_approval`, or whose class is high-effect, is a `GatedAction`; a high-effect action in no task,
+   * or in a task held to no scope, is held to the approval path. The approval path needs an
+   * enforcement-point PolicyDecision naming it that allows it or asks for approval and an approval of the
+   * held decision it executes; any other high-effect action needs an enforcement-point allow, or a
+   * require_approval such an approval released. A deny naming it closes the gate. A ToolCall with no effect
+   * class, and a consequential decision no ToolCall executes, are unjudged. */
+  private conductGate(events: Event[]): void {
+    const policies = new Map<string, Event>();
+    for (const e of events) {
+      if (this.ptype(e) === "PolicyDecision") policies.set(eventIri(String(e.id)), e);
+    }
+    const named = new Map<string, Event[]>();
+    for (const policy of policies.values()) {
+      const request = refsOf(policy).request;
+      if (typeof request === "string") {
+        const list = named.get(request) ?? [];
+        list.push(policy);
+        named.set(request, list);
+      }
+    }
+    const executed = new Set<string>();
+    for (const event of events) {
+      const ptype = this.ptype(event);
+      if (ptype !== "ToolCall" && ptype !== "ResourceAccess") continue;
+      const node = eventIri(String(event.id));
+      const refs = refsOf(event);
+      const decision = this.heldDecision(refs.decision);
+      if (ptype === "ToolCall" && decision !== null) executed.add(decision);
+      const effect = dataOf(event).effect_class;
+      if (typeof effect !== "string") {
+        if (ptype === "ToolCall") this.gate(node, true, false);
+        continue;
+      }
+      const scopes = [...this.actionTasks(event)].map((t) => this.domain.scopesFor(t));
+      let approval = scopes.some((ss) => ss.some((sc) => sc.requiresApproval.has(effect)));
+      if (
+        HIGH_EFFECT.has(effect) &&
+        (scopes.length === 0 || scopes.some((ss) => ss.length === 0))
+      ) {
+        approval = true;
+      }
+      if (!approval && !HIGH_EFFECT.has(effect)) continue;
+      const gating = [...(named.get(node) ?? [])];
+      const authorization = refs.authorization;
+      if (typeof authorization === "string" && policies.has(authorization)) {
+        gating.push(policies.get(authorization) as Event);
+      }
+      const rulings = new Set(
+        gating
+          .filter(
+            (p) =>
+              typeof p.agentcesourceclass === "string" && LOGIN_CLASSES.has(p.agentcesourceclass),
+          )
+          .map((p) => dataOf(p).decision),
+      );
+      const denied = gating.some((p) => dataOf(p).decision === "deny");
+      const approvals = decision !== null ? this.store.objects(decision, "agentce:approvedBy") : [];
+      const released = approval
+        ? rulings.has("allow") || rulings.has("require_approval")
+        : !rulings.has("allow") && rulings.has("require_approval");
+      if (released || approval) {
+        for (const approved of approvals) this.store.addEdge(node, "agentce:releasedBy", approved);
+      }
+      const met =
+        !denied && ((rulings.has("allow") && !approval) || (released && approvals.length > 0));
+      this.gate(node, met, true);
+      if (!met && decision !== null && this.store.humanActorFailed.has(decision)) {
+        // An approval that fails SPEC §10.4 left the gate shut: the deviation register cannot waive it.
+        this.store.humanActorFailed.add(node);
+      }
+    }
+    for (const decision of [...this.decisionTime.keys()].sort()) {
+      if (!executed.has(decision) && this.store.isA(decision, "agentce:ConsequentialDecision")) {
+        this.gate(decision, true, false);
+      }
+    }
+  }
+
+  private gate(node: string, met: boolean, judged: boolean): void {
+    this.store.addType(node, GATED_ACTION);
+    this.literal(node, "agentce:gateMet", met);
+    this.literal(node, "agentce:gateJudged", judged);
   }
 
   /** Compute the Conduct within-scope and within-budget flags (SPEC §7.7, CND-01/CND-07): an
@@ -1006,6 +1101,7 @@ class Builder {
     }
     this.actsOnUntrusted(events, this.robustToUntrusted(events));
     this.conductScopeBudget(events);
+    this.conductGate(events);
     this.precededBy();
   }
 

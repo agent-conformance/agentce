@@ -45,10 +45,10 @@
       },
       "violations": [
         {
-          "constraint": "sh:minCount",
-          "focus": "agentce:event/d1",
+          "constraint": "sh:hasValue",
+          "focus": "agentce:event/tc1",
           "message_key": "CND-02.S1",
-          "path": "agentce:approvedBy"
+          "path": "agentce:gateMet"
         }
       ]
     },
