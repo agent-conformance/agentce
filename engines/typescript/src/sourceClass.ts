@@ -55,13 +55,13 @@ function sameValue(a: unknown, b: unknown): boolean {
   return pyEquals(a ?? null, b ?? null);
 }
 
-/** Which witnesses may stand in for an instruction's own class at (iv): its own class only (a twin), its
- * own class or a twin (a parent: the PolicyDecision allows the action, which acts on the child only), or
- * all. */
 /** The declared classes SPEC §6.2.3 requires a principal for: a twin witnesses one only when both carry the same
  * id. */
 const PRINCIPAL_REQUIRED = new Set(["user", "operator", "service", "agent_identified"]);
 
+/** Which witnesses may stand in for an instruction's own class at (iv): its own class only (a twin), its
+ * own class or a twin (a parent: the PolicyDecision allows the action, which acts on the child only), or
+ * all. */
 const OWN = 0;
 const TWIN = 1;
 const ALL = 2;

@@ -71,7 +71,7 @@ def engine_cmds() -> dict[str, list[str]]:
     jars = sorted((ROOT / "engines/java/build/libs").glob("agentce-*-all.jar"))
     if not jars:
         sys.exit(
-            "cli_options_check: no Java jar under engines/java/build/libs (run cli_options.sh)"
+            "no Java jar under engines/java/build/libs (run the gate's .sh script, which builds the engines)"
         )
     # The JIT flags cut each short-lived JVM's CPU about threefold, which the seeded-fault demo pays
     # once per case per fault; they change compilation only, never what the jar does.

@@ -31,7 +31,6 @@ here (sorted keys, no spaces), so no engine code is used to build a fixture.
 
 from __future__ import annotations
 
-import copy
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
@@ -1394,7 +1393,6 @@ def focus_case(
             agent={"id": SUBJECT},
             tool={"name": "lookup", "protocol": "native"},
             effect_class="read" if verdict == "pass" else "irreversible",
-            agentcetask=None,
             refs={"task": "task-1"},
         )
         ev.items[-1]["agentcetask"] = "task-1"
@@ -1597,7 +1595,7 @@ def gate_case(
         raise FixtureError(f"gate_case: {gate}/cases.json has no case {name!r}")
     write_bundle(
         dest / "bundle",
-        copy.deepcopy(cases[name]["events"]),
+        cases[name]["events"],
         domain=gate.split("_")[0] + "-fixture",
         sources=[{"id": f"urn:src:{c}", "class": c} for c in (EP, SR)],
     )

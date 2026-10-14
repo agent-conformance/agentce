@@ -47,13 +47,13 @@ public final class SourceClass {
      * constant, so a later reading of single-source evidence (SPEC §10.4 {@code partial}) changes it in one place. */
     public static final String BELOW_MINIMUM_OUTCOME = "insufficient_evidence";
 
-    /** Which witnesses may stand in for an instruction's own class at (iv): its own class only (a twin), its own
-     * class or a twin (a parent: the PolicyDecision allows the action, which acts on the child only), or all. */
-    private static final int OWN = 0;
-
     /** The declared classes SPEC §6.2.3 requires a principal for: a twin witnesses one only when both carry the same
      * id. */
     private static final Set<String> PRINCIPAL_REQUIRED = Set.of("user", "operator", "service", "agent_identified");
+
+    /** Which witnesses may stand in for an instruction's own class at (iv): its own class only (a twin), its own
+     * class or a twin (a parent: the PolicyDecision allows the action, which acts on the child only), or all. */
+    private static final int OWN = 0;
     private static final int TWIN = 1;
     private static final int ALL = 2;
 

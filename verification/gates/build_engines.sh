@@ -32,9 +32,9 @@ build() {
 # The two builds are independent; Gradle is waited on by PID so set -e still sees a failure.
 build_engines() {
   local gradle_pid
-  build "$root/engines/java/build/libs/.cli-options-inputs" \
+  build "$root/engines/java/build/libs/.engine-build-inputs" \
     "cd engines/java && ./gradlew --no-daemon --quiet :runnableJar" engines/java & gradle_pid=$!
-  build "$root/engines/typescript/dist/.cli-options-inputs" \
+  build "$root/engines/typescript/dist/.engine-build-inputs" \
     "cd engines/typescript && pnpm install --frozen-lockfile >/dev/null && pnpm build >/dev/null" \
     engines/typescript pnpm-lock.yaml pnpm-workspace.yaml
   wait "$gradle_pid"

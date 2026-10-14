@@ -57,6 +57,7 @@ from types import ModuleType
 from typing import Any
 
 import yaml
+from cli_options_check import engine_cmds
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "verification/gates/fixtures/trust_matrix"
@@ -254,8 +255,6 @@ PASSING = {"conformant", "not_applicable"}
 NOT_PASSING = {"non_conformant", "insufficient_evidence", "partial", "not_assessed"}
 SEVERITY = ("GAP", "DIFF", "MISMATCH", "ERROR", "AGREE")
 KEY = re.compile(r"(?:^|\[)([a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+)(?:\]|:)", re.M)
-# Tier-1 JIT and the serial collector cut each short Java run's CPU, as the other gates' JAVA_OPTS do.
-JAVA_FLAGS = ["-XX:TieredStopAtLevel=1", "-XX:+UseSerialGC"]
 
 
 class Refused(Exception):
@@ -339,7 +338,8 @@ def select(matrix: dict[str, Any], env: dict[str, str]) -> list[str]:
                 "trust_matrix.only_unknown_cell",
                 f"{ONLY_ENV} names no cell {', '.join(unknown)}",
             )
-        return [i for i in ids if i in set(only)]
+        wanted = set(only)
+        return [i for i in ids if i in wanted]
     if tier == "full":
         return ids
     quick = {str(q) for q in matrix.get("quick") or []}
@@ -369,7 +369,7 @@ def load_builders(name: str) -> ModuleType:
     return module
 
 
-def check_matrix(data: dict[str, Any], module: ModuleType | None) -> list[str]:
+def check_matrix(data: dict[str, Any], module: ModuleType) -> list[str]:
     """The matrix's own form: every problem at once, before anything runs."""
     errors: list[str] = []
     dims = {
@@ -399,9 +399,7 @@ def check_matrix(data: dict[str, Any], module: ModuleType | None) -> list[str]:
                 f"{cid}: needs exactly one of fixture, cannot_occur, ruling_needed (has {kinds or 'none'})"
             )
         elif kinds == ["fixture"]:
-            if module is not None and not callable(
-                getattr(module, str(cell["fixture"]), None)
-            ):
+            if not callable(getattr(module, str(cell["fixture"]), None)):
                 errors.append(f"{cid}: fixture {cell['fixture']!r} is not a builder")
             for control in cell.get("controls") or []:
                 words = expected_words(cell, control) if "expected" in cell else ()
@@ -512,20 +510,6 @@ def coverage(
 
 
 # ---------------------------------------------------------------------------------------------------- running
-
-
-def engine_commands(root: Path) -> dict[str, list[str]]:
-    jars = sorted((root / "engines/java/build/libs").glob("agentce-*-all.jar"))
-    ts = root / "engines/typescript/dist/cli.js"
-    if not jars or not ts.is_file():
-        raise SystemExit(
-            "trust_matrix: TypeScript dist or Java jar missing (run trust_matrix.sh)"
-        )
-    return {
-        "python": [str(Path(sys.executable).parent / "agentce")],
-        "typescript": ["node", str(ts)],
-        "java": ["java", *JAVA_FLAGS, "-jar", str(jars[-1])],
-    }
 
 
 def run_engine(
@@ -702,18 +686,16 @@ def sweep(
             }
             if not cell.get("fixture"):
                 row["status"] = "CANNOT_OCCUR" if cell.get("cannot_occur") else "RULING"
-            elif isinstance(fx, str):
-                row.update(
-                    expected=expected_words(cell, control),
-                    status="ERROR",
-                    note=f"{fx} | {row['note']}",
-                )
+                rows.append(row)
+                continue
+            row["expected"] = expected_words(cell, control)
+            if isinstance(fx, str):
+                row.update(status="ERROR", note=f"{fx} | {row['note']}")
             else:
                 for eng in cmds:
                     run = runs[(cell["id"], eng)]
                     row["readings"][eng] = read_outcome(run, control, fx.subject)
                     row["exits"][eng] = run.get("exit")
-                row["expected"] = expected_words(cell, control)
                 row["status"], row["flags"] = classify(row["expected"], row["readings"])
                 if len(set(row["exits"].values())) > 1:
                     row["flags"].append("exit-split")
@@ -847,7 +829,7 @@ def main(argv: list[str], env: dict[str, str]) -> int:
         print(f"trust_matrix FAIL [{problem.split(':', 1)[0]}] {problem}")
     cells = [c for c in matrix["cells"] if str(c["id"]) in chosen]
     with tempfile.TemporaryDirectory() as tmp:
-        rows = sweep(cells, module, ROOT, engine_commands(ROOT), Path(tmp) / "work")
+        rows = sweep(cells, module, ROOT, engine_cmds(), Path(tmp) / "work")
         line = summary(rows)
         write_outputs(Path(env.get(OUT_ENV) or Path(tmp) / "out"), rows, line)
     print(f"trust_matrix: {tier_of(env)} tier, {line}")
