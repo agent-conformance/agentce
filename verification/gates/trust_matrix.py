@@ -20,7 +20,8 @@ applies:
 A cell's status is its worst control's. fixtures/trust_matrix/open.json names every cell known not to read AGREE,
 with its status and the item that closes it. The gate fails on a cell that reads other than AGREE and is not listed
 (open.unlisted), a listed cell that reads AGREE (open.listed_agree) or another status than listed
-(open.status_changed), and on any coverage failure, all of which are printed before any cell runs:
+(open.status_changed), and on any coverage failure; every coverage failure is printed before any cell runs, and the
+cells still run, so one run shows all of them:
   coverage.digest          the matrix's SHA-256 is not DIGEST (edit the generator, then re-pin)
   coverage.unused_value    a declared dimension value no runnable cell uses (a cell leaving a dimension out uses
                            its first declared value, the builders' default)
@@ -59,173 +60,195 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "verification/gates/fixtures/trust_matrix"
-TIER_ENV, ONLY_ENV, OUT_ENV = "AGENTCE_VERIFY_TIER", "AGENTCE_TRUST_MATRIX_ONLY", "AGENTCE_TRUST_MATRIX_OUT"
+TIER_ENV, ONLY_ENV, OUT_ENV = (
+    "AGENTCE_VERIFY_TIER",
+    "AGENTCE_TRUST_MATRIX_ONLY",
+    "AGENTCE_TRUST_MATRIX_OUT",
+)
 #: SHA-256 of fixtures/trust_matrix/matrix.yaml: a matrix edit is deliberate.
 DIGEST = "7c4c637224bb804c8d8507f7330c634d6f2d4a440a3875dfb4d2cf76341900a1"
 #: The cell ids open.json may hold. Closing a cell removes it here and from open.json in one commit; nothing is added.
-OPEN_PINNED: frozenset[str] = frozenset({
-    "anchor-cnd05-direct-user",
-    "anchor-rob02-clean-memory",
-    "c04-acted-Decision_only-en-missing",
-    "c04-acted-Decision_only-en-tool_output",
-    "c04-acted-Decision_only-en-user",
-    "c04-acted-Decision_only-se-missing",
-    "c04-acted-Decision_only-se-tool_output",
-    "c04-acted-Decision_only-se-user",
-    "c04-acted-consequential_ToolCall-en-missing",
-    "c04-acted-consequential_ToolCall-en-tool_output",
-    "c04-acted-consequential_ToolCall-en-user",
-    "c04-deleg-en-ep_unverified-none",
-    "c04-deleg-en-none-none",
-    "c04-deleg-se-ep_unverified-ep_pd_principal",
-    "c04-deleg-se-none-ep_pd_principal",
-    "c04-integ-failed-gateway",
-    "c04-integ-failed-ingress",
-    "c04-integ-missing-gateway",
-    "c04-integ-missing-ingress",
-    "c04-integ-weak_chained-gateway",
-    "c04-integ-weak_chained-ingress",
-    "c04-lineage-held-not_held",
-    "c04-noprincipal-en-agent_identified",
-    "c04-noprincipal-en-operator",
-    "c04-noprincipal-en-service",
-    "c04-noprincipal-en-user",
-    "c04-strip-en-agent_unidentified",
-    "c04-strip-en-memory_trusted",
-    "c04-strip-en-memory_untrusted",
-    "c04-strip-en-missing",
-    "c04-strip-en-retrieved",
-    "c04-strip-en-tool_output",
-    "c05-integ-failed-gateway-user",
-    "c05-integ-failed-ingress-user",
-    "c05-integ-failed-policy-SR-user-corr",
-    "c05-integ-gap-gateway-user",
-    "c05-integ-gap-ingress-user",
-    "c05-integ-missing-gateway-user",
-    "c05-integ-missing-ingress-user",
-    "c05-integ-unsigned-gateway-user",
-    "c05-integ-unsigned-ingress-user",
-    "c05-integ-verified_signed-gateway-user",
-    "c05-integ-verified_signed-ingress-user",
-    "c05-integ-weak_chained-gateway-user",
-    "c05-integ-weak_chained-ingress-user",
-    "c05-integ-weak_chained-policy-SR-user-corr",
-    "c05-integ-weak_unanchored-gateway-user",
-    "c05-integ-weak_unanchored-ingress-user",
-    "c06-acted-EP-missing",
-    "c06-acted-EP-user",
-    "c06-ep-deny-no-refusal",
-    "c06-ep-deny-sr-refusal",
-    "fx-CND-01-EP-integ-weak",
-    "fx-CND-01-en-fail-uea",
-    "fx-CND-01-en-fail-uep",
-    "fx-CND-02-in-loginin-pass",
-    "fx-DOC-03-en-pass-uea",
-    "fx-DOC-03-en-pass-uep",
-    "fx-INC-02-IS-integ-failed",
-    "fx-INC-02-IS-integ-missing",
-    "fx-INT-01-EP-integ-failed",
-    "fx-INT-01-EP-integ-gap",
-    "fx-INT-01-EP-integ-missing",
-    "fx-INT-01-EP-integ-unsigned",
-    "fx-INT-01-EP-integ-weak_chained",
-    "fx-INT-01-en-coverage-unknown",
-    "fx-INT-04-EP-integ-failed",
-    "fx-INT-04-EP-integ-gap",
-    "fx-INT-04-EP-integ-missing",
-    "fx-INT-04-EP-integ-unsigned",
-    "fx-INT-04-EP-integ-weak_chained",
-    "fx-INT-04-en-coverage-unknown",
-    "fx-OVS-03-EP-integ-failed",
-    "fx-OVS-03-EP-integ-weak_chained",
-    "fx-OVS-06-EP-integ-failed",
-    "fx-OVS-06-EP-integ-gap",
-    "fx-OVS-06-EP-integ-missing",
-    "fx-OVS-06-EP-integ-unsigned",
-    "fx-OVS-06-EP-integ-weak_chained",
-    "fx-ROB-01-EP-integ-failed",
-    "fx-ROB-01-EP-integ-gap",
-    "fx-ROB-01-EP-integ-missing",
-    "fx-ROB-01-EP-integ-unsigned",
-    "fx-ROB-01-EP-integ-weak_chained",
-    "fx-ROB-05-en-pass-uea",
-    "fx-ROB-05-en-pass-uep",
-    "fx-ROB-06-en-pass-uea",
-    "fx-ROB-06-en-pass-uep",
-    "r02-grid-none-ep_untrusted",
-    "r02-grid-sr_trusted-ep_untrusted",
-    "r02-grid-unmarked_trusted_origin-ep_untrusted",
-    "r02-integ-failed-ep_trusted",
-    "r02-integ-gap-ep_trusted",
-    "r02-integ-missing-ep_trusted",
-    "r02-integ-unsigned-ep_trusted",
-    "r02-integ-verified_signed-ep_trusted",
-    "r02-integ-weak_chained-ep_trusted",
-    "r02-integ-weak_unanchored-ep_trusted",
-    "r02-other-subject-ep_quarantined-ep_trusted",
-    "r02-other-subject-ep_untrusted-ep_trusted",
-    "r02-other-subject-sr_untrusted-ep_trusted",
-})
+OPEN_PINNED: frozenset[str] = frozenset(
+    {
+        "anchor-cnd05-direct-user",
+        "anchor-rob02-clean-memory",
+        "c04-acted-Decision_only-en-missing",
+        "c04-acted-Decision_only-en-tool_output",
+        "c04-acted-Decision_only-en-user",
+        "c04-acted-Decision_only-se-missing",
+        "c04-acted-Decision_only-se-tool_output",
+        "c04-acted-Decision_only-se-user",
+        "c04-acted-consequential_ToolCall-en-missing",
+        "c04-acted-consequential_ToolCall-en-tool_output",
+        "c04-acted-consequential_ToolCall-en-user",
+        "c04-deleg-en-ep_unverified-none",
+        "c04-deleg-en-none-none",
+        "c04-deleg-se-ep_unverified-ep_pd_principal",
+        "c04-deleg-se-none-ep_pd_principal",
+        "c04-integ-failed-gateway",
+        "c04-integ-failed-ingress",
+        "c04-integ-missing-gateway",
+        "c04-integ-missing-ingress",
+        "c04-integ-weak_chained-gateway",
+        "c04-integ-weak_chained-ingress",
+        "c04-lineage-held-not_held",
+        "c04-noprincipal-en-agent_identified",
+        "c04-noprincipal-en-operator",
+        "c04-noprincipal-en-service",
+        "c04-noprincipal-en-user",
+        "c04-strip-en-agent_unidentified",
+        "c04-strip-en-memory_trusted",
+        "c04-strip-en-memory_untrusted",
+        "c04-strip-en-missing",
+        "c04-strip-en-retrieved",
+        "c04-strip-en-tool_output",
+        "c05-integ-failed-gateway-user",
+        "c05-integ-failed-ingress-user",
+        "c05-integ-failed-policy-SR-user-corr",
+        "c05-integ-gap-gateway-user",
+        "c05-integ-gap-ingress-user",
+        "c05-integ-missing-gateway-user",
+        "c05-integ-missing-ingress-user",
+        "c05-integ-unsigned-gateway-user",
+        "c05-integ-unsigned-ingress-user",
+        "c05-integ-verified_signed-gateway-user",
+        "c05-integ-verified_signed-ingress-user",
+        "c05-integ-weak_chained-gateway-user",
+        "c05-integ-weak_chained-ingress-user",
+        "c05-integ-weak_chained-policy-SR-user-corr",
+        "c05-integ-weak_unanchored-gateway-user",
+        "c05-integ-weak_unanchored-ingress-user",
+        "c06-acted-EP-missing",
+        "c06-acted-EP-user",
+        "c06-ep-deny-no-refusal",
+        "c06-ep-deny-sr-refusal",
+        "fx-CND-01-EP-integ-weak",
+        "fx-CND-01-en-fail-uea",
+        "fx-CND-01-en-fail-uep",
+        "fx-CND-02-in-loginin-pass",
+        "fx-DOC-03-en-pass-uea",
+        "fx-DOC-03-en-pass-uep",
+        "fx-INC-02-IS-integ-failed",
+        "fx-INC-02-IS-integ-missing",
+        "fx-INT-01-EP-integ-failed",
+        "fx-INT-01-EP-integ-gap",
+        "fx-INT-01-EP-integ-missing",
+        "fx-INT-01-EP-integ-unsigned",
+        "fx-INT-01-EP-integ-weak_chained",
+        "fx-INT-01-en-coverage-unknown",
+        "fx-INT-04-EP-integ-failed",
+        "fx-INT-04-EP-integ-gap",
+        "fx-INT-04-EP-integ-missing",
+        "fx-INT-04-EP-integ-unsigned",
+        "fx-INT-04-EP-integ-weak_chained",
+        "fx-INT-04-en-coverage-unknown",
+        "fx-OVS-03-EP-integ-failed",
+        "fx-OVS-03-EP-integ-weak_chained",
+        "fx-OVS-06-EP-integ-failed",
+        "fx-OVS-06-EP-integ-gap",
+        "fx-OVS-06-EP-integ-missing",
+        "fx-OVS-06-EP-integ-unsigned",
+        "fx-OVS-06-EP-integ-weak_chained",
+        "fx-ROB-01-EP-integ-failed",
+        "fx-ROB-01-EP-integ-gap",
+        "fx-ROB-01-EP-integ-missing",
+        "fx-ROB-01-EP-integ-unsigned",
+        "fx-ROB-01-EP-integ-weak_chained",
+        "fx-ROB-05-en-pass-uea",
+        "fx-ROB-05-en-pass-uep",
+        "fx-ROB-06-en-pass-uea",
+        "fx-ROB-06-en-pass-uep",
+        "r02-grid-none-ep_untrusted",
+        "r02-grid-sr_trusted-ep_untrusted",
+        "r02-grid-unmarked_trusted_origin-ep_untrusted",
+        "r02-integ-failed-ep_trusted",
+        "r02-integ-gap-ep_trusted",
+        "r02-integ-missing-ep_trusted",
+        "r02-integ-unsigned-ep_trusted",
+        "r02-integ-verified_signed-ep_trusted",
+        "r02-integ-weak_chained-ep_trusted",
+        "r02-integ-weak_unanchored-ep_trusted",
+        "r02-other-subject-ep_quarantined-ep_trusted",
+        "r02-other-subject-ep_untrusted-ep_trusted",
+        "r02-other-subject-sr_untrusted-ep_trusted",
+    }
+)
 #: The cells the quick tier must run: the witness, principal and timing cells of 18.176 and the CND-05 cells the
 #: seeded faults turn red.
-REQUIRED_QUICK: frozenset[str] = frozenset({
-    "c05-twin-both-no-principal",
-    "c05-twin-other-principal",
-    "c05-twin-no-principal-instr-present",
-    "c05-twin-principal-empty-id",
-    "c05-twin-principal-empty-object",
-    "c05-twin-principal-string",
-    "c05-twin-other-content",
-    "c05-twin-other-task",
-    "c05-twin-other-subject",
-    "c05-twin-other-authorised-class",
-    "c05-pd-other-request",
-    "c05-depth2-SR-corr-ep_pd_principal",
-    "c05-depth3-SR-corr-ep_pd_principal",
-    "c05-depth2-SR-twin",
-    "c05-depth3-SR-twin",
-    "c05-twin-origin-ep_read_untrusted",
-    "c05-twin-origin-sr_read",
-    "c05-twin-parent-tool_output",
-    "c05-twin-before-call",
-    "c05-pd-before-call",
-    "c05-twin-same-instant",
-    "c05-pd-same-instant",
-    "c05-twin-same-instant-offset",
-    "c05-pd-same-instant-offset",
-    "c05-twin-after-call-1s",
-    "c05-pd-after-call-1s",
-    "c05-twin-after-call",
-    "c05-pd-after-call",
-    "c05-twin-no-time",
-    "c05-pd-no-time",
-    "c05-twin-bad-time",
-    "c05-pd-bad-time",
-    "c05-call-no-time-twin",
-    "c05-call-bad-time-twin",
-    "c05-sr-call-twin-before",
-    "c05-sr-call-pd-before",
-    "c05-sr-call-forged-late-twin",
-    "c05-sr-call-forged-late-pd",
-    "c05-dec-twin-before-call",
-    "c05-dec-twin-same-instant",
-    "c05-dec-twin-after-call",
-    "c05-both-twin-before-call",
-    "c05-both-twin-same-instant",
-    "c05-both-twin-after-call",
-    "c05-deconly-twin",
-    "c05-dec-forged-late-twin-after-call",
-    "c05-dec-sr-call-twin-before",
-    "c05-cycle-self-parent-pd",
-    "c05-cycle-a-pd-b-ep",
-})
+REQUIRED_QUICK: frozenset[str] = frozenset(
+    {
+        "c05-acted-Decision_only-se-user",
+        "c05-acted-both-se-user",
+        "c05-both-twin-after-call",
+        "c05-both-twin-before-call",
+        "c05-both-twin-same-instant",
+        "c05-call-bad-time-twin",
+        "c05-call-no-time-twin",
+        "c05-corr-SR-user-none-present",
+        "c05-cycle-a-pd-b-ep",
+        "c05-cycle-self-parent-pd",
+        "c05-dec-forged-late-twin-after-call",
+        "c05-dec-sr-call-twin-before",
+        "c05-dec-twin-after-call",
+        "c05-dec-twin-before-call",
+        "c05-dec-twin-same-instant",
+        "c05-deconly-twin",
+        "c05-depth2-SR-corr-ep_pd_principal",
+        "c05-depth2-SR-twin",
+        "c05-depth3-SR-corr-ep_pd_principal",
+        "c05-depth3-SR-twin",
+        "c05-pd-after-call",
+        "c05-pd-after-call-1s",
+        "c05-pd-bad-time",
+        "c05-pd-before-call",
+        "c05-pd-no-time",
+        "c05-pd-other-request",
+        "c05-pd-same-instant",
+        "c05-pd-same-instant-offset",
+        "c05-relabel-SR-user-ep_twin_untrusted",
+        "c05-sr-call-forged-late-pd",
+        "c05-sr-call-forged-late-twin",
+        "c05-sr-call-pd-before",
+        "c05-sr-call-twin-before",
+        "c05-strip-se-operator",
+        "c05-strip-se-user",
+        "c05-twin-after-call",
+        "c05-twin-after-call-1s",
+        "c05-twin-bad-time",
+        "c05-twin-before-call",
+        "c05-twin-both-no-principal",
+        "c05-twin-no-principal-instr-present",
+        "c05-twin-no-time",
+        "c05-twin-origin-ep_read_untrusted",
+        "c05-twin-origin-sr_read",
+        "c05-twin-other-authorised-class",
+        "c05-twin-other-content",
+        "c05-twin-other-principal",
+        "c05-twin-other-subject",
+        "c05-twin-other-task",
+        "c05-twin-parent-tool_output",
+        "c05-twin-principal-empty-id",
+        "c05-twin-principal-empty-object",
+        "c05-twin-principal-string",
+        "c05-twin-same-instant",
+        "c05-twin-same-instant-offset",
+    }
+)
 RULING_CEILING = 1
 FOCUS_CLASSES = ("enforcement_point", "independent_system", "self_report")
 CLASS_DIMS = ("focus_class", "instruction_class", "call_class", "decision_class")
 OWNER = re.compile(r"^\d+\.\d+[a-z]?$")
 
 ENGINES = ("python", "typescript", "java")
-WORDS = {"conformant", "non_conformant", "insufficient_evidence", "partial", "not_applicable", "not_assessed", "refuse"}
+WORDS = {
+    "conformant",
+    "non_conformant",
+    "insufficient_evidence",
+    "partial",
+    "not_applicable",
+    "not_assessed",
+    "refuse",
+}
 ALIASES = {"not_conformant": ("non_conformant", "insufficient_evidence", "partial")}
 PASSING = {"conformant", "not_applicable"}
 NOT_PASSING = {"non_conformant", "insufficient_evidence", "partial", "not_assessed"}
@@ -269,7 +292,10 @@ def parse_args(argv: list[str]) -> dict[str, Any]:
             raise Refused("trust_matrix.repeated_option", f"{name} given twice")
         if name == "--self-test":
             if eq:
-                raise Refused("trust_matrix.unknown_option", f"--self-test takes no value ({token!r})")
+                raise Refused(
+                    "trust_matrix.unknown_option",
+                    f"--self-test takes no value ({token!r})",
+                )
             opts[name] = True
         elif eq:
             opts[name] = value
@@ -282,14 +308,18 @@ def parse_args(argv: list[str]) -> dict[str, Any]:
             raise Refused("trust_matrix.option_value_missing", f"{name} needs a path")
         i += 1
     if "--self-test" in opts and len(opts) > 1:
-        raise Refused("trust_matrix.self_test_alone", "--self-test takes no other option")
+        raise Refused(
+            "trust_matrix.self_test_alone", "--self-test takes no other option"
+        )
     return opts
 
 
 def tier_of(env: dict[str, str]) -> str:
     tier = env.get(TIER_ENV, "quick")
     if tier not in ("quick", "full"):
-        raise Refused("trust_matrix.tier_unknown", f"{TIER_ENV}={tier!r} is not quick or full")
+        raise Refused(
+            "trust_matrix.tier_unknown", f"{TIER_ENV}={tier!r} is not quick or full"
+        )
     return tier
 
 
@@ -300,10 +330,15 @@ def select(matrix: dict[str, Any], env: dict[str, str]) -> list[str]:
     if ONLY_ENV in env:
         only = [t.strip() for t in env[ONLY_ENV].split(",") if t.strip()]
         if not only:
-            raise Refused("trust_matrix.only_empty", f"{ONLY_ENV} is set but names no cell")
+            raise Refused(
+                "trust_matrix.only_empty", f"{ONLY_ENV} is set but names no cell"
+            )
         unknown = sorted(set(only) - set(ids))
         if unknown:
-            raise Refused("trust_matrix.only_unknown_cell", f"{ONLY_ENV} names no cell {', '.join(unknown)}")
+            raise Refused(
+                "trust_matrix.only_unknown_cell",
+                f"{ONLY_ENV} names no cell {', '.join(unknown)}",
+            )
         return [i for i in ids if i in set(only)]
     if tier == "full":
         return ids
@@ -337,7 +372,10 @@ def load_builders(name: str) -> ModuleType:
 def check_matrix(data: dict[str, Any], module: ModuleType | None) -> list[str]:
     """The matrix's own form: every problem at once, before anything runs."""
     errors: list[str] = []
-    dims = {str(d["name"]): {str(v) for v in d.get("values", [])} for d in data.get("dimensions") or []}
+    dims = {
+        str(d["name"]): {str(v) for v in d.get("values", [])}
+        for d in data.get("dimensions") or []
+    }
     seen: set[str] = set()
     for n, cell in enumerate(data.get("cells") or []):
         cid = str(cell.get("id") or f"#{n + 1}")
@@ -352,19 +390,31 @@ def check_matrix(data: dict[str, Any], module: ModuleType | None) -> list[str]:
             if str(name) not in dims:
                 errors.append(f"{cid}: dimension {name!r} is not declared")
             elif str(value) not in dims[str(name)]:
-                errors.append(f"{cid}: {name}={value} is not one of the declared values")
+                errors.append(
+                    f"{cid}: {name}={value} is not one of the declared values"
+                )
         kinds = [k for k in ("fixture", "cannot_occur", "ruling_needed") if cell.get(k)]
         if len(kinds) != 1:
-            errors.append(f"{cid}: needs exactly one of fixture, cannot_occur, ruling_needed (has {kinds or 'none'})")
+            errors.append(
+                f"{cid}: needs exactly one of fixture, cannot_occur, ruling_needed (has {kinds or 'none'})"
+            )
         elif kinds == ["fixture"]:
-            if module is not None and not callable(getattr(module, str(cell["fixture"]), None)):
+            if module is not None and not callable(
+                getattr(module, str(cell["fixture"]), None)
+            ):
                 errors.append(f"{cid}: fixture {cell['fixture']!r} is not a builder")
             for control in cell.get("controls") or []:
                 words = expected_words(cell, control) if "expected" in cell else ()
                 if not words or not set(words) <= WORDS:
-                    errors.append(f"{cid}: expected for {control} must be words from {sorted(WORDS | set(ALIASES))}")
+                    errors.append(
+                        f"{cid}: expected for {control} must be words from {sorted(WORDS | set(ALIASES))}"
+                    )
     runnable = {str(c.get("id")) for c in data.get("cells") or [] if c.get("fixture")}
-    errors += [f"quick: {q} is not a runnable cell" for q in data.get("quick") or [] if str(q) not in runnable]
+    errors += [
+        f"quick: {q} is not a runnable cell"
+        for q in data.get("quick") or []
+        if str(q) not in runnable
+    ]
     if not data.get("cells"):
         errors.append("no cells")
     return errors
@@ -407,7 +457,9 @@ def coverage(
     problems: list[str] = []
     actual = hashlib.sha256(raw).hexdigest()
     if actual != digest:
-        problems.append(f"coverage.digest: the matrix's SHA-256 is {actual}, the pin is {digest}")
+        problems.append(
+            f"coverage.digest: the matrix's SHA-256 is {actual}, the pin is {digest}"
+        )
     cells = matrix["cells"]
     runnable = [c for c in cells if c.get("fixture")]
     for dim in matrix.get("dimensions") or []:
@@ -416,29 +468,46 @@ def coverage(
         used = {str((c.get("dims") or {}).get(dim["name"], default)) for c in runnable}
         for value in dim.get("values") or []:
             if str(value) not in used:
-                problems.append(f"coverage.unused_value: {dim['name']}={value} is used by no runnable cell")
+                problems.append(
+                    f"coverage.unused_value: {dim['name']}={value} is used by no runnable cell"
+                )
     for control, floor in sorted(minimums.items()):
         if floor == "self_report":
             continue
         named = [c for c in cells if control in c["controls"]]
         if named and all(c.get("cannot_occur") for c in named):
             continue
-        classes = {str(v) for c in named if not c.get("cannot_occur")
-                   for k, v in (c.get("dims") or {}).items() if k in CLASS_DIMS}
+        classes = {
+            str(v)
+            for c in named
+            if not c.get("cannot_occur")
+            for k, v in (c.get("dims") or {}).items()
+            if k in CLASS_DIMS
+        }
         for missing in [f for f in FOCUS_CLASSES if f not in classes]:
-            problems.append(f"coverage.catalog_focus: {control} (min_source_class {floor}) has no cell whose "
-                            f"focus class is {missing}")
+            problems.append(
+                f"coverage.catalog_focus: {control} (min_source_class {floor}) has no cell whose "
+                f"focus class is {missing}"
+            )
     rulings = sum(1 for c in cells if c.get("ruling_needed"))
     if rulings > ceiling:
-        problems.append(f"coverage.ruling_ceiling: {rulings} ruling_needed cells, the ceiling is {ceiling}")
+        problems.append(
+            f"coverage.ruling_ceiling: {rulings} ruling_needed cells, the ceiling is {ceiling}"
+        )
     for cid, entry in sorted(open_map.items()):
         if not (isinstance(entry, dict) and OWNER.match(str(entry.get("owner") or ""))):
-            problems.append(f"coverage.open_owner: open entry {cid} names no owning item")
+            problems.append(
+                f"coverage.open_owner: open entry {cid} names no owning item"
+            )
         if cid not in pinned:
-            problems.append(f"coverage.open_grew: open entry {cid} is not in OPEN_PINNED (the open list only shrinks)")
+            problems.append(
+                f"coverage.open_grew: open entry {cid} is not in OPEN_PINNED (the open list only shrinks)"
+            )
     quick = {str(q) for q in matrix.get("quick") or []}
     for cid in sorted(required_quick - quick):
-        problems.append(f"coverage.quick_missing: {cid} must be in the matrix's quick list")
+        problems.append(
+            f"coverage.quick_missing: {cid} must be in the matrix's quick list"
+        )
     return problems
 
 
@@ -449,7 +518,9 @@ def engine_commands(root: Path) -> dict[str, list[str]]:
     jars = sorted((root / "engines/java/build/libs").glob("agentce-*-all.jar"))
     ts = root / "engines/typescript/dist/cli.js"
     if not jars or not ts.is_file():
-        raise SystemExit("trust_matrix: TypeScript dist or Java jar missing (run trust_matrix.sh)")
+        raise SystemExit(
+            "trust_matrix: TypeScript dist or Java jar missing (run trust_matrix.sh)"
+        )
     return {
         "python": [str(Path(sys.executable).parent / "agentce")],
         "typescript": ["node", str(ts)],
@@ -457,18 +528,37 @@ def engine_commands(root: Path) -> dict[str, list[str]]:
     }
 
 
-def run_engine(cmd: list[str], root: Path, fx: Any, out: Path, timeout: float = 300.0) -> dict[str, Any]:
-    args = ["assess", "--bundle", str(fx.bundle), "--profile", str(fx.profile), "--domain", str(fx.domain),
-            "--out", str(out)]
+def run_engine(
+    cmd: list[str], root: Path, fx: Any, out: Path, timeout: float = 300.0
+) -> dict[str, Any]:
+    args = [
+        "assess",
+        "--bundle",
+        str(fx.bundle),
+        "--profile",
+        str(fx.profile),
+        "--domain",
+        str(fx.domain),
+        "--out",
+        str(out),
+    ]
     try:
-        p = subprocess.run(cmd + args, cwd=root, capture_output=True, text=True, timeout=timeout)
+        p = subprocess.run(
+            cmd + args, cwd=root, capture_output=True, text=True, timeout=timeout
+        )
     except subprocess.TimeoutExpired:
         return {"exit": None, "error": f"timed out after {timeout:.0f}s"}
-    run: dict[str, Any] = {"exit": p.returncode, "text": (p.stdout + p.stderr)[-4000:], "assertions": None,
-                           "quarantined": (out / "quarantine.jsonl").is_file()
-                           and bool((out / "quarantine.jsonl").read_text(encoding="utf-8").strip())}
+    run: dict[str, Any] = {
+        "exit": p.returncode,
+        "text": (p.stdout + p.stderr)[-4000:],
+        "assertions": None,
+        "quarantined": (out / "quarantine.jsonl").is_file()
+        and bool((out / "quarantine.jsonl").read_text(encoding="utf-8").strip()),
+    }
     try:
-        run["assertions"] = json.loads((out / "assertions.json").read_text(encoding="utf-8"))
+        run["assertions"] = json.loads(
+            (out / "assertions.json").read_text(encoding="utf-8")
+        )
     except FileNotFoundError:
         pass
     except ValueError as exc:
@@ -486,28 +576,57 @@ def read_outcome(run: dict[str, Any], control: str, subject: str) -> Reading:
             key = KEY.search(run.get("text", ""))
             return Reading("refuse", (), key.group(1) if key else "no message key")
         last = (run.get("text") or "").strip().splitlines()[-1:] or ["no output"]
-        return Reading("error", (), f"exit {run['exit']}, no assertions.json: {last[0][:160]}")
+        return Reading(
+            "error", (), f"exit {run['exit']}, no assertions.json: {last[0][:160]}"
+        )
     rows = rows if isinstance(rows, list) else rows.get("assertions", [])
-    hits = [r for r in rows if isinstance(r, dict) and r.get("control") == control and r.get("subject") == subject]
+    hits = [
+        r
+        for r in rows
+        if isinstance(r, dict)
+        and r.get("control") == control
+        and r.get("subject") == subject
+    ]
     if not hits:
         return Reading("error", (), f"no {control} assertion for {subject}")
     hit = hits[0]
-    focus = {re.sub(r"^agentce:event/", "", str(v.get("focus"))) for v in hit.get("violations") or []
-             if isinstance(v, dict)}
+    focus = {
+        re.sub(r"^agentce:event/", "", str(v.get("focus")))
+        for v in hit.get("violations") or []
+        if isinstance(v, dict)
+    }
     remarks = hit.get("remarks", hit.get("remark")) or []
-    extra = [f"remarks={','.join(sorted(map(str, [remarks] if isinstance(remarks, str) else remarks)))}"] \
-        if remarks else []
-    extra += ["source_class_satisfied=false"] if hit.get("source_class_satisfied") is False else []
-    return Reading(str(hit.get("outcome")).replace("-", "_"), tuple(sorted(focus)), "; ".join(extra))
+    extra = (
+        [
+            f"remarks={','.join(sorted(map(str, [remarks] if isinstance(remarks, str) else remarks)))}"
+        ]
+        if remarks
+        else []
+    )
+    extra += (
+        ["source_class_satisfied=false"]
+        if hit.get("source_class_satisfied") is False
+        else []
+    )
+    return Reading(
+        str(hit.get("outcome")).replace("-", "_"),
+        tuple(sorted(focus)),
+        "; ".join(extra),
+    )
 
 
-def classify(expected: tuple[str, ...], readings: dict[str, Reading]) -> tuple[str, list[str]]:
+def classify(
+    expected: tuple[str, ...], readings: dict[str, Reading]
+) -> tuple[str, list[str]]:
     exp = set(expected)
     ran = [r for r in readings.values() if r.word != "error"]
     words = {r.word for r in ran}
     flags = ["split"] if len({(r.word, r.focus, r.detail) for r in ran}) > 1 else []
-    if any((r.word == "conformant" and "conformant" not in exp) or (r.word == "not_applicable" and not exp & PASSING)
-           for r in ran):
+    if any(
+        (r.word == "conformant" and "conformant" not in exp)
+        or (r.word == "not_applicable" and not exp & PASSING)
+        for r in ran
+    ):
         return "GAP", flags
     if flags:
         return "DIFF", flags
@@ -520,8 +639,13 @@ def classify(expected: tuple[str, ...], readings: dict[str, Reading]) -> tuple[s
     return "MISMATCH", flags
 
 
-def sweep(cells: list[dict[str, Any]], module: ModuleType, root: Path, cmds: dict[str, list[str]],
-          work: Path) -> list[dict[str, Any]]:
+def sweep(
+    cells: list[dict[str, Any]],
+    module: ModuleType,
+    root: Path,
+    cmds: dict[str, list[str]],
+    work: Path,
+) -> list[dict[str, Any]]:
     """Build and run every runnable cell; one row per cell and control."""
     fixtures: dict[str, Any] = {}
     for cell in cells:
@@ -531,25 +655,59 @@ def sweep(cells: list[dict[str, Any]], module: ModuleType, root: Path, cmds: dic
         dest.mkdir(parents=True)
         try:
             builder = getattr(module, str(cell["fixture"]))
-            fixtures[cell["id"]] = builder(dest, root, dict(cell.get("dims") or {}), dict(cell.get("fixture_args") or {}))
-        except Exception as exc:  # a builder's own error is the cell's ERROR, never the gate's end
-            fixtures[cell["id"]] = f"fixture {cell['fixture']} failed: {type(exc).__name__}: {exc}"
-    tasks = [(cid, eng) for cid, fx in fixtures.items() if not isinstance(fx, str) for eng in cmds]
+            fixtures[cell["id"]] = builder(
+                dest,
+                root,
+                dict(cell.get("dims") or {}),
+                dict(cell.get("fixture_args") or {}),
+            )
+        except (
+            Exception
+        ) as exc:  # a builder's own error is the cell's ERROR, never the gate's end
+            fixtures[cell["id"]] = (
+                f"fixture {cell['fixture']} failed: {type(exc).__name__}: {exc}"
+            )
+    tasks = [
+        (cid, eng)
+        for cid, fx in fixtures.items()
+        if not isinstance(fx, str)
+        for eng in cmds
+    ]
     with ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as pool:
-        futures = {t: pool.submit(run_engine, cmds[t[1]], root, fixtures[t[0]], work / str(t[0]) / f"out-{t[1]}")
-                   for t in tasks}
+        futures = {
+            t: pool.submit(
+                run_engine,
+                cmds[t[1]],
+                root,
+                fixtures[t[0]],
+                work / str(t[0]) / f"out-{t[1]}",
+            )
+            for t in tasks
+        }
         runs = {t: f.result() for t, f in futures.items()}
     rows: list[dict[str, Any]] = []
     for cell in cells:
-        fx = fixtures.get(cell["id"])
+        fx: Any = fixtures.get(cell["id"])
         for control in cell["controls"]:
-            row: dict[str, Any] = {"id": str(cell["id"]), "control": control, "dims": dict(cell.get("dims") or {}),
-                                   "spec_ref": cell["spec_ref"], "note": " ".join(str(cell.get("note") or "").split()),
-                                   "flags": [], "readings": {}, "exits": {}, "expected": ()}
+            row: dict[str, Any] = {
+                "id": str(cell["id"]),
+                "control": control,
+                "dims": dict(cell.get("dims") or {}),
+                "spec_ref": cell["spec_ref"],
+                "note": " ".join(str(cell.get("note") or "").split()),
+                "flags": [],
+                "readings": {},
+                "exits": {},
+                "expected": (),
+            }
             if not cell.get("fixture"):
                 row["status"] = "CANNOT_OCCUR" if cell.get("cannot_occur") else "RULING"
             elif isinstance(fx, str):
-                row.update(expected=expected_words(cell, control), status="ERROR", note=f"{fx} | {row['note']}")
+                row.update(
+                    expected=expected_words(cell, control),
+                    status="ERROR",
+                    note=f"{fx} | {row['note']}",
+                )
             else:
                 for eng in cmds:
                     run = runs[(cell["id"], eng)]
@@ -581,14 +739,20 @@ def judge(status: dict[str, str], open_map: dict[str, Any]) -> list[str]:
     for cid, got in sorted(status.items()):
         entry = open_map.get(cid)
         if entry is None and got != "AGREE":
-            problems.append(f"open.unlisted: {cid} reads {got} and open.json does not list it (fix the engine, or "
-                            "the cell if the SPEC says otherwise)")
+            problems.append(
+                f"open.unlisted: {cid} reads {got} and open.json does not list it (fix the engine, or "
+                "the cell if the SPEC says otherwise)"
+            )
         elif entry is not None and got == "AGREE":
-            problems.append(f"open.listed_agree: {cid} reads AGREE: remove it from open.json and from OPEN_PINNED "
-                            f"(owner {entry.get('owner')})")
+            problems.append(
+                f"open.listed_agree: {cid} reads AGREE: remove it from open.json and from OPEN_PINNED "
+                f"(owner {entry.get('owner')})"
+            )
         elif entry is not None and got != entry.get("status"):
-            problems.append(f"open.status_changed: {cid} reads {got}, open.json lists {entry.get('status')} "
-                            f"(owner {entry.get('owner')})")
+            problems.append(
+                f"open.status_changed: {cid} reads {got}, open.json lists {entry.get('status')} "
+                f"(owner {entry.get('owner')})"
+            )
     return problems
 
 
@@ -601,16 +765,49 @@ def write_outputs(out: Path, rows: list[dict[str, Any]], line: str) -> None:
     def clean(text: Any) -> str:
         return " ".join(str(text).split())
 
-    cols = ["id", "control", "dims", "expected", "spec_ref", *ENGINES, "status", "flags", "note"]
-    tsv, md = ["\t".join(cols)], ["# VG-TRUST-MATRIX", "", line, "", "| " + " | ".join(cols) + " |",
-                                  "|" + "---|" * len(cols)]
+    cols = [
+        "id",
+        "control",
+        "dims",
+        "expected",
+        "spec_ref",
+        *ENGINES,
+        "status",
+        "flags",
+        "note",
+    ]
+    tsv, md = (
+        ["\t".join(cols)],
+        [
+            "# VG-TRUST-MATRIX",
+            "",
+            line,
+            "",
+            "| " + " | ".join(cols) + " |",
+            "|" + "---|" * len(cols),
+        ],
+    )
     for r in rows:
-        values = [r["id"], r["control"], "; ".join(f"{k}={v}" for k, v in r["dims"].items()) or "-",
-                  "|".join(r["expected"]) or "-", r["spec_ref"],
-                  *[f"{r['readings'][e].show()} exit {r['exits'][e]}" if e in r["readings"] else "-" for e in ENGINES],
-                  r["status"], ",".join(r["flags"]) or "-", r["note"] or "-"]
+        values = [
+            r["id"],
+            r["control"],
+            "; ".join(f"{k}={v}" for k, v in r["dims"].items()) or "-",
+            "|".join(r["expected"]) or "-",
+            r["spec_ref"],
+            *[
+                f"{r['readings'][e].show()} exit {r['exits'][e]}"
+                if e in r["readings"]
+                else "-"
+                for e in ENGINES
+            ],
+            r["status"],
+            ",".join(r["flags"]) or "-",
+            r["note"] or "-",
+        ]
         tsv.append("\t".join(clean(v) for v in values))
-        md.append("| " + " | ".join(clean(v).replace("|", "\\|") for v in values) + " |")
+        md.append(
+            "| " + " | ".join(clean(v).replace("|", "\\|") for v in values) + " |"
+        )
     (out / "results.tsv").write_text("\n".join(tsv) + "\n", encoding="utf-8")
     (out / "results.md").write_text("\n".join(md) + "\n", encoding="utf-8")
 
@@ -618,7 +815,9 @@ def write_outputs(out: Path, rows: list[dict[str, Any]], line: str) -> None:
 def summary(rows: list[dict[str, Any]]) -> str:
     count = {s: sum(1 for r in rows if r["status"] == s) for s in SEVERITY}
     cells = len({r["id"] for r in rows if r["status"] in SEVERITY})
-    return (f"{cells} cells run ({len(rows)} control rows): " + ", ".join(f"{s} {count[s]}" for s in SEVERITY))
+    return f"{cells} cells run ({len(rows)} control rows): " + ", ".join(
+        f"{s} {count[s]}" for s in SEVERITY
+    )
 
 
 # ---------------------------------------------------------------------------------------------------- main
@@ -646,8 +845,6 @@ def main(argv: list[str], env: dict[str, str]) -> int:
     problems = coverage(raw, matrix, open_map, catalog_minimums(ROOT))
     for problem in problems:
         print(f"trust_matrix FAIL [{problem.split(':', 1)[0]}] {problem}")
-    if problems:
-        return 1
     cells = [c for c in matrix["cells"] if str(c["id"]) in chosen]
     with tempfile.TemporaryDirectory() as tmp:
         rows = sweep(cells, module, ROOT, engine_commands(ROOT), Path(tmp) / "work")
@@ -655,14 +852,26 @@ def main(argv: list[str], env: dict[str, str]) -> int:
         write_outputs(Path(env.get(OUT_ENV) or Path(tmp) / "out"), rows, line)
     print(f"trust_matrix: {tier_of(env)} tier, {line}")
     failures = judge(cell_status(rows), open_map)
-    by_id = {r["id"]: r for r in rows if r["status"] not in ("AGREE", "CANNOT_OCCUR", "RULING")}
+    by_id = {
+        r["id"]: r
+        for r in rows
+        if r["status"] not in ("AGREE", "CANNOT_OCCUR", "RULING")
+    }
     for failure in failures:
         cid = failure.split(": ", 1)[1].split(" ", 1)[0]
         row = by_id.get(cid)
-        readings = "; ".join(f"{e} {x.show()}" for e, x in row["readings"].items()) if row else ""
-        detail = f"\n    {row['control']} expected {'|'.join(row['expected'])}: {readings}" if row else ""
+        readings = (
+            "; ".join(f"{e} {x.show()}" for e, x in row["readings"].items())
+            if row
+            else ""
+        )
+        detail = (
+            f"\n    {row['control']} expected {'|'.join(row['expected'])}: {readings}"
+            if row
+            else ""
+        )
         print(f"trust_matrix FAIL [{failure.split(':', 1)[0]}] {failure}{detail}")
-    if failures:
+    if failures or problems:
         return 1
     print("trust_matrix: PASS")
     return 0
@@ -685,31 +894,91 @@ def self_test() -> int:
             return
         raise AssertionError(f"{key} not refused")
 
-    base = {
+    base: dict[str, Any] = {
         "quick": ["a"],
         "dimensions": [{"name": "focus_class", "values": list(FOCUS_CLASSES)}],
-        "cells": [{"id": i, "controls": ["X-01"], "dims": {"focus_class": f}, "spec_ref": "s", "fixture": "f",
-                   "expected": "conformant"} for i, f in zip("abc", FOCUS_CLASSES)],
+        "cells": [
+            {
+                "id": i,
+                "controls": ["X-01"],
+                "dims": {"focus_class": f},
+                "spec_ref": "s",
+                "fixture": "f",
+                "expected": "conformant",
+            }
+            for i, f in zip("abc", FOCUS_CLASSES)
+        ],
     }
     raw = b"matrix"
-    ok = {"digest": hashlib.sha256(raw).hexdigest(), "pinned": frozenset({"b"}), "required_quick": frozenset({"a"}),
-          "ceiling": 1}
+    ok: dict[str, Any] = {
+        "digest": hashlib.sha256(raw).hexdigest(),
+        "pinned": frozenset({"b"}),
+        "required_quick": frozenset({"a"}),
+        "ceiling": 1,
+    }
     open_ok = {"b": {"status": "GAP", "owner": "18.122"}}
     assert coverage(raw, base, open_ok, {"X-01": "enforcement_point"}, **ok) == []
     expect("coverage.digest", coverage(b"other", base, open_ok, {}, **ok))
-    unused = {**base, "dimensions": [{"name": "focus_class", "values": [*FOCUS_CLASSES, "sideways"]}]}
+    unused = {
+        **base,
+        "dimensions": [{"name": "focus_class", "values": [*FOCUS_CLASSES, "sideways"]}],
+    }
     expect("coverage.unused_value", coverage(raw, unused, open_ok, {}, **ok))
-    expect("coverage.catalog_focus", coverage(raw, base, open_ok, {"X-01": "enforcement_point",
-                                                                    "Y-01": "independent_system"}, **ok))
-    assert coverage(raw, {**base, "cells": [*base["cells"], {"id": "o", "controls": ["Z-01"], "cannot_occur": "r"}]},
-                    open_ok, {"Z-01": "independent_system"}, **ok) == []
-    rulings = {**base, "cells": [*base["cells"], *({"id": f"r{n}", "controls": ["X-01"], "ruling_needed": "?"}
-                                                    for n in range(2))]}
+    expect(
+        "coverage.catalog_focus",
+        coverage(
+            raw,
+            base,
+            open_ok,
+            {"X-01": "enforcement_point", "Y-01": "independent_system"},
+            **ok,
+        ),
+    )
+    assert (
+        coverage(
+            raw,
+            {
+                **base,
+                "cells": [
+                    *base["cells"],
+                    {"id": "o", "controls": ["Z-01"], "cannot_occur": "r"},
+                ],
+            },
+            open_ok,
+            {"Z-01": "independent_system"},
+            **ok,
+        )
+        == []
+    )
+    rulings = {
+        **base,
+        "cells": [
+            *base["cells"],
+            *(
+                {"id": f"r{n}", "controls": ["X-01"], "ruling_needed": "?"}
+                for n in range(2)
+            ),
+        ],
+    }
     expect("coverage.ruling_ceiling", coverage(raw, rulings, open_ok, {}, **ok))
-    expect("coverage.open_owner", coverage(raw, base, {"b": {"status": "GAP", "owner": ""}}, {}, **ok))
-    expect("coverage.open_grew", coverage(raw, base, {**open_ok, "c": {"status": "GAP", "owner": "18.1"}}, {}, **ok))
-    expect("coverage.quick_missing", coverage(raw, {**base, "quick": []}, open_ok, {}, **ok))
-    open_all = {"a": {"status": "GAP", "owner": "18.1"}, "b": {"status": "GAP", "owner": "18.1"}}
+    expect(
+        "coverage.open_owner",
+        coverage(raw, base, {"b": {"status": "GAP", "owner": ""}}, {}, **ok),
+    )
+    expect(
+        "coverage.open_grew",
+        coverage(
+            raw, base, {**open_ok, "c": {"status": "GAP", "owner": "18.1"}}, {}, **ok
+        ),
+    )
+    expect(
+        "coverage.quick_missing",
+        coverage(raw, {**base, "quick": []}, open_ok, {}, **ok),
+    )
+    open_all = {
+        "a": {"status": "GAP", "owner": "18.1"},
+        "b": {"status": "GAP", "owner": "18.1"},
+    }
     expect("open.listed_agree", judge({"a": "AGREE"}, open_all))
     for status in ("GAP", "DIFF", "ERROR", "MISMATCH"):
         expect("open.unlisted", judge({"z": status}, open_all))
@@ -719,7 +988,11 @@ def self_test() -> int:
         refused("trust_matrix.tier_unknown", select, base, {TIER_ENV: bad})
     refused("trust_matrix.only_empty", select, base, {ONLY_ENV: " , "})
     refused("trust_matrix.only_unknown_cell", select, base, {ONLY_ENV: "a,nope"})
-    assert select(base, {}) == ["a"] and select(base, {TIER_ENV: "full"}) == ["a", "b", "c"]
+    assert select(base, {}) == ["a"] and select(base, {TIER_ENV: "full"}) == [
+        "a",
+        "b",
+        "c",
+    ]
     assert select(base, {ONLY_ENV: "c"}) == ["c"]
     refused("trust_matrix.unknown_option", parse_args, ["--bogus"])
     refused("trust_matrix.repeated_option", parse_args, ["--matrix=x", "--matrix", "y"])
@@ -727,22 +1000,41 @@ def self_test() -> int:
     refused("trust_matrix.option_value_missing", parse_args, ["--open="])
     refused("trust_matrix.option_value_missing", parse_args, ["--matrix"])
     assert parse_args(["--matrix", "m", "--open=o"]) == {"--matrix": "m", "--open": "o"}
-    nc, ie, ok_r = Reading("non_conformant", ("tc1",)), Reading("insufficient_evidence"), Reading("conformant")
+    nc, ie, ok_r = (
+        Reading("non_conformant", ("tc1",)),
+        Reading("insufficient_evidence"),
+        Reading("conformant"),
+    )
     for expected, readings, want in [
         (("conformant",), {"p": ok_r, "t": ok_r, "j": ok_r}, ("AGREE", [])),
         (("insufficient_evidence",), {"p": nc, "t": nc, "j": nc}, ("AGREE", ["word"])),
         (("non_conformant",), {"p": nc, "t": ok_r, "j": nc}, ("GAP", ["split"])),
         (("non_conformant",), {"p": nc, "t": ie, "j": nc}, ("DIFF", ["split"])),
-        (("non_conformant",), {"p": nc, "t": Reading("error", (), "x"), "j": nc}, ("ERROR", [])),
+        (
+            ("non_conformant",),
+            {"p": nc, "t": Reading("error", (), "x"), "j": nc},
+            ("ERROR", []),
+        ),
         (("conformant",), {"p": nc, "t": nc, "j": nc}, ("MISMATCH", [])),
         (("non_conformant",), {"p": Reading("not_applicable")}, ("GAP", [])),
         (("refuse",), {"p": Reading("refuse", (), "input.x")}, ("AGREE", [])),
     ]:
         assert classify(expected, readings) == want, (expected, readings)
-    assert cell_status([{"id": "a", "status": "AGREE"}, {"id": "a", "status": "MISMATCH"},
-                        {"id": "b", "status": "RULING"}]) == {"a": "MISMATCH"}
-    assert read_outcome({"exit": 3, "assertions": None, "text": "error [input.bundle_x]: no"}, "C", "s").detail \
+    assert cell_status(
+        [
+            {"id": "a", "status": "AGREE"},
+            {"id": "a", "status": "MISMATCH"},
+            {"id": "b", "status": "RULING"},
+        ]
+    ) == {"a": "MISMATCH"}
+    assert (
+        read_outcome(
+            {"exit": 3, "assertions": None, "text": "error [input.bundle_x]: no"},
+            "C",
+            "s",
+        ).detail
         == "input.bundle_x"
+    )
     for key in dict.fromkeys(seen):
         print(f"self-test ok: {key}")
     print("trust_matrix self-test: OK")
