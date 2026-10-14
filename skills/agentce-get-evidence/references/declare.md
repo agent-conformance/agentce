@@ -28,10 +28,15 @@ The procedure for the declaration phase of `agentce-get-evidence` (SPEC §13.3.3
    `lint_profile --profile agentce/applicability.yaml` until clean. The lint enforces: schema validity;
    a trust class and justification per source (and a coverage manifest, or `manifest_reason`, for
    enforcement points); observation window ≥ 90 days or `pilot_window: true`; `confirmed_by` for
-   classification, decision typing, and oversight; and, for the Conduct overlay, an effect scope per
-   task type.
-8. **Conduct overlay (optional, SPEC §7.7).** If targeted, declare task effect scopes from
-   `assets/task-scope.template.yaml` — per task type the allowed tools and effect classes, resources
-   and data classes, egress destinations, budgets, and the effect classes that require human approval —
-   plus the authorised principal roles. `lint_profile` refuses the overlay without a scope for every
-   declared task type.
+   classification, decision typing, and oversight; and, for the Conduct overlay, the task scopes of
+   step 8.
+8. **Conduct overlay (optional, SPEC §7.7).** If targeted, add `"conduct@2026.09"` to the profile's
+   `catalogs` and copy the `task_scopes` list from `assets/task-scope.template.yaml` into the domain
+   binding you pass to `agentce assess --domain`: one entry per task type, with the allowed tools and
+   effect classes, resources and data classes, egress destinations, budgets, the effect classes that
+   need a human's approval, and the authorised principal roles. List an approval class in
+   `allowed_effect_classes` as well as in `requires_approval`, or CND-01 reads those calls out of scope.
+   Name the task type in each tool call's `agentcetask` attribute or `refs.task`, unless the binding
+   declares a single task type. Run `lint_profile --profile agentce/applicability.yaml --domain
+   <binding>`: it refuses the overlay without a scope entry, an approval class left out of
+   `allowed_effect_classes`, and scopes written in the profile, where the engine never reads them.

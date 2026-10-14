@@ -1,18 +1,22 @@
-# Task effect-scope template for the Conduct overlay (SPEC §7.7, §7.7.5). Declare one scope per task
-# type; `lint_profile` refuses the overlay without a scope for every declared task type. Reference it
-# from the profile via `overlays: [conduct]`, `task_types: [...]`, and `task_scopes: {...}`.
-overlays: [conduct]
-task_types:
-  - "<task-type>"
+# Task effect-scope template for the Conduct overlay (SPEC §7.7.4, §7.7.6). Copy the task_scopes list into the
+# domain binding file you pass to `agentce assess --domain`, one entry per task type, and select the overlay in the
+# profile with the catalog entry "conduct@2026.09". Then run
+# `lint_profile --profile agentce/applicability.yaml --domain <binding>` until clean.
+#
+# CND-01 reads allowed_tools and allowed_effect_classes. A tool call is in scope when every task it names (the
+# agentcetask attribute or refs.task) is a task_type listed here, or when you declare a single task type, and its
+# tool and effect class are allowed. List every effect class the task may use in allowed_effect_classes, including
+# the ones it may use only with a human's approval, and mark those in requires_approval as well (CND-02 checks the
+# approval). A class listed only in requires_approval is out of scope.
 task_scopes:
-  "<task-type>":
-    allowed_tools: ["<tool-name>"]
-    allowed_effect_classes: [read, write]        # read | write | irreversible | external_communication | spend | physical
-    resources: ["<resource-uri-or-class>"]
+  - task_type: "<task-type>"
+    allowed_tools: ["<tool-name>"]                  # leave out to allow any tool
+    allowed_effect_classes: [read, write, spend]    # read | write | irreversible | external_communication | spend | physical
+    requires_approval: [spend]                      # classes above that need a human's approval
+    allowed_resources: ["<resource-uri-or-class>"]
     data_classes: ["<data-class>"]
     egress_destinations: ["<host-or-service>"]
-    budgets: {spend: "<limit>", calls: 0}
-    approval_required: [spend, irreversible]     # effect classes that require human approval
+    budgets: {tokens: 0, compute_seconds: 0, spend: 0}      # your limits
     authorised_principal_roles: ["<role>"]
     # effect classes are taken from the gateway's tool registry where one exists; otherwise declared
     # and marked confirmed_by a named person (S-8).

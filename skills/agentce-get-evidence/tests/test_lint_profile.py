@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import yaml
 
 import lint_profile
@@ -77,18 +79,103 @@ def test_enforcement_point_needs_a_manifest() -> None:
     assert "lint.enforcement_point_missing_manifest" in codes
 
 
-def test_conduct_overlay_requires_task_scopes() -> None:
+_TEMPLATE = Path(__file__).resolve().parents[1] / "assets" / "task-scope.template.yaml"
+
+
+def _codes(profile: object, domain: object = None) -> set[str]:
+    return {f.code for f in lint_profile.lint(profile, domain)}
+
+
+def _conduct_profile() -> dict:  # type: ignore[type-arg]
     profile = yaml.safe_load(_CLEAN)
-    profile["overlays"] = ["conduct"]
+    profile["catalogs"] = ["eu-ai-act@2026.09", "conduct@2026.09"]
+    return profile  # type: ignore[no-any-return]
+
+
+def test_conduct_overlay_requires_task_scopes_in_the_binding() -> None:
+    profile = _conduct_profile()
+    assert "lint.conduct_overlay_missing_task_scope" in _codes(profile)
+    for domain in (
+        {},
+        {"task_scopes": {}},
+        {"task_scopes": [{"allowed_effect_classes": ["read"]}]},
+        [],
+    ):
+        assert "lint.conduct_overlay_missing_task_scope" in _codes(profile, domain)
+    domain = {"task_scopes": [{"task_type": "t", "allowed_effect_classes": ["read"]}]}
+    assert _codes(profile, domain) == set()
+    # only a conduct@ catalog entry selects the overlay, as in the engine; overlays is reported, never read
+    legacy = yaml.safe_load(_CLEAN)
+    legacy["overlays"] = ["conduct"]
+    assert _codes(legacy) == {"lint.overlays_not_read"}
+    assert _codes(yaml.safe_load(_CLEAN)) == set()
+
+
+def test_task_scopes_in_the_profile_are_reported() -> None:
+    profile = _conduct_profile()
     profile["task_types"] = ["disburse_credit"]
-    profile["task_scopes"] = {}
-    assert "lint.conduct_overlay_missing_task_scope" in {
-        f.code for f in lint_profile.lint(profile)
-    }
     profile["task_scopes"] = {"disburse_credit": {"allowed_effect_classes": ["read"]}}
-    assert "lint.conduct_overlay_missing_task_scope" not in {
-        f.code for f in lint_profile.lint(profile)
+    findings = [
+        f for f in lint_profile.lint(profile) if f.code == "lint.task_scope_in_profile"
+    ]
+    assert sorted(f.details["key"] for f in findings) == ["task_scopes", "task_types"]
+    # reported whether or not the overlay is selected, since the engine reads neither key
+    plain = yaml.safe_load(_CLEAN)
+    plain["task_scopes"] = {}
+    assert "lint.task_scope_in_profile" in _codes(plain)
+
+
+def test_an_approval_class_must_also_be_allowed() -> None:
+    domain = {
+        "task_scopes": [
+            {
+                "task_type": "t",
+                "allowed_effect_classes": ["read"],
+                "requires_approval": ["spend", "read"],
+            }
+        ]
     }
+    findings = [
+        f
+        for f in lint_profile.lint(_conduct_profile(), domain)
+        if f.code == "lint.task_scope_approval_not_allowed"
+    ]
+    assert [f.details["effect_class"] for f in findings] == ["spend"]
+
+
+def test_the_template_filled_in_is_clean() -> None:
+    text = _TEMPLATE.read_text(encoding="utf-8")
+    for blank, value in (
+        ("<task-type>", "credit-review"),
+        ("<tool-name>", "lookup"),
+    ):
+        text = text.replace(blank, value)
+    assert _codes(_conduct_profile(), yaml.safe_load(text)) == set()
+
+
+def test_domain_flag(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    profile = tmp_path / "p.yaml"
+    profile.write_text(yaml.safe_dump(_conduct_profile()), encoding="utf-8")
+    domain = tmp_path / "domain.yaml"
+    domain.write_text(
+        "task_scopes:\n  - {task_type: t, allowed_effect_classes: [read]}\n",
+        encoding="utf-8",
+    )
+    assert lint_profile.main(["--profile", str(profile)]) == lint_profile.FINDINGS
+    assert (
+        lint_profile.main(["--profile", str(profile), "--domain", str(domain)])
+        == lint_profile.OK
+    )
+    assert (
+        lint_profile.main(["--profile", str(profile), "--domain"])
+        == lint_profile.INPUT_ERROR
+    )
+    assert (
+        lint_profile.main(
+            ["--profile", str(profile), "--domain", str(tmp_path / "missing.yaml")]
+        )
+        == lint_profile.INPUT_ERROR
+    )
 
 
 def test_a_profile_file_is_linted(tmp_path) -> None:  # type: ignore[no-untyped-def]

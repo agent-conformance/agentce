@@ -6,8 +6,8 @@ with a reason); a source whose kind is a known self-report pattern -- a framewor
 tracing processor, an in-process approval prompt, an agent-written log -- is **never** declared
 anything but ``self_report`` (rule S-2, SPEC 6.9); the observation window is at least 90 days unless a
 pilot is declared; classification, decision typing, and oversight are ``confirmed_by`` a named person
-(rule S-8); and, when the Conduct overlay is targeted, every declared task type has an effect scope
-(SPEC 7.7.5).
+(rule S-8); and, when the profile selects the Conduct overlay (a ``conduct@`` catalog entry), the domain
+binding passed with ``--domain`` declares task effect scopes in the form the engine reads (SPEC 7.7.5, 7.7.6).
 
 ``--self-test`` lints a built-in clean profile and a built-in defective one and confirms the lint
 accepts the first and rejects the second (printing ``LINT PROFILE SELF-TEST OK``). Deterministic,
@@ -43,8 +43,9 @@ def _days(window: dict[str, Any]) -> int | None:
     return (end - start).days
 
 
-def lint(profile: object) -> list[Finding]:
-    """Return the findings for ``profile`` (an empty list means it is clean)."""
+def lint(profile: object, domain: object = None) -> list[Finding]:
+    """Return the findings for ``profile`` and its domain binding (``None`` when none was passed); an
+    empty list means both are clean."""
     findings: list[Finding] = []
     if not isinstance(profile, dict):
         return [Finding("lint.not_a_mapping", "the profile is not a YAML mapping")]
@@ -79,7 +80,7 @@ def lint(profile: object) -> list[Finding]:
         findings.extend(_lint_sources(sid, subject.get("evidence_sources")))
         findings.extend(_lint_confirmations(sid, subject))
 
-    findings.extend(_lint_conduct(profile))
+    findings.extend(_lint_conduct(profile, domain))
     return findings
 
 
@@ -164,34 +165,75 @@ def _lint_confirmations(sid: str, subject: dict[str, Any]) -> list[Finding]:
     return findings
 
 
-def _lint_conduct(profile: dict[str, Any]) -> list[Finding]:
-    overlays = profile.get("overlays")
-    overlays = overlays if isinstance(overlays, list) else []
-    if "conduct" not in overlays:
-        return []
-    task_types = profile.get("task_types")
-    task_types = [str(t) for t in task_types] if isinstance(task_types, list) else []
-    scopes = profile.get("task_scopes")
-    scopes = scopes if isinstance(scopes, dict) else {}
-    return [
+def _selects_conduct(profile: dict[str, Any]) -> bool:
+    catalogs = profile.get("catalogs")
+    return any(
+        isinstance(c, str) and c.split("@", 1)[0] == "conduct"
+        for c in (catalogs if isinstance(catalogs, list) else [])
+    )
+
+
+def _lint_conduct(profile: dict[str, Any], domain: object) -> list[Finding]:
+    findings = [
         Finding(
-            "lint.conduct_overlay_missing_task_scope",
-            f"the Conduct overlay is targeted but task type {task!r} has no effect scope (SPEC 7.7.5)",
-            {"task_type": task},
+            "lint.task_scope_in_profile",
+            f"the profile declares {key}, which the engine never reads: task effect scopes go in the "
+            "domain binding's task_scopes list (SPEC 7.7.6)",
+            {"key": key},
         )
-        for task in task_types
-        if task not in scopes
+        for key in ("task_types", "task_scopes")
+        if key in profile
     ]
+    if "overlays" in profile:
+        findings.append(
+            Finding(
+                "lint.overlays_not_read",
+                "the profile declares overlays, which the engine never reads: select an overlay with its "
+                'catalog entry, for the Conduct overlay "conduct@2026.09" in catalogs',
+            )
+        )
+    if not _selects_conduct(profile):
+        return findings
+    scopes = domain.get("task_scopes") if isinstance(domain, dict) else None
+    entries = [
+        e
+        for e in (scopes if isinstance(scopes, list) else [])
+        if isinstance(e, dict) and isinstance(e.get("task_type"), str)
+    ]
+    if not entries:
+        where = (
+            "the domain binding"
+            if domain is not None
+            else "no domain binding (pass --domain)"
+        )
+        findings.append(
+            Finding(
+                "lint.conduct_overlay_missing_task_scope",
+                f"the Conduct overlay is selected but {where} declares no task_scopes entry with a "
+                "task_type, so CND-01 reads every tool call in a task out of scope (SPEC 7.7.5, 7.7.6)",
+            )
+        )
+    for entry in entries:
+        allowed = entry.get("allowed_effect_classes")
+        allowed = allowed if isinstance(allowed, list) else []
+        gated = entry.get("requires_approval")
+        findings.extend(
+            Finding(
+                "lint.task_scope_approval_not_allowed",
+                f"task type {entry['task_type']!r} marks {cls!r} requires_approval but does not list it in "
+                "allowed_effect_classes, so CND-01 reads every such call out of scope; list it in both",
+                {"task_type": entry["task_type"], "effect_class": cls},
+            )
+            for cls in (gated if isinstance(gated, list) else [])
+            if cls not in allowed
+        )
+    return findings
 
 
 _GOOD_PROFILE = """
 profile_version: 1
 observation_window: {start: "2026-05-01T00:00:00Z", end: "2026-08-29T00:00:00Z"}
-catalogs: ["eu-ai-act@2026.09"]
-overlays: [conduct]
-task_types: [disburse_credit]
-task_scopes:
-  disburse_credit: {allowed_effect_classes: [read, write], approval_required: [spend]}
+catalogs: ["eu-ai-act@2026.09", "conduct@2026.09"]
 subjects:
   - id: spiffe://corp/agents/credit
     declared_decision_types: [dom:CreditDecision]
@@ -209,9 +251,8 @@ subjects:
 _BAD_PROFILE = """
 profile_version: 1
 observation_window: {start: "2026-08-01T00:00:00Z", end: "2026-08-10T00:00:00Z"}
-catalogs: ["eu-ai-act@2026.09"]
+catalogs: ["eu-ai-act@2026.09", "conduct@2026.09"]
 overlays: [conduct]
-task_types: [disburse_credit]
 task_scopes: {}
 subjects:
   - id: spiffe://corp/agents/credit
@@ -221,12 +262,28 @@ subjects:
 """
 
 
+_GOOD_DOMAIN = """
+task_scopes:
+  - {task_type: disburse_credit, allowed_effect_classes: [read, write, spend], requires_approval: [spend]}
+"""
+
+_BAD_DOMAIN = """
+task_scopes:
+  - {task_type: disburse_credit, allowed_effect_classes: [read], requires_approval: [spend]}
+"""
+
+
 def _self_test(want_json: bool) -> int:
-    good = lint(yaml.safe_load(_GOOD_PROFILE))
-    bad_codes = {f.code for f in lint(yaml.safe_load(_BAD_PROFILE))}
+    good = lint(yaml.safe_load(_GOOD_PROFILE), yaml.safe_load(_GOOD_DOMAIN))
+    bad_codes = {f.code for f in lint(yaml.safe_load(_BAD_PROFILE))} | {
+        f.code for f in lint(yaml.safe_load(_GOOD_PROFILE), yaml.safe_load(_BAD_DOMAIN))
+    }
     expected_in_bad = {
         "lint.self_report_as_enforcement",
         "lint.conduct_overlay_missing_task_scope",
+        "lint.task_scope_in_profile",
+        "lint.task_scope_approval_not_allowed",
+        "lint.overlays_not_read",
         "lint.observation_window_too_short",
         "lint.missing_confirmation",
     }
@@ -244,8 +301,38 @@ def _self_test(want_json: bool) -> int:
     return OK if ok else FINDINGS
 
 
+_FLAGS = frozenset({"--json", "--self-test"})
+_VALUED = frozenset({"--profile", "--domain"})
+
+
+def _refused_args(argv: list[str]) -> str | None:
+    """Why the arguments are refused (an unknown argument, a repeated option, or --self-test with a
+    file), else None."""
+    seen: list[str] = []
+    rest = iter(argv)
+    for arg in rest:
+        if arg in _VALUED:
+            if arg in seen:
+                return f"{arg} given twice"
+            seen.append(arg)
+            next(rest, None)
+        elif arg not in _FLAGS:
+            return f"unknown argument {arg!r}"
+    if "--self-test" in argv and seen:
+        return f"--self-test lints built-in profiles and takes no {' or '.join(seen)}"
+    return None
+
+
 def _body(argv: list[str]) -> int:
     want_json = "--json" in argv
+    refused = _refused_args(argv)
+    if refused is not None:
+        emit(
+            {"status": "input_error", "message": refused},
+            want_json=want_json,
+            human=f"INPUT ERROR: {refused}",
+        )
+        return INPUT_ERROR
     if "--self-test" in argv:
         return _self_test(want_json)
     path = arg_value(argv, "--profile")
@@ -256,8 +343,21 @@ def _body(argv: list[str]) -> int:
             human="INPUT ERROR: pass --profile <file>",
         )
         return INPUT_ERROR
+    domain_path = arg_value(argv, "--domain")
+    if "--domain" in argv and domain_path is None:
+        emit(
+            {"status": "input_error", "message": "pass --domain <file>"},
+            want_json=want_json,
+            human="INPUT ERROR: pass --domain <file>",
+        )
+        return INPUT_ERROR
     try:
         profile = yaml.safe_load(open(path, encoding="utf-8"))
+        domain = (
+            None
+            if domain_path is None
+            else yaml.safe_load(open(domain_path, encoding="utf-8"))
+        )
     except (OSError, yaml.YAMLError) as exc:
         emit(
             {"status": "input_error", "message": str(exc)},
@@ -265,9 +365,10 @@ def _body(argv: list[str]) -> int:
             human=f"INPUT ERROR: {exc}",
         )
         return INPUT_ERROR
-    findings = lint(profile)
+    findings = lint(profile, domain)
     payload = {
         "profile": path,
+        "domain": domain_path,
         "clean": not findings,
         "findings": [f.to_json() for f in findings],
     }

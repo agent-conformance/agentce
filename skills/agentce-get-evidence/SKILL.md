@@ -96,7 +96,8 @@ declared as anything else.
 ## Scripts (`scripts/`, each `--json`, exit 0 ok / 1 findings / 2 input error / 3 version mismatch)
 
 - `find_chokepoints.py --repo <path>` — inventory chokepoints (incl. instruction-entry and refusal).
-- `lint_profile.py --profile <file>` (`--self-test`) — the profile rules above.
+- `lint_profile.py --profile <file> [--domain <binding>]` (`--self-test`) — the profile rules above; with the
+  Conduct overlay selected, pass the domain binding so the lint can check its task scopes.
 - `linkml_validate.py --events <jsonl> | --profile <file>` — validate against the generated schemas.
 - `bundle_preflight.py --bundle <dir> [--profile <file>]` — quarantines, per-source counts, trust-class
   consistency, dangling refs (read-only).
@@ -105,7 +106,8 @@ declared as anything else.
 ## Assets
 
 `assets/`: `applicability.template.yaml`, `domain.template.linkml.yaml`, `deviations.template.yaml`,
-`chokepoints.template.md`, and `task-scope.template.yaml` (the Conduct overlay, SPEC §7.7). The
+`chokepoints.template.md`, and `task-scope.template.yaml` (the Conduct overlay's task scopes, SPEC §7.7.6, which go in
+the domain binding). The
 deviation register is written by the operator, never by this skill (S-3).
 
 ## Where to read next
