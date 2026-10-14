@@ -252,13 +252,38 @@ function assertControl(
     classGap: kinds,
     humanActorFailed:
       outcome === "non-conformant" &&
-      violations.some((v) => store.humanActorFailed.has(v.focus) && readsHumanActor(v.path)),
+      violations.some((v) => reachesHumanActorFailure(store, v.focus, v.path)),
   });
 }
 
-/** Whether a rendered shape path passes through a predicate whose value the SPEC §10.4 human-actor rule decides. */
-export function readsHumanActor(path: string): boolean {
-  return path.split(/[\s()|^]+/).some((token) => HUMAN_ACTOR_PATHS.has(token));
+/** Whether a violation's rendered shape path reads a predicate the SPEC §10.4 human-actor rule decides and, from its
+ * focus, reaches a node that fails the rule. The walk follows every other step of the path from the focus, in any order
+ * and to the path's length, so it reaches at least what the path itself reaches (fail closed). */
+export function reachesHumanActorFailure(store: GraphStore, focus: string, path: string): boolean {
+  const tokens = path.match(/\^?[^\s()|^]+/g) ?? [];
+  const predicate = (token: string): string => (token.startsWith("^") ? token.slice(1) : token);
+  if (!tokens.some((token) => HUMAN_ACTOR_PATHS.has(predicate(token)))) return false;
+  const steps = tokens.filter((token) => !HUMAN_ACTOR_PATHS.has(predicate(token)));
+  const reach = new Set([focus]);
+  let frontier = [focus];
+  for (let i = 0; i < tokens.length; i++) {
+    const next: string[] = [];
+    for (const start of frontier) {
+      for (const step of steps) {
+        const nodes = step.startsWith("^")
+          ? store.subjects(step.slice(1), start)
+          : store.objects(start, step);
+        for (const node of nodes) {
+          if (!reach.has(node)) {
+            reach.add(node);
+            next.push(node);
+          }
+        }
+      }
+    }
+    frontier = next;
+  }
+  return [...reach].some((node) => store.humanActorFailed.has(node));
 }
 
 /** `make`, called at most once: on the first call, and its value returned from then on. */

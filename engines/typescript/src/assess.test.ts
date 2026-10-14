@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { type Assertion, assertionToJson, makeAssertion } from "./assertions";
-import { applyDeviations, assessSubjects, readsHumanActor } from "./assess";
+import { applyDeviations, assessSubjects, reachesHumanActorFailure } from "./assess";
 import { loadBundle } from "./bundle";
 import { canonicalString } from "./canonical";
 import { loadCatalog } from "./catalog";
@@ -23,6 +23,7 @@ import { InputError } from "./errors";
 import { ingest } from "./ingest";
 import { profileFromDict } from "./profile";
 import { loadDeviationRegister } from "./readiness";
+import { GraphStore } from "./store";
 
 const REPO = join(__dirname, "..", "..", "..");
 const BASE = join(REPO, "spec", "catalogs", "base", "eu-ai-act");
@@ -309,9 +310,52 @@ test("not waivable: judged per assertion across subjects", () => {
 });
 
 test("not waivable: paths match by predicate token", () => {
-  assert.equal(readsHumanActor("agentce:approvedBy"), true);
-  assert.equal(readsHumanActor("(agentce:decidedBy ^agentce:reviewedBy)"), true);
-  assert.equal(readsHumanActor("(agentce:x | agentce:interventionByHuman)"), true);
-  assert.equal(readsHumanActor("agentce:approvedByProxy"), false);
-  assert.equal(readsHumanActor("agentce:authorizedBy"), false);
+  const store = new GraphStore();
+  store.humanActorFailed.add("d1");
+  for (const path of [
+    "agentce:approvedBy",
+    "(agentce:decidedBy ^agentce:reviewedBy)",
+    "(agentce:x | agentce:interventionByHuman)",
+  ]) {
+    assert.equal(reachesHumanActorFailure(store, "d1", path), true);
+  }
+  assert.equal(reachesHumanActorFailure(store, "d1", "agentce:approvedByProxy"), false);
+  assert.equal(reachesHumanActorFailure(store, "d1", "agentce:authorizedBy"), false);
+  assert.equal(reachesHumanActorFailure(store, "d2", "agentce:approvedBy"), false);
+});
+
+test("not waivable: the path reaches the failing decision from another focus", () => {
+  const store = new GraphStore();
+  store.humanActorFailed.add("d1");
+  store.addEdge("tc1", "agentce:executes", "d1");
+  store.addEdge("tc2", "agentce:executes", "d2");
+  store.addEdge("a1", "agentce:approves", "d1");
+  assert.equal(
+    reachesHumanActorFailure(store, "tc1", "(agentce:executes agentce:approvedBy)"),
+    true,
+  );
+  assert.equal(
+    reachesHumanActorFailure(store, "tc1", "(agentce:executes agentce:reviewedBy)"),
+    true,
+  );
+  assert.equal(
+    reachesHumanActorFailure(
+      store,
+      "a1",
+      "(agentce:approves ^agentce:executes agentce:approvedBy)",
+    ),
+    true,
+  );
+  assert.equal(
+    reachesHumanActorFailure(store, "tc1", "(^agentce:x | agentce:executes) agentce:approvedBy"),
+    true,
+  );
+  assert.equal(
+    reachesHumanActorFailure(store, "tc2", "(agentce:executes agentce:approvedBy)"),
+    false,
+  );
+  assert.equal(
+    reachesHumanActorFailure(store, "tc1", "(agentce:executes agentce:authorizedBy)"),
+    false,
+  );
 });
