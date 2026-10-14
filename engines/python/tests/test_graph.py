@@ -1222,6 +1222,35 @@ def test_intervention_by_a_service_actor_is_not_by_a_human() -> None:
     assert _flag(events, "i1", "interventionByHuman") == ["false"]
 
 
+def test_not_waivable_set_lists_failing_oversight_records_and_the_decision_they_name() -> (
+    None
+):
+    """18.186: the store lists what the deviation register cannot waive (SPEC §10.4): each failing ApprovalDecided,
+    Override and Interrupt, and the held decision a failing approval names; a passing approval adds nothing."""
+    d1 = event_iri("d1")
+    store = build_graph([decision("d1", "t"), _approval("a1", ALICE)], domain=DOMAIN)
+    assert store.human_actor_failed == {event_iri("a1"), d1}
+    store = build_graph(
+        [decision("d1", "t"), _approval("a1", ALICE), *LOGINS], domain=DOMAIN
+    )
+    assert store.human_actor_failed == set()
+    events = [
+        decision("d1", "t"),
+        _override("o1", actor=SERVICE),
+        _interrupt("i1", "halted", "manual", actor=SERVICE),
+    ]
+    assert build_graph(events, domain=DOMAIN).human_actor_failed == {
+        event_iri("o1"),
+        event_iri("i1"),
+    }
+    # A failing approval naming no held decision adds only itself.
+    orphan = _approval("a1", ALICE)
+    orphan["data"]["refs"] = {"decision": "agentce:event/nowhere"}
+    assert build_graph(
+        [decision("d1", "t"), orphan], domain=DOMAIN
+    ).human_actor_failed == {event_iri("a1")}
+
+
 def test_incident_responded_needs_detection_and_a_response() -> None:
     responded = _incident(
         "x1", detected_at="2026-01-01T00:00:00Z", reported_at="2026-01-02T00:00:00Z"

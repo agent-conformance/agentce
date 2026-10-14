@@ -80,6 +80,9 @@ class Assertion:
     #: this outcome insufficient_evidence (HR-5): what is missing is a record of those types at the minimum.
     #: Run state for the missing-evidence text; never written to assertions.json.
     class_gap: tuple[str, ...] = ()
+    #: True when this non-conformant outcome rests on a record failing the SPEC §10.4 human-actor rule, which the
+    #: deviation register cannot waive (18.186). Run state for ``apply_deviations``; never written to assertions.json.
+    human_actor_failed: bool = False
 
     def to_json(self) -> dict[str, Any]:
         record: dict[str, Any] = {

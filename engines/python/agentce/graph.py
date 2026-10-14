@@ -876,6 +876,12 @@ class _Builder:
             key = self._verified_actor(node, event)
             by_human[node] = key is not None
             ref = _refs(event).get("decision")
+            if key is None:
+                # What the deviation register cannot waive (SPEC §10.4): the failing record, and the held decision
+                # a failing approval names.
+                self.store.human_actor_failed.add(node)
+                if ptype == "ApprovalDecided" and (held := self._held_decision(ref)):
+                    self.store.human_actor_failed.add(held)
             if ptype != "ApprovalDecided" or not isinstance(ref, str):
                 continue
             # A name that leads to no held decision keeps its own key: it reviews and approves no held decision.

@@ -1,0 +1,9 @@
+deviation_register_version: 1
+deviations:
+  - control: "OVS-07"
+    rationale: "approvals recorded by hand during a migration"
+    compensating_control: "weekly manual review"
+    owner: "risk-owner@example.org"
+    approver: "ciso@example.org"
+    granted: "2026-01-01"
+    expiry: "2026-03-01"

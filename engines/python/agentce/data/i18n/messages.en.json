@@ -361,6 +361,7 @@
   "outcome.not_assessed": "not assessed",
   "outcome.partial": "partial",
   "readiness.deviation_expired_ignored": "{control}: deviation expired {expiry}; ignored and reported, the control remains non-conformant",
+  "readiness.deviation_not_waivable": "{control}: deviation not applied because an approval, override or interrupt in these records fails the human-actor rule (SPEC §10.4), which no deviation can waive; the control remains non-conformant",
   "report.activity_actions_label": "Actions by effect class",
   "report.activity_agents_label": "Agents",
   "report.activity_approvals_label": "Approvals recorded by",

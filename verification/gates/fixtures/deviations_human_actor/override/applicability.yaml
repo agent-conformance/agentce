@@ -1,0 +1,26 @@
+profile_version: 1
+observation_window:
+  start: "2026-01-01T00:00:00Z"
+  end: "2026-02-01T00:00:00Z"
+content_capture:
+  mode: hashes_only
+catalogs:
+  - "eu-ai-act@2026.09"
+  - "conduct@2026.09"
+subjects:
+  - id: "spiffe://corp/agents/cnd05-fixture"
+    name: "trust sweep cnd05-fixture"
+    role: "both"
+    coverage_denominators:
+      - kind: "system_of_record_export"
+        source: "urn:src:sor-export"
+        manifest: "reference/sor-counts.json"
+        covers:
+          - "Decision"
+          - "Override"
+          - "PolicyDecision"
+          - "SessionStart"
+          - "ToolCall"
+  - id: "spiffe://corp/agents/other"
+    name: "trust sweep other"
+    role: "both"

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import dataclasses
 import functools
+import re
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -43,6 +44,18 @@ def _role_applies(roles: set[str], applies_to_roles: list[str]) -> bool:
 #: any observed class. `agentce.blind_spots` groups on this same equivalence (RFC 0008 Sec.2) and
 #: shares this constant so the two definitions of "self-report-equivalent" cannot drift apart.
 SELF_REPORT_EQUIVALENT_CLASSES = frozenset({"any", "self_report"})
+
+#: The predicates whose value the SPEC §10.4 human-actor rule decides: a human's approval or review of a decision,
+#: enough human approvers, a human intervention, and the review half of a risk review (18.186).
+HUMAN_ACTOR_PATHS = frozenset(
+    {
+        "agentce:approvedBy",
+        "agentce:reviewedBy",
+        "agentce:oversightCoverageComplete",
+        "agentce:interventionByHuman",
+        "agentce:riskReviewed",
+    }
+)
 
 
 def _class_ok(observed: str, required: str) -> bool:
@@ -232,8 +245,18 @@ def _assert_control(
         source_class_satisfied=not below,
         evidence_strength=None if below else control.raw.get("evidence_strength"),
         class_gap=kinds,
+        human_actor_failed=outcome == "non-conformant"
+        and any(
+            v.focus in store.human_actor_failed and _reads_human_actor(v.path)
+            for v in violations
+        ),
         **base,
     )
+
+
+def _reads_human_actor(path: str) -> bool:
+    """Whether a rendered shape path passes through a predicate whose value the SPEC §10.4 human-actor rule decides."""
+    return not HUMAN_ACTOR_PATHS.isdisjoint(re.split(r"[\s()|^]+", path))
 
 
 def _events_by_iri(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -425,7 +448,7 @@ def apply_deviations(
     deviations: list[dict[str, Any]],
     *,
     as_of: str,
-) -> tuple[list[Assertion], list[str]]:
+) -> tuple[list[Assertion], list[str], list[str]]:
     """Apply an already-linted deviation register to ``assertions`` (SPEC §13.3.4 Stage 2): every
     ``non-conformant`` assertion whose control has a matching, unexpired register entry becomes
     ``partial`` and carries that control's id as ``deviation``. Pure: never mutates its inputs, never
@@ -435,10 +458,16 @@ def apply_deviations(
     An entry whose ``expiry`` is before ``as_of`` is never applied -- the matching assertion is
     returned unchanged and the control id is collected into the second return value (``expired``) so
     the caller can report it as an ignored, expired deviation (a limitation, never a lint failure;
-    ``readiness.deviation_lint`` only rejects an *applied* deviation that has since expired)."""
+    ``readiness.deviation_lint`` only rejects an *applied* deviation that has since expired).
+
+    An entry is never applied to an assertion that rests on a record failing the SPEC §10.4 human-actor rule
+    (``human_actor_failed``), expired or not: "the deviation register cannot waive this rule". Its control is collected
+    into the third return value (``not_waivable``) so the caller reports it, and the assertion stays non-conformant
+    (18.186)."""
     by_control = deviations_by_control(deviations)
     as_of_date = parse_date(as_of)
     expired: list[str] = []
+    not_waivable: list[str] = []
     applied: list[Assertion] = []
     for assertion in assertions:
         entry = (
@@ -447,6 +476,10 @@ def apply_deviations(
             else None
         )
         if entry is None:
+            applied.append(assertion)
+            continue
+        if assertion.human_actor_failed:
+            not_waivable.append(assertion.control)
             applied.append(assertion)
             continue
         expiry = parse_date(entry.get("expiry"))
@@ -459,4 +492,4 @@ def apply_deviations(
                 assertion, outcome="partial", deviation=assertion.control
             )
         )
-    return applied, expired
+    return applied, expired, not_waivable

@@ -167,7 +167,10 @@ def test_apply_deviations_flips_non_conformant_to_partial_and_stamps_control_id(
     None
 ):
     ovs = _non_conformant_ovs03()
-    applied, expired = apply_deviations([ovs], [_deviation()], as_of=ovs.window[1])
+    applied, expired, not_waivable = apply_deviations(
+        [ovs], [_deviation()], as_of=ovs.window[1]
+    )
+    assert not_waivable == []
     assert expired == []
     assert applied[0].outcome == "partial"
     assert applied[0].deviation == "OVS-03"
@@ -188,7 +191,7 @@ def test_apply_deviations_leaves_conformant_and_insufficient_evidence_untouched(
     conformant = next(a for a in assertions if a.control == "OVS-03")
     assert conformant.outcome == "conformant"
     insufficient = dataclasses.replace(conformant, outcome="insufficient_evidence")
-    applied, expired = apply_deviations(
+    applied, expired, _ = apply_deviations(
         [conformant, insufficient], [_deviation()], as_of=conformant.window[1]
     )
     assert expired == []
@@ -198,7 +201,7 @@ def test_apply_deviations_leaves_conformant_and_insufficient_evidence_untouched(
 
 def test_apply_deviations_skips_and_reports_an_expired_entry() -> None:
     ovs = _non_conformant_ovs03()
-    applied, expired = apply_deviations(
+    applied, expired, _ = apply_deviations(
         [ovs], [_deviation(expiry="2020-01-01")], as_of=ovs.window[1]
     )
     assert expired == ["OVS-03"]
@@ -215,16 +218,123 @@ def test_apply_deviations_is_pure() -> None:
 
 def test_apply_deviations_of_empty_inputs_is_a_no_op() -> None:
     ovs = _non_conformant_ovs03()
-    applied_empty_assertions, expired_empty_assertions = apply_deviations(
+    applied_empty_assertions, expired_empty_assertions, _ = apply_deviations(
         [], [_deviation()], as_of="2026-01-01"
     )
     assert applied_empty_assertions == []
     assert expired_empty_assertions == []
-    applied_empty_deviations, expired_empty_deviations = apply_deviations(
+    applied_empty_deviations, expired_empty_deviations, _ = apply_deviations(
         [ovs], [], as_of="2026-01-01"
     )
     assert applied_empty_deviations == [ovs]
     assert expired_empty_deviations == []
+
+
+# --- 18.186: the deviation register cannot waive the SPEC §10.4 human-actor rule. ---
+
+_HUMAN_ACTOR = (
+    _REPO_ROOT / "verification" / "gates" / "fixtures" / "deviations_human_actor"
+)
+
+
+def _human_actor_case(
+    name: str, drop: tuple[str, ...] = ()
+) -> tuple[dict[str, Any], list[dict[str, object]]]:
+    """The case's assertions by control for its fixture subject, and its register's entries."""
+    import yaml
+
+    from agentce.bundle import load_bundle
+    from agentce.ingest import ingest
+
+    case = _HUMAN_ACTOR / name
+    accepted = [
+        e for e in ingest(load_bundle(case / "bundle")).accepted if e["id"] not in drop
+    ]
+    catalogs = [
+        load_catalog(_BASE),
+        load_catalog(_REPO_ROOT / "spec" / "catalogs" / "overlays" / "conduct"),
+    ]
+    profile = Profile.from_dict(
+        {"subjects": [{"id": "spiffe://corp/agents/cnd05-fixture", "role": "both"}]}
+    )
+    domain = DomainBinding.load(case / "domain.linkml.yaml")
+    assertions = assess_subjects(accepted, profile, catalogs, domain, withheld=())
+    register = yaml.safe_load((case / "deviations.yaml").read_text(encoding="utf-8"))
+    return {a.control: a for a in assertions}, register["deviations"]
+
+
+def test_a_failing_approval_is_not_waivable_on_the_controls_that_read_it() -> None:
+    by_control, register = _human_actor_case("approval")
+    readers = ("CND-02", "OVS-01", "OVS-08", "RSK-02")
+    chosen = [by_control[c] for c in (*readers, "OVS-05")]
+    applied, expired, not_waivable = apply_deviations(
+        chosen, register, as_of=chosen[0].window[1]
+    )
+    assert expired == []
+    assert not_waivable == list(readers)
+    for a in applied[:4]:
+        assert (a.outcome, a.deviation) == ("non-conformant", None), a.control
+    # The decision's missing authorization is no §10.4 failure: the register still waives it.
+    assert (applied[4].outcome, applied[4].deviation) == ("partial", "OVS-05")
+
+
+def test_an_expired_entry_on_a_failing_approval_is_reported_not_waivable() -> None:
+    by_control, register = _human_actor_case("approval")
+    cnd02 = by_control["CND-02"]
+    entry = {
+        **next(d for d in register if d["control"] == "CND-02"),
+        "expiry": "2020-01-01",
+    }
+    applied, expired, not_waivable = apply_deviations(
+        [cnd02], [entry], as_of=cnd02.window[1]
+    )
+    assert (expired, not_waivable) == ([], ["CND-02"])
+    assert applied[0].outcome == "non-conformant"
+
+
+def test_a_decision_with_no_approval_is_waivable_not_not_waivable() -> None:
+    by_control, register = _human_actor_case("approval", drop=("ap1",))
+    cnd02 = by_control["CND-02"]
+    assert cnd02.outcome == "non-conformant"
+    assert not cnd02.human_actor_failed
+    applied, _, not_waivable = apply_deviations(
+        [cnd02], register, as_of=cnd02.window[1]
+    )
+    assert not_waivable == []
+    assert (applied[0].outcome, applied[0].deviation) == ("partial", "CND-02")
+
+
+def test_an_override_by_the_agent_itself_is_not_waivable_on_ovs07() -> None:
+    by_control, register = _human_actor_case("override")
+    ovs07 = by_control["OVS-07"]
+    applied, _, not_waivable = apply_deviations(
+        [ovs07], register, as_of=ovs07.window[1]
+    )
+    assert not_waivable == ["OVS-07"]
+    assert (applied[0].outcome, applied[0].deviation) == ("non-conformant", None)
+
+
+def test_not_waivable_is_per_assertion_across_subjects() -> None:
+    by_control, register = _human_actor_case("approval")
+    failing = by_control["CND-02"]
+    clean = dataclasses.replace(
+        failing, subject="spiffe://corp/agents/other", human_actor_failed=False
+    )
+    applied, _, not_waivable = apply_deviations(
+        [failing, clean], register, as_of=failing.window[1]
+    )
+    assert not_waivable == ["CND-02"]
+    assert [a.outcome for a in applied] == ["non-conformant", "partial"]
+
+
+def test_not_waivable_paths_match_by_predicate_token() -> None:
+    from agentce.assess import _reads_human_actor
+
+    assert _reads_human_actor("agentce:approvedBy")
+    assert _reads_human_actor("(agentce:decidedBy ^agentce:reviewedBy)")
+    assert _reads_human_actor("(agentce:x | agentce:interventionByHuman)")
+    assert not _reads_human_actor("agentce:approvedByProxy")
+    assert not _reads_human_actor("agentce:authorizedBy")
 
 
 _ROB02 = _REPO_ROOT / "verification" / "gates" / "fixtures" / "rob02_untrusted"

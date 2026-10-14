@@ -1736,8 +1736,8 @@
         {
           "description": "apply_deviations is skipped entirely (deviation_expired hard-coded to an empty list, the register never applied), so a non-conformant control with an unexpired deviation stays non-conformant instead of becoming partial",
           "file": "engines/python/agentce/commands/__init__.py",
-          "search": "        evaluated, deviation_expired = apply_deviations(\n            evaluated, deviations, as_of=new_window_end\n        )\n",
-          "replace": "        deviation_expired: list[str] = []\n"
+          "search": "        evaluated, deviation_expired, deviation_not_waivable = apply_deviations(\n            evaluated, deviations, as_of=new_window_end\n        )\n",
+          "replace": "        deviation_expired: list[str] = []\n        deviation_not_waivable: list[str] = []\n"
         },
         {
           "description": "_deviation_detail drops the approver field, so a rendered deviation object matches neither of auditor.schema.json's oneOf branches and schema validation fails",

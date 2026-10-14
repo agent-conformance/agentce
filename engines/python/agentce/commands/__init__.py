@@ -1459,10 +1459,10 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
                 + "; ".join(problems),
                 "correct the deviation register and re-run.",
             )
-        evaluated, deviation_expired = apply_deviations(
+        evaluated, deviation_expired, deviation_not_waivable = apply_deviations(
             evaluated, deviations, as_of=new_window_end
         )
-        if deviation_expired:
+        if deviation_expired or deviation_not_waivable:
             deviation_cat = messages.catalogue(_opt_str(ns, "report_language") or "en")
             deviation_by_control = deviations_by_control(deviations)
             for control in deviation_expired:
@@ -1471,6 +1471,13 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
                         deviation_cat["readiness.deviation_expired_ignored"],
                         control=control,
                         expiry=deviation_by_control.get(control, {}).get("expiry", ""),
+                    )
+                )
+            for control in dict.fromkeys(deviation_not_waivable):
+                limitations.append(
+                    i18n_format.format_message(
+                        deviation_cat["readiness.deviation_not_waivable"],
+                        control=control,
                     )
                 )
         deviation_register_digest = _digest_of(deviation_file)

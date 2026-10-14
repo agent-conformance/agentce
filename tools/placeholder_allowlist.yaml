@@ -87,6 +87,18 @@ allow:
     class: legitimate
     justification: "Genesis all-zero prev pointer in the corpus evidence hash chain (no predecessor block)."
 
+  - path: verification/gates/fixtures/deviations_human_actor/approval/bundle/events/subject.jsonl
+    pattern: zero-digest
+    count: 5
+    class: legitimate
+    justification: "Genesis all-zero prev pointer of each one-record stream in VG-DEVIATIONS-PARITY's SPEC §10.4 fixture (no predecessor block)."
+
+  - path: verification/gates/fixtures/deviations_human_actor/override/bundle/events/subject.jsonl
+    pattern: zero-digest
+    count: 5
+    class: legitimate
+    justification: "Genesis all-zero prev pointer of each one-record stream in VG-DEVIATIONS-PARITY's SPEC §10.4 fixture (no predecessor block)."
+
   - path: verification/gates/fixtures/cli_options/conformance/corpus-one/projects/credit/claude-agent-sdk/known-pass/evidence/events/_benign-quarantine.jsonl
     pattern: zero-digest
     count: 2

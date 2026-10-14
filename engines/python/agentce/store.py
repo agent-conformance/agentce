@@ -42,6 +42,10 @@ class GraphStore:
     def __init__(self, path: Path | str = ":memory:") -> None:
         self.conn = sqlite3.connect(str(path))
         self.conn.executescript(_SCHEMA)
+        #: The focus IRIs a record failing the SPEC §10.4 human-actor rule touches: each such ApprovalDecided,
+        #: Override and Interrupt, and the held decision a failing ApprovalDecided names. Filled by the graph
+        #: builder; run state for ``assess.apply_deviations`` (the register cannot waive this rule), never a triple.
+        self.human_actor_failed: set[str] = set()
 
     def close(self) -> None:
         self.conn.close()
