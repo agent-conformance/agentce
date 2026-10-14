@@ -207,6 +207,7 @@
   ],
   "$defs": {
     "source_class": {
+      "description": "The class of the source that recorded an event (SPEC §6.4, HR-5). The classes are ordered `self_report` < `enforcement_point` < `independent_system`. An assertion meets a control's `min_source_class` only when its evidence comes from a source of that class or a higher one. Otherwise the result is `insufficient_evidence`, so an `enforcement_point` record does not meet an `independent_system` minimum.",
       "type": "string",
       "enum": ["self_report", "enforcement_point", "independent_system"]
     },
