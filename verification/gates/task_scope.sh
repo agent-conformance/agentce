@@ -80,7 +80,10 @@ PY
 # The filled-in template is what lint_profile reads too: it must read it (exit 0 or 1, a findings list) and report
 # no Conduct or task-scope finding.
 code=0
-lint="$(cd "$root/skills/agentce-get-evidence" && env -u VIRTUAL_ENV uv run --frozen python scripts/lint_profile.py \
+# The skill folder's uv.lock is not committed (skills/README.md, S-10), so the script runs in the Python engine's locked
+# environment, which has the one library it imports (PyYAML).
+lint="$(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen python \
+  "$root/skills/agentce-get-evidence/scripts/lint_profile.py" \
   --profile "$fixtures/applicability.yaml" --domain "$work/template-domain.yaml" --json)" || code=$?
 if [ "$code" -gt 1 ] || ! jq -e '(.findings | type == "array")
     and ([.findings[].code | select(startswith("lint.conduct") or startswith("lint.task_scope"))] | length == 0)' \
