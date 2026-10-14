@@ -119,8 +119,8 @@ dimensions:
     values: ["none", "self", "pair"]
   - name: delegation   # a DelegationIssued named by the call (SPEC §6.3 agentce:chainVerified)
     values: ["none", "ep_verified", "ep_unverified", "sr_verified"]
-  - name: refusal   # a Refusal of the acted-on instruction (CND-06)
-    values: ["none", "sr_refusal", "ep_refusal"]
+  - name: refusal   # a Refusal of the acted-on instruction (CND-06; an enforcement-point Refusal is c06-refusal-en's focus)
+    values: ["none", "sr_refusal"]
   - name: memory   # clean guard write and trust_min trusted read the decision used (ROB-02 minimum evidence)
     values: ["none", "clean"]
   - name: write   # the write of the record the decision used (ROB-02)
@@ -5681,6 +5681,101 @@ cells:
     dims: {}
     cannot_occur: "ORG-01 is the org-template's stand-in control: the template is not a selectable shipped catalog (spec/catalogs/org-template) and its own README says to replace it; it is listed so the 25-entry census is complete"
     spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met)"
+  - id: c04-strip-IS-user
+    controls: ["CND-04"]
+    dims: {instruction_class: "independent_system", source_class: "user", principal: "present", acted_on: "both", delegation: "ep_verified"}
+    fixture: "instruction_chain"
+    expected: "insufficient_evidence"
+    spec_ref: "SPEC §7.7.5 (evidence classes: high-severity controls require EP PolicyDecision corroboration, principal and decision; ingress attestation lifts CND-04/05 from partial single_source to conformant; relabelling is CND.instruction_relabelled)"
+    note: "an independent_system instruction (above the enforcement_point minimum); ruled 2026-10-12: 5, reading B"
+  - id: fx-CND-01-IS-pass
+    controls: ["CND-01"]
+    dims: {focus_class: "independent_system", shape_verdict: "pass"}
+    fixture: "focus_case"
+    fixture_args: {scenario: "effect_scope", catalogs: ["baseline@2026.09", "conduct@2026.09"]}
+    expected: "insufficient_evidence"
+    spec_ref: "SPEC §7.7.4 CND-01 (every ToolCall/ResourceAccess within the task's declared effect scope); §7.7.3 effect row (min enforcement_point); SPEC §6.4 (controls declare min_source_class; source_class_satisfied per assertion)"
+    note: "the call recorded by an independent system: the catalog's minimum_evidence names an enforcement_point ToolCall, which this record is not (fail closed); a failing shape still reads non_conformant"
+  - id: fx-CND-07-IS-pass
+    controls: ["CND-07"]
+    dims: {focus_class: "independent_system", shape_verdict: "pass"}
+    fixture: "focus_case"
+    fixture_args: {scenario: "budget", catalogs: ["baseline@2026.09", "conduct@2026.09"]}
+    expected: "insufficient_evidence"
+    spec_ref: "SPEC §7.7.4 CND-07 (consumption within declared budgets); §7.7.3 budget row (independent_system provider usage export); SPEC §6.4 (controls declare min_source_class; source_class_satisfied per assertion)"
+    note: "the spend call recorded by an independent system: the catalog's minimum_evidence names an enforcement_point ToolCall, which this record is not (fail closed); a failing shape reads non_conformant"
+  - id: fx-CND-01-IS-fail
+    controls: ["CND-01"]
+    dims: {focus_class: "independent_system", shape_verdict: "fail"}
+    fixture: "focus_case"
+    fixture_args: {scenario: "effect_scope", catalogs: ["baseline@2026.09", "conduct@2026.09"]}
+    expected: "non_conformant"
+    spec_ref: "SPEC §7.7.4 CND-01 (every ToolCall/ResourceAccess within the task's declared effect scope); §7.7.3 effect row (min enforcement_point); SPEC §6.4 (controls declare min_source_class; source_class_satisfied per assertion)"
+    note: "the call recorded by an independent system: the catalog's minimum_evidence names an enforcement_point ToolCall, which this record is not (fail closed); a failing shape still reads non_conformant"
+  - id: fx-CND-07-IS-fail
+    controls: ["CND-07"]
+    dims: {focus_class: "independent_system", shape_verdict: "fail"}
+    fixture: "focus_case"
+    fixture_args: {scenario: "budget", catalogs: ["baseline@2026.09", "conduct@2026.09"]}
+    expected: "non_conformant"
+    spec_ref: "SPEC §7.7.4 CND-07 (consumption within declared budgets); §7.7.3 budget row (independent_system provider usage export); SPEC §6.4 (controls declare min_source_class; source_class_satisfied per assertion)"
+    note: "the spend call recorded by an independent system: the catalog's minimum_evidence names an enforcement_point ToolCall, which this record is not (fail closed); a failing shape reads non_conformant"
+  - id: fx-CND-03-EP
+    controls: ["CND-03"]
+    dims: {focus_class: "enforcement_point", shape_verdict: "pass"}
+    fixture: "focus_case"
+    fixture_args: {scenario: "harm_signal", catalogs: ["baseline@2026.09", "conduct@2026.09"]}
+    expected: ["not_assessed", "insufficient_evidence"]
+    spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met); SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met)"
+    note: "no checklist or statistical evaluator: not_assessed"
+  - id: fx-CND-08-EP
+    controls: ["CND-08"]
+    dims: {focus_class: "enforcement_point", shape_verdict: "pass"}
+    fixture: "focus_case"
+    fixture_args: {scenario: "parity", catalogs: ["baseline@2026.09", "conduct@2026.09"]}
+    expected: ["not_assessed", "insufficient_evidence"]
+    spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met); SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met)"
+    note: "no checklist or statistical evaluator: not_assessed"
+  - id: fx-EMP-01-EP
+    controls: ["EMP-01"]
+    dims: {focus_class: "enforcement_point", shape_verdict: "pass"}
+    fixture: "focus_case"
+    fixture_args: {scenario: "manual_decision", catalogs: ["baseline@2026.09", "employment@2026.09"]}
+    expected: ["not_assessed", "insufficient_evidence"]
+    spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met); SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met)"
+    note: "no checklist or statistical evaluator: not_assessed"
+  - id: fx-FIN-01-EP
+    controls: ["FIN-01"]
+    dims: {focus_class: "enforcement_point", shape_verdict: "pass"}
+    fixture: "focus_case"
+    fixture_args: {scenario: "manual_decision", catalogs: ["baseline@2026.09", "finance@2026.09"]}
+    expected: ["not_assessed", "insufficient_evidence"]
+    spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met); SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met)"
+    note: "no checklist or statistical evaluator: not_assessed"
+  - id: fx-INS-01-EP
+    controls: ["INS-01"]
+    dims: {focus_class: "enforcement_point", shape_verdict: "pass"}
+    fixture: "focus_case"
+    fixture_args: {scenario: "manual_decision", catalogs: ["baseline@2026.09", "insurance@2026.09"]}
+    expected: ["not_assessed", "insufficient_evidence"]
+    spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met); SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met)"
+    note: "no checklist or statistical evaluator: not_assessed"
+  - id: fx-INC-02-IS-integ-weak_chained-sor
+    controls: ["INC-02"]
+    dims: {focus_class: "independent_system", integrity: "weak_chained", integrity_stream: "sor"}
+    fixture: "focus_case"
+    fixture_args: {scenario: "incident", catalogs: ["eu-ai-act@2026.09"]}
+    expected: "conformant"
+    spec_ref: "SPEC §6.6 (EP streams must be source_signed or export_anchored to verify; export_chained EP stream is verified_weak and every rung-2 outcome depending on it is capped at partial, weak_integrity); SPEC §8.1 integrity verify (failed, gap, reordered downgrade every dependent assertion to insufficient_evidence; verified_weak caps at partial)"
+    note: "the Incident's stream named by role (sor) and as the focus stream: independent_system streams MAY be export_chained (§6.6)"
+  - id: fx-INC-02-IS-integ-weak_chained-focus
+    controls: ["INC-02"]
+    dims: {focus_class: "independent_system", integrity: "weak_chained", integrity_stream: "focus"}
+    fixture: "focus_case"
+    fixture_args: {scenario: "incident", catalogs: ["eu-ai-act@2026.09"]}
+    expected: "conformant"
+    spec_ref: "SPEC §6.6 (EP streams must be source_signed or export_anchored to verify; export_chained EP stream is verified_weak and every rung-2 outcome depending on it is capped at partial, weak_integrity); SPEC §8.1 integrity verify (failed, gap, reordered downgrade every dependent assertion to insufficient_evidence; verified_weak caps at partial)"
+    note: "the Incident's stream named by role (sor) and as the focus stream: independent_system streams MAY be export_chained (§6.6)"
   - id: anchor-cnd05-direct-user
     controls: ["CND-05"]
     dims: {instruction_class: "enforcement_point", source_class: "user"}

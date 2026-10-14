@@ -1,4 +1,9 @@
 {
+  "anchor-cnd05-direct-user": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
   "anchor-rob02-clean-memory": {
     "owner": "18.132",
     "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",

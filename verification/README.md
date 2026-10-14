@@ -37,6 +37,11 @@ Each gate is an entry in [`gates.json`](gates.json) with:
 - a **claim** in the public claims register, or an **invariant** stated in `AGENTS.md`, that it backs;
 - at least one **seeded fault**: a small, exact edit that must turn the gate RED.
 
+`--quick` and `--full` tell each gate which tier it runs in through `AGENTCE_VERIFY_TIER` (`quick` or `full`).
+A gate with a quick subset reads it: `VG-TRUST-MATRIX` runs the 67 cells of its matrix's quick list in a quick run
+and all 782 in a full one. `--gate` passes your environment through unchanged, so
+`AGENTCE_VERIFY_TIER=full ./verification/run --gate VG-TRUST-MATRIX` runs the whole matrix for that gate alone.
+
 `./verification/run --demo-fault <ID>` applies each seeded fault, shows the gate RED, restores the file byte for
 byte, and shows it GREEN. If a demo is interrupted, `git checkout -- <file>` restores the file it names.
 

@@ -3,6 +3,27 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.104.0
+
+- `VG-TRUST-MATRIX` (18.176, added). The trust-model case matrix now runs as a build gate. It has 782 cells, covering
+  where an instruction came from and who recorded it, its lineage and principal, the gateway twin or PolicyDecision
+  that backs it and when each was recorded against the call, memory writes and reads, refusals, and the focus class of
+  every catalog control whose `min_source_class` is above `self_report`. Each cell names the SPEC section its expected
+  outcome comes from, and `fixtures/trust_matrix/build.py` builds its bundle from the cell's dimension values. The
+  quick tier runs 67 cells; `AGENTCE_VERIFY_TIER=full` (which `--full` now hands every gate) runs all of them. Each cell
+  runs through the real Python, TypeScript and Java CLIs. The gate fails when a cell reads a pass the SPEC rules out,
+  when the engines disagree, or when a cell fails closed where it should pass, unless `fixtures/trust_matrix/open.json`
+  lists the cell with its status and the item that closes it. That list can only shrink. A listed cell that reads
+  AGREE fails the gate until it is removed. Coverage checks run before any cell and fail on a matrix whose digest is
+  not the pinned one, a declared value no cell uses, a catalog control above `self_report` with no cell for one focus
+  class, or an open entry with no owner or outside the pinned set. Three seeded faults, one per engine, let any
+  record attest an instruction again, which turns the CND-05 cells red.
+- `VG-SOURCE-CLASS` (18.176, changed). A gateway twin with no principal no longer backs an instruction that needs one.
+  A twin or PolicyDecision recorded after the call it would back no longer backs it either. Both now read
+  `insufficient_evidence`.
+- `./verification/run --quick` and `--full` now set `AGENTCE_VERIFY_TIER` to `quick` or `full` for each gate they
+  run; `--gate` and `--demo-fault` leave the caller's environment as it is.
+
 ## 0.103.0
 
 - `VG-SOURCE-CLASS` (18.127, added). A control declares the least source class its verdict may rest on

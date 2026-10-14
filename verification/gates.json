@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.103.0",
+  "suite_version": "0.104.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -3485,6 +3485,49 @@
         }
       ],
       "fix_hint": "Run verification/gates/source_class.sh; it names the engine, the case, the outcome and failing events it gave and the ones expected. The rule is below_minimum and judged_class in each engine's source-class module (source_class.py, sourceClass.ts, SourceClass.java), applied after the shape verdict in assess; attestation of an instruction is SourceClassJudge.attested. A refused catalog points at the min_source_class check of each engine's catalog loader."
+    },
+    {
+      "id": "VG-TRUST-MATRIX",
+      "title": "The trust-model case matrix holds in all three engines: every cell (an instruction's class, lineage, principal, corroboration, ingress twin and the order its witnesses are recorded in; memory writes and reads; refusals; and the focus class of every catalog control above self_report) gives an outcome its SPEC section allows from the real Python, TypeScript and Java CLIs, or is listed in the shrink-only open list with the item that closes it; the quick tier runs the quick list, the full tier every cell (18.176)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/trust_matrix.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "the coverage checks hold (the matrix's SHA-256 is the pinned one; every declared dimension value is used by a runnable cell; every catalog control whose min_source_class is above self_report has a cell for each of enforcement_point, independent_system and self_report; at most one ruling_needed cell; every open.json entry names its owning item and is in OPEN_PINNED; the quick list holds REQUIRED_QUICK), and every cell the tier runs reads AGREE in all three engines or reads the status open.json lists for it",
+        "fail": "a coverage check fails, a cell open.json does not list reads GAP, DIFF, MISMATCH or ERROR, a listed cell reads AGREE (remove it from open.json and OPEN_PINNED) or a status other than the listed one"
+      },
+      "faults": [
+        {
+          "description": "Python counts an acted-on instruction as attested whatever records it, the reading before 18.127, so a self_report user instruction behind an enforcement-point call reads CND-05 conformant",
+          "file": "engines/python/agentce/source_class.py",
+          "search": "            return (ep if self.attested(focus, node) else 0), \"Instruction\"\n",
+          "replace": "            return ep, \"Instruction\"\n"
+        },
+        {
+          "description": "TypeScript counts an acted-on instruction as attested whatever records it, the reading before 18.127, so a self_report user instruction behind an enforcement-point call reads CND-05 conformant",
+          "file": "engines/typescript/src/sourceClass.ts",
+          "search": "      return [this.attested(focus, node) ? ep : 0, \"Instruction\"];\n",
+          "replace": "      return [ep, \"Instruction\"];\n"
+        },
+        {
+          "description": "Java counts an acted-on instruction as attested whatever records it, the reading before 18.127, so a self_report user instruction behind an enforcement-point call reads CND-05 conformant",
+          "file": "engines/java/src/main/java/org/agentce/SourceClass.java",
+          "search": "                return Map.entry(attested(focus, node) ? RANK.get(ENFORCEMENT_POINT) : 0, \"Instruction\");\n",
+          "replace": "                return Map.entry(RANK.get(ENFORCEMENT_POINT), \"Instruction\");\n"
+        }
+      ],
+      "fix_hint": "Run verification/gates/trust_matrix.sh (AGENTCE_VERIFY_TIER=full for every cell, AGENTCE_TRUST_MATRIX_ONLY=<ids> for some, AGENTCE_TRUST_MATRIX_OUT=<dir> to keep results.tsv and results.md); each FAIL line names its key, the cell, the control, the expected words and each engine's reading. A CND-04 or CND-05 cell points at judged_class and attested in each engine's source-class module (source_class.py, sourceClass.ts, SourceClass.java). The matrix is generated: change a cell in its generator, then re-pin DIGEST in trust_matrix.py; a closed cell leaves open.json and OPEN_PINNED in the same commit."
     },
     {
       "id": "VG-EUAIACT-CLUSTER1",
