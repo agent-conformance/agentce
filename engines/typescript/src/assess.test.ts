@@ -22,8 +22,10 @@ import { DomainBinding } from "./domain";
 import { InputError } from "./errors";
 import { ingest } from "./ingest";
 import { profileFromDict } from "./profile";
+import { parseShapesTtl } from "./psp";
 import { loadDeviationRegister } from "./readiness";
 import { GraphStore } from "./store";
+import { propertyReads } from "./structural";
 
 const REPO = join(__dirname, "..", "..", "..");
 const BASE = join(REPO, "spec", "catalogs", "base", "eu-ai-act");
@@ -309,53 +311,67 @@ test("not waivable: judged per assertion across subjects", () => {
   );
 });
 
-test("not waivable: paths match by predicate token", () => {
+test("not waivable: reads match by predicate", () => {
   const store = new GraphStore();
   store.humanActorFailed.add("d1");
-  for (const path of [
-    "agentce:approvedBy",
-    "(agentce:decidedBy ^agentce:reviewedBy)",
-    "(agentce:x | agentce:interventionByHuman)",
+  for (const reads of [
+    ["agentce:approvedBy"],
+    ["agentce:decidedBy", "^agentce:reviewedBy"],
+    ["agentce:x", "agentce:interventionByHuman"],
   ]) {
-    assert.equal(reachesHumanActorFailure(store, "d1", path), true);
+    assert.equal(reachesHumanActorFailure(store, "d1", reads), true);
   }
-  assert.equal(reachesHumanActorFailure(store, "d1", "agentce:approvedByProxy"), false);
-  assert.equal(reachesHumanActorFailure(store, "d1", "agentce:authorizedBy"), false);
-  assert.equal(reachesHumanActorFailure(store, "d2", "agentce:approvedBy"), false);
+  assert.equal(reachesHumanActorFailure(store, "d1", ["agentce:approvedByProxy"]), false);
+  assert.equal(reachesHumanActorFailure(store, "d1", ["agentce:authorizedBy"]), false);
+  assert.equal(reachesHumanActorFailure(store, "d2", ["agentce:approvedBy"]), false);
 });
 
-test("not waivable: the path reaches the failing decision from another focus", () => {
+test("not waivable: the shape reaches the failing decision from another focus", () => {
   const store = new GraphStore();
   store.humanActorFailed.add("d1");
   store.addEdge("tc1", "agentce:executes", "d1");
   store.addEdge("tc2", "agentce:executes", "d2");
   store.addEdge("a1", "agentce:approves", "d1");
+  const reaches = (focus: string, reads: string[]): boolean =>
+    reachesHumanActorFailure(store, focus, reads);
+  assert.equal(reaches("tc1", ["agentce:executes", "agentce:approvedBy"]), true);
+  assert.equal(reaches("tc1", ["agentce:executes", "agentce:reviewedBy"]), true);
   assert.equal(
-    reachesHumanActorFailure(store, "tc1", "(agentce:executes agentce:approvedBy)"),
+    reaches("a1", ["agentce:approves", "^agentce:executes", "agentce:approvedBy"]),
     true,
   );
-  assert.equal(
-    reachesHumanActorFailure(store, "tc1", "(agentce:executes agentce:reviewedBy)"),
-    true,
-  );
-  assert.equal(
-    reachesHumanActorFailure(
-      store,
-      "a1",
-      "(agentce:approves ^agentce:executes agentce:approvedBy)",
-    ),
-    true,
-  );
-  assert.equal(
-    reachesHumanActorFailure(store, "tc1", "(^agentce:x | agentce:executes) agentce:approvedBy"),
-    true,
-  );
-  assert.equal(
-    reachesHumanActorFailure(store, "tc2", "(agentce:executes agentce:approvedBy)"),
-    false,
-  );
-  assert.equal(
-    reachesHumanActorFailure(store, "tc1", "(agentce:executes agentce:authorizedBy)"),
-    false,
+  assert.equal(reaches("tc2", ["agentce:executes", "agentce:approvedBy"]), false);
+  assert.equal(reaches("tc1", ["agentce:executes", "agentce:authorizedBy"]), false);
+});
+
+test("not waivable: property reads include nested shapes", () => {
+  const shapes = parseShapesTtl(`@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
+agentce:S a sh:NodeShape ; sh:targetClass agentce:ToolCall ;
+  sh:property [ sh:path agentce:executes ; sh:node agentce:N ] ;
+  sh:property [ sh:path ( agentce:executes [ sh:inversePath agentce:about ] ) ; sh:equals agentce:x ] ;
+  sh:property [ sh:path agentce:calls ; sh:qualifiedValueShape agentce:Q ; sh:qualifiedMinCount 1 ] .
+agentce:N a sh:NodeShape ; sh:property [ sh:path agentce:approvedBy ; sh:node agentce:S ] .
+agentce:Q a sh:NodeShape ; sh:property [ sh:path agentce:reviewedBy ; sh:minCount 1 ] .
+`);
+  const shape = [...shapes.values()].find((s) => s.iri.endsWith("#S"));
+  assert.ok(shape !== undefined);
+  assert.deepEqual(
+    propertyReads(shape, shapes),
+    new Map([
+      [
+        "agentce:executes",
+        [
+          "agentce:executes",
+          "agentce:approvedBy",
+          "^agentce:about",
+          "agentce:x",
+          "agentce:calls",
+          "agentce:reviewedBy",
+        ],
+      ],
+      ["(agentce:executes ^agentce:about)", ["agentce:executes", "^agentce:about", "agentce:x"]],
+      ["agentce:calls", ["agentce:calls", "agentce:reviewedBy"]],
+    ]),
   );
 });

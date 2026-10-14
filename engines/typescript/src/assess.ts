@@ -21,7 +21,13 @@ import type { Profile, Subject } from "./profile";
 import { compareDate, parseDate } from "./readiness";
 import { BELOW_MINIMUM_OUTCOME, SourceClassJudge, belowMinimum } from "./sourceClass";
 import type { GraphStore } from "./store";
-import { evaluateShape, violationToJson, withinTolerance } from "./structural";
+import {
+  type Violation,
+  evaluateShape,
+  propertyReads,
+  violationToJson,
+  withinTolerance,
+} from "./structural";
 import { byteCompare, pyStr } from "./util";
 
 type Event = Record<string, unknown>;
@@ -252,21 +258,36 @@ function assertControl(
     classGap: kinds,
     humanActorFailed:
       outcome === "non-conformant" &&
-      violations.some((v) => reachesHumanActorFailure(store, v.focus, v.path)),
+      restsOnHumanActorFailure(store, violations, () => propertyReads(shape, catalog.shapes)),
   });
 }
 
-/** Whether a violation's rendered shape path reads a predicate the SPEC §10.4 human-actor rule decides and, from its
- * focus, reaches a node that fails the rule. The walk follows every other step of the path from the focus, in any order
- * and to the path's length, so it reaches at least what the path itself reaches (fail closed). */
-export function reachesHumanActorFailure(store: GraphStore, focus: string, path: string): boolean {
-  const tokens = path.match(/\^?[^\s()|^]+/g) ?? [];
-  const predicate = (token: string): string => (token.startsWith("^") ? token.slice(1) : token);
-  if (!tokens.some((token) => HUMAN_ACTOR_PATHS.has(predicate(token)))) return false;
-  const steps = tokens.filter((token) => !HUMAN_ACTOR_PATHS.has(predicate(token)));
+/** Whether a violation's constraint reads a predicate the SPEC §10.4 human-actor rule decides and, from its focus,
+ * reaches a node that fails the rule (`reads` gives each path's predicates, nested shapes included). */
+function restsOnHumanActorFailure(
+  store: GraphStore,
+  violations: Violation[],
+  reads: () => Map<string, string[]>,
+): boolean {
+  if (store.humanActorFailed.size === 0) return false;
+  const byPath = reads();
+  return violations.some((v) => reachesHumanActorFailure(store, v.focus, byPath.get(v.path) ?? []));
+}
+
+/** Whether `reads` names a predicate the human-actor rule decides and, walking its other predicates from `focus` (`^`
+ * for an inverse) in any order up to their number, the walk reaches a node failing the rule. It reaches at least what
+ * the shape itself reaches, so it fails closed. */
+export function reachesHumanActorFailure(
+  store: GraphStore,
+  focus: string,
+  reads: readonly string[],
+): boolean {
+  const predicate = (step: string): string => (step.startsWith("^") ? step.slice(1) : step);
+  if (!reads.some((step) => HUMAN_ACTOR_PATHS.has(predicate(step)))) return false;
+  const steps = reads.filter((step) => !HUMAN_ACTOR_PATHS.has(predicate(step)));
   const reach = new Set([focus]);
   let frontier = [focus];
-  for (let i = 0; i < tokens.length; i++) {
+  for (let i = 0; i < steps.length && frontier.length > 0; i++) {
     const next: string[] = [];
     for (const start of frontier) {
       for (const step of steps) {

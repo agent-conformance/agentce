@@ -35,6 +35,46 @@ export function violationToJson(violation: Violation): Record<string, string> {
   };
 }
 
+/** The predicates a path reads, in order, an inverse step written `^<predicate>`. */
+export function pathSteps(path: PathExpr): string[] {
+  if (path.kind === "predicate") {
+    return [path.iri];
+  }
+  if (path.kind === "inverse") {
+    return pathSteps(path.path).map((s) => (s.startsWith("^") ? s.slice(1) : `^${s}`));
+  }
+  return (path.kind === "sequence" ? path.steps : path.options).flatMap(pathSteps);
+}
+
+/** Per rendered path of `shape`'s property shapes (a violation's `path`), every predicate its constraints read, once
+ * each in first-read order: the path's own steps, a predicate it is compared with, and those of a nested `sh:node` or
+ * qualified shape (each nested shape once along a chain, so a cycle ends). */
+export function propertyReads(shape: Shape, shapes: Map<string, Shape>): Map<string, string[]> {
+  const reads = (prop: PropertyShape, seen: ReadonlySet<string>): string[] => {
+    const out = pathSteps(prop.path);
+    for (const other of [prop.equals, prop.disjoint, prop.lessThan, prop.lessThanOrEquals]) {
+      if (other !== null) out.push(other);
+    }
+    for (const ref of [prop.node, prop.qualifiedValueShape]) {
+      const nested = ref === null ? undefined : (shapes.get(ref) ?? shapeByCurie(shapes, ref));
+      if (nested !== undefined && !seen.has(nested.iri)) {
+        for (const inner of nested.properties) {
+          out.push(...reads(inner, new Set([...seen, nested.iri])));
+        }
+      }
+    }
+    return out;
+  };
+  const byPath = new Map<string, Set<string>>();
+  for (const prop of shape.properties) {
+    const path = renderPath(prop.path);
+    const steps = byPath.get(path) ?? new Set<string>();
+    for (const step of reads(prop, new Set())) steps.add(step);
+    byPath.set(path, steps);
+  }
+  return new Map([...byPath].map(([path, steps]) => [path, [...steps]]));
+}
+
 export function renderPath(path: PathExpr): string {
   if (path.kind === "predicate") {
     return path.iri;
