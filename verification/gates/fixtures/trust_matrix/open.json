@@ -1,0 +1,502 @@
+{
+  "anchor-rob02-clean-memory": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c04-acted-Decision_only-en-missing": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-acted-Decision_only-en-tool_output": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-acted-Decision_only-en-user": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-acted-Decision_only-se-missing": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-acted-Decision_only-se-tool_output": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-acted-Decision_only-se-user": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-acted-consequential_ToolCall-en-missing": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-acted-consequential_ToolCall-en-tool_output": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-acted-consequential_ToolCall-en-user": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-deleg-en-ep_unverified-none": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-deleg-en-none-none": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-deleg-se-ep_unverified-ep_pd_principal": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-deleg-se-none-ep_pd_principal": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-integ-failed-gateway": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c04-integ-failed-ingress": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c04-integ-missing-gateway": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c04-integ-missing-ingress": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c04-integ-weak_chained-gateway": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c04-integ-weak_chained-ingress": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c04-lineage-held-not_held": {
+    "owner": "18.122",
+    "reason": "MISMATCH at 78bdb0da; closed by 18.122's matrix check",
+    "status": "MISMATCH"
+  },
+  "c04-noprincipal-en-agent_identified": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-noprincipal-en-operator": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-noprincipal-en-service": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-noprincipal-en-user": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-strip-en-agent_unidentified": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-strip-en-memory_trusted": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-strip-en-memory_untrusted": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-strip-en-missing": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-strip-en-retrieved": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c04-strip-en-tool_output": {
+    "owner": "18.122",
+    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
+    "status": "GAP"
+  },
+  "c05-integ-failed-gateway-user": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c05-integ-failed-ingress-user": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c05-integ-failed-policy-SR-user-corr": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c05-integ-gap-gateway-user": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c05-integ-gap-ingress-user": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c05-integ-missing-gateway-user": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c05-integ-missing-ingress-user": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c05-integ-unsigned-gateway-user": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c05-integ-unsigned-ingress-user": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c05-integ-verified_signed-gateway-user": {
+    "owner": "18.155",
+    "reason": "GAP at 78bdb0da; closed by 18.155's matrix check",
+    "status": "GAP"
+  },
+  "c05-integ-verified_signed-ingress-user": {
+    "owner": "18.155",
+    "reason": "GAP at 78bdb0da; closed by 18.155's matrix check",
+    "status": "GAP"
+  },
+  "c05-integ-weak_chained-gateway-user": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c05-integ-weak_chained-ingress-user": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c05-integ-weak_chained-policy-SR-user-corr": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c05-integ-weak_unanchored-gateway-user": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c05-integ-weak_unanchored-ingress-user": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "c06-acted-EP-missing": {
+    "owner": "18.173",
+    "reason": "GAP at 78bdb0da; closed by 18.173's matrix check",
+    "status": "GAP"
+  },
+  "c06-acted-EP-user": {
+    "owner": "18.173",
+    "reason": "GAP at 78bdb0da; closed by 18.173's matrix check",
+    "status": "GAP"
+  },
+  "c06-ep-deny-no-refusal": {
+    "owner": "18.173",
+    "reason": "GAP at 78bdb0da; closed by 18.173's matrix check",
+    "status": "GAP"
+  },
+  "c06-ep-deny-sr-refusal": {
+    "owner": "18.173",
+    "reason": "MISMATCH at 78bdb0da; closed by 18.173's matrix check",
+    "status": "MISMATCH"
+  },
+  "fx-CND-01-EP-integ-weak": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-CND-01-en-fail-uea": {
+    "owner": "18.174",
+    "reason": "GAP at 78bdb0da; closed by 18.174's matrix check",
+    "status": "GAP"
+  },
+  "fx-CND-01-en-fail-uep": {
+    "owner": "18.174",
+    "reason": "GAP at 78bdb0da; closed by 18.174's matrix check",
+    "status": "GAP"
+  },
+  "fx-CND-02-in-loginin-pass": {
+    "owner": "18.187",
+    "reason": "GAP at 78bdb0da; closed by 18.187 (CND-02 implements \u00a77.7.4; approvals cell c02-consequential-irreversible-none-appr)",
+    "status": "GAP"
+  },
+  "fx-DOC-03-en-pass-uea": {
+    "owner": "18.37e",
+    "reason": "GAP at 78bdb0da; closed by 18.37e's matrix check",
+    "status": "GAP"
+  },
+  "fx-DOC-03-en-pass-uep": {
+    "owner": "18.37e",
+    "reason": "GAP at 78bdb0da; closed by 18.37e's matrix check",
+    "status": "GAP"
+  },
+  "fx-INC-02-IS-integ-failed": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-INC-02-IS-integ-missing": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-INT-01-EP-integ-failed": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-INT-01-EP-integ-gap": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-INT-01-EP-integ-missing": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-INT-01-EP-integ-unsigned": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-INT-01-EP-integ-weak_chained": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-INT-01-en-coverage-unknown": {
+    "owner": "18.134",
+    "reason": "GAP at 78bdb0da; closed by 18.134's matrix check",
+    "status": "GAP"
+  },
+  "fx-INT-04-EP-integ-failed": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-INT-04-EP-integ-gap": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-INT-04-EP-integ-missing": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-INT-04-EP-integ-unsigned": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-INT-04-EP-integ-weak_chained": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-INT-04-en-coverage-unknown": {
+    "owner": "18.134",
+    "reason": "GAP at 78bdb0da; closed by 18.134's matrix check",
+    "status": "GAP"
+  },
+  "fx-OVS-03-EP-integ-failed": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-OVS-03-EP-integ-weak_chained": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-OVS-06-EP-integ-failed": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-OVS-06-EP-integ-gap": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-OVS-06-EP-integ-missing": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-OVS-06-EP-integ-unsigned": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-OVS-06-EP-integ-weak_chained": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-ROB-01-EP-integ-failed": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-ROB-01-EP-integ-gap": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-ROB-01-EP-integ-missing": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-ROB-01-EP-integ-unsigned": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-ROB-01-EP-integ-weak_chained": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "fx-ROB-05-en-pass-uea": {
+    "owner": "18.37e",
+    "reason": "GAP at 78bdb0da; closed by 18.37e's matrix check",
+    "status": "GAP"
+  },
+  "fx-ROB-05-en-pass-uep": {
+    "owner": "18.37e",
+    "reason": "GAP at 78bdb0da; closed by 18.37e's matrix check",
+    "status": "GAP"
+  },
+  "fx-ROB-06-en-pass-uea": {
+    "owner": "18.37e",
+    "reason": "GAP at 78bdb0da; closed by 18.37e's matrix check",
+    "status": "GAP"
+  },
+  "fx-ROB-06-en-pass-uep": {
+    "owner": "18.37e",
+    "reason": "GAP at 78bdb0da; closed by 18.37e's matrix check",
+    "status": "GAP"
+  },
+  "r02-grid-none-ep_untrusted": {
+    "owner": "18.172",
+    "reason": "GAP at 78bdb0da; closed by 18.172's matrix check",
+    "status": "GAP"
+  },
+  "r02-grid-sr_trusted-ep_untrusted": {
+    "owner": "18.172",
+    "reason": "GAP at 78bdb0da; closed by 18.172's matrix check",
+    "status": "GAP"
+  },
+  "r02-grid-unmarked_trusted_origin-ep_untrusted": {
+    "owner": "18.172",
+    "reason": "GAP at 78bdb0da; closed by 18.172's matrix check",
+    "status": "GAP"
+  },
+  "r02-integ-failed-ep_trusted": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "r02-integ-gap-ep_trusted": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "r02-integ-missing-ep_trusted": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "r02-integ-unsigned-ep_trusted": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "r02-integ-verified_signed-ep_trusted": {
+    "owner": "18.155",
+    "reason": "GAP at 78bdb0da; closed by 18.155's matrix check",
+    "status": "GAP"
+  },
+  "r02-integ-weak_chained-ep_trusted": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "r02-integ-weak_unanchored-ep_trusted": {
+    "owner": "18.132",
+    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
+    "status": "GAP"
+  },
+  "r02-other-subject-ep_quarantined-ep_trusted": {
+    "owner": "18.120",
+    "reason": "GAP at 78bdb0da; closed by 18.120's matrix check",
+    "status": "GAP"
+  },
+  "r02-other-subject-ep_untrusted-ep_trusted": {
+    "owner": "18.120",
+    "reason": "GAP at 78bdb0da; closed by 18.120's matrix check",
+    "status": "GAP"
+  },
+  "r02-other-subject-sr_untrusted-ep_trusted": {
+    "owner": "18.120",
+    "reason": "GAP at 78bdb0da; closed by 18.120's matrix check",
+    "status": "GAP"
+  }
+}

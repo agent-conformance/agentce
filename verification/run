@@ -32,6 +32,8 @@ from typing import Any
 HERE = Path(__file__).resolve().parent
 DEFAULT_ROOT = HERE.parent
 TIERS = ("quick", "full")
+#: The environment variable a --quick or --full run hands each gate (--gate and --demo-fault pass the caller's).
+TIER_ENV = "AGENTCE_VERIFY_TIER"
 GATE_ID = re.compile(r"^VG-[A-Z0-9]+(-[A-Z0-9]+)*(@[0-9A-Za-z.]+)?$")
 CHANGELOG_VERSION = re.compile(r"^## ([0-9]+\.[0-9]+\.[0-9]+)", re.MULTILINE)
 TAIL_LINES = 20
@@ -496,8 +498,10 @@ def main(argv: list[str]) -> int:
         )
         return 2
     tier = "full" if args.full else "quick"
+    # Each gate learns the tier it runs in, so a gate with a quick subset (VG-TRUST-MATRIX) runs all of it in --full.
+    tier_env = {**os.environ, TIER_ENV: tier}
     results = [
-        run_gate(gate, root)
+        run_gate(gate, root, tier_env)
         for gate in gates.values()
         if args.full or gate["tier"] == "quick"
     ]
