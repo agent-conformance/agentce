@@ -259,6 +259,7 @@ test("(iv) a self_report instruction is not attested on its own", () => {
 
 function twin(over: Record<string, unknown> = {}): Event {
   const t = instruction({ eid: "i1-ingress", cls: EP });
+  t.time = "2026-01-02T00:00:00Z"; // at ingress, before the call
   const data = dataOf(t);
   for (const [key, value] of Object.entries(over)) {
     if (key === "task" || key === "parent" || key === "origin") {

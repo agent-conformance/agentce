@@ -251,6 +251,7 @@ def test_iv_a_self_report_instruction_is_not_attested_on_its_own() -> None:
 
 def _twin(**over: Any) -> dict[str, Any]:
     twin = _instruction("i1-ingress", cls=EP)
+    twin["time"] = "2026-01-02T00:00:00Z"  # at ingress, before the call
     for key, value in over.items():
         if key in ("task", "parent", "origin"):
             twin["data"]["refs"][key] = value
@@ -258,6 +259,8 @@ def _twin(**over: Any) -> dict[str, Any]:
             twin["subject"] = value
         elif key == "cls":
             twin["agentcesourceclass"] = value
+        elif key == "time":
+            twin["time"] = value
         else:
             twin["data"][key] = value
     return twin
@@ -566,3 +569,31 @@ def test_rob02_a_decision_that_used_nothing_recorded_reads_insufficient_evidence
     assert _rob02([*_memory(), used]).outcome == "conformant"
     nothing = _event("d1", "Decision", SR, decision_type="dom:CreditDecision")
     assert _rob02([*_memory(), nothing]).outcome == "insufficient_evidence"
+
+
+def test_iv_a_witness_recorded_after_the_call_attests_nothing() -> None:
+    # Ingress records the instruction at entry (SPEC §7.7.5): a twin or allow after the call cannot have gated it.
+    late = "2026-01-02T00:00:04Z"
+    assert not _attested([_instruction(cls=SR), _twin(time=late), _call()])
+    policy = _policy()
+    policy["time"] = late
+    assert not _attested([_instruction(cls=SR), _call(), policy])
+    # The same instant witnesses, whatever offset it is written with.
+    assert _attested(
+        [_instruction(cls=SR), _twin(time="2026-01-02T05:00:03+05:00"), _call()]
+    )
+
+
+def test_iv_a_witness_has_no_clock_on_a_self_report_call_or_a_missing_time() -> None:
+    # A self_report call's time is the agent's own account, so nothing orders a witness before it.
+    assert not _attested([_instruction(cls=SR), _twin(), _call(cls=SR)])
+    assert not _attested([_instruction(cls=SR), _twin(time=None), _call()])
+    assert not _attested([_instruction(cls=SR), _twin(time="soon"), _call()])
+
+
+def test_iv_a_twin_of_a_user_instruction_needs_a_principal_on_both_sides() -> None:
+    blanks: list[Any] = [None, {"id": ""}, {}, "user:alice"]
+    for blank in blanks:
+        assert not _attested(
+            [_instruction(cls=SR, principal=blank), _twin(principal=blank), _call()]
+        )

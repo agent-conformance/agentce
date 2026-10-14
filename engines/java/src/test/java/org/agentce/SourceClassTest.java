@@ -133,7 +133,9 @@ class SourceClassTest {
     }
 
     private static ObjectNode twin() {
-        return instruction("i1-ingress", EP);
+        ObjectNode twin = instruction("i1-ingress", EP);
+        twin.put("time", "2026-01-02T00:00:00Z"); // at ingress, before the call
+        return twin;
     }
 
     private static SourceClass.Judge judge(List<? extends JsonNode> events) {
