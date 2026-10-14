@@ -272,32 +272,52 @@ class AssessTest {
     }
 
     @Test
-    void notWaivablePathsMatchByPredicateToken() {
+    void notWaivableReadsMatchByPredicate() {
         GraphStore store = new GraphStore();
         store.humanActorFailed.add("d1");
-        for (String path : List.of("agentce:approvedBy", "(agentce:decidedBy ^agentce:reviewedBy)",
-                "(agentce:x | agentce:interventionByHuman)")) {
-            assertTrue(Assess.reachesHumanActorFailure(store, "d1", path));
+        for (List<String> reads : List.of(List.of("agentce:approvedBy"),
+                List.of("agentce:decidedBy", "^agentce:reviewedBy"),
+                List.of("agentce:x", "agentce:interventionByHuman"))) {
+            assertTrue(Assess.reachesHumanActorFailure(store, "d1", reads));
         }
-        assertTrue(!Assess.reachesHumanActorFailure(store, "d1", "agentce:approvedByProxy"));
-        assertTrue(!Assess.reachesHumanActorFailure(store, "d1", "agentce:authorizedBy"));
-        assertTrue(!Assess.reachesHumanActorFailure(store, "d2", "agentce:approvedBy"));
+        assertTrue(!Assess.reachesHumanActorFailure(store, "d1", List.of("agentce:approvedByProxy")));
+        assertTrue(!Assess.reachesHumanActorFailure(store, "d1", List.of("agentce:authorizedBy")));
+        assertTrue(!Assess.reachesHumanActorFailure(store, "d2", List.of("agentce:approvedBy")));
     }
 
     @Test
-    void notWaivableWhenThePathReachesTheFailingDecisionFromAnotherFocus() {
+    void notWaivableWhenTheShapeReachesTheFailingDecisionFromAnotherFocus() {
         GraphStore store = new GraphStore();
         store.humanActorFailed.add("d1");
         store.addEdge("tc1", "agentce:executes", "d1");
         store.addEdge("tc2", "agentce:executes", "d2");
         store.addEdge("a1", "agentce:approves", "d1");
-        assertTrue(Assess.reachesHumanActorFailure(store, "tc1", "(agentce:executes agentce:approvedBy)"));
-        assertTrue(Assess.reachesHumanActorFailure(store, "tc1", "(agentce:executes agentce:reviewedBy)"));
+        assertTrue(Assess.reachesHumanActorFailure(store, "tc1", List.of("agentce:executes", "agentce:approvedBy")));
+        assertTrue(Assess.reachesHumanActorFailure(store, "tc1", List.of("agentce:executes", "agentce:reviewedBy")));
         assertTrue(Assess.reachesHumanActorFailure(store, "a1",
-                "(agentce:approves ^agentce:executes agentce:approvedBy)"));
-        assertTrue(Assess.reachesHumanActorFailure(store, "tc1",
-                "(^agentce:x | agentce:executes) agentce:approvedBy"));
-        assertTrue(!Assess.reachesHumanActorFailure(store, "tc2", "(agentce:executes agentce:approvedBy)"));
-        assertTrue(!Assess.reachesHumanActorFailure(store, "tc1", "(agentce:executes agentce:authorizedBy)"));
+                List.of("agentce:approves", "^agentce:executes", "agentce:approvedBy")));
+        assertTrue(!Assess.reachesHumanActorFailure(store, "tc2", List.of("agentce:executes", "agentce:approvedBy")));
+        assertTrue(!Assess.reachesHumanActorFailure(store, "tc1", List.of("agentce:executes", "agentce:authorizedBy")));
+    }
+
+    @Test
+    void notWaivablePropertyReadsIncludeNestedShapes() {
+        Map<String, Psp.Shape> shapes = Psp.parseShapesTtl("""
+                @prefix sh: <http://www.w3.org/ns/shacl#> .
+                @prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
+                agentce:S a sh:NodeShape ; sh:targetClass agentce:ToolCall ;
+                  sh:property [ sh:path agentce:executes ; sh:node agentce:N ] ;
+                  sh:property [ sh:path ( agentce:executes [ sh:inversePath agentce:about ] ) ; sh:equals agentce:x ] ;
+                  sh:property [ sh:path agentce:calls ; sh:qualifiedValueShape agentce:Q ; sh:qualifiedMinCount 1 ] .
+                agentce:N a sh:NodeShape ; sh:property [ sh:path agentce:approvedBy ; sh:node agentce:S ] .
+                agentce:Q a sh:NodeShape ; sh:property [ sh:path agentce:reviewedBy ; sh:minCount 1 ] .
+                """);
+        Psp.Shape shape = shapes.values().stream().filter(s -> s.iri.endsWith("#S")).findFirst().orElseThrow();
+        assertEquals(Map.of(
+                "agentce:executes", List.of("agentce:executes", "agentce:approvedBy", "^agentce:about", "agentce:x",
+                        "agentce:calls", "agentce:reviewedBy"),
+                "(agentce:executes ^agentce:about)", List.of("agentce:executes", "^agentce:about", "agentce:x"),
+                "agentce:calls", List.of("agentce:calls", "agentce:reviewedBy")),
+                Structural.propertyReads(shape, shapes));
     }
 }

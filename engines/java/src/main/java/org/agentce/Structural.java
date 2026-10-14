@@ -59,6 +59,51 @@ public final class Structural {
         return out;
     }
 
+    /** The predicates a path reads, in order, an inverse step written {@code ^<predicate>}. */
+    static List<String> pathSteps(Psp.PathExpr path) {
+        return switch (path.kind) {
+            case PREDICATE -> List.of(path.iri);
+            case INVERSE -> pathSteps(path.path).stream()
+                    .map(s -> s.startsWith("^") ? s.substring(1) : "^" + s)
+                    .toList();
+            case SEQUENCE, ALTERNATIVE -> path.parts.stream().flatMap(p -> pathSteps(p).stream()).toList();
+        };
+    }
+
+    /** Per rendered path of {@code shape}'s property shapes (a violation's {@code path}), every predicate its
+     * constraints read, once each in first-read order: the path's own steps, a predicate it is compared with, and
+     * those of a nested {@code sh:node} or qualified shape (each nested shape once along a chain, so a cycle ends). */
+    static Map<String, List<String>> propertyReads(Psp.Shape shape, Map<String, Psp.Shape> shapes) {
+        Map<String, Set<String>> byPath = new java.util.LinkedHashMap<>();
+        for (Psp.PropertyShape prop : shape.properties) {
+            byPath.computeIfAbsent(renderPath(prop.path), k -> new LinkedHashSet<>())
+                    .addAll(reads(prop, shapes, Set.of()));
+        }
+        Map<String, List<String>> out = new java.util.LinkedHashMap<>();
+        byPath.forEach((path, steps) -> out.put(path, List.copyOf(steps)));
+        return out;
+    }
+
+    private static List<String> reads(Psp.PropertyShape prop, Map<String, Psp.Shape> shapes, Set<String> seen) {
+        List<String> out = new ArrayList<>(pathSteps(prop.path));
+        for (String other : new String[] {prop.equals, prop.disjoint, prop.lessThan, prop.lessThanOrEquals}) {
+            if (other != null) {
+                out.add(other);
+            }
+        }
+        for (String ref : new String[] {prop.node, prop.qualifiedValueShape}) {
+            Psp.Shape nested = ref == null ? null : shapes.getOrDefault(ref, shapeByCurie(shapes, ref));
+            if (nested != null && !seen.contains(nested.iri)) {
+                Set<String> inner = new LinkedHashSet<>(seen);
+                inner.add(nested.iri);
+                for (Psp.PropertyShape p : nested.properties) {
+                    out.addAll(reads(p, shapes, inner));
+                }
+            }
+        }
+        return out;
+    }
+
     public static String renderPath(Psp.PathExpr path) {
         return switch (path.kind) {
             case PREDICATE -> path.iri;

@@ -53,22 +53,32 @@ public final class Assess {
             "agentce:interventionByHuman",
             "agentce:riskReviewed");
 
-    private static final java.util.regex.Pattern PATH_TOKENS = java.util.regex.Pattern.compile("\\^?[^\\s()|^]+");
+    /** Whether a violation's constraint reads a predicate the SPEC §10.4 human-actor rule decides and, from its
+     * focus, reaches a node that fails the rule ({@code reads} gives each path's predicates, nested shapes
+     * included). */
+    private static boolean restsOnHumanActorFailure(
+            GraphStore store, List<Structural.Violation> violations, Supplier<Map<String, List<String>>> reads) {
+        if (store.humanActorFailed.isEmpty()) {
+            return false;
+        }
+        Map<String, List<String>> byPath = reads.get();
+        return violations.stream().anyMatch(
+                v -> reachesHumanActorFailure(store, v.focus, byPath.getOrDefault(v.path, List.of())));
+    }
 
-    /** Whether a violation's rendered shape path reads a predicate the SPEC §10.4 human-actor rule decides and, from
-     * its focus, reaches a node that fails the rule. The walk follows every other step of the path from the focus, in
-     * any order and to the path's length, so it reaches at least what the path itself reaches (fail closed). */
-    static boolean reachesHumanActorFailure(GraphStore store, String focus, String path) {
-        List<String> tokens = PATH_TOKENS.matcher(path).results().map(java.util.regex.MatchResult::group).toList();
-        List<String> steps = tokens.stream()
-                .filter(token -> !HUMAN_ACTOR_PATHS.contains(token.startsWith("^") ? token.substring(1) : token))
+    /** Whether {@code reads} names a predicate the human-actor rule decides and, walking its other predicates from
+     * {@code focus} ({@code ^} for an inverse) in any order up to their number, the walk reaches a node failing the
+     * rule. It reaches at least what the shape itself reaches, so it fails closed. */
+    static boolean reachesHumanActorFailure(GraphStore store, String focus, List<String> reads) {
+        List<String> steps = reads.stream()
+                .filter(step -> !HUMAN_ACTOR_PATHS.contains(step.startsWith("^") ? step.substring(1) : step))
                 .toList();
-        if (steps.size() == tokens.size()) {
+        if (steps.size() == reads.size()) {
             return false;
         }
         Set<String> reach = new LinkedHashSet<>(List.of(focus));
         List<String> frontier = List.of(focus);
-        for (int i = 0; i < tokens.size(); i++) {
+        for (int i = 0; i < steps.size() && !frontier.isEmpty(); i++) {
             List<String> next = new ArrayList<>();
             for (String start : frontier) {
                 for (String step : steps) {
@@ -276,10 +286,9 @@ public final class Assess {
         if (!isBelow) {
             for (Structural.Violation v : result.violations) {
                 assertion.violations.add(Structural.violationToJson(v));
-                if (!assertion.humanActorFailed && "non-conformant".equals(outcome)) {
-                    assertion.humanActorFailed = reachesHumanActorFailure(store, v.focus, v.path);
-                }
             }
+            assertion.humanActorFailed = "non-conformant".equals(outcome) && restsOnHumanActorFailure(
+                    store, result.violations, () -> Structural.propertyReads(shape, catalog.shapes));
             JsonNode strength = control.raw.get("evidence_strength");
             assertion.evidenceStrength = strength != null && strength.isTextual() ? strength.textValue() : null;
         }
