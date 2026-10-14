@@ -195,11 +195,20 @@ def _lint_conduct(profile: dict[str, Any], domain: object) -> list[Finding]:
     if not _selects_conduct(profile):
         return findings
     scopes = domain.get("task_scopes") if isinstance(domain, dict) else None
+    listed = scopes if isinstance(scopes, list) else []
     entries = [
-        e
-        for e in (scopes if isinstance(scopes, list) else [])
-        if isinstance(e, dict) and isinstance(e.get("task_type"), str)
+        e for e in listed if isinstance(e, dict) and isinstance(e.get("task_type"), str)
     ]
+    findings.extend(
+        Finding(
+            "lint.task_scope_entry_malformed",
+            f"task_scopes entry {index + 1} is not a mapping with a quoted task_type string, so the "
+            "engine cannot read it and holds every task it may name to no scope (SPEC 7.7.6)",
+            {"entry": index + 1},
+        )
+        for index, e in enumerate(listed)
+        if not (isinstance(e, dict) and isinstance(e.get("task_type"), str))
+    )
     if not entries:
         where = (
             "the domain binding"
@@ -270,6 +279,7 @@ task_scopes:
 _BAD_DOMAIN = """
 task_scopes:
   - {task_type: disburse_credit, allowed_effect_classes: [read], requires_approval: [spend]}
+  - {task-type: refund, allowed_effect_classes: [read]}
 """
 
 
@@ -283,6 +293,7 @@ def _self_test(want_json: bool) -> int:
         "lint.conduct_overlay_missing_task_scope",
         "lint.task_scope_in_profile",
         "lint.task_scope_approval_not_allowed",
+        "lint.task_scope_entry_malformed",
         "lint.overlays_not_read",
         "lint.observation_window_too_short",
         "lint.missing_confirmation",

@@ -143,6 +143,24 @@ def test_an_approval_class_must_also_be_allowed() -> None:
     assert [f.details["effect_class"] for f in findings] == ["spend"]
 
 
+def test_an_unreadable_task_scope_entry_is_reported() -> None:
+    domain = yaml.safe_load(
+        """
+task_scopes:
+  - {task-type: "2024", allowed_effect_classes: [read]}
+  - {task_type: 2024, allowed_effect_classes: [read]}
+  - nope
+  - {task_type: batch, allowed_effect_classes: [read, irreversible]}
+"""
+    )
+    findings = [
+        f
+        for f in lint_profile.lint(_conduct_profile(), domain)
+        if f.code == "lint.task_scope_entry_malformed"
+    ]
+    assert [f.details["entry"] for f in findings] == [1, 2, 3]
+
+
 def test_the_template_filled_in_is_clean() -> None:
     text = _TEMPLATE.read_text(encoding="utf-8")
     for blank, value in (
