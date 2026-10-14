@@ -18,6 +18,7 @@ from typing import Any
 from .graph import _TRUSTED_INSTRUCTION, _data, _refs, _text
 from .statistical import event_type as _type
 from .store import GraphStore
+from .structural import compare_instants
 
 #: The source classes in their SPEC §6.4 order; the rank is the order. ``any`` is not a class.
 SOURCE_CLASS_RANK: dict[str, int] = {
@@ -51,6 +52,9 @@ def _principal_id(value: Any) -> str | None:
     return None
 
 
+#: The declared classes SPEC §6.2.3 requires a principal for: a twin witnesses one only when both carry the same id.
+_PRINCIPAL_REQUIRED = frozenset({"user", "operator", "service", "agent_identified"})
+
 #: Which witnesses may stand in for an instruction's own class at (iv): its own class only (a twin), its own
 #: class or a twin (a parent: the PolicyDecision allows the action, which acts on the child only), or all.
 _OWN, _TWIN, _ALL = 0, 1, 2
@@ -75,8 +79,10 @@ class SourceClassJudge:
         #: Each enforcement-point Instruction with a content_ref and refs.task, by (content_ref, refs.task,
         #: principal id), in held order: the candidate twins of an instruction with those three.
         self._twins: dict[tuple[str, str, str | None], list[str]] = {}
-        #: (refs.request, principal id) of each enforcement-point PolicyDecision allow that names a principal.
-        self._allows: set[tuple[str, str]] = set()
+        #: The times of the enforcement-point PolicyDecision allows naming a principal, by (refs.request, principal id).
+        self._allows: dict[tuple[str, str], list[Any]] = {}
+        #: Each focus's clock (:meth:`_clock`), computed once.
+        self._clocks: dict[str, tuple[str, ...] | None] = {}
         for iri, event in events_by_iri.items():
             if event.get("agentcesourceclass") != ENFORCEMENT_POINT:
                 continue
@@ -93,7 +99,9 @@ class SourceClassJudge:
                 and isinstance(refs.get("request"), str)
                 and principal is not None
             ):
-                self._allows.add((refs["request"], principal))
+                self._allows.setdefault((refs["request"], principal), []).append(
+                    event.get("time")
+                )
 
     def _own_rank(self, node: str) -> int:
         event = self.events.get(node)
@@ -135,7 +143,7 @@ class SourceClassJudge:
             return True
         if witnesses == _OWN:
             return False
-        if self._twin_witnesses(node, event, visiting):
+        if self._twin_witnesses(focus, node, event, visiting):
             return True
         return witnesses == _ALL and self._decision_witnesses(focus, event)
 
@@ -149,21 +157,56 @@ class SourceClassJudge:
             and _data(event).get("trust_min") == "trusted"
         )
 
+    def _clock(self, focus: str) -> tuple[str, ...] | None:
+        """The times a witness must not follow, read only where the agent does not write them: an
+        enforcement-point (or better) focus's own time; for a Decision, self_report by nature, the time of every
+        enforcement-point ToolCall executing it. None when there is no such clock (a self_report ToolCall, a
+        Decision no enforcement-point call executes) or one of those times is missing."""
+        if focus not in self._clocks:
+            event = self.events.get(focus)
+            if event is not None and _type(event) == "Decision":
+                anchors = [
+                    self.events[call]
+                    for call in self.store.subjects("agentce:executes", focus)
+                    if call in self.events and self._own_rank(call) > 0
+                ]
+            else:
+                anchors = (
+                    [event] if event is not None and self._own_rank(focus) > 0 else []
+                )
+            times = tuple(t for a in anchors if isinstance(t := a.get("time"), str))
+            ok = bool(anchors) and len(times) == len(anchors)
+            self._clocks[focus] = times if ok else None
+        return self._clocks[focus]
+
+    def _in_time(self, focus: str, witnessed_at: Any) -> bool:
+        """Whether a witness recorded at ``witnessed_at`` is at or before the focus's clock, as instants."""
+        clock = self._clock(focus)
+        return (
+            clock is not None
+            and isinstance(witnessed_at, str)
+            and all(compare_instants(witnessed_at, t) in (-1, 0) for t in clock)
+        )
+
     def _twin_witnesses(
-        self, node: str, event: dict[str, Any], visiting: frozenset[str]
+        self, focus: str, node: str, event: dict[str, Any], visiting: frozenset[str]
     ) -> bool:
-        """(iv) by an enforcement-point twin: the same content_ref, refs.task, source_class and principal, held
-        under the subject, meeting (i)-(iv) by its own class, every instruction above it declaring a trusted class."""
+        """(iv) by an enforcement-point twin: the same content_ref, refs.task, source_class and principal (present on
+        both for a class that requires one), held under the subject, recorded at or before the focus's clock, meeting
+        (i)-(iv) by its own class, every instruction above it declaring a trusted class."""
         data = _data(event)
         content, task = _text(data.get("content_ref")), _text(_refs(event).get("task"))
+        principal = _principal_id(data.get("principal"))
         if content is None or task is None:
             return False
-        key = (content, task, _principal_id(data.get("principal")))
-        for twin in self._twins.get(key, ()):
+        if principal is None and data.get("source_class") in _PRINCIPAL_REQUIRED:
+            return False
+        for twin in self._twins.get((content, task, principal), ()):
             if twin == node or twin in visiting:
                 continue
             if (
                 _data(self.events[twin]).get("source_class") == data.get("source_class")
+                and self._in_time(focus, self.events[twin].get("time"))
                 and self._attested(twin, twin, visiting, _OWN)
                 and self._lineage_trusted(twin)
             ):
@@ -187,9 +230,11 @@ class SourceClassJudge:
 
     def _decision_witnesses(self, focus: str, event: dict[str, Any]) -> bool:
         """(iv) by an enforcement-point PolicyDecision allow whose refs.request is the focus and whose principal is
-        the instruction's (both present)."""
+        the instruction's (both present), recorded at or before the focus's clock."""
         principal = _principal_id(_data(event).get("principal"))
-        return principal is not None and (focus, principal) in self._allows
+        return principal is not None and any(
+            self._in_time(focus, at) for at in self._allows.get((focus, principal), ())
+        )
 
     def _attested_rank(self, focus: str, node: str, kind: str) -> tuple[int, str]:
         """A record one hop from the focus: an Instruction ranks enforcement_point only when attested; anything

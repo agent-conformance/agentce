@@ -13,6 +13,7 @@
 import { TRUSTED_INSTRUCTION, dataOf, isRecord, pyEquals, refsOf, text } from "./graph";
 import type { Event } from "./graph";
 import type { GraphStore } from "./store";
+import { compareInstants } from "./structural";
 import { byteCompare } from "./util";
 
 /** The source classes in their SPEC §6.4 order; the rank is the order. `any` is not a class. */
@@ -57,6 +58,10 @@ function sameValue(a: unknown, b: unknown): boolean {
 /** Which witnesses may stand in for an instruction's own class at (iv): its own class only (a twin), its
  * own class or a twin (a parent: the PolicyDecision allows the action, which acts on the child only), or
  * all. */
+/** The declared classes SPEC §6.2.3 requires a principal for: a twin witnesses one only when both carry the same
+ * id. */
+const PRINCIPAL_REQUIRED = new Set(["user", "operator", "service", "agent_identified"]);
+
 const OWN = 0;
 const TWIN = 1;
 const ALL = 2;
@@ -72,8 +77,11 @@ export class SourceClassJudge {
   /** Each enforcement-point Instruction with a content_ref and refs.task, by (content_ref, refs.task,
    * principal id), in held order: the candidate twins of an instruction with those three. */
   private readonly twins = new Map<string, string[]>();
-  /** (refs.request, principal id) of each enforcement-point PolicyDecision allow that names a principal. */
-  private readonly allows = new Set<string>();
+  /** The times of the enforcement-point PolicyDecision allows naming a principal, by (refs.request,
+   * principal id). */
+  private readonly allows = new Map<string, unknown[]>();
+  /** Each focus's clock (`clock`), computed once. */
+  private readonly clocks = new Map<string, string[] | null>();
 
   constructor(
     private readonly store: GraphStore,
@@ -105,7 +113,13 @@ export class SourceClassJudge {
         typeof refs.request === "string" &&
         principal !== null
       ) {
-        this.allows.add(JSON.stringify([refs.request, principal]));
+        const key = JSON.stringify([refs.request, principal]);
+        const bucket = this.allows.get(key);
+        if (bucket === undefined) {
+          this.allows.set(key, [event.time]);
+        } else {
+          bucket.push(event.time);
+        }
       }
     }
   }
@@ -166,7 +180,7 @@ export class SourceClassJudge {
     if (witnesses === OWN) {
       return false;
     }
-    if (this.twinWitnesses(node, event, here)) {
+    if (this.twinWitnesses(focus, node, event, here)) {
       return true;
     }
     return witnesses === ALL && this.decisionWitnesses(focus, event);
@@ -184,23 +198,77 @@ export class SourceClassJudge {
     );
   }
 
-  /** (iv) by an enforcement-point twin: the same content_ref, refs.task, source_class and principal, held
-   * under the subject, meeting (i)-(iv) by its own class, every instruction above it declaring a trusted
-   * class. */
-  private twinWitnesses(node: string, event: Event, visiting: ReadonlySet<string>): boolean {
+  /** The times a witness must not follow, read only where the agent does not write them: an
+   * enforcement-point (or better) focus's own time; for a Decision, self_report by nature, the time of every
+   * enforcement-point ToolCall executing it. Null when there is no such clock (a self_report ToolCall, a
+   * Decision no enforcement-point call executes) or one of those times is missing. */
+  private clock(focus: string): string[] | null {
+    let clock = this.clocks.get(focus);
+    if (clock === undefined) {
+      const event = this.events.get(focus);
+      let anchors: Event[] = [];
+      if (event !== undefined && typeOf(event) === "Decision") {
+        for (const call of this.store.subjects("agentce:executes", focus)) {
+          const record = this.events.get(call);
+          if (record !== undefined && this.ownRank(call) > 0) {
+            anchors.push(record);
+          }
+        }
+      } else if (event !== undefined && this.ownRank(focus) > 0) {
+        anchors = [event];
+      }
+      const times = anchors.map((a) => a.time).filter((t): t is string => typeof t === "string");
+      clock = anchors.length > 0 && times.length === anchors.length ? times : null;
+      this.clocks.set(focus, clock);
+    }
+    return clock;
+  }
+
+  /** Whether a witness recorded at `witnessedAt` is at or before the focus's clock, as instants. */
+  private inTime(focus: string, witnessedAt: unknown): boolean {
+    const clock = this.clock(focus);
+    return (
+      clock !== null &&
+      typeof witnessedAt === "string" &&
+      clock.every((t) => {
+        const order = compareInstants(witnessedAt, t);
+        return order === -1 || order === 0;
+      })
+    );
+  }
+
+  /** (iv) by an enforcement-point twin: the same content_ref, refs.task, source_class and principal (present
+   * on both for a class that requires one), held under the subject, recorded at or before the focus's clock,
+   * meeting (i)-(iv) by its own class, every instruction above it declaring a trusted class. */
+  private twinWitnesses(
+    focus: string,
+    node: string,
+    event: Event,
+    visiting: ReadonlySet<string>,
+  ): boolean {
     const data = dataOf(event);
     const content = text(data.content_ref);
     const task = text(refsOf(event).task);
+    const principal = principalId(data.principal);
     if (content === null || task === null) {
       return false;
     }
-    const key = JSON.stringify([content, task, principalId(data.principal)]);
+    if (
+      principal === null &&
+      typeof data.source_class === "string" &&
+      PRINCIPAL_REQUIRED.has(data.source_class)
+    ) {
+      return false;
+    }
+    const key = JSON.stringify([content, task, principal]);
     for (const twin of this.twins.get(key) ?? []) {
       if (twin === node || visiting.has(twin)) {
         continue;
       }
+      const record = this.events.get(twin) as Event;
       if (
-        sameValue(dataOf(this.events.get(twin) as Event).source_class, data.source_class) &&
+        sameValue(dataOf(record).source_class, data.source_class) &&
+        this.inTime(focus, record.time) &&
         this.attestedAt(twin, twin, visiting, OWN) &&
         this.lineageTrusted(twin)
       ) {
@@ -231,10 +299,15 @@ export class SourceClassJudge {
   }
 
   /** (iv) by an enforcement-point PolicyDecision allow whose refs.request is the focus and whose principal
-   * is the instruction's (both present). */
+   * is the instruction's (both present), recorded at or before the focus's clock. */
   private decisionWitnesses(focus: string, event: Event): boolean {
     const principal = principalId(dataOf(event).principal);
-    return principal !== null && this.allows.has(JSON.stringify([focus, principal]));
+    return (
+      principal !== null &&
+      (this.allows.get(JSON.stringify([focus, principal])) ?? []).some((at) =>
+        this.inTime(focus, at),
+      )
+    );
   }
 
   /** A record one hop from the focus: an Instruction ranks enforcement_point only when attested; anything

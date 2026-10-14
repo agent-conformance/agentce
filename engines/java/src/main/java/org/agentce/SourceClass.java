@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Supplier;
@@ -49,6 +50,10 @@ public final class SourceClass {
     /** Which witnesses may stand in for an instruction's own class at (iv): its own class only (a twin), its own
      * class or a twin (a parent: the PolicyDecision allows the action, which acts on the child only), or all. */
     private static final int OWN = 0;
+
+    /** The declared classes SPEC §6.2.3 requires a principal for: a twin witnesses one only when both carry the same
+     * id. */
+    private static final Set<String> PRINCIPAL_REQUIRED = Set.of("user", "operator", "service", "agent_identified");
     private static final int TWIN = 1;
     private static final int ALL = 2;
 
@@ -90,8 +95,11 @@ public final class SourceClass {
         /** Each enforcement-point Instruction with a content_ref and refs.task, by (content_ref, refs.task,
          * principal id), in held order: the candidate twins of an instruction with those three. */
         private final Map<List<String>, List<String>> twins = new HashMap<>();
-        /** (refs.request, principal id) of each enforcement-point PolicyDecision allow that names a principal. */
-        private final Set<List<String>> allows = new HashSet<>();
+        /** The times of the enforcement-point PolicyDecision allows naming a principal, by (refs.request,
+         * principal id). */
+        private final Map<List<String>, List<JsonNode>> allows = new HashMap<>();
+        /** Each focus's clock ({@link #clock}), computed once; an empty optional when it has none. */
+        private final Map<String, Optional<List<String>>> clocks = new HashMap<>();
 
         public Judge(GraphStore store, Map<String, JsonNode> eventsByIri) {
             this.store = store;
@@ -116,7 +124,8 @@ public final class SourceClass {
                         && textEquals(data.get("decision"), "allow")
                         && str(refs.get("request")) != null
                         && principal != null) {
-                    allows.add(List.of(str(refs.get("request")), principal));
+                    allows.computeIfAbsent(List.of(str(refs.get("request")), principal), k -> new ArrayList<>())
+                            .add(event.get("time"));
                 }
             }
         }
@@ -170,7 +179,7 @@ public final class SourceClass {
             if (witnesses == OWN) {
                 return false;
             }
-            if (twinWitnesses(node, event, inner)) {
+            if (twinWitnesses(focus, node, event, inner)) {
                 return true;
             }
             return witnesses == ALL && decisionWitnesses(focus, event);
@@ -185,22 +194,73 @@ public final class SourceClass {
                     && textEquals(dataOf(event).get("trust_min"), "trusted");
         }
 
-        /** (iv) by an enforcement-point twin: the same content_ref, refs.task, source_class and principal, held
-         * under the subject, meeting (i)-(iv) by its own class, every instruction above it declaring a trusted
-         * class. */
-        private boolean twinWitnesses(String node, JsonNode event, Set<String> visiting) {
+        /** The times a witness must not follow, read only where the agent does not write them: an
+         * enforcement-point (or better) focus's own time; for a Decision, self_report by nature, the time of every
+         * enforcement-point ToolCall executing it. Null when there is no such clock (a self_report ToolCall, a
+         * Decision no enforcement-point call executes) or one of those times is missing. */
+        private List<String> clock(String focus) {
+            return clocks.computeIfAbsent(focus, f -> {
+                JsonNode event = events.get(f);
+                List<JsonNode> anchors = new ArrayList<>();
+                if (event != null && "Decision".equals(type(event))) {
+                    for (String call : store.subjects("agentce:executes", f)) {
+                        if (events.containsKey(call) && ownRank(call) > 0) {
+                            anchors.add(events.get(call));
+                        }
+                    }
+                } else if (event != null && ownRank(f) > 0) {
+                    anchors.add(event);
+                }
+                List<String> times = new ArrayList<>();
+                for (JsonNode anchor : anchors) {
+                    JsonNode time = anchor.get("time");
+                    if (time != null && time.isTextual()) {
+                        times.add(time.textValue());
+                    }
+                }
+                return anchors.isEmpty() || times.size() != anchors.size()
+                        ? Optional.empty()
+                        : Optional.of(times);
+            }).orElse(null);
+        }
+
+        /** Whether a witness recorded at {@code witnessedAt} is at or before the focus's clock, as instants. */
+        private boolean inTime(String focus, JsonNode witnessedAt) {
+            List<String> clock = clock(focus);
+            if (clock == null || witnessedAt == null || !witnessedAt.isTextual()) {
+                return false;
+            }
+            for (String t : clock) {
+                Integer order = Structural.compareInstants(witnessedAt.textValue(), t);
+                if (order == null || order > 0) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /** (iv) by an enforcement-point twin: the same content_ref, refs.task, source_class and principal (present
+         * on both for a class that requires one), held under the subject, recorded at or before the focus's clock,
+         * meeting (i)-(iv) by its own class, every instruction above it declaring a trusted class. */
+        private boolean twinWitnesses(String focus, String node, JsonNode event, Set<String> visiting) {
             JsonNode data = dataOf(event);
             String content = text(data.get("content_ref"));
             String task = text(refsOf(event).get("task"));
+            String principal = principalId(data.get("principal"));
             if (content == null || task == null) {
                 return false;
             }
-            List<String> key = Arrays.asList(content, task, principalId(data.get("principal")));
+            String declared = str(data.get("source_class"));
+            if (principal == null && declared != null && PRINCIPAL_REQUIRED.contains(declared)) {
+                return false;
+            }
+            List<String> key = Arrays.asList(content, task, principal);
             for (String twin : twins.getOrDefault(key, List.of())) {
                 if (twin.equals(node) || visiting.contains(twin)) {
                     continue;
                 }
                 if (sameValue(dataOf(events.get(twin)).get("source_class"), data.get("source_class"))
+                        && inTime(focus, events.get(twin).get("time"))
                         && attested(twin, twin, visiting, OWN)
                         && lineageTrusted(twin)) {
                     return true;
@@ -228,10 +288,18 @@ public final class SourceClass {
         }
 
         /** (iv) by an enforcement-point PolicyDecision allow whose refs.request is the focus and whose principal
-         * is the instruction's (both present). */
+         * is the instruction's (both present), recorded at or before the focus's clock. */
         private boolean decisionWitnesses(String focus, JsonNode event) {
             String principal = principalId(dataOf(event).get("principal"));
-            return principal != null && allows.contains(List.of(focus, principal));
+            if (principal == null) {
+                return false;
+            }
+            for (JsonNode at : allows.getOrDefault(List.of(focus, principal), List.of())) {
+                if (inTime(focus, at)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /** A record one hop from the focus: an Instruction ranks enforcement_point only when attested; anything
