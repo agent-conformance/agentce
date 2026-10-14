@@ -272,15 +272,15 @@ def _reaches_human_actor_failure(
     store: GraphStore, focus: str, reads: Sequence[str]
 ) -> bool:
     """Whether ``reads`` names a predicate the human-actor rule decides and, walking its other predicates from
-    ``focus`` (``^`` for an inverse) in any order up to their number, the walk reaches a node failing the rule. It
-    reaches at least what the shape itself reaches, so it fails closed."""
+    ``focus`` (``^`` for an inverse) in any order and as often as they lead somewhere new, the walk reaches a node failing
+    the rule. It reaches at least what the shape itself reaches, a repeated step included, so it fails closed."""
     if HUMAN_ACTOR_PATHS.isdisjoint(step.lstrip("^") for step in reads):
         return False
     steps = list(
         dict.fromkeys(s for s in reads if s.lstrip("^") not in HUMAN_ACTOR_PATHS)
     )
     reach, frontier = {focus}, {focus}
-    for _ in steps:
+    while frontier:
         frontier = {
             node
             for start in frontier
@@ -291,8 +291,6 @@ def _reaches_human_actor_failure(
                 else store.objects(start, step)
             )
         } - reach
-        if not frontier:
-            break
         reach |= frontier
     return not reach.isdisjoint(store.human_actor_failed)
 

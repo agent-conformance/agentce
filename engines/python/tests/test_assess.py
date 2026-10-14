@@ -360,6 +360,12 @@ def test_not_waivable_when_the_shape_reaches_the_failing_decision_from_another_f
         store.add_edge("tc1", "agentce:executes", "d1")
         store.add_edge("tc2", "agentce:executes", "d2")
         store.add_edge("a1", "agentce:approves", "d1")
+        # Two hops on one predicate, given once (property_reads dedupes): the walk repeats it.
+        store.add_edge("i3", "agentce:derivedFrom", "i2")
+        store.add_edge("i2", "agentce:derivedFrom", "d1")
+        assert _reaches_human_actor_failure(
+            store, "i3", ["agentce:derivedFrom", "agentce:approvedBy"]
+        )
         assert _reaches_human_actor_failure(
             store, "tc1", ["agentce:executes", "agentce:approvedBy"]
         )
