@@ -332,6 +332,9 @@ test("not waivable: the shape reaches the failing decision from another focus", 
   store.addEdge("tc1", "agentce:executes", "d1");
   store.addEdge("tc2", "agentce:executes", "d2");
   store.addEdge("a1", "agentce:approves", "d1");
+  // Two hops on one predicate, given once (propertyReads dedupes): the walk repeats it.
+  store.addEdge("i3", "agentce:derivedFrom", "i2");
+  store.addEdge("i2", "agentce:derivedFrom", "d1");
   const reaches = (focus: string, reads: string[]): boolean =>
     reachesHumanActorFailure(store, focus, reads);
   assert.equal(reaches("tc1", ["agentce:executes", "agentce:approvedBy"]), true);
@@ -340,6 +343,7 @@ test("not waivable: the shape reaches the failing decision from another focus", 
     reaches("a1", ["agentce:approves", "^agentce:executes", "agentce:approvedBy"]),
     true,
   );
+  assert.equal(reaches("i3", ["agentce:derivedFrom", "agentce:approvedBy"]), true);
   assert.equal(reaches("tc2", ["agentce:executes", "agentce:approvedBy"]), false);
   assert.equal(reaches("tc1", ["agentce:executes", "agentce:authorizedBy"]), false);
 });

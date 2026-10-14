@@ -275,8 +275,8 @@ function restsOnHumanActorFailure(
 }
 
 /** Whether `reads` names a predicate the human-actor rule decides and, walking its other predicates from `focus` (`^`
- * for an inverse) in any order up to their number, the walk reaches a node failing the rule. It reaches at least what
- * the shape itself reaches, so it fails closed. */
+ * for an inverse) in any order and as often as they lead somewhere new, the walk reaches a node failing the rule. It
+ * reaches at least what the shape itself reaches, a repeated step included, so it fails closed. */
 export function reachesHumanActorFailure(
   store: GraphStore,
   focus: string,
@@ -287,7 +287,7 @@ export function reachesHumanActorFailure(
   const steps = reads.filter((step) => !HUMAN_ACTOR_PATHS.has(predicate(step)));
   const reach = new Set([focus]);
   let frontier = [focus];
-  for (let i = 0; i < steps.length && frontier.length > 0; i++) {
+  while (frontier.length > 0) {
     const next: string[] = [];
     for (const start of frontier) {
       for (const step of steps) {
