@@ -67,8 +67,9 @@ public final class Assess {
     }
 
     /** Whether {@code reads} names a predicate the human-actor rule decides and, walking its other predicates from
-     * {@code focus} ({@code ^} for an inverse) in any order up to their number, the walk reaches a node failing the
-     * rule. It reaches at least what the shape itself reaches, so it fails closed. */
+     * {@code focus} ({@code ^} for an inverse) in any order and as often as they lead somewhere new, the walk reaches a
+     * node failing the rule. It reaches at least what the shape itself reaches, a repeated step included, so it fails
+     * closed. */
     static boolean reachesHumanActorFailure(GraphStore store, String focus, List<String> reads) {
         List<String> steps = reads.stream()
                 .filter(step -> !HUMAN_ACTOR_PATHS.contains(step.startsWith("^") ? step.substring(1) : step))
@@ -78,7 +79,7 @@ public final class Assess {
         }
         Set<String> reach = new LinkedHashSet<>(List.of(focus));
         List<String> frontier = List.of(focus);
-        for (int i = 0; i < steps.size() && !frontier.isEmpty(); i++) {
+        while (!frontier.isEmpty()) {
             List<String> next = new ArrayList<>();
             for (String start : frontier) {
                 for (String step : steps) {

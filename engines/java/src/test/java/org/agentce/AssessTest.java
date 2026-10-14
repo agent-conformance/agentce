@@ -292,6 +292,10 @@ class AssessTest {
         store.addEdge("tc1", "agentce:executes", "d1");
         store.addEdge("tc2", "agentce:executes", "d2");
         store.addEdge("a1", "agentce:approves", "d1");
+        // Two hops on one predicate, given once (propertyReads dedupes): the walk repeats it.
+        store.addEdge("i3", "agentce:derivedFrom", "i2");
+        store.addEdge("i2", "agentce:derivedFrom", "d1");
+        assertTrue(Assess.reachesHumanActorFailure(store, "i3", List.of("agentce:derivedFrom", "agentce:approvedBy")));
         assertTrue(Assess.reachesHumanActorFailure(store, "tc1", List.of("agentce:executes", "agentce:approvedBy")));
         assertTrue(Assess.reachesHumanActorFailure(store, "tc1", List.of("agentce:executes", "agentce:reviewedBy")));
         assertTrue(Assess.reachesHumanActorFailure(store, "a1",
