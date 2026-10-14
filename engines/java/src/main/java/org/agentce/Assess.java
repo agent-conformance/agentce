@@ -53,17 +53,38 @@ public final class Assess {
             "agentce:interventionByHuman",
             "agentce:riskReviewed");
 
-    private static final java.util.regex.Pattern PATH_TOKENS = java.util.regex.Pattern.compile("[\\s()|^]+");
+    private static final java.util.regex.Pattern PATH_TOKENS = java.util.regex.Pattern.compile("\\^?[^\\s()|^]+");
 
-    /** Whether a rendered shape path passes through a predicate whose value the SPEC §10.4 human-actor rule
-     * decides. */
-    static boolean readsHumanActor(String path) {
-        for (String token : PATH_TOKENS.split(path)) {
-            if (HUMAN_ACTOR_PATHS.contains(token)) {
-                return true;
-            }
+    /** Whether a violation's rendered shape path reads a predicate the SPEC §10.4 human-actor rule decides and, from
+     * its focus, reaches a node that fails the rule. The walk follows every other step of the path from the focus, in
+     * any order and to the path's length, so it reaches at least what the path itself reaches (fail closed). */
+    static boolean reachesHumanActorFailure(GraphStore store, String focus, String path) {
+        List<String> tokens = PATH_TOKENS.matcher(path).results().map(java.util.regex.MatchResult::group).toList();
+        List<String> steps = tokens.stream()
+                .filter(token -> !HUMAN_ACTOR_PATHS.contains(token.startsWith("^") ? token.substring(1) : token))
+                .toList();
+        if (steps.size() == tokens.size()) {
+            return false;
         }
-        return false;
+        Set<String> reach = new LinkedHashSet<>(List.of(focus));
+        List<String> frontier = List.of(focus);
+        for (int i = 0; i < tokens.size(); i++) {
+            List<String> next = new ArrayList<>();
+            for (String start : frontier) {
+                for (String step : steps) {
+                    List<String> nodes = step.startsWith("^")
+                            ? store.subjects(step.substring(1), start)
+                            : store.objects(start, step);
+                    for (String node : nodes) {
+                        if (reach.add(node)) {
+                            next.add(node);
+                        }
+                    }
+                }
+            }
+            frontier = next;
+        }
+        return reach.stream().anyMatch(store.humanActorFailed::contains);
     }
 
     static boolean classOk(String observed, String required) {
@@ -256,7 +277,7 @@ public final class Assess {
             for (Structural.Violation v : result.violations) {
                 assertion.violations.add(Structural.violationToJson(v));
                 if (!assertion.humanActorFailed && "non-conformant".equals(outcome)) {
-                    assertion.humanActorFailed = store.humanActorFailed.contains(v.focus) && readsHumanActor(v.path);
+                    assertion.humanActorFailed = reachesHumanActorFailure(store, v.focus, v.path);
                 }
             }
             JsonNode strength = control.raw.get("evidence_strength");

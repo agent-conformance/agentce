@@ -273,10 +273,31 @@ class AssessTest {
 
     @Test
     void notWaivablePathsMatchByPredicateToken() {
-        assertTrue(Assess.readsHumanActor("agentce:approvedBy"));
-        assertTrue(Assess.readsHumanActor("(agentce:decidedBy ^agentce:reviewedBy)"));
-        assertTrue(Assess.readsHumanActor("(agentce:x | agentce:interventionByHuman)"));
-        assertTrue(!Assess.readsHumanActor("agentce:approvedByProxy"));
-        assertTrue(!Assess.readsHumanActor("agentce:authorizedBy"));
+        GraphStore store = new GraphStore();
+        store.humanActorFailed.add("d1");
+        for (String path : List.of("agentce:approvedBy", "(agentce:decidedBy ^agentce:reviewedBy)",
+                "(agentce:x | agentce:interventionByHuman)")) {
+            assertTrue(Assess.reachesHumanActorFailure(store, "d1", path));
+        }
+        assertTrue(!Assess.reachesHumanActorFailure(store, "d1", "agentce:approvedByProxy"));
+        assertTrue(!Assess.reachesHumanActorFailure(store, "d1", "agentce:authorizedBy"));
+        assertTrue(!Assess.reachesHumanActorFailure(store, "d2", "agentce:approvedBy"));
+    }
+
+    @Test
+    void notWaivableWhenThePathReachesTheFailingDecisionFromAnotherFocus() {
+        GraphStore store = new GraphStore();
+        store.humanActorFailed.add("d1");
+        store.addEdge("tc1", "agentce:executes", "d1");
+        store.addEdge("tc2", "agentce:executes", "d2");
+        store.addEdge("a1", "agentce:approves", "d1");
+        assertTrue(Assess.reachesHumanActorFailure(store, "tc1", "(agentce:executes agentce:approvedBy)"));
+        assertTrue(Assess.reachesHumanActorFailure(store, "tc1", "(agentce:executes agentce:reviewedBy)"));
+        assertTrue(Assess.reachesHumanActorFailure(store, "a1",
+                "(agentce:approves ^agentce:executes agentce:approvedBy)"));
+        assertTrue(Assess.reachesHumanActorFailure(store, "tc1",
+                "(^agentce:x | agentce:executes) agentce:approvedBy"));
+        assertTrue(!Assess.reachesHumanActorFailure(store, "tc2", "(agentce:executes agentce:approvedBy)"));
+        assertTrue(!Assess.reachesHumanActorFailure(store, "tc1", "(agentce:executes agentce:authorizedBy)"));
     }
 }
