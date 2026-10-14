@@ -597,11 +597,12 @@ class _Builder:
             ):
                 over_budget.add(request)
         for event in events:
-            if self._ptype(event) not in ("ToolCall", "ResourceAccess"):
+            ptype = self._ptype(event)
+            if ptype not in ("ToolCall", "ResourceAccess"):
                 continue
             node = event_iri(str(event["id"]))
             in_scope = node not in denied and (
-                self._ptype(event) != "ToolCall" or self._within_task_scope(event)
+                ptype != "ToolCall" or self._within_task_scope(event)
             )
             self.store.add_literal(
                 node, "agentce:withinScope", "true" if in_scope else "false", BOOL

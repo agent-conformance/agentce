@@ -738,12 +738,12 @@ class Builder {
       }
     }
     for (const event of events) {
-      if (this.ptype(event) !== "ToolCall" && this.ptype(event) !== "ResourceAccess") {
+      const ptype = this.ptype(event);
+      if (ptype !== "ToolCall" && ptype !== "ResourceAccess") {
         continue;
       }
       const node = eventIri(String(event.id));
-      const inScope =
-        !denied.has(node) && (this.ptype(event) !== "ToolCall" || this.withinTaskScope(event));
+      const inScope = !denied.has(node) && (ptype !== "ToolCall" || this.withinTaskScope(event));
       this.store.addLiteral(node, "agentce:withinScope", inScope ? "true" : "false", BOOL);
       this.store.addLiteral(
         node,

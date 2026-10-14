@@ -49,7 +49,7 @@ for name, case in cases.items():
             event["agentcetask"] = call["agentcetask"]
         events.append(event)
         if "deny" in call:
-            at = {"after": 3 * n + 2, "before": 3 * n, "unheld": 3 * n + 2}[call["deny"]]
+            at = 3 * n if call["deny"] == "before" else 3 * n + 2
             request = "agentce:event/not-held" if call["deny"] == "unheld" else f"agentce:event/{call['id']}"
             events.append({"id": f"pd-{call['id']}", "source": "urn:src:gateway", "subject": who,
                            "type": "org.agent-conformance.evidence.PolicyDecision.v1",

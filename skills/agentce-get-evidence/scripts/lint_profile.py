@@ -323,34 +323,28 @@ def _refused_args(argv: list[str]) -> str | None:
     return None
 
 
+def _input_error(message: str, want_json: bool) -> int:
+    emit(
+        {"status": "input_error", "message": message},
+        want_json=want_json,
+        human=f"INPUT ERROR: {message}",
+    )
+    return INPUT_ERROR
+
+
 def _body(argv: list[str]) -> int:
     want_json = "--json" in argv
     refused = _refused_args(argv)
     if refused is not None:
-        emit(
-            {"status": "input_error", "message": refused},
-            want_json=want_json,
-            human=f"INPUT ERROR: {refused}",
-        )
-        return INPUT_ERROR
+        return _input_error(refused, want_json)
     if "--self-test" in argv:
         return _self_test(want_json)
     path = arg_value(argv, "--profile")
     if path is None:
-        emit(
-            {"status": "input_error", "message": "pass --profile <file>"},
-            want_json=want_json,
-            human="INPUT ERROR: pass --profile <file>",
-        )
-        return INPUT_ERROR
+        return _input_error("pass --profile <file>", want_json)
     domain_path = arg_value(argv, "--domain")
     if "--domain" in argv and domain_path is None:
-        emit(
-            {"status": "input_error", "message": "pass --domain <file>"},
-            want_json=want_json,
-            human="INPUT ERROR: pass --domain <file>",
-        )
-        return INPUT_ERROR
+        return _input_error("pass --domain <file>", want_json)
     try:
         profile = yaml.safe_load(open(path, encoding="utf-8"))
         domain = (
@@ -359,12 +353,7 @@ def _body(argv: list[str]) -> int:
             else yaml.safe_load(open(domain_path, encoding="utf-8"))
         )
     except (OSError, yaml.YAMLError) as exc:
-        emit(
-            {"status": "input_error", "message": str(exc)},
-            want_json=want_json,
-            human=f"INPUT ERROR: {exc}",
-        )
-        return INPUT_ERROR
+        return _input_error(str(exc), want_json)
     findings = lint(profile, domain)
     payload = {
         "profile": path,

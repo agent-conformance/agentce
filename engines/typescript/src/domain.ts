@@ -120,7 +120,7 @@ export class DomainBinding {
       return named;
     }
     if (this.taskScopes.size === 1) {
-      return [...this.taskScopes.values()][0];
+      return this.taskScopes.values().next().value as TaskScope[];
     }
     return [];
   }
