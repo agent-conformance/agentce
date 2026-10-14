@@ -5,7 +5,8 @@
 # unquoted dates (S10), an empty register (S11), only an expired entry (S13), two subjects (S14), the
 # `--deviations=<path>` spelling (S15), a missing value (S16, S23), hostile and mistaken register bytes
 # (S17-S21), a `.` segment in the register path (S2D, S6D), the flag given twice (S22, S22b) and an entry on a
-# control that fails the SPEC §10.4 human-actor rule, which the register cannot waive (S24, S25) -- and must give Python's exit code, error key, cause
+# control that fails the SPEC §10.4 human-actor rule, which the register cannot waive (S24, S25, and S26 through a
+# third-party catalog whose sequence paths reach the failing decision from the action) -- and must give Python's exit code, error key, cause
 # and fix, or write byte-identical assertions, OSCAL, activity and blind-spot files with the same
 # limitations and register digest. Each engine's test-only `auditor-view` seam must also print the
 # bytes Python's compute_auditor_view gives over the same assertions and register, in either order.
@@ -104,6 +105,9 @@ for kase in S24:approval S25:override; do
   scenario "${kase%%:*}" --bundle "$d/bundle" --profile "$d/applicability.yaml" --domain "$d/domain.linkml.yaml" \
     --deviations "$d/deviations.yaml"
 done
+scenario S26 --bundle "$H/approval/bundle" --profile "$H/approval/applicability.yaml" \
+  --domain "$H/approval/domain.linkml.yaml" --catalog-dir "$H/thirdparty/catalog" --allow-unverified-catalog \
+  --deviations "$H/thirdparty/deviations.yaml"
 scenario S23 --bundle "$F/evidence" --deviations --profile "$F/applicability.yaml" \
   --domain "$F/domain.linkml.yaml" --catalog-dir "$F/catalog" --allow-unverified-catalog
 
@@ -178,7 +182,13 @@ FILES = ("assertions.json", "oscal-ar.json", "activity.json", "blind-spots.json"
 DIGEST = {"S22": "sha256:1c8bd1ab", "S22b": "sha256:ec70a21e"}
 # SPEC §10.4: the register cannot waive the human-actor rule. Per scenario, the controls whose entry is not applied
 # (non-conformant, no deviation, one limitation each) and the ones it still waives (partial, the control's id).
-HUMAN_ACTOR = {"S24": (["CND-02", "OVS-01", "OVS-08", "RSK-02"], ["OVS-05"]), "S25": (["OVS-07"], [])}
+# S26's TPX-01 and TPX-04 reach the failing decision from the ToolCall that executes it; TPX-03 reads no human-actor
+# predicate (approvedByProxy is not approvedBy). Last, each scenario's exit code.
+HUMAN_ACTOR = {
+    "S24": (["CND-02", "OVS-01", "OVS-08", "RSK-02"], ["OVS-05"], 2),
+    "S25": (["OVS-07"], [], 2),
+    "S26": (["TPX-01", "TPX-02", "TPX-04"], ["TPX-03"], 1),
+}
 NOT_WAIVABLE = (": deviation not applied because an approval, override or interrupt in these records fails the"
                 " human-actor rule (SPEC §10.4), which no deviation can waive; the control remains non-conformant")
 failures = []
@@ -259,9 +269,9 @@ for s in SUCCESSES:
     if s in DIGEST:
         check(str(digest).startswith(DIGEST[s]), f"{s}: digest {digest} is not the last register's")
 
-for s, (kept, waived) in HUMAN_ACTOR.items():
+for s, (kept, waived, exit_code) in HUMAN_ACTOR.items():
     for engine in ENGINES:
-        check(code(engine, s) == 2, f"{s}: {engine} exited {code(engine, s)}, not 2: {read(f'{work}/{engine}/{s}.err')[-400:]}")
+        check(code(engine, s) == exit_code, f"{s}: {engine} exited {code(engine, s)}, not {exit_code}: {read(f'{work}/{engine}/{s}.err')[-400:]}")
         if not os.path.exists(f"{work}/{engine}/{s}/manifest.json"):
             check(False, f"{s}: {engine} wrote no manifest.json")
             continue

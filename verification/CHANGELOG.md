@@ -3,6 +3,16 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.105.0
+
+- `VG-DEVIATIONS-PARITY` (18.186, changed). A deviation register entry is not applied to a control that fails on the
+  SPEC §10.4 human-actor rule. S24 (an approval with no `session_ref`) and S25 (an override made in the agent's own
+  session) pin CND-02, OVS-01, OVS-07, OVS-08 and RSK-02 as non-conformant with no deviation and one not-applied
+  limitation each, while OVS-05's ordinary failure is still waived. S26 runs a third-party catalog whose ToolCall shapes
+  reach the decision's approval through a sequence path (`agentce:executes` then `agentce:approvedBy` or
+  `agentce:reviewedBy`); those controls stay non-conformant too. Three new seeded faults: Python's and Java's
+  `apply_deviations` ignore the human-actor flag, and TypeScript's check looks only at the violation's focus.
+
 ## 0.104.0
 
 - `VG-TRUST-MATRIX` (18.176, added). The trust-model case matrix now runs as a build gate. It has 782 cells, covering
