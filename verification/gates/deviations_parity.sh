@@ -5,8 +5,9 @@
 # unquoted dates (S10), an empty register (S11), only an expired entry (S13), two subjects (S14), the
 # `--deviations=<path>` spelling (S15), a missing value (S16, S23), hostile and mistaken register bytes
 # (S17-S21), a `.` segment in the register path (S2D, S6D), the flag given twice (S22, S22b) and an entry on a
-# control that fails the SPEC §10.4 human-actor rule, which the register cannot waive (S24, S25, and S26 through a
-# third-party catalog whose sequence paths reach the failing decision from the action) -- and must give Python's exit code, error key, cause
+# control that fails the SPEC §10.4 human-actor rule, which the register cannot waive (S24, S25, S26 through a
+# third-party catalog whose sequence paths reach the failing decision from the action, and S27 through paths that
+# repeat a predicate) -- and must give Python's exit code, error key, cause
 # and fix, or write byte-identical assertions, OSCAL, activity and blind-spot files with the same
 # limitations and register digest. Each engine's test-only `auditor-view` seam must also print the
 # bytes Python's compute_auditor_view gives over the same assertions and register, in either order.
@@ -108,6 +109,9 @@ done
 scenario S26 --bundle "$H/approval/bundle" --profile "$H/approval/applicability.yaml" \
   --domain "$H/approval/domain.linkml.yaml" --catalog-dir "$H/thirdparty/catalog" --allow-unverified-catalog \
   --deviations "$H/thirdparty/deviations.yaml"
+scenario S27 --bundle "$H/repeat/bundle" --profile "$H/repeat/applicability.yaml" \
+  --domain "$H/approval/domain.linkml.yaml" --catalog-dir "$H/repeat/catalog" --allow-unverified-catalog \
+  --deviations "$H/repeat/deviations.yaml"
 scenario S23 --bundle "$F/evidence" --deviations --profile "$F/applicability.yaml" \
   --domain "$F/domain.linkml.yaml" --catalog-dir "$F/catalog" --allow-unverified-catalog
 
@@ -184,11 +188,14 @@ DIGEST = {"S22": "sha256:1c8bd1ab", "S22b": "sha256:ec70a21e"}
 # (non-conformant, no deviation, one limitation each) and the ones it still waives (partial, the control's id).
 # S26's TPX-01 and TPX-04 reach the failing decision from the ToolCall that executes it through a sequence path, TPX-05
 # and TPX-06 through a nested sh:node and sh:qualifiedValueShape, and TPX-02 reads it through an alternative path;
-# TPX-03 reads no human-actor predicate (approvedByProxy is not approvedBy). Last, each scenario's exit code.
+# TPX-03 reads no human-actor predicate (approvedByProxy is not approvedBy). S27's PRB-01 and PRB-03 repeat
+# agentce:derivedFrom before agentce:approvedBy (PRB-03 across a nested sh:node), PRB-02 takes it once, and PRB-04 ends
+# on approvedByProxy. Last, each scenario's exit code.
 HUMAN_ACTOR = {
     "S24": (["CND-02", "OVS-01", "OVS-08", "RSK-02"], ["OVS-05"], 2),
     "S25": (["OVS-07"], [], 2),
     "S26": (["TPX-01", "TPX-02", "TPX-04", "TPX-05", "TPX-06"], ["TPX-03"], 1),
+    "S27": (["PRB-01", "PRB-02", "PRB-03"], ["PRB-04"], 1),
 }
 NOT_WAIVABLE = (": deviation not applied because an approval, override or interrupt in these records fails the"
                 " human-actor rule (SPEC §10.4), which no deviation can waive; the control remains non-conformant")

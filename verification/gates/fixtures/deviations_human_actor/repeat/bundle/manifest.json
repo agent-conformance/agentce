@@ -1,0 +1,132 @@
+{
+  "agentce_bundle_version": 1,
+  "domain": "approvals-fixture",
+  "files": [
+    {
+      "path": "events/subject.jsonl",
+      "sha256": "0d8897148ab139dcea25a73dc40de6edeccf9e177b7e246138840773c29aee26"
+    },
+    {
+      "path": "reference/sor-counts.json",
+      "sha256": "5b6142dd1102113e408012c14a5004923700912a359a09e69ad8bae971f8abd8"
+    }
+  ],
+  "sources": [
+    {
+      "id": "urn:src:agent",
+      "class": "self_report"
+    },
+    {
+      "id": "urn:src:agent-ep",
+      "class": "enforcement_point"
+    },
+    {
+      "id": "urn:src:approvals",
+      "class": "independent_system"
+    },
+    {
+      "id": "urn:src:approvals-ep",
+      "class": "enforcement_point"
+    },
+    {
+      "id": "urn:src:gateway",
+      "class": "enforcement_point"
+    },
+    {
+      "id": "urn:src:guard",
+      "class": "enforcement_point"
+    },
+    {
+      "id": "urn:src:idp",
+      "class": "independent_system"
+    },
+    {
+      "id": "urn:src:idp-ep",
+      "class": "enforcement_point"
+    },
+    {
+      "id": "urn:src:ingress",
+      "class": "enforcement_point"
+    },
+    {
+      "id": "urn:src:policy",
+      "class": "enforcement_point"
+    },
+    {
+      "id": "urn:src:sor",
+      "class": "independent_system"
+    },
+    {
+      "id": "urn:src:worker",
+      "class": "self_report"
+    }
+  ],
+  "streams": [
+    {
+      "stream": "urn:src:agent|spiffe://corp/agents/cnd05-fixture",
+      "head": "a1d36f53984b7ba3194e2f46603507f6d60705abb7db4aff3e04591edac75df7",
+      "anchors": [
+        {
+          "kind": "rfc3161",
+          "at": "2026-01-03T00:00:00Z",
+          "ref": "anchors/0.tsr"
+        }
+      ]
+    },
+    {
+      "stream": "urn:src:approvals|spiffe://corp/agents/cnd05-fixture",
+      "head": "e0c776417af6c03a0bfa4a4a3a0b42e3aa2c25c5ef9c2c3504c8a4f18622e5ac",
+      "anchors": [
+        {
+          "kind": "rfc3161",
+          "at": "2026-01-03T00:00:00Z",
+          "ref": "anchors/1.tsr"
+        }
+      ]
+    },
+    {
+      "stream": "urn:src:gateway|spiffe://corp/agents/cnd05-fixture",
+      "head": "244b5c83618585ad69a880e6a68a45e91db398481acca1c6fe9000ee09f4f89b",
+      "anchors": [
+        {
+          "kind": "rfc3161",
+          "at": "2026-01-03T00:00:00Z",
+          "ref": "anchors/2.tsr"
+        }
+      ]
+    },
+    {
+      "stream": "urn:src:idp|spiffe://corp/agents/cnd05-fixture",
+      "head": "35f5fb9ace99c031d83c46f0d5c3e0924e4852ba9e769da4703e991987c421c9",
+      "anchors": [
+        {
+          "kind": "rfc3161",
+          "at": "2026-01-03T00:00:00Z",
+          "ref": "anchors/3.tsr"
+        }
+      ]
+    },
+    {
+      "stream": "urn:src:ingress|spiffe://corp/agents/cnd05-fixture",
+      "head": "c4d01d89d1a71c2da2048e1ec95d7fb70275934c55edb81c9c2bd4eec16b8cc8",
+      "anchors": [
+        {
+          "kind": "rfc3161",
+          "at": "2026-01-03T00:00:00Z",
+          "ref": "anchors/4.tsr"
+        }
+      ]
+    },
+    {
+      "stream": "urn:src:policy|spiffe://corp/agents/cnd05-fixture",
+      "head": "1bbb656ea64007a02236aa3b3487c9346c6b7b9ded84d0c9132e0013e3c943a5",
+      "anchors": [
+        {
+          "kind": "rfc3161",
+          "at": "2026-01-03T00:00:00Z",
+          "ref": "anchors/5.tsr"
+        }
+      ]
+    }
+  ]
+}

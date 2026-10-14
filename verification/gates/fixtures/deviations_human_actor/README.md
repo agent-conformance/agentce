@@ -1,6 +1,6 @@
 # deviations_human_actor
 
-Fixtures for VG-DEVIATIONS-PARITY scenarios S24, S25 and S26 (SPEC §10.4: the deviation register cannot waive the
+Fixtures for VG-DEVIATIONS-PARITY scenarios S24, S25, S26 and S27 (SPEC §10.4: the deviation register cannot waive the
 human-actor rule).
 
 - `approval/`: an ApprovalDecided for decision `d1` whose actor names no `session_ref`, so it fails the human-actor
@@ -13,3 +13,7 @@ human-actor rule).
   shape reads `agentce:approvedBy`, TPX-02 reads the decision through an alternative path, and all five stay
   non-conformant.
   TPX-03 reads `agentce:approvedByProxy`, which the rule does not decide, so the register waives it.
+- `repeat/`: `approval/`'s records plus a ModelCall whose parent is the decision and an Instruction whose parent is
+  that ModelCall (S27, run with `approval/`'s domain). PRB-01 and PRB-03 take `agentce:derivedFrom` twice before `agentce:approvedBy` (PRB-03 across
+  a nested `sh:node`), PRB-02 once, and all three stay non-conformant. PRB-04 ends on `agentce:approvedByProxy`, which
+  the rule does not decide, so the register waives it.

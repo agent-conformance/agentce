@@ -99,6 +99,12 @@ allow:
     class: legitimate
     justification: "Genesis all-zero prev pointer of each one-record stream in VG-DEVIATIONS-PARITY's SPEC §10.4 fixture (no predecessor block)."
 
+  - path: verification/gates/fixtures/deviations_human_actor/repeat/bundle/events/subject.jsonl
+    pattern: zero-digest
+    count: 6
+    class: legitimate
+    justification: "Genesis all-zero prev pointer of each stream's first record in VG-DEVIATIONS-PARITY's SPEC §10.4 fixture (no predecessor block)."
+
   - path: verification/gates/fixtures/cli_options/conformance/corpus-one/projects/credit/claude-agent-sdk/known-pass/evidence/events/_benign-quarantine.jsonl
     pattern: zero-digest
     count: 2

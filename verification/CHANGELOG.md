@@ -11,8 +11,10 @@ fails if a gate in `gates.json` is not named in this file.
   limitation each, while OVS-05's ordinary failure is still waived. S26 runs a third-party catalog whose ToolCall shapes
   reach the decision's approval through a sequence path (`agentce:executes` then `agentce:approvedBy` or
   `agentce:reviewedBy`) or through a nested `sh:node` or `sh:qualifiedValueShape`; those controls stay non-conformant
-  too. Three new seeded faults: Python's and Java's
-  `apply_deviations` ignore the human-actor flag, and TypeScript's check looks only at the violation's focus. A fourth: Java's property reads skip nested shapes.
+  too. S27 runs paths that repeat `agentce:derivedFrom` before `agentce:approvedBy`, directly or across a nested
+  `sh:node`; those controls stay non-conformant as well. Five new seeded faults: Python's and Java's `apply_deviations`
+  ignore the human-actor flag, TypeScript's check looks only at the violation's focus, Java's property reads skip nested
+  shapes, and Python's walk takes each distinct step once instead of following it until it reaches nothing new.
 
 ## 0.104.0
 

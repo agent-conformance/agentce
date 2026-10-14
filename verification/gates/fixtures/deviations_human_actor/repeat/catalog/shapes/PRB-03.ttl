@@ -1,0 +1,5 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
+
+agentce:PRB-03-Shape a sh:NodeShape ; sh:targetClass agentce:Instruction ; sh:property [ sh:path agentce:derivedFrom ; sh:node agentce:PRB-03-Inner ; sh:name "S1" ] .
+agentce:PRB-03-Inner a sh:NodeShape ; sh:property [ sh:path ( agentce:derivedFrom agentce:approvedBy ) ; sh:minCount 1 ; sh:name "S2" ] .
