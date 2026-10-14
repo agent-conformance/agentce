@@ -18,8 +18,8 @@ authorised instruction classes).
 - `unknown-class-*`: no events. The gate copies `spec/catalogs/overlays/conduct`, sets CND-05's `min_source_class` to
   the value given (or removes it), and every engine must refuse the catalog at load with
   `catalog.control.min_source_class_unknown` and exit 3; Python's `catalog lint` must refuse it too.
-- `decision-no-instruction-*`: the agent's own consequential decision names no instruction. It is judged through the
-  enforcement-point calls that execute it, and as the self_report record it is when none of them acts on an attested
+- `decision-no-instruction-*`: the agent's own consequential decision names no instruction. It is judged through every
+  ToolCall that executes it, and as the self_report record it is when none of them acts on an attested
   instruction; it is never left unjudged.
 - `source-class-from-unknown-*`: no events. As `unknown-class-*`, but CND-05's `source_class_from` is set to the value
   given, and the refusal key is `catalog.control.source_class_from_unknown`.
