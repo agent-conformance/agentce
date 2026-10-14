@@ -9,9 +9,10 @@ fails if a gate in `gates.json` is not named in this file.
   tools and effect classes a task's actions may use), but no engine read it: an irreversible call in a task whose
   scope allows read only read CND-01 conformant unless a gateway had also denied it. All three engines now hold a
   ToolCall that names a task, by `refs.task` or `agentcetask`, to every scope declared for that task's type, or for
-  the only type when the binding declares one; a task held to no scope, or a call with no effect class, is out of
-  scope. A call in no task keeps the deny-only reading. The gate runs 39 cases in the three CLIs, among them a second
-  subject, a deny before and after the call and one naming an event not held, and the get-evidence skill's
+  the only type when the binding declares one and no entry it cannot read; a task held to no scope, or a call with no
+  effect class, is out of scope. A call in no task keeps the deny-only reading. The gate runs 42 cases in the three
+  CLIs, among them a second subject, a deny before and after the call and one naming an event not held, an unreadable
+  entry (a misspelled key, an unquoted number, a bare string) beside a valid one, and the get-evidence skill's
   task-scope template filled in as a user would, which `lint_profile --domain` must also read cleanly. Three seeded
   faults, one per engine, make the scope ignore the effect class.
 - `VG-TRUST-MATRIX` (18.174, changed). `fx-CND-01-en-fail-uea` and `fx-CND-01-en-fail-uep` (an irreversible call in a

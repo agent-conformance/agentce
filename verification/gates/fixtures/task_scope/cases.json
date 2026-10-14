@@ -694,6 +694,60 @@
           "tc1"
         ]
       }
+    },
+    "malformed-key-beside-valid": {
+      "why": "an entry with a misspelled task-type key, declared read only, beside one valid type; the unreadable entry keeps the valid type from standing for every task (verifier 18.174 r1 B1)",
+      "domain": "task_scopes:\n  - {task-type: \"2024\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\"]}\n  - {task_type: \"batch\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\", \"irreversible\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "irreversible",
+          "agentcetask": "2024"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "numeric-type-beside-valid": {
+      "why": "an entry whose task_type is an unquoted number, declared read only, beside one valid type (verifier 18.174 r1 B1)",
+      "domain": "task_scopes:\n  - {task_type: 2024, allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\"]}\n  - {task_type: \"batch\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\", \"irreversible\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "irreversible",
+          "agentcetask": "2024"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "non-mapping-entry-beside-valid": {
+      "why": "a task_scopes entry that is not a mapping, beside one valid type",
+      "domain": "task_scopes:\n  - \"2024\"\n  - {task_type: \"batch\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\", \"irreversible\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "irreversible",
+          "agentcetask": "2024"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
     }
   }
 }
