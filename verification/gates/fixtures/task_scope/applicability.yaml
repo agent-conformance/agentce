@@ -1,0 +1,18 @@
+# Applicability profile for the VG-TASK-SCOPE gate fixture (verification/gates/task_scope.sh): the baseline catalog
+# and the Conduct overlay, so CND-01 judges each case's tool calls against the case's declared task scopes.
+profile_version: 1
+observation_window:
+  start: "2026-01-01T00:00:00Z"
+  end: "2026-02-01T00:00:00Z"
+content_capture:
+  mode: hashes_only
+catalogs:
+  - "baseline@2026.09"
+  - "conduct@2026.09"
+subjects:
+  - id: "spiffe://corp/agents/task-scope-fixture"
+    name: "VG-TASK-SCOPE gate fixture subject"
+    role: "both"
+  - id: "spiffe://corp/agents/task-scope-other"
+    name: "VG-TASK-SCOPE second subject"
+    role: "both"

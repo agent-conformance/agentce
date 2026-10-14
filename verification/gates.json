@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.105.0",
+  "suite_version": "0.106.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -4504,6 +4504,50 @@
         }
       ],
       "fix_hint": "Run verification/gates/pathlib_predicates.sh and read the site it names: route the call through signing.is_regular_file or signing.is_directory (unreadable_is_absent=True where 'not there' is the right answer and safe, the default where the caller must report the folder as unreadable), or, if the call is on an engine-owned path, add it to verification/gates/fixtures/pathlib_predicates/baseline.json in review."
+    },
+    {
+      "id": "VG-TASK-SCOPE",
+      "title": "CND-01 holds every tool call in a task to the task's declared effect scope in all three engines: a ToolCall naming a task (refs.task or agentcetask) is within scope only when every task_scopes entry of the domain binding that the task resolves to allows its tool and effect class, and the get-evidence skill's task-scope template, filled in as a user would, is the binding the engines read (18.174)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/task_scope.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "lint_profile --domain reads the filled-in skills/agentce-get-evidence/assets/task-scope.template.yaml with no Conduct or task-scope finding; then every case in verification/gates/fixtures/task_scope/cases.json (a task named by agentcetask, by refs.task, by both agreeing or disagreeing, or not at all; a binding declaring the named type, a single type, several types and none named, a differently cased type, no scopes, a mapping instead of a list, an entry with no task_type; a tool allowed, not allowed or missing, a scope listing no tools or an empty list; an effect class allowed, not allowed, missing, listed only in requires_approval, or a scope listing none or a non-list; a type declared twice with a narrower second entry; one call in and one out; a second subject's out-of-scope call; a PolicyDecision deny after the call, before it, and one naming an event not held; and the template's in-scope, approval-marked, out-of-scope and other-tool calls) gives CND-01 its expected outcome and failing calls from the real Python, TypeScript and Java CLIs, with nothing quarantined",
+        "fail": "lint_profile cannot read the filled-in template or reports a Conduct or task-scope finding on it, or any case gives CND-01 another outcome or another set of failing calls in any engine, or quarantines a record"
+      },
+      "faults": [
+        {
+          "description": "Python's task scope ignores the effect class, so an irreversible call in a task whose scope allows read only reads CND-01 conformant",
+          "file": "engines/python/agentce/domain.py",
+          "search": "        return effect_class in self.allowed_effect_classes\n",
+          "replace": "        return True\n"
+        },
+        {
+          "description": "TypeScript's task scope ignores the effect class, so an irreversible call in a task whose scope allows read only reads CND-01 conformant",
+          "file": "engines/typescript/src/domain.ts",
+          "search": "return typeof effectClass === \"string\" && this.allowedEffectClasses.has(effectClass);",
+          "replace": "return true;"
+        },
+        {
+          "description": "Java's task scope ignores the effect class, so an irreversible call in a task whose scope allows read only reads CND-01 conformant",
+          "file": "engines/java/src/main/java/org/agentce/DomainBinding.java",
+          "search": "return effectClass != null && allowedEffectClasses.contains(effectClass);",
+          "replace": "return true;"
+        }
+      ],
+      "fix_hint": "Run verification/gates/task_scope.sh; it names the engine, the case, CND-01's outcome and failing calls it gave and the ones expected. The binding is read by DomainBinding (domain.py, domain.ts, DomainBinding.java: TaskScope, scopes_for/scopesFor); withinScope is computed in each graph builder's conduct scope pass (_within_task_scope, withinTaskScope)."
     }
   ]
 }

@@ -1,0 +1,699 @@
+{
+  "_description": "VG-TASK-SCOPE cases (18.174): each case is a domain binding and the enforcement-point ToolCalls of one subject; verification/gates/task_scope.sh builds the bundle, the real Python, TypeScript and Java CLIs assess it against the baseline catalog and the Conduct overlay, and CND-01's outcome and failing calls must be the expected ones in every engine. A call's agentcetask is the CloudEvents task attribute, refs_task its refs.task, deny adds an enforcement-point PolicyDecision denying it (\"after\" or \"before\" the call, or \"unheld\": naming an event no record holds), and subject \"other\" records the call under a second subject, whose CND-01 reading is expected_other. A domain of \"@template\" is skills/agentce-get-evidence/assets/task-scope.template.yaml with <task-type> = credit-review and <tool-name> = lookup.",
+  "cases": {
+    "type-named-in-scope": {
+      "why": "the task names a declared task type; its tool and effect class are allowed",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\"]}\n  - {task_type: \"payments\", allowed_tools: [\"pay\"], allowed_effect_classes: [\"read\", \"spend\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "credit-review"
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": []
+      }
+    },
+    "type-named-effect-out": {
+      "why": "an irreversible call in a task whose scope allows read only",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\"]}\n  - {task_type: \"payments\", allowed_tools: [\"pay\"], allowed_effect_classes: [\"read\", \"spend\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "irreversible",
+          "agentcetask": "credit-review"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "type-named-tool-out": {
+      "why": "a tool the task's scope does not list, though another task type allows it",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\"]}\n  - {task_type: \"payments\", allowed_tools: [\"pay\"], allowed_effect_classes: [\"read\", \"spend\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "pay",
+          "effect_class": "read",
+          "agentcetask": "credit-review"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "type-named-other-scope-in": {
+      "why": "the second declared task type's own scope allows the call",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\"]}\n  - {task_type: \"payments\", allowed_tools: [\"pay\"], allowed_effect_classes: [\"read\", \"spend\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "pay",
+          "effect_class": "spend",
+          "agentcetask": "payments"
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": []
+      }
+    },
+    "single-type-in-scope": {
+      "why": "one task type declared, so every task is of it: an allowed call",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\", \"write\"],\n     requires_approval: [\"irreversible\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "task-1"
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": []
+      }
+    },
+    "single-type-effect-out": {
+      "why": "one task type declared: an irreversible call it does not allow",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\", \"write\"],\n     requires_approval: [\"irreversible\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "irreversible",
+          "agentcetask": "task-1"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "single-type-tool-out": {
+      "why": "one task type declared: a tool it does not list",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\", \"write\"],\n     requires_approval: [\"irreversible\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "pay",
+          "effect_class": "read",
+          "agentcetask": "task-1"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "requires-approval-allows-nothing": {
+      "why": "requires_approval marks a class for CND-02; it does not put the class in scope",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\", \"write\"],\n     requires_approval: [\"irreversible\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "irreversible",
+          "agentcetask": "task-1"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "requires-approval-and-allowed": {
+      "why": "a class both allowed and marked requires_approval is in scope for CND-01",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\", \"irreversible\"], requires_approval: [\"irreversible\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "irreversible",
+          "agentcetask": "task-1"
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": []
+      }
+    },
+    "several-types-unnamed": {
+      "why": "several task types declared and the task names none of them: no scope holds it",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\"]}\n  - {task_type: \"payments\", allowed_tools: [\"pay\"], allowed_effect_classes: [\"read\", \"spend\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "task-1"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "several-types-wrong-case": {
+      "why": "task types match exactly; a differently cased name names no type",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\"]}\n  - {task_type: \"payments\", allowed_tools: [\"pay\"], allowed_effect_classes: [\"read\", \"spend\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "Credit-Review"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "several-types-empty-task": {
+      "why": "an empty task attribute is a task that names no declared type",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\"]}\n  - {task_type: \"payments\", allowed_tools: [\"pay\"], allowed_effect_classes: [\"read\", \"spend\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": ""
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "no-scopes-declared": {
+      "why": "a task, but the binding declares no scope at all",
+      "domain": "decision_types: []\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "task-1"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "no-binding-scopes-untasked": {
+      "why": "no scope declared and the call names no task: CND-01 judges actions in a task",
+      "domain": "decision_types: []\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read"
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": []
+      }
+    },
+    "untasked-outside-every-scope": {
+      "why": "a call in no task, of a tool and class no scope allows: CND-01 judges actions in a task",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\"]}\n  - {task_type: \"payments\", allowed_tools: [\"pay\"], allowed_effect_classes: [\"read\", \"spend\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "ping",
+          "effect_class": "irreversible"
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": []
+      }
+    },
+    "refs-task-in-scope": {
+      "why": "the task named by refs.task",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\"]}\n  - {task_type: \"payments\", allowed_tools: [\"pay\"], allowed_effect_classes: [\"read\", \"spend\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "refs_task": "credit-review"
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": []
+      }
+    },
+    "refs-task-effect-out": {
+      "why": "the task named by refs.task; an irreversible call",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\"]}\n  - {task_type: \"payments\", allowed_tools: [\"pay\"], allowed_effect_classes: [\"read\", \"spend\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "irreversible",
+          "refs_task": "credit-review"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "both-names-agree": {
+      "why": "refs.task and agentcetask name the same task",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\"]}\n  - {task_type: \"payments\", allowed_tools: [\"pay\"], allowed_effect_classes: [\"read\", \"spend\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "credit-review",
+          "refs_task": "credit-review"
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": []
+      }
+    },
+    "both-names-differ": {
+      "why": "refs.task and agentcetask name different tasks: the call must be within both scopes",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\"]}\n  - {task_type: \"payments\", allowed_tools: [\"pay\"], allowed_effect_classes: [\"read\", \"spend\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "payments",
+          "refs_task": "credit-review"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "effect-class-missing": {
+      "why": "a call in a task with no effect class",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\", \"write\"],\n     requires_approval: [\"irreversible\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "agentcetask": "task-1"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "tool-missing": {
+      "why": "a call with no tool, in a scope that lists tools",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\", \"write\"],\n     requires_approval: [\"irreversible\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "effect_class": "read",
+          "agentcetask": "task-1"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "no-tools-listed": {
+      "why": "a scope that lists no tools allows any tool",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_effect_classes: [\"read\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "anything",
+          "effect_class": "read",
+          "agentcetask": "task-1"
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": []
+      }
+    },
+    "empty-tools-list": {
+      "why": "a scope that lists an empty tool list allows no tool",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [], allowed_effect_classes: [\"read\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "task-1"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "no-effect-classes-listed": {
+      "why": "a scope that lists no effect classes allows no call",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "task-1"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "effect-classes-not-a-list": {
+      "why": "allowed_effect_classes that is not a list declares none",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: \"read\"}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "task-1"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "non-string-members-ignored": {
+      "why": "only string members of a list count",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [1, true, \"write\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "task-1"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "same-type-twice-narrower": {
+      "why": "a task type declared twice: the call must be within both scopes",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\", \"write\"]}\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "write",
+          "agentcetask": "task-1"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "same-type-twice-both-allow": {
+      "why": "a task type declared twice, both scopes allow the call",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\", \"write\"]}\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "task-1"
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": []
+      }
+    },
+    "scopes-as-mapping": {
+      "why": "task_scopes written as a mapping by task type (not the SPEC §7.7.6 list) declares no scope",
+      "domain": "task_scopes:\n  credit-review: {allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "credit-review"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "entry-without-task-type": {
+      "why": "a scope entry with no task_type scopes nothing",
+      "domain": "task_scopes:\n  - {allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "task-1"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "denied-in-scope": {
+      "why": "an enforcement-point deny puts an otherwise allowed call out of scope, as before",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\", \"write\"],\n     requires_approval: [\"irreversible\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "task-1",
+          "deny": "after"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "one-in-one-out": {
+      "why": "two calls in the same task: only the one outside the scope fails",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\", \"write\"],\n     requires_approval: [\"irreversible\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "task-1"
+        },
+        {
+          "id": "tc2",
+          "tool": "lookup",
+          "effect_class": "spend",
+          "agentcetask": "task-1"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc2"
+        ]
+      }
+    },
+    "deny-before-call": {
+      "why": "a deny recorded before the call it names still puts the call out of scope: a deny is never an allow",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\", \"write\"],\n     requires_approval: [\"irreversible\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "task-1",
+          "deny": "before"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "deny-unheld-request": {
+      "why": "a deny naming an event no record holds changes nothing: the in-scope call stays in scope",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\", \"write\"],\n     requires_approval: [\"irreversible\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "task-1",
+          "deny": "unheld"
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": []
+      }
+    },
+    "other-subject-out": {
+      "why": "the binding's scopes hold every subject: a second subject's out-of-scope call fails its own CND-01 reading and leaves the first subject's in-scope call conformant",
+      "domain": "task_scopes:\n  - {task_type: \"credit-review\", allowed_tools: [\"lookup\"], allowed_effect_classes: [\"read\", \"write\"],\n     requires_approval: [\"irreversible\"]}\n",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "task-1"
+        },
+        {
+          "id": "tc2",
+          "tool": "lookup",
+          "effect_class": "spend",
+          "agentcetask": "task-1",
+          "subject": "other"
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": []
+      },
+      "expected_other": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc2"
+        ]
+      }
+    },
+    "template-in-scope": {
+      "why": "the skill's template, filled in: a lookup read in the task type it declares is in scope",
+      "domain": "@template",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "read",
+          "agentcetask": "credit-review"
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": []
+      }
+    },
+    "template-approval-class": {
+      "why": "the template lists spend in allowed_effect_classes and requires_approval, so CND-01 reads a spend call in scope (CND-02 judges the approval)",
+      "domain": "@template",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "spend",
+          "agentcetask": "credit-review"
+        }
+      ],
+      "expected": {
+        "outcome": "conformant",
+        "failing": []
+      }
+    },
+    "template-effect-out": {
+      "why": "the template does not allow irreversible",
+      "domain": "@template",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "lookup",
+          "effect_class": "irreversible",
+          "agentcetask": "credit-review"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "template-tool-out": {
+      "why": "the template allows only the tool it names",
+      "domain": "@template",
+      "calls": [
+        {
+          "id": "tc1",
+          "tool": "pay",
+          "effect_class": "read",
+          "agentcetask": "credit-review"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    }
+  }
+}
