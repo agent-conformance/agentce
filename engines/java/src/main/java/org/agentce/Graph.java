@@ -715,11 +715,36 @@ public final class Graph {
             store.addLiteral(node, "agentce:instructionUntrusted", untrusted ? "true" : "false", BOOL);
         }
 
-        /** Compute the Conduct within-scope and within-budget flags (SPEC §7.7, CND-01/CND-07) from
-         * the enforcement point's records: an action is out of scope when a {@code PolicyDecision}
-         * denies its request, and over budget when a {@code Refusal} with reason class
-         * {@code budget_exceeded} names it; both default to conformant, so the flags are inert for a
-         * bundle that records neither. */
+        /** Whether a ToolCall stays within the declared effect scope of every task it names, by
+         * {@code refs.task} or the {@code agentcetask} attribute (SPEC §7.7.4 CND-01, §7.7.6): each
+         * scope the domain binding holds the task to ({@link DomainBinding#scopesFor}) allows its tool
+         * and its effect class. A task held to no scope, or a call with no effect class, is out of
+         * scope. */
+        private boolean withinTaskScope(JsonNode event) {
+            Set<String> tasks = new LinkedHashSet<>();
+            for (JsonNode task : new JsonNode[] {refsOf(event).get("task"), event.get("agentcetask")}) {
+                if (task != null && task.isTextual()) {
+                    tasks.add(task.asText());
+                }
+            }
+            JsonNode data = dataOf(event);
+            JsonNode tool = data.get("tool");
+            String name = tool != null && tool.isObject() ? str(tool.get("name")) : null;
+            String effectClass = str(data.get("effect_class"));
+            for (String task : tasks) {
+                List<DomainBinding.TaskScope> scopes = domain.scopesFor(task);
+                if (scopes.isEmpty() || !scopes.stream().allMatch(s -> s.allows(name, effectClass))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /** Compute the Conduct within-scope and within-budget flags (SPEC §7.7, CND-01/CND-07): an
+         * action is out of scope when a {@code PolicyDecision} denies its request, or when it is a
+         * ToolCall in a task whose declared effect scope does not allow its tool and effect class
+         * ({@code withinTaskScope}); it is over budget when a {@code Refusal} with reason class
+         * {@code budget_exceeded} names it. An action in no task and never denied reads within scope. */
         private void conductScopeBudget(List<JsonNode> events) {
             Set<String> denied = new LinkedHashSet<>();
             Set<String> overBudget = new LinkedHashSet<>();
@@ -743,7 +768,9 @@ public final class Graph {
                     continue;
                 }
                 String node = Iri.eventIri(event.get("id").asText());
-                store.addLiteral(node, "agentce:withinScope", denied.contains(node) ? "false" : "true", BOOL);
+                boolean inScope =
+                        !denied.contains(node) && (!"ToolCall".equals(ptype) || withinTaskScope(event));
+                store.addLiteral(node, "agentce:withinScope", inScope ? "true" : "false", BOOL);
                 store.addLiteral(
                         node, "agentce:withinBudget", overBudget.contains(node) ? "false" : "true", BOOL);
             }

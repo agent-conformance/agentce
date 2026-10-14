@@ -1,0 +1,51 @@
+package org.agentce;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.List;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
+
+/** The domain binding's task scopes (SPEC §7.7.6), as engines/python/tests/test_domain.py. */
+class DomainBindingTest {
+
+    @Test
+    void taskScopeParsing() {
+        DomainBinding binding = DomainBinding.fromDict(Json.parse("{\"task_scopes\":["
+                + "{\"task_type\":\"a\",\"allowed_tools\":[\"t\",1],\"allowed_effect_classes\":[\"read\"],"
+                + "\"requires_approval\":[\"spend\",null]},"
+                + "{\"task_type\":\"a\",\"allowed_effect_classes\":\"read\"},"
+                + "{\"allowed_effect_classes\":[\"read\"]},\"nope\"]}"));
+        assertEquals(Set.of("a"), binding.taskScopes.keySet());
+        DomainBinding.TaskScope first = binding.taskScopes.get("a").get(0);
+        DomainBinding.TaskScope second = binding.taskScopes.get("a").get(1);
+        assertEquals(Set.of("t"), first.allowedTools());
+        assertEquals(Set.of("read"), first.allowedEffectClasses());
+        assertEquals(Set.of("spend"), first.requiresApproval());
+        assertNull(second.allowedTools());
+        assertTrue(second.allowedEffectClasses().isEmpty());
+        assertTrue(first.allows("t", "read") && !first.allows("u", "read"));
+        assertFalse(first.allows("t", "write") || first.allows("t", "spend") || second.allows("t", "read"));
+    }
+
+    @Test
+    void taskScopeNotAListDeclaresNone() {
+        assertTrue(DomainBinding.fromDict(Json.parse("{\"task_scopes\":{\"a\":{}}}")).taskScopes.isEmpty());
+        assertTrue(DomainBinding.fromDict(Json.parse("{\"task_scopes\":5}")).taskScopes.isEmpty());
+    }
+
+    @Test
+    void taskScopeResolution() {
+        DomainBinding one = DomainBinding.fromDict(Json.parse("{\"task_scopes\":[{\"task_type\":\"a\"}]}"));
+        DomainBinding two = DomainBinding.fromDict(
+                Json.parse("{\"task_scopes\":[{\"task_type\":\"a\"},{\"task_type\":\"b\"}]}"));
+        assertSame(one.taskScopes.get("a"), one.scopesFor("task-1"));
+        assertSame(two.taskScopes.get("b"), two.scopesFor("b"));
+        assertEquals(List.of(), two.scopesFor("task-1"));
+        assertEquals(List.of(), DomainBinding.empty().scopesFor("a"));
+    }
+}

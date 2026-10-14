@@ -808,4 +808,45 @@ class GraphTest {
         assertEquals(List.of("agentce:event/a1"),
                 failed.apply(List.of(decisionEvent("d1"), approval("a1", "nowhere", "alice"))));
     }
+    private static JsonNode taskCall(String id, String tool, String effect, String agentTask, String refsTask) {
+        ObjectNode event = (ObjectNode) Json.parse("{\"id\":\"" + id + "\",\"source\":\"urn:src:gw\","
+                + "\"subject\":\"spiffe://corp/agents/a\",\"type\":\"org.agent-conformance.evidence.ToolCall.v1\","
+                + "\"data\":{\"@type\":\"ToolCall\",\"tool\":{\"name\":\"" + tool + "\"},"
+                + "\"effect_class\":\"" + effect + "\"}}");
+        if (agentTask != null) {
+            event.put("agentcetask", agentTask);
+        }
+        if (refsTask != null) {
+            ((ObjectNode) event.get("data")).putObject("refs").put("task", refsTask);
+        }
+        return event;
+    }
+
+    @Test
+    void withinTaskScopeHoldsATaskedToolCallToEveryNamedTasksScope() {
+        DomainBinding domain = DomainBinding.fromDict(Json.parse("{\"task_scopes\":["
+                + "{\"task_type\":\"review\",\"allowed_tools\":[\"lookup\"],\"allowed_effect_classes\":[\"read\"]},"
+                + "{\"task_type\":\"pay\",\"allowed_tools\":[\"pay\"],\"allowed_effect_classes\":[\"spend\"]}]}"));
+        List<JsonNode> calls = List.of(
+                taskCall("in", "lookup", "read", "review", null),
+                taskCall("effect", "lookup", "irreversible", "review", null),
+                taskCall("tool", "pay", "read", null, "review"),
+                taskCall("unknown", "lookup", "read", "task-1", null),
+                taskCall("differ", "lookup", "read", "pay", "review"),
+                taskCall("untasked", "ping", "irreversible", null, null));
+        GraphStore store = Graph.buildGraph(calls, domain);
+        Map<String, String> got = new LinkedHashMap<>();
+        for (JsonNode call : calls) {
+            String id = call.get("id").asText();
+            got.put(id, store.literalValues("agentce:event/" + id, "agentce:withinScope").get(0));
+        }
+        Map<String, String> expected = new LinkedHashMap<>();
+        expected.put("in", "true");
+        expected.put("effect", "false");
+        expected.put("tool", "false");
+        expected.put("unknown", "false");
+        expected.put("differ", "false");
+        expected.put("untasked", "true");
+        assertEquals(expected, got);
+    }
 }
