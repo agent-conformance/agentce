@@ -1355,3 +1355,59 @@ def test_human_actor_rule() -> None:
         "d1",
         "oversightCoverageComplete",
     ) == ["true"]
+
+
+_SCOPES = DomainBinding.from_dict(
+    {
+        "task_scopes": [
+            {
+                "task_type": "review",
+                "allowed_tools": ["lookup"],
+                "allowed_effect_classes": ["read"],
+            },
+            {
+                "task_type": "pay",
+                "allowed_tools": ["pay"],
+                "allowed_effect_classes": ["spend"],
+            },
+        ]
+    }
+)
+
+
+def _scoped_call(eid: str, tool: str, effect: str, **extra: Any) -> dict[str, Any]:
+    event: dict[str, Any] = {
+        "id": eid,
+        "source": "urn:src:gw",
+        "subject": "spiffe://corp/agents/a",
+        "type": "org.agent-conformance.evidence.ToolCall.v1",
+        "data": {"@type": "ToolCall", "tool": {"name": tool}, "effect_class": effect},
+    }
+    if "refs_task" in extra:
+        event["data"]["refs"] = {"task": extra.pop("refs_task")}
+    event.update(extra)
+    return event
+
+
+def test_task_scope_within_scope() -> None:
+    calls = [
+        _scoped_call("in", "lookup", "read", agentcetask="review"),
+        _scoped_call("effect", "lookup", "irreversible", agentcetask="review"),
+        _scoped_call("tool", "pay", "read", refs_task="review"),
+        _scoped_call("unknown", "lookup", "read", agentcetask="task-1"),
+        _scoped_call("differ", "lookup", "read", agentcetask="pay", refs_task="review"),
+        _scoped_call("untasked", "ping", "irreversible"),
+    ]
+    store = build_graph(calls, domain=_SCOPES)
+    got = {
+        c["id"]: store.literal_values(event_iri(c["id"]), "agentce:withinScope")
+        for c in calls
+    }
+    assert {k: v[0] for k, v in got.items()} == {
+        "in": "true",
+        "effect": "false",
+        "tool": "false",
+        "unknown": "false",
+        "differ": "false",
+        "untasked": "true",
+    }

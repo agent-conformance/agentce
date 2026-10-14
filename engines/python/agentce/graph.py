@@ -573,10 +573,11 @@ class _Builder:
             self.operated[family].update(names)
 
     def _conduct_scope_budget(self, events: list[dict[str, Any]]) -> None:
-        """Compute the Conduct within-scope and within-budget flags (SPEC §7.7, CND-01/CND-07) from
-        the enforcement point's records: an action is out of scope when a ``PolicyDecision`` denies
-        its request, and over budget when a ``Refusal`` with reason class ``budget_exceeded`` names
-        it; both default to conformant, so the flags are inert for a bundle that records neither."""
+        """Compute the Conduct within-scope and within-budget flags (SPEC §7.7, CND-01/CND-07): an
+        action is out of scope when a ``PolicyDecision`` denies its request, or when it is a ToolCall
+        in a task whose declared effect scope does not allow its tool and effect class
+        (:meth:`_within_task_scope`); it is over budget when a ``Refusal`` with reason class
+        ``budget_exceeded`` names it. An action in no task and never denied reads within scope."""
         denied: set[str] = set()
         over_budget: set[str] = set()
         for event in events:
@@ -599,8 +600,11 @@ class _Builder:
             if self._ptype(event) not in ("ToolCall", "ResourceAccess"):
                 continue
             node = event_iri(str(event["id"]))
+            in_scope = node not in denied and (
+                self._ptype(event) != "ToolCall" or self._within_task_scope(event)
+            )
             self.store.add_literal(
-                node, "agentce:withinScope", "false" if node in denied else "true", BOOL
+                node, "agentce:withinScope", "true" if in_scope else "false", BOOL
             )
             self.store.add_literal(
                 node,
@@ -608,6 +612,26 @@ class _Builder:
                 "false" if node in over_budget else "true",
                 BOOL,
             )
+
+    def _within_task_scope(self, event: dict[str, Any]) -> bool:
+        """Whether a ToolCall stays within the declared effect scope of every task it names, by
+        ``refs.task`` or the ``agentcetask`` attribute (SPEC §7.7.4 CND-01, §7.7.6): each scope
+        the domain binding holds the task to (:meth:`DomainBinding.scopes_for`) allows its tool and
+        its effect class. A task held to no scope, or a call with no effect class, is out of scope."""
+        tasks = {
+            t
+            for t in (_refs(event).get("task"), event.get("agentcetask"))
+            if isinstance(t, str)
+        }
+        data = _data(event)
+        tool = data.get("tool")
+        name = tool.get("name") if isinstance(tool, dict) else None
+        effect = data.get("effect_class")
+        for task in tasks:
+            scopes = self.domain.scopes_for(task)
+            if not scopes or not all(s.allows(name, effect) for s in scopes):
+                return False
+        return True
 
     def _acts_on_untrusted(
         self, events: list[dict[str, Any]], tainted: set[str]

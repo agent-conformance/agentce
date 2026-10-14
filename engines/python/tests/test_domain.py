@@ -55,3 +55,48 @@ def test_load_empty_file(tmp_path: Path) -> None:
     path = tmp_path / "empty.yaml"
     path.write_text("", encoding="utf-8")
     assert DomainBinding.load(path).subclasses == {}
+
+
+def test_task_scope_parsing() -> None:
+    binding = DomainBinding.from_dict(
+        {
+            "task_scopes": [
+                {
+                    "task_type": "a",
+                    "allowed_tools": ["t", 1],
+                    "allowed_effect_classes": ["read"],
+                    "requires_approval": ["spend", None],
+                },
+                {"task_type": "a", "allowed_effect_classes": "read"},
+                {"allowed_effect_classes": ["read"]},
+                "nope",
+            ]
+        }
+    )
+    assert list(binding.task_scopes) == ["a"]
+    first, second = binding.task_scopes["a"]
+    assert first.allowed_tools == {"t"} and first.allowed_effect_classes == {"read"}
+    assert second.allowed_tools is None and second.allowed_effect_classes == frozenset()
+    assert (
+        first.requires_approval == {"spend"} and second.requires_approval == frozenset()
+    )
+    assert not first.allows("t", "spend")
+    assert first.allows("t", "read") and not first.allows("u", "read")
+    assert not first.allows("t", "write") and not second.allows("t", "read")
+
+
+def test_task_scope_not_a_list_declares_none() -> None:
+    assert DomainBinding.from_dict({"task_scopes": {"a": {}}}).task_scopes == {}
+    assert DomainBinding.from_dict({"task_scopes": 5}).task_scopes == {}
+
+
+def test_task_scope_resolution() -> None:
+    one = DomainBinding.from_dict({"task_scopes": [{"task_type": "a"}]})
+    two = DomainBinding.from_dict(
+        {"task_scopes": [{"task_type": "a"}, {"task_type": "b"}]}
+    )
+    assert one.scopes_for("task-1") == one.task_scopes["a"]
+    assert two.scopes_for("b") == two.task_scopes["b"]
+    assert (
+        two.scopes_for("task-1") == [] and DomainBinding.empty().scopes_for("a") == []
+    )
