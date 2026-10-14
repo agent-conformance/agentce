@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { type Assertion, assertionToJson, makeAssertion } from "./assertions";
-import { applyDeviations, assessSubjects } from "./assess";
+import { applyDeviations, assessSubjects, readsHumanActor } from "./assess";
 import { loadBundle } from "./bundle";
 import { canonicalString } from "./canonical";
 import { loadCatalog } from "./catalog";
@@ -213,4 +213,105 @@ test("a late record that reads non-conformant is marked for the exit code (18.14
   const benign = quarantineRob02("rob02-benign-time-order");
   assert.equal(benign.outcome, "conformant");
   assert.notEqual(benign.withheldNonConformant, true);
+});
+
+// --- 18.186: the deviation register cannot waive the SPEC §10.4 human-actor rule. ---
+
+const HUMAN_ACTOR = join(REPO, "verification", "gates", "fixtures", "deviations_human_actor");
+
+/** The case's assertions by control for its fixture subject, and its register's entries. */
+function humanActorCase(
+  name: string,
+  drop: string[] = [],
+): { byControl: Map<string, Assertion>; register: Record<string, unknown>[] } {
+  const kase = join(HUMAN_ACTOR, name);
+  const accepted = ingest(loadBundle(join(kase, "bundle"))).accepted.filter(
+    (event) => !drop.includes(String(event.id)),
+  );
+  const catalogs = [
+    loadCatalog(BASE),
+    loadCatalog(join(REPO, "spec", "catalogs", "overlays", "conduct")),
+  ];
+  const profile = profileFromDict({
+    subjects: [{ id: "spiffe://corp/agents/cnd05-fixture", role: "both" }],
+  });
+  const domain = DomainBinding.load(join(kase, "domain.linkml.yaml"));
+  const assertions = assessSubjects(accepted, profile, catalogs, domain, true, []);
+  return {
+    byControl: new Map(assertions.map((a) => [a.control, a])),
+    register: loadDeviationRegister(join(kase, "deviations.yaml")),
+  };
+}
+
+function pick(byControl: Map<string, Assertion>, control: string): Assertion {
+  return byControl.get(control) as Assertion;
+}
+
+test("not waivable: a failing approval stays non-conformant on the controls that read it", () => {
+  const { byControl, register } = humanActorCase("approval");
+  const readers = ["CND-02", "OVS-01", "OVS-08", "RSK-02"];
+  const chosen = [...readers, "OVS-05"].map((c) => pick(byControl, c));
+  const { assertions, expired, notWaivable } = applyDeviations(
+    chosen,
+    register,
+    chosen[0].window[1],
+  );
+  assert.deepEqual(expired, []);
+  assert.deepEqual(notWaivable, readers);
+  for (const a of assertions.slice(0, 4)) {
+    assert.deepEqual([a.outcome, a.deviation], ["non-conformant", null], a.control);
+  }
+  // The decision's missing authorization is no §10.4 failure: the register still waives it.
+  assert.deepEqual([assertions[4].outcome, assertions[4].deviation], ["partial", "OVS-05"]);
+});
+
+test("not waivable: an expired entry on a failing approval is reported not waivable", () => {
+  const { byControl, register } = humanActorCase("approval");
+  const cnd02 = pick(byControl, "CND-02");
+  const entry = { ...register.find((d) => d.control === "CND-02"), expiry: "2020-01-01" };
+  const { assertions, expired, notWaivable } = applyDeviations([cnd02], [entry], cnd02.window[1]);
+  assert.deepEqual([expired, notWaivable], [[], ["CND-02"]]);
+  assert.equal(assertions[0].outcome, "non-conformant");
+});
+
+test("not waivable: a decision with no approval at all is still waivable", () => {
+  const { byControl, register } = humanActorCase("approval", ["ap1"]);
+  const cnd02 = pick(byControl, "CND-02");
+  assert.equal(cnd02.outcome, "non-conformant");
+  assert.notEqual(cnd02.humanActorFailed, true);
+  const { assertions, notWaivable } = applyDeviations([cnd02], register, cnd02.window[1]);
+  assert.deepEqual(notWaivable, []);
+  assert.deepEqual([assertions[0].outcome, assertions[0].deviation], ["partial", "CND-02"]);
+});
+
+test("not waivable: an override by the agent itself stays non-conformant on OVS-07", () => {
+  const { byControl, register } = humanActorCase("override");
+  const ovs07 = pick(byControl, "OVS-07");
+  const { assertions, notWaivable } = applyDeviations([ovs07], register, ovs07.window[1]);
+  assert.deepEqual(notWaivable, ["OVS-07"]);
+  assert.deepEqual([assertions[0].outcome, assertions[0].deviation], ["non-conformant", null]);
+});
+
+test("not waivable: judged per assertion across subjects", () => {
+  const { byControl, register } = humanActorCase("approval");
+  const failing = pick(byControl, "CND-02");
+  const clean = { ...failing, subject: "spiffe://corp/agents/other", humanActorFailed: false };
+  const { assertions, notWaivable } = applyDeviations(
+    [failing, clean],
+    register,
+    failing.window[1],
+  );
+  assert.deepEqual(notWaivable, ["CND-02"]);
+  assert.deepEqual(
+    assertions.map((a) => a.outcome),
+    ["non-conformant", "partial"],
+  );
+});
+
+test("not waivable: paths match by predicate token", () => {
+  assert.equal(readsHumanActor("agentce:approvedBy"), true);
+  assert.equal(readsHumanActor("(agentce:decidedBy ^agentce:reviewedBy)"), true);
+  assert.equal(readsHumanActor("(agentce:x | agentce:interventionByHuman)"), true);
+  assert.equal(readsHumanActor("agentce:approvedByProxy"), false);
+  assert.equal(readsHumanActor("agentce:authorizedBy"), false);
 });

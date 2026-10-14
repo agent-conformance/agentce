@@ -927,3 +927,31 @@ test("human-actor rule: an approval or override counts only with a held login ou
     ["true"],
   );
 });
+
+test("not waivable: the store lists failing oversight records and the decision they name (18.186)", () => {
+  // What the deviation register cannot waive (SPEC §10.4): each failing ApprovalDecided, Override and Interrupt,
+  // and the held decision a failing approval names; a passing approval adds nothing.
+  const failed = (events: Record<string, unknown>[]) =>
+    [...buildGraph(events, { domain: MINOR_DOMAIN }).humanActorFailed].sort();
+  const approval = (decision: string) =>
+    refEvent(
+      "a1",
+      "ApprovalDecided",
+      { outcome: "approve", actor: HUMAN_A, session_ref: sessionOf(HUMAN_A) },
+      decision,
+    );
+  assert.deepEqual(failed([decisionEvent("d1"), approval("d1")]), [
+    "agentce:event/a1",
+    "agentce:event/d1",
+  ]);
+  assert.deepEqual(failed([decisionEvent("d1"), approval("d1"), ...LOGINS]), []);
+  const service = { kind: "service", id: "svc" };
+  const intervention = (id: string, ptype: string) =>
+    refEvent(id, ptype, { actor: service, session_ref: sessionOf(service) }, "d1");
+  assert.deepEqual(
+    failed([decisionEvent("d1"), intervention("o1", "Override"), intervention("i1", "Interrupt")]),
+    ["agentce:event/i1", "agentce:event/o1"],
+  );
+  // A failing approval naming no held decision adds only itself.
+  assert.deepEqual(failed([decisionEvent("d1"), approval("nowhere")]), ["agentce:event/a1"]);
+});
