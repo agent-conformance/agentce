@@ -182,12 +182,13 @@ FILES = ("assertions.json", "oscal-ar.json", "activity.json", "blind-spots.json"
 DIGEST = {"S22": "sha256:1c8bd1ab", "S22b": "sha256:ec70a21e"}
 # SPEC §10.4: the register cannot waive the human-actor rule. Per scenario, the controls whose entry is not applied
 # (non-conformant, no deviation, one limitation each) and the ones it still waives (partial, the control's id).
-# S26's TPX-01 and TPX-04 reach the failing decision from the ToolCall that executes it; TPX-03 reads no human-actor
-# predicate (approvedByProxy is not approvedBy). Last, each scenario's exit code.
+# S26's TPX-01 and TPX-04 reach the failing decision from the ToolCall that executes it through a sequence path, TPX-05
+# and TPX-06 through a nested sh:node and sh:qualifiedValueShape, and TPX-02 reads it through an alternative path;
+# TPX-03 reads no human-actor predicate (approvedByProxy is not approvedBy). Last, each scenario's exit code.
 HUMAN_ACTOR = {
     "S24": (["CND-02", "OVS-01", "OVS-08", "RSK-02"], ["OVS-05"], 2),
     "S25": (["OVS-07"], [], 2),
-    "S26": (["TPX-01", "TPX-02", "TPX-04"], ["TPX-03"], 1),
+    "S26": (["TPX-01", "TPX-02", "TPX-04", "TPX-05", "TPX-06"], ["TPX-03"], 1),
 }
 NOT_WAIVABLE = (": deviation not applied because an approval, override or interrupt in these records fails the"
                 " human-actor rule (SPEC §10.4), which no deviation can waive; the control remains non-conformant")

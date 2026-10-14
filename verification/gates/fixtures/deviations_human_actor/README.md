@@ -9,5 +9,7 @@ human-actor rule).
 - `override/`: an Override made in the agent's own session. The register names OVS-07, which stays non-conformant.
 - `thirdparty/`: a third-party catalog run over `approval/`'s records (S26). TPX-01 and TPX-04 target the ToolCall and
   reach the decision's approval through a sequence path (`agentce:executes` then `agentce:approvedBy` or
-  `agentce:reviewedBy`), TPX-02 reads the decision through an alternative path, and all three stay non-conformant.
+  `agentce:reviewedBy`), TPX-05 and TPX-06 reach it through a nested `sh:node` and `sh:qualifiedValueShape` whose
+  shape reads `agentce:approvedBy`, TPX-02 reads the decision through an alternative path, and all five stay
+  non-conformant.
   TPX-03 reads `agentce:approvedByProxy`, which the rule does not decide, so the register waives it.

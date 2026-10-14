@@ -10,8 +10,9 @@ fails if a gate in `gates.json` is not named in this file.
   session) pin CND-02, OVS-01, OVS-07, OVS-08 and RSK-02 as non-conformant with no deviation and one not-applied
   limitation each, while OVS-05's ordinary failure is still waived. S26 runs a third-party catalog whose ToolCall shapes
   reach the decision's approval through a sequence path (`agentce:executes` then `agentce:approvedBy` or
-  `agentce:reviewedBy`); those controls stay non-conformant too. Three new seeded faults: Python's and Java's
-  `apply_deviations` ignore the human-actor flag, and TypeScript's check looks only at the violation's focus.
+  `agentce:reviewedBy`) or through a nested `sh:node` or `sh:qualifiedValueShape`; those controls stay non-conformant
+  too. Three new seeded faults: Python's and Java's
+  `apply_deviations` ignore the human-actor flag, and TypeScript's check looks only at the violation's focus. A fourth: Java's property reads skip nested shapes.
 
 ## 0.104.0
 

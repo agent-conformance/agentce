@@ -1,0 +1,5 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
+
+agentce:TPX-05-Shape a sh:NodeShape ; sh:targetClass agentce:ToolCall ; sh:property [ sh:path agentce:executes ; sh:node agentce:TPX-05-Approved ; sh:name "S1" ] .
+agentce:TPX-05-Approved a sh:NodeShape ; sh:property [ sh:path agentce:approvedBy ; sh:minCount 1 ; sh:name "S2" ] .

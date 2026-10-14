@@ -1,0 +1,20 @@
+id: TPX-05
+version: "2026.09"
+title: "third-party TPX-05"
+description: "A third-party control for VG-DEVIATIONS-PARITY S26."
+crosswalk: []
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: self_report
+  minimum_evidence:
+    - {event: ToolCall, class: any}
+  shape: shapes/TPX-05.ttl
+expectations:
+  - {id: F1, text: "See the shape."}
+severity: high
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+test_cases: []
