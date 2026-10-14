@@ -1103,11 +1103,11 @@ class Builder {
       const key = this.verifiedActor(node, event);
       byHuman.set(node, key !== null);
       const ref = refsOf(event).decision;
+      const held = ptype === "ApprovalDecided" ? this.heldDecision(ref) : null;
       if (key === null) {
         // What the deviation register cannot waive (SPEC §10.4): the failing record, and the held decision a failing
         // approval names.
         this.store.humanActorFailed.add(node);
-        const held = ptype === "ApprovalDecided" ? this.heldDecision(ref) : null;
         if (held !== null) {
           this.store.humanActorFailed.add(held);
         }
@@ -1116,7 +1116,7 @@ class Builder {
         continue;
       }
       // A name that leads to no held decision keeps its own key: it reviews and approves no held decision.
-      const decision = this.heldDecision(ref) ?? ref;
+      const decision = held ?? ref;
       const approve = dataOf(event).outcome === "approve";
       const actor = humanId(dataOf(event).actor);
       // A human's own no withdraws that human's approve even when it fails §10.4 (fail closed, 18.142).

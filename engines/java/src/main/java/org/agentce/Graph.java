@@ -1130,11 +1130,11 @@ public final class Graph {
                 byHuman.put(node, human != null);
                 JsonNode refNode = refsOf(event).get("decision");
                 String ref = str(refNode);
+                String held = "ApprovalDecided".equals(ptype) ? heldDecision(refNode) : null;
                 if (human == null) {
                     // What the deviation register cannot waive (SPEC §10.4): the failing record, and the held
                     // decision a failing approval names.
                     store.humanActorFailed.add(node);
-                    String held = "ApprovalDecided".equals(ptype) ? heldDecision(refNode) : null;
                     if (held != null) {
                         store.humanActorFailed.add(held);
                     }
@@ -1143,7 +1143,6 @@ public final class Graph {
                     continue;
                 }
                 // A name that leads to no held decision keeps its own key: it reviews and approves no held decision.
-                String held = heldDecision(refNode);
                 String decision = held != null ? held : ref;
                 boolean approve = "approve".equals(str(dataOf(event).get("outcome")));
                 String actor = humanId(dataOf(event).get("actor"));

@@ -267,15 +267,13 @@ for s, (kept, waived) in HUMAN_ACTOR.items():
             continue
         by_control = {a["control"]: a for a in json.loads(read(f"{work}/{engine}/{s}/assertions.json"))
                       if a["subject"] == "spiffe://corp/agents/cnd05-fixture"}
-        for c in kept:
-            got = (by_control.get(c, {}).get("outcome"), by_control.get(c, {}).get("deviation"))
-            check(got == ("non-conformant", None), f"{s}: {engine} {c} reads {got}, not non-conformant without a deviation")
-        for c in waived:
-            got = (by_control.get(c, {}).get("outcome"), by_control.get(c, {}).get("deviation"))
-            check(got == ("partial", c), f"{s}: {engine} {c} reads {got}, not partial with its deviation")
+        expected = [(c, ("non-conformant", None)) for c in kept] + [(c, ("partial", c)) for c in waived]
+        for c, want in expected:
+            a = by_control.get(c, {})
+            check((a.get("outcome"), a.get("deviation")) == want, f"{s}: {engine} {c} reads {a.get('outcome')}, {a.get('deviation')}, not {want}")
         lines = [x for x in manifest(engine, s)[0] or [] if x.endswith(NOT_WAIVABLE)]
-        check(lines == [c + NOT_WAIVABLE for c in sorted(kept, key=lambda c: list(by_control).index(c))],
-              f"{s}: {engine} not-applied limitations are {lines}")
+        # One line per kept control, in assertion order.
+        check(lines == [c + NOT_WAIVABLE for c in by_control if c in kept], f"{s}: {engine} not-applied limitations are {lines}")
         if engine != "python":
             for n in FILES:
                 a, b = f"{work}/python/{s}/{n}", f"{work}/{engine}/{s}/{n}"

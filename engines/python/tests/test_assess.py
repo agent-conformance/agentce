@@ -15,6 +15,7 @@ from agentce.report import write_report
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _BASE = _REPO_ROOT / "spec" / "catalogs" / "base" / "eu-ai-act"
+_CONDUCT = _REPO_ROOT / "spec" / "catalogs" / "overlays" / "conduct"
 SUBJECT = "spiffe://corp/agents/a"
 
 
@@ -241,9 +242,8 @@ def _human_actor_case(
     name: str, drop: tuple[str, ...] = ()
 ) -> tuple[dict[str, Any], list[dict[str, object]]]:
     """The case's assertions by control for its fixture subject, and its register's entries."""
-    import yaml
-
     from agentce.bundle import load_bundle
+    from agentce.commands import _load_deviation_register
     from agentce.ingest import ingest
 
     case = _HUMAN_ACTOR / name
@@ -252,15 +252,16 @@ def _human_actor_case(
     ]
     catalogs = [
         load_catalog(_BASE),
-        load_catalog(_REPO_ROOT / "spec" / "catalogs" / "overlays" / "conduct"),
+        load_catalog(_CONDUCT),
     ]
     profile = Profile.from_dict(
         {"subjects": [{"id": "spiffe://corp/agents/cnd05-fixture", "role": "both"}]}
     )
     domain = DomainBinding.load(case / "domain.linkml.yaml")
     assertions = assess_subjects(accepted, profile, catalogs, domain, withheld=())
-    register = yaml.safe_load((case / "deviations.yaml").read_text(encoding="utf-8"))
-    return {a.control: a for a in assertions}, register["deviations"]
+    return {a.control: a for a in assertions}, _load_deviation_register(
+        case / "deviations.yaml"
+    )
 
 
 def test_a_failing_approval_is_not_waivable_on_the_controls_that_read_it() -> None:

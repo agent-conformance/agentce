@@ -53,10 +53,12 @@ public final class Assess {
             "agentce:interventionByHuman",
             "agentce:riskReviewed");
 
+    private static final java.util.regex.Pattern PATH_TOKENS = java.util.regex.Pattern.compile("[\\s()|^]+");
+
     /** Whether a rendered shape path passes through a predicate whose value the SPEC §10.4 human-actor rule
      * decides. */
     static boolean readsHumanActor(String path) {
-        for (String token : path.split("[\\s()|^]+")) {
+        for (String token : PATH_TOKENS.split(path)) {
             if (HUMAN_ACTOR_PATHS.contains(token)) {
                 return true;
             }
@@ -253,8 +255,9 @@ public final class Assess {
         if (!isBelow) {
             for (Structural.Violation v : result.violations) {
                 assertion.violations.add(Structural.violationToJson(v));
-                assertion.humanActorFailed |= "non-conformant".equals(outcome)
-                        && store.humanActorFailed.contains(v.focus) && readsHumanActor(v.path);
+                if (!assertion.humanActorFailed && "non-conformant".equals(outcome)) {
+                    assertion.humanActorFailed = store.humanActorFailed.contains(v.focus) && readsHumanActor(v.path);
+                }
             }
             JsonNode strength = control.raw.get("evidence_strength");
             assertion.evidenceStrength = strength != null && strength.isTextual() ? strength.textValue() : null;

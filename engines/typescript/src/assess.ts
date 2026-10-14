@@ -54,7 +54,7 @@ export const SELF_REPORT_EQUIVALENT_CLASSES = new Set(["any", "self_report"]);
 
 /** The predicates whose value the SPEC §10.4 human-actor rule decides: a human's approval or review of a decision,
  * enough human approvers, a human intervention, and the review half of a risk review (18.186). */
-export const HUMAN_ACTOR_PATHS = new Set([
+const HUMAN_ACTOR_PATHS = new Set([
   "agentce:approvedBy",
   "agentce:reviewedBy",
   "agentce:oversightCoverageComplete",
