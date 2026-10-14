@@ -247,16 +247,34 @@ def _assert_control(
         class_gap=kinds,
         human_actor_failed=outcome == "non-conformant"
         and any(
-            v.focus in store.human_actor_failed and _reads_human_actor(v.path)
-            for v in violations
+            _reaches_human_actor_failure(store, v.focus, v.path) for v in violations
         ),
         **base,
     )
 
 
-def _reads_human_actor(path: str) -> bool:
-    """Whether a rendered shape path passes through a predicate whose value the SPEC §10.4 human-actor rule decides."""
-    return not HUMAN_ACTOR_PATHS.isdisjoint(re.split(r"[\s()|^]+", path))
+def _reaches_human_actor_failure(store: GraphStore, focus: str, path: str) -> bool:
+    """Whether a violation's rendered shape path reads a predicate the SPEC §10.4 human-actor rule decides and, from
+    its focus, reaches a node that fails the rule. The walk follows every other step of the path from the focus, in
+    any order and to the path's length, so it reaches at least what the path itself reaches (fail closed)."""
+    tokens = re.findall(r"\^?[^\s()|^]+", path)
+    if HUMAN_ACTOR_PATHS.isdisjoint(token.lstrip("^") for token in tokens):
+        return False
+    steps = [token for token in tokens if token.lstrip("^") not in HUMAN_ACTOR_PATHS]
+    reach = frontier = {focus}
+    for _ in tokens:
+        frontier = {
+            node
+            for start in frontier
+            for step in steps
+            for node in (
+                store.subjects(step[1:], start)
+                if step.startswith("^")
+                else store.objects(start, step)
+            )
+        } - reach
+        reach = reach | frontier
+    return not reach.isdisjoint(store.human_actor_failed)
 
 
 def _events_by_iri(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:

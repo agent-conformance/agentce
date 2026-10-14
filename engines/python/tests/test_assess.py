@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from agentce.store import GraphStore
 from agentce.assess import apply_deviations, assess_subjects
 from agentce.catalog import load_catalog
 from agentce.domain import DomainBinding
@@ -329,13 +330,50 @@ def test_not_waivable_is_per_assertion_across_subjects() -> None:
 
 
 def test_not_waivable_paths_match_by_predicate_token() -> None:
-    from agentce.assess import _reads_human_actor
+    from agentce.assess import _reaches_human_actor_failure
 
-    assert _reads_human_actor("agentce:approvedBy")
-    assert _reads_human_actor("(agentce:decidedBy ^agentce:reviewedBy)")
-    assert _reads_human_actor("(agentce:x | agentce:interventionByHuman)")
-    assert not _reads_human_actor("agentce:approvedByProxy")
-    assert not _reads_human_actor("agentce:authorizedBy")
+    with GraphStore() as store:
+        store.human_actor_failed.add("d1")
+        for path in (
+            "agentce:approvedBy",
+            "(agentce:decidedBy ^agentce:reviewedBy)",
+            "(agentce:x | agentce:interventionByHuman)",
+        ):
+            assert _reaches_human_actor_failure(store, "d1", path)
+        assert not _reaches_human_actor_failure(store, "d1", "agentce:approvedByProxy")
+        assert not _reaches_human_actor_failure(store, "d1", "agentce:authorizedBy")
+        assert not _reaches_human_actor_failure(store, "d2", "agentce:approvedBy")
+
+
+def test_not_waivable_when_the_path_reaches_the_failing_decision_from_another_focus() -> (
+    None
+):
+    """A third-party shape on ToolCall whose sequence path reaches the failing decision (verifier 18.186 r1)."""
+    from agentce.assess import _reaches_human_actor_failure
+
+    with GraphStore() as store:
+        store.human_actor_failed.add("d1")
+        store.add_edge("tc1", "agentce:executes", "d1")
+        store.add_edge("tc2", "agentce:executes", "d2")
+        store.add_edge("a1", "agentce:approves", "d1")
+        assert _reaches_human_actor_failure(
+            store, "tc1", "(agentce:executes agentce:approvedBy)"
+        )
+        assert _reaches_human_actor_failure(
+            store, "tc1", "(agentce:executes agentce:reviewedBy)"
+        )
+        assert _reaches_human_actor_failure(
+            store, "a1", "(agentce:approves ^agentce:executes agentce:approvedBy)"
+        )
+        assert _reaches_human_actor_failure(
+            store, "tc1", "(^agentce:x | agentce:executes) agentce:approvedBy"
+        )
+        assert not _reaches_human_actor_failure(
+            store, "tc2", "(agentce:executes agentce:approvedBy)"
+        )
+        assert not _reaches_human_actor_failure(
+            store, "tc1", "(agentce:executes agentce:authorizedBy)"
+        )
 
 
 _ROB02 = _REPO_ROOT / "verification" / "gates" / "fixtures" / "rob02_untrusted"
