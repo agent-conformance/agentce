@@ -276,9 +276,7 @@ def _reaches_human_actor_failure(
     the rule. It reaches at least what the shape itself reaches, a repeated step included, so it fails closed."""
     if HUMAN_ACTOR_PATHS.isdisjoint(step.lstrip("^") for step in reads):
         return False
-    steps = list(
-        dict.fromkeys(s for s in reads if s.lstrip("^") not in HUMAN_ACTOR_PATHS)
-    )
+    steps = [s for s in reads if s.lstrip("^") not in HUMAN_ACTOR_PATHS]
     reach, frontier = {focus}, {focus}
     while frontier:
         frontier = {
