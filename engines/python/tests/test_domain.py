@@ -100,3 +100,16 @@ def test_task_scope_resolution() -> None:
     assert (
         two.scopes_for("task-1") == [] and DomainBinding.empty().scopes_for("a") == []
     )
+
+
+def test_task_scope_unreadable_entry_keeps_single_type_from_standing_for_all() -> None:
+    for bad in ({"task-type": "2024"}, {"task_type": 2024}, "nope"):
+        binding = DomainBinding.from_dict(
+            {"task_scopes": [bad, {"task_type": "batch"}]}
+        )
+        assert binding.task_scopes_malformed and list(binding.task_scopes) == ["batch"]
+        assert binding.scopes_for("2024") == []
+        assert binding.scopes_for("batch") == binding.task_scopes["batch"]
+    assert not DomainBinding.from_dict(
+        {"task_scopes": [{"task_type": "a"}]}
+    ).task_scopes_malformed

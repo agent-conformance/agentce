@@ -29,6 +29,8 @@ public final class DomainBinding {
     public final Map<String, String> requiredOversight = new HashMap<>();
     /** task type -> every scope declared for it, in order (an action must stay within all of them). */
     public final Map<String, List<TaskScope>> taskScopes = new LinkedHashMap<>();
+    /** whether a task_scopes entry was unreadable (not a mapping, or no string task_type). */
+    public boolean taskScopesMalformed;
 
     /**
      * One task type's declared effect scope (SPEC §7.7.6), as CND-01 reads it: the tools and the
@@ -89,6 +91,7 @@ public final class DomainBinding {
             for (JsonNode entry : scopes) {
                 JsonNode taskType = entry.get("task_type");
                 if (!entry.isObject() || taskType == null || !taskType.isTextual()) {
+                    binding.taskScopesMalformed = true;
                     continue;
                 }
                 JsonNode tools = entry.get("allowed_tools");
@@ -105,15 +108,16 @@ public final class DomainBinding {
 
     /**
      * The scopes a task's actions are held to: those declared for the task type the task names, else,
-     * when the binding declares a single task type, that type's (every task is of it), else none, so
-     * nothing the task does can be shown within a declared scope.
+     * when the binding declares a single task type and no unreadable entry, that type's (every task is
+     * of it), else none, so nothing the task does can be shown within a declared scope. An unreadable
+     * entry may name another type, so it never lets the remaining one stand for all.
      */
     public List<TaskScope> scopesFor(String task) {
         List<TaskScope> named = taskScopes.get(task);
         if (named != null) {
             return named;
         }
-        if (taskScopes.size() == 1) {
+        if (taskScopes.size() == 1 && !taskScopesMalformed) {
             return taskScopes.values().iterator().next();
         }
         return List.of();

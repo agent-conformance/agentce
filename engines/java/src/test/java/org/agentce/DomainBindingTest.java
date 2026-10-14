@@ -48,4 +48,18 @@ class DomainBindingTest {
         assertEquals(List.of(), two.scopesFor("task-1"));
         assertEquals(List.of(), DomainBinding.empty().scopesFor("a"));
     }
+
+    @Test
+    void unreadableTaskScopeEntryKeepsTheSingleTypeFromStandingForAll() {
+        for (String bad : List.of("{\"task-type\":\"2024\"}", "{\"task_type\":2024}", "\"nope\"")) {
+            DomainBinding binding = DomainBinding.fromDict(
+                    Json.parse("{\"task_scopes\":[" + bad + ",{\"task_type\":\"batch\"}]}"));
+            assertTrue(binding.taskScopesMalformed);
+            assertEquals(Set.of("batch"), binding.taskScopes.keySet());
+            assertEquals(List.of(), binding.scopesFor("2024"));
+            assertSame(binding.taskScopes.get("batch"), binding.scopesFor("batch"));
+        }
+        assertFalse(DomainBinding.fromDict(
+                Json.parse("{\"task_scopes\":[{\"task_type\":\"a\"}]}")).taskScopesMalformed);
+    }
 }

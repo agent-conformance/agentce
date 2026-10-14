@@ -56,6 +56,8 @@ export class DomainBinding {
   readonly requiredOversight = new Map<string, string>();
   /** task type -> every scope declared for it, in order (an action must stay within all of them). */
   readonly taskScopes = new Map<string, TaskScope[]>();
+  /** whether a task_scopes entry was unreadable (not a mapping, or no string task_type). */
+  taskScopesMalformed = false;
 
   static empty(): DomainBinding {
     return new DomainBinding();
@@ -93,6 +95,7 @@ export class DomainBinding {
     const scopes = Array.isArray(data.task_scopes) ? data.task_scopes : [];
     for (const entry of scopes) {
       if (!isRecord(entry) || typeof entry.task_type !== "string") {
+        binding.taskScopesMalformed = true;
         continue;
       }
       const tools = entry.allowed_tools;
@@ -111,15 +114,16 @@ export class DomainBinding {
 
   /**
    * The scopes a task's actions are held to: those declared for the task type the task names,
-   * else, when the binding declares a single task type, that type's (every task is of it), else
-   * none, so nothing the task does can be shown within a declared scope.
+   * else, when the binding declares a single task type and no unreadable entry, that type's (every
+   * task is of it), else none, so nothing the task does can be shown within a declared scope. An
+   * unreadable entry may name another type, so it never lets the remaining one stand for all.
    */
   scopesFor(task: string): TaskScope[] {
     const named = this.taskScopes.get(task);
     if (named !== undefined) {
       return named;
     }
-    if (this.taskScopes.size === 1) {
+    if (this.taskScopes.size === 1 && !this.taskScopesMalformed) {
       return this.taskScopes.values().next().value as TaskScope[];
     }
     return [];

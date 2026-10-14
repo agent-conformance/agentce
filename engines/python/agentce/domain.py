@@ -60,6 +60,8 @@ class DomainBinding:
     required_oversight: dict[str, str] = field(default_factory=dict)
     #: task type -> every scope declared for it, in order (an action must stay within all of them).
     task_scopes: dict[str, list[TaskScope]] = field(default_factory=dict)
+    #: whether a ``task_scopes`` entry was unreadable (not a mapping, or no string ``task_type``).
+    task_scopes_malformed: bool = False
 
     @classmethod
     def empty(cls) -> DomainBinding:
@@ -90,6 +92,7 @@ class DomainBinding:
             if not isinstance(entry, dict) or not isinstance(
                 entry.get("task_type"), str
             ):
+                binding.task_scopes_malformed = True
                 continue
             tools = entry.get("allowed_tools")
             binding.task_scopes.setdefault(entry["task_type"], []).append(
@@ -103,11 +106,12 @@ class DomainBinding:
 
     def scopes_for(self, task: str) -> list[TaskScope]:
         """The scopes a task's actions are held to: those declared for the task type the task names,
-        else, when the binding declares a single task type, that type's (every task is of it), else
-        none, so nothing the task does can be shown within a declared scope."""
+        else, when the binding declares a single task type and no unreadable entry, that type's (every
+        task is of it), else none, so nothing the task does can be shown within a declared scope. An
+        unreadable entry may name another type, so it never lets the remaining one stand for all."""
         if task in self.task_scopes:
             return self.task_scopes[task]
-        if len(self.task_scopes) == 1:
+        if len(self.task_scopes) == 1 and not self.task_scopes_malformed:
             return next(iter(self.task_scopes.values()))
         return []
 

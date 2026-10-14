@@ -44,3 +44,14 @@ test("task scope resolution", () => {
   assert.deepEqual(two.scopesFor("task-1"), []);
   assert.deepEqual(DomainBinding.empty().scopesFor("a"), []);
 });
+
+test("an unreadable task scope entry keeps the single type from standing for all", () => {
+  for (const bad of [{ "task-type": "2024" }, { task_type: 2024 }, "nope"]) {
+    const binding = DomainBinding.fromDict({ task_scopes: [bad, { task_type: "batch" }] });
+    assert.ok(binding.taskScopesMalformed);
+    assert.deepEqual([...binding.taskScopes.keys()], ["batch"]);
+    assert.deepEqual(binding.scopesFor("2024"), []);
+    assert.equal(binding.scopesFor("batch"), binding.taskScopes.get("batch"));
+  }
+  assert.ok(!DomainBinding.fromDict({ task_scopes: [{ task_type: "a" }] }).taskScopesMalformed);
+});
