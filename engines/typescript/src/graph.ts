@@ -691,11 +691,6 @@ class Builder {
     this.store.addLiteral(node, "agentce:instructionUntrusted", untrusted ? "true" : "false", BOOL);
   }
 
-  /** Compute the Conduct within-scope and within-budget flags (SPEC §7.7, CND-01/CND-07): an
-   * action is out of scope when a `PolicyDecision` denies its request, or when it is a ToolCall in a
-   * task whose declared effect scope does not allow its tool and effect class (`withinTaskScope`);
-   * it is over budget when a `Refusal` with reason class `budget_exceeded` names it. An action in no
-   * task and never denied reads within scope. */
   /**
    * Whether a ToolCall stays within the declared effect scope of every task it names, by
    * `refs.task` or the `agentcetask` attribute (SPEC §7.7.4 CND-01, §7.7.6): each scope the domain
@@ -718,6 +713,11 @@ class Builder {
     return true;
   }
 
+  /** Compute the Conduct within-scope and within-budget flags (SPEC §7.7, CND-01/CND-07): an
+   * action is out of scope when a `PolicyDecision` denies its request, or when it is a ToolCall in a
+   * task whose declared effect scope does not allow its tool and effect class (`withinTaskScope`);
+   * it is over budget when a `Refusal` with reason class `budget_exceeded` names it. An action in no
+   * task and never denied reads within scope. */
   private conductScopeBudget(events: Event[]): void {
     const denied = new Set<string>();
     const overBudget = new Set<string>();
