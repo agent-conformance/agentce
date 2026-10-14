@@ -89,7 +89,7 @@
         },
         "min_source_class": {
           "$ref": "#/$defs/source_class",
-          "description": "The lowest source class the control accepts (HR-5). The classes are ordered self_report < enforcement_point < independent_system (SPEC §6.4); a focus whose judged class is below this minimum makes a conformant verdict insufficient_evidence. Required, and exactly one of the three values: anything else (any, another case, another word, empty or missing) is refused when the catalog loads (catalog.control.min_source_class_unknown)."
+          "description": "The lowest source class the control accepts (HR-5); `$defs.source_class` gives the order of the classes and what falling below the minimum does (SPEC §6.4). Required, and exactly one of the three values: anything else (any, another case, another word, empty or missing) is refused when the catalog loads (catalog.control.min_source_class_unknown)."
         },
         "source_class_from": {
           "type": "array",
