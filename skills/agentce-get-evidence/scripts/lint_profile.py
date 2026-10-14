@@ -195,20 +195,19 @@ def _lint_conduct(profile: dict[str, Any], domain: object) -> list[Finding]:
     if not _selects_conduct(profile):
         return findings
     scopes = domain.get("task_scopes") if isinstance(domain, dict) else None
-    listed = scopes if isinstance(scopes, list) else []
-    entries = [
-        e for e in listed if isinstance(e, dict) and isinstance(e.get("task_type"), str)
-    ]
-    findings.extend(
-        Finding(
-            "lint.task_scope_entry_malformed",
-            f"task_scopes entry {index + 1} is not a mapping with a quoted task_type string, so the "
-            "engine cannot read it and holds every task it may name to no scope (SPEC 7.7.6)",
-            {"entry": index + 1},
-        )
-        for index, e in enumerate(listed)
-        if not (isinstance(e, dict) and isinstance(e.get("task_type"), str))
-    )
+    entries = []
+    for number, e in enumerate(scopes if isinstance(scopes, list) else [], 1):
+        if isinstance(e, dict) and isinstance(e.get("task_type"), str):
+            entries.append(e)
+        else:
+            findings.append(
+                Finding(
+                    "lint.task_scope_entry_malformed",
+                    f"task_scopes entry {number} is not a mapping with a quoted task_type string, so "
+                    "the engine cannot read it and holds every task it may name to no scope (SPEC 7.7.6)",
+                    {"entry": number},
+                )
+            )
     if not entries:
         where = (
             "the domain binding"
