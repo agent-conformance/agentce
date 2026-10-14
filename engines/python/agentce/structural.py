@@ -60,6 +60,46 @@ def render_path(path: PathExpr) -> str:
     return "(" + " | ".join(render_path(option) for option in path.options) + ")"
 
 
+def path_steps(path: PathExpr) -> list[str]:
+    """The predicates a path reads, in order, an inverse step written ``^<predicate>``."""
+    if isinstance(path, Predicate):
+        return [path.iri]
+    if isinstance(path, Inverse):
+        return [s[1:] if s.startswith("^") else f"^{s}" for s in path_steps(path.path)]
+    parts = path.steps if isinstance(path, Sequence) else path.options
+    return [step for part in parts for step in path_steps(part)]
+
+
+def property_reads(shape: Shape, shapes: dict[str, Shape]) -> dict[str, list[str]]:
+    """Per rendered path of ``shape``'s property shapes (a violation's ``path``), every predicate its constraints read,
+    once each in first-read order: the path's own steps, a predicate it is compared with, and those of a nested
+    ``sh:node`` or qualified shape (each nested shape once along a chain, so a cycle ends)."""
+
+    def reads(prop: PropertyShape, seen: frozenset[str]) -> list[str]:
+        out = path_steps(prop.path)
+        out += [
+            other
+            for other in (
+                prop.equals,
+                prop.disjoint,
+                prop.less_than,
+                prop.less_than_or_equals,
+            )
+            if other is not None
+        ]
+        for ref in (prop.node, prop.qualified_value_shape):
+            nested = ref and (shapes.get(ref) or _shape_by_curie(shapes, ref))
+            if nested and nested.iri not in seen:
+                for inner in nested.properties:
+                    out += reads(inner, seen | {nested.iri})
+        return out
+
+    by_path: dict[str, list[str]] = {}
+    for prop in shape.properties:
+        by_path.setdefault(render_path(prop.path), []).extend(reads(prop, frozenset()))
+    return {path: list(dict.fromkeys(steps)) for path, steps in by_path.items()}
+
+
 def _predicate_values(store: GraphStore, focus: str, predicate: str) -> list[Value]:
     values = [Value(obj, True) for obj in store.objects(focus, predicate)]
     values += [

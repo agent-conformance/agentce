@@ -8,7 +8,13 @@ from pathlib import Path
 from typing import Any
 
 from agentce.store import GraphStore
-from agentce.assess import apply_deviations, assess_subjects
+from agentce.assess import (
+    _reaches_human_actor_failure,
+    apply_deviations,
+    assess_subjects,
+)
+from agentce.psp import parse_shapes_ttl
+from agentce.structural import property_reads
 from agentce.catalog import load_catalog
 from agentce.domain import DomainBinding
 from agentce.profile import Profile
@@ -329,51 +335,78 @@ def test_not_waivable_is_per_assertion_across_subjects() -> None:
     assert [a.outcome for a in applied] == ["non-conformant", "partial"]
 
 
-def test_not_waivable_paths_match_by_predicate_token() -> None:
-    from agentce.assess import _reaches_human_actor_failure
-
+def test_not_waivable_reads_match_by_predicate() -> None:
     with GraphStore() as store:
         store.human_actor_failed.add("d1")
-        for path in (
-            "agentce:approvedBy",
-            "(agentce:decidedBy ^agentce:reviewedBy)",
-            "(agentce:x | agentce:interventionByHuman)",
+        for reads in (
+            ["agentce:approvedBy"],
+            ["agentce:decidedBy", "^agentce:reviewedBy"],
+            ["agentce:x", "agentce:interventionByHuman"],
         ):
-            assert _reaches_human_actor_failure(store, "d1", path)
-        assert not _reaches_human_actor_failure(store, "d1", "agentce:approvedByProxy")
-        assert not _reaches_human_actor_failure(store, "d1", "agentce:authorizedBy")
-        assert not _reaches_human_actor_failure(store, "d2", "agentce:approvedBy")
+            assert _reaches_human_actor_failure(store, "d1", reads)
+        assert not _reaches_human_actor_failure(
+            store, "d1", ["agentce:approvedByProxy"]
+        )
+        assert not _reaches_human_actor_failure(store, "d1", ["agentce:authorizedBy"])
+        assert not _reaches_human_actor_failure(store, "d2", ["agentce:approvedBy"])
 
 
-def test_not_waivable_when_the_path_reaches_the_failing_decision_from_another_focus() -> (
+def test_not_waivable_when_the_shape_reaches_the_failing_decision_from_another_focus() -> (
     None
 ):
-    """A third-party shape on ToolCall whose sequence path reaches the failing decision (verifier 18.186 r1)."""
-    from agentce.assess import _reaches_human_actor_failure
-
+    """Third-party shapes on ToolCall that reach the failing decision (verifier 18.186 r1, and nested shapes)."""
     with GraphStore() as store:
         store.human_actor_failed.add("d1")
         store.add_edge("tc1", "agentce:executes", "d1")
         store.add_edge("tc2", "agentce:executes", "d2")
         store.add_edge("a1", "agentce:approves", "d1")
         assert _reaches_human_actor_failure(
-            store, "tc1", "(agentce:executes agentce:approvedBy)"
+            store, "tc1", ["agentce:executes", "agentce:approvedBy"]
         )
         assert _reaches_human_actor_failure(
-            store, "tc1", "(agentce:executes agentce:reviewedBy)"
+            store, "tc1", ["agentce:executes", "agentce:reviewedBy"]
         )
         assert _reaches_human_actor_failure(
-            store, "a1", "(agentce:approves ^agentce:executes agentce:approvedBy)"
-        )
-        assert _reaches_human_actor_failure(
-            store, "tc1", "(^agentce:x | agentce:executes) agentce:approvedBy"
+            store, "a1", ["agentce:approves", "^agentce:executes", "agentce:approvedBy"]
         )
         assert not _reaches_human_actor_failure(
-            store, "tc2", "(agentce:executes agentce:approvedBy)"
+            store, "tc2", ["agentce:executes", "agentce:approvedBy"]
         )
         assert not _reaches_human_actor_failure(
-            store, "tc1", "(agentce:executes agentce:authorizedBy)"
+            store, "tc1", ["agentce:executes", "agentce:authorizedBy"]
         )
+
+
+def test_not_waivable_property_reads_include_nested_shapes() -> None:
+    shapes = parse_shapes_ttl(
+        """@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
+agentce:S a sh:NodeShape ; sh:targetClass agentce:ToolCall ;
+  sh:property [ sh:path agentce:executes ; sh:node agentce:N ] ;
+  sh:property [ sh:path ( agentce:executes [ sh:inversePath agentce:about ] ) ; sh:equals agentce:x ] ;
+  sh:property [ sh:path agentce:calls ; sh:qualifiedValueShape agentce:Q ; sh:qualifiedMinCount 1 ] .
+agentce:N a sh:NodeShape ; sh:property [ sh:path agentce:approvedBy ; sh:node agentce:S ] .
+agentce:Q a sh:NodeShape ; sh:property [ sh:path agentce:reviewedBy ; sh:minCount 1 ] .
+"""
+    )
+    shape = next(s for s in shapes.values() if s.iri.endswith("#S"))
+    assert property_reads(shape, shapes) == {
+        # N's sh:node back to S is followed once, so S's own predicates join through the cycle.
+        "agentce:executes": [
+            "agentce:executes",
+            "agentce:approvedBy",
+            "^agentce:about",
+            "agentce:x",
+            "agentce:calls",
+            "agentce:reviewedBy",
+        ],
+        "(agentce:executes ^agentce:about)": [
+            "agentce:executes",
+            "^agentce:about",
+            "agentce:x",
+        ],
+        "agentce:calls": ["agentce:calls", "agentce:reviewedBy"],
+    }
 
 
 _ROB02 = _REPO_ROOT / "verification" / "gates" / "fixtures" / "rob02_untrusted"

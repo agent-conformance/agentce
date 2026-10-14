@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import dataclasses
 import functools
-import re
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -28,7 +27,7 @@ from .profile import Profile, Subject
 from .readiness import parse_date
 from .source_class import BELOW_MINIMUM_OUTCOME, SourceClassJudge, below_minimum
 from .store import GraphStore
-from .structural import evaluate_shape, within_tolerance
+from .structural import Violation, evaluate_shape, property_reads, within_tolerance
 
 _EVIDENCE_CAP = 20
 
@@ -246,23 +245,42 @@ def _assert_control(
         evidence_strength=None if below else control.raw.get("evidence_strength"),
         class_gap=kinds,
         human_actor_failed=outcome == "non-conformant"
-        and any(
-            _reaches_human_actor_failure(store, v.focus, v.path) for v in violations
+        and _rests_on_human_actor_failure(
+            store, violations, functools.partial(property_reads, shape, catalog.shapes)
         ),
         **base,
     )
 
 
-def _reaches_human_actor_failure(store: GraphStore, focus: str, path: str) -> bool:
-    """Whether a violation's rendered shape path reads a predicate the SPEC §10.4 human-actor rule decides and, from
-    its focus, reaches a node that fails the rule. The walk follows every other step of the path from the focus, in
-    any order and to the path's length, so it reaches at least what the path itself reaches (fail closed)."""
-    tokens = re.findall(r"\^?[^\s()|^]+", path)
-    if HUMAN_ACTOR_PATHS.isdisjoint(token.lstrip("^") for token in tokens):
+def _rests_on_human_actor_failure(
+    store: GraphStore,
+    violations: Sequence[Violation],
+    reads: Callable[[], dict[str, list[str]]],
+) -> bool:
+    """Whether a violation's constraint reads a predicate the SPEC §10.4 human-actor rule decides and, from its focus,
+    reaches a node that fails the rule (``reads`` gives each path's predicates, nested shapes included)."""
+    if not store.human_actor_failed:
         return False
-    steps = [token for token in tokens if token.lstrip("^") not in HUMAN_ACTOR_PATHS]
-    reach = frontier = {focus}
-    for _ in tokens:
+    by_path = reads()
+    return any(
+        _reaches_human_actor_failure(store, v.focus, by_path.get(v.path, []))
+        for v in violations
+    )
+
+
+def _reaches_human_actor_failure(
+    store: GraphStore, focus: str, reads: Sequence[str]
+) -> bool:
+    """Whether ``reads`` names a predicate the human-actor rule decides and, walking its other predicates from
+    ``focus`` (``^`` for an inverse) in any order up to their number, the walk reaches a node failing the rule. It
+    reaches at least what the shape itself reaches, so it fails closed."""
+    if HUMAN_ACTOR_PATHS.isdisjoint(step.lstrip("^") for step in reads):
+        return False
+    steps = list(
+        dict.fromkeys(s for s in reads if s.lstrip("^") not in HUMAN_ACTOR_PATHS)
+    )
+    reach, frontier = {focus}, {focus}
+    for _ in steps:
         frontier = {
             node
             for start in frontier
@@ -273,7 +291,9 @@ def _reaches_human_actor_failure(store: GraphStore, focus: str, path: str) -> bo
                 else store.objects(start, step)
             )
         } - reach
-        reach = reach | frontier
+        if not frontier:
+            break
+        reach |= frontier
     return not reach.isdisjoint(store.human_actor_failed)
 
 
