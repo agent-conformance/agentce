@@ -955,3 +955,51 @@ test("not waivable: the store lists failing oversight records and the decision t
   // A failing approval naming no held decision adds only itself.
   assert.deepEqual(failed([decisionEvent("d1"), approval("nowhere")]), ["agentce:event/a1"]);
 });
+
+test("task scope: a tasked ToolCall is within scope only when every named task's scope allows it", () => {
+  const domain = DomainBinding.fromDict({
+    task_scopes: [
+      { task_type: "review", allowed_tools: ["lookup"], allowed_effect_classes: ["read"] },
+      { task_type: "pay", allowed_tools: ["pay"], allowed_effect_classes: ["spend"] },
+    ],
+  });
+  const call = (id: string, tool: string, effect: string, extra: Record<string, unknown> = {}) => {
+    const { refs_task: task, ...rest } = extra;
+    return {
+      id,
+      source: "urn:src:gw",
+      subject: "spiffe://corp/agents/a",
+      type: "org.agent-conformance.evidence.ToolCall.v1",
+      data: {
+        "@type": "ToolCall",
+        tool: { name: tool },
+        effect_class: effect,
+        ...(task === undefined ? {} : { refs: { task } }),
+      },
+      ...rest,
+    };
+  };
+  const calls = [
+    call("in", "lookup", "read", { agentcetask: "review" }),
+    call("effect", "lookup", "irreversible", { agentcetask: "review" }),
+    call("tool", "pay", "read", { refs_task: "review" }),
+    call("unknown", "lookup", "read", { agentcetask: "task-1" }),
+    call("differ", "lookup", "read", { agentcetask: "pay", refs_task: "review" }),
+    call("untasked", "ping", "irreversible"),
+  ];
+  const store = buildGraph(calls, { domain });
+  const got = Object.fromEntries(
+    calls.map((c) => [
+      c.id,
+      store.literalValues(`agentce:event/${c.id}`, "agentce:withinScope")[0],
+    ]),
+  );
+  assert.deepEqual(got, {
+    in: "true",
+    effect: "false",
+    tool: "false",
+    unknown: "false",
+    differ: "false",
+    untasked: "true",
+  });
+});
