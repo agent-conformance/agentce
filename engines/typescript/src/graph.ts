@@ -22,8 +22,78 @@ import { byteCompare } from "./util";
 const BOOL = "xsd:boolean";
 /** CND-02's population (SPEC §7.7.4), materialised by `conductGate`. */
 export const GATED_ACTION = "agentce:GatedAction";
+/** A ModelCall in a task: consumption CND-07 judges against the task's budgets. */
+export const TASK_MODEL_CALL = "agentce:TaskModelCall";
+/** An action whose task budgets the records cannot tell (CND-07's evidence shape). */
+export const BUDGET_UNJUDGED = "agentce:BudgetUnjudged";
 const DATETIME = "xsd:dateTime";
 const INTEGER = "xsd:integer";
+
+/** A non-negative whole number (`5`, or `5.0` as another engine's reader may give it), else null. */
+function whole(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+/** What each task's records show it consumed (SPEC §7.7.3 budget row); the Python engine's `_TaskUsage`
+ * documents the reading. */
+class TaskUsage {
+  readonly tokens = new Map<string, number>();
+  readonly tokensUnread = new Set<string>();
+  readonly spendCalls = new Map<string, number>();
+  readonly spendUnknown = new Set<string>();
+
+  add(ptype: string, data: Record<string, unknown>, tasks: Set<string>): void {
+    for (const task of tasks) {
+      if (ptype === "ToolCall") {
+        const effect = data.effect_class;
+        if (effect === "spend") {
+          this.spendCalls.set(task, (this.spendCalls.get(task) ?? 0) + 1);
+        } else if (typeof effect !== "string") {
+          this.spendUnknown.add(task);
+        }
+        continue;
+      }
+      this.spendUnknown.add(task);
+      const usage = data.usage;
+      const counts = ["input_tokens", "output_tokens"].map((k) =>
+        isRecord(usage) ? whole(usage[k]) : null,
+      );
+      if (counts.every((n) => n !== null)) {
+        this.tokens.set(
+          task,
+          (this.tokens.get(task) ?? 0) + counts.reduce((a, n) => a + (n ?? 0), 0),
+        );
+      } else {
+        this.tokensUnread.add(task);
+      }
+    }
+  }
+
+  /** true within the limit, false over it, null when the records cannot tell. */
+  verdict(task: string, dimension: string, limit: number | null): boolean | null {
+    if (dimension === "tokens") {
+      const cap = whole(limit);
+      if (cap === null) {
+        return null;
+      }
+      if ((this.tokens.get(task) ?? 0) > cap) {
+        return false;
+      }
+      // no readable usage for the task, or a model call without one: the records cannot tell
+      return this.tokensUnread.has(task) || !this.tokens.has(task) ? null : true;
+    }
+    if (dimension === "spend") {
+      if (limit === null) {
+        return null;
+      }
+      if (this.spendCalls.get(task)) {
+        return limit === 0 ? false : null;
+      }
+      return this.spendUnknown.has(task) ? null : true;
+    }
+    return null;
+  }
+}
 
 /** The base class hierarchy (child -> parent), mirroring spec/vocab/agentce.ttl (SPEC §6.3). */
 const BASE_SUBCLASS: Record<string, string> = {
@@ -379,6 +449,8 @@ class Builder {
     usedClasses.add("prov:Activity");
     usedClasses.add("prov:Entity");
     usedClasses.add(GATED_ACTION);
+    usedClasses.add(TASK_MODEL_CALL);
+    usedClasses.add(BUDGET_UNJUDGED);
     for (const event of events) {
       const node = eventIri(String(event.id));
       this.eventIris.add(node);
@@ -811,11 +883,13 @@ class Builder {
   /** Compute the Conduct within-scope and within-budget flags (SPEC §7.7, CND-01/CND-07): an
    * action is out of scope when a `PolicyDecision` denies its request, or when it is a ToolCall in a
    * task whose declared effect scope does not allow its tool and effect class (`withinTaskScope`);
-   * it is over budget when a `Refusal` with reason class `budget_exceeded` names it. An action in no
-   * task and never denied reads within scope. */
+   * it is over budget when a `Refusal` with reason class `budget_exceeded` names it, or when its task's
+   * recorded usage exceeds a budget a scope of the task declares (`taskBudget`). An action in no task
+   * and never denied reads within scope. */
   private conductScopeBudget(events: Event[]): void {
     const denied = new Set<string>();
     const overBudget = new Set<string>();
+    const usage = new TaskUsage();
     for (const event of events) {
       const ptype = this.ptype(event);
       const data = dataOf(event);
@@ -831,22 +905,57 @@ class Builder {
       ) {
         overBudget.add(request);
       }
+      if (ptype === "ModelCall" || ptype === "ToolCall") {
+        usage.add(ptype, data, this.actionTasks(event));
+      }
     }
     for (const event of events) {
       const ptype = this.ptype(event);
-      if (ptype !== "ToolCall" && ptype !== "ResourceAccess") {
+      if (ptype !== "ToolCall" && ptype !== "ResourceAccess" && ptype !== "ModelCall") {
         continue;
       }
       const node = eventIri(String(event.id));
-      const inScope = !denied.has(node) && (ptype !== "ToolCall" || this.withinTaskScope(event));
-      this.store.addLiteral(node, "agentce:withinScope", inScope ? "true" : "false", BOOL);
-      this.store.addLiteral(
-        node,
-        "agentce:withinBudget",
-        overBudget.has(node) ? "false" : "true",
-        BOOL,
-      );
+      const tasks = this.actionTasks(event);
+      if (ptype === "ModelCall") {
+        if (tasks.size === 0) {
+          continue;
+        }
+        // A model call in a task is consumption CND-07 judges (SPEC §7.7.3 ModelCall.usage).
+        this.store.addType(node, TASK_MODEL_CALL);
+      } else {
+        const inScope = !denied.has(node) && (ptype !== "ToolCall" || this.withinTaskScope(event));
+        this.literal(node, "agentce:withinScope", inScope);
+      }
+      const [within, judged] = this.taskBudget(tasks, usage);
+      this.literal(node, "agentce:withinBudget", within && !overBudget.has(node));
+      if (!judged) {
+        this.store.addType(node, BUDGET_UNJUDGED);
+        this.literal(node, "agentce:budgetJudged", false);
+      }
     }
+  }
+
+  /** Whether an action's tasks stayed within every budget their scopes declare (SPEC §7.7.4 CND-07,
+   * §7.7.6 budgets), and whether the records can tell; the Python engine's `_task_budget` documents
+   * the reading. */
+  private taskBudget(tasks: Set<string>, usage: TaskUsage): [boolean, boolean] {
+    let within = true;
+    let judged = true;
+    for (const task of tasks) {
+      const scopes = this.domain.scopesFor(task);
+      if (scopes.length === 0) {
+        judged &&= this.domain.taskScopes.size === 0 && !this.domain.taskScopesMalformed;
+        continue;
+      }
+      for (const scope of scopes) {
+        for (const [dimension, limit] of scope.budgets) {
+          const verdict = usage.verdict(task, dimension, limit);
+          within &&= verdict !== false;
+          judged &&= verdict !== null;
+        }
+      }
+    }
+    return [within, judged];
   }
 
   /** Flag every ToolCall/Decision that acts on an instruction whose chain passes through an untrusted

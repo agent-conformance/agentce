@@ -3,7 +3,7 @@
  *
  * The binding subclasses `agentce:Decision` and `agentce:ContextItem` for the domain and declares
  * which decision types are consequential and the oversight modality each requires; for the Conduct
- * overlay it declares each task type's effect scope (SPEC §7.7.6 `task_scopes`). A run with no
+ * overlay it declares each task type's effect scope and budgets (SPEC §7.7.6 `task_scopes`). A run with no
  * binding is valid (an empty binding).
  */
 
@@ -24,10 +24,34 @@ function strings(value: unknown): Set<string> {
   );
 }
 
+/** The resource budgets a task scope declares (SPEC §7.7.6 `budgets`), in the order CND-07 reads them. */
+export const BUDGET_DIMENSIONS = ["tokens", "compute_seconds", "spend"] as const;
+
+/** A declared budget: the dimension and its limit; a null limit is unreadable. */
+export type Budget = readonly [dimension: string, limit: number | null];
+
+/** A declared budget limit: a non-negative number; anything else is null, a limit no usage can be
+ * shown to stay within. */
+function limit(value: unknown): number | null {
+  return typeof value === "number" && value >= 0 ? value : null;
+}
+
+/** The budgets a scope declares, as (dimension, limit) pairs; a dimension left out declares no limit.
+ * A `budgets` value that is not a mapping declares every dimension unreadable. */
+function budgets(value: unknown): Budget[] {
+  if (value === undefined || value === null) {
+    return [];
+  }
+  if (!isRecord(value)) {
+    return BUDGET_DIMENSIONS.map((d) => [d, null] as const);
+  }
+  return BUDGET_DIMENSIONS.filter((d) => d in value).map((d) => [d, limit(value[d])] as const);
+}
+
 /**
- * One task type's declared effect scope (SPEC §7.7.6), as CND-01 reads it: the tools and the effect
- * classes an action of the task may use. `requiresApproval` marks classes for CND-02 and allows
- * none by itself.
+ * One task type's declared effect scope (SPEC §7.7.6): the tools and the effect classes an action
+ * of the task may use, as CND-01 reads them, and the resource budgets CND-07 reads.
+ * `requiresApproval` marks classes for CND-02 and allows none by itself.
  */
 export class TaskScope {
   constructor(
@@ -37,6 +61,8 @@ export class TaskScope {
     readonly allowedEffectClasses: Set<string>,
     /** the effect classes that need a human's approval (CND-02's marker; allows none for CND-01). */
     readonly requiresApproval: Set<string> = new Set(),
+    /** the declared budgets, in BUDGET_DIMENSIONS order. */
+    readonly budgets: readonly Budget[] = [],
   ) {}
 
   allows(tool: unknown, effectClass: unknown): boolean {
@@ -105,6 +131,7 @@ export class DomainBinding {
           tools === undefined || tools === null ? null : strings(tools),
           strings(entry.allowed_effect_classes),
           strings(entry.requires_approval),
+          budgets(entry.budgets),
         ),
       );
       binding.taskScopes.set(entry.task_type, list);

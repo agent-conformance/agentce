@@ -1184,3 +1184,126 @@ test("CND-02: releasedBy links the approvals the gate rests on", () => {
     "agentce:event/ap1",
   ]);
 });
+
+// --- CND-07: task budgets (SPEC §7.7.4, §7.7.6; 18.175) ----------------------------------------------------------
+
+function budgetCall(id: string, tool: string, effect: string | null, task?: string) {
+  return {
+    id,
+    source: "urn:src:gw",
+    subject: "spiffe://corp/agents/a",
+    type: "org.agent-conformance.evidence.ToolCall.v1",
+    data: {
+      "@type": "ToolCall",
+      tool: { name: tool },
+      ...(effect === null ? {} : { effect_class: effect }),
+    },
+    ...(task === undefined ? {} : { agentcetask: task }),
+  };
+}
+
+function modelCall(id: string, task: string | null, usage: unknown) {
+  return {
+    id,
+    source: "urn:src:agent",
+    subject: "spiffe://corp/agents/a",
+    type: "org.agent-conformance.evidence.ModelCall.v1",
+    data: { "@type": "ModelCall", usage },
+    ...(task === null ? {} : { agentcetask: task }),
+  };
+}
+
+/** Each action's withinBudget and whether the records could tell (no agentce:BudgetUnjudged type). */
+function budgetFlags(
+  events: { id: string }[],
+  budgets: unknown,
+  binding: Record<string, unknown> = {},
+): Record<string, [unknown, boolean]> {
+  const entry: Record<string, unknown> = {
+    task_type: "review",
+    allowed_effect_classes: ["read", "spend"],
+  };
+  if (budgets !== null) entry.budgets = budgets;
+  const store = buildGraph(events as Record<string, unknown>[], {
+    domain: DomainBinding.fromDict({ task_scopes: [entry], ...binding }),
+  });
+  return Object.fromEntries(
+    events.map((e) => [
+      e.id,
+      [
+        store.literalValues(`agentce:event/${e.id}`, "agentce:withinBudget")[0],
+        !store.isA(`agentce:event/${e.id}`, "agentce:BudgetUnjudged"),
+      ],
+    ]),
+  );
+}
+
+const flagSet = (flags: Record<string, [unknown, boolean]>) => [
+  ...new Set(Object.values(flags).map((f) => JSON.stringify(f))),
+];
+
+test("task budget tokens: summed per task, every action of the task reads over", () => {
+  const under = [
+    modelCall("m1", "review", { input_tokens: 400, output_tokens: 100 }),
+    budgetCall("t1", "lookup", "read", "review"),
+  ];
+  assert.deepEqual(budgetFlags(under, { tokens: 500 }), {
+    m1: ["true", true],
+    t1: ["true", true],
+  });
+  const over = [...under, modelCall("m2", "review", { input_tokens: 1, output_tokens: 0 })];
+  assert.deepEqual(flagSet(budgetFlags(over, { tokens: 500 })), ['["false",true]']);
+  // a whole number written 500.0 reads as 500 (JSON and YAML readers give the same number)
+  assert.deepEqual(flagSet(budgetFlags(over, { tokens: 500.0 })), ['["false",true]']);
+});
+
+test("task budget tokens: an unreadable usage or limit leaves an under-limit task untold", () => {
+  const under = [
+    modelCall("m1", "review", { input_tokens: 400, output_tokens: 100 }),
+    budgetCall("t1", "lookup", "read", "review"),
+  ];
+  const unread = [...under, modelCall("m2", "review", { input_tokens: 1 })];
+  assert.deepEqual(flagSet(budgetFlags(unread, { tokens: 500 })), ['["true",false]']);
+  // an overrun the readable usage already shows is told, whatever else is unreadable
+  const over = [...unread, modelCall("m3", "review", { input_tokens: 1, output_tokens: 0 })];
+  assert.deepEqual(flagSet(budgetFlags(over, { tokens: 500 })), ['["false",true]']);
+  for (const limit of [500.5, "500", true, -1]) {
+    assert.deepEqual(flagSet(budgetFlags(under, { tokens: limit })), ['["true",false]']);
+  }
+});
+
+test("task budget spend and compute: spend told only against zero, compute never", () => {
+  const spend = [budgetCall("s1", "pay", "spend", "review")];
+  assert.deepEqual(budgetFlags(spend, { spend: 0 }), { s1: ["false", true] });
+  assert.deepEqual(budgetFlags(spend, { spend: 10 }), { s1: ["true", false] });
+  const read = [budgetCall("r1", "lookup", "read", "review")];
+  assert.deepEqual(budgetFlags(read, { spend: 10 }), { r1: ["true", true] });
+  assert.deepEqual(budgetFlags([budgetCall("x1", "pay", null, "review")], { spend: 0 }), {
+    x1: ["true", false],
+  });
+  assert.deepEqual(budgetFlags(read, { tokens: 5 }), { r1: ["true", false] });
+  const billed = [...read, modelCall("m1", "review", { input_tokens: 1, output_tokens: 1 })];
+  assert.deepEqual(flagSet(budgetFlags(billed, { spend: 0 })), ['["true",false]']);
+  assert.deepEqual(budgetFlags(read, { compute_seconds: 60 }), { r1: ["true", false] });
+  assert.deepEqual(budgetFlags(read, "lots"), { r1: ["true", false] });
+  assert.deepEqual(budgetFlags(read, null), { r1: ["true", true] });
+});
+
+test("task budget scope: a task held to no scope is untold, an untasked call sets no limit", () => {
+  const other = [
+    budgetCall("o1", "lookup", "read", "elsewhere"),
+    budgetCall("u1", "lookup", "read"),
+  ];
+  const flags = budgetFlags(other, null, {
+    task_scopes: [{ task_type: "review", budgets: { tokens: 5 } }, { task_type: "pay" }],
+  });
+  assert.deepEqual(flags, { o1: ["true", false], u1: ["true", true] });
+  const store = buildGraph(other, { domain: DomainBinding.fromDict({}) });
+  assert.equal(store.isA("agentce:event/o1", "agentce:BudgetUnjudged"), false);
+  const untasked = modelCall("m0", null, { input_tokens: 9, output_tokens: 9 });
+  const scoped = DomainBinding.fromDict({ task_scopes: [{ task_type: "review" }] });
+  assert.equal(
+    buildGraph([untasked], { domain: scoped }).isA("agentce:event/m0", "agentce:TaskModelCall"),
+    false,
+  );
+});

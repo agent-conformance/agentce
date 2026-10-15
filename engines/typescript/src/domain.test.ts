@@ -55,3 +55,30 @@ test("an unreadable task scope entry keeps the single type from standing for all
   }
   assert.ok(!DomainBinding.fromDict({ task_scopes: [{ task_type: "a" }] }).taskScopesMalformed);
 });
+
+test("task scope budgets", () => {
+  const binding = DomainBinding.fromDict({
+    task_scopes: [
+      { task_type: "a", budgets: { spend: 0, tokens: 10, cost: 3, compute_seconds: "60" } },
+      { task_type: "b", budgets: [1] },
+      { task_type: "c", budgets: { tokens: true, spend: -1 } },
+      { task_type: "d" },
+    ],
+  });
+  const of = (t: string) => binding.taskScopes.get(t)?.[0]?.budgets;
+  assert.deepEqual(of("a"), [
+    ["tokens", 10],
+    ["compute_seconds", null],
+    ["spend", 0],
+  ]);
+  assert.deepEqual(of("b"), [
+    ["tokens", null],
+    ["compute_seconds", null],
+    ["spend", null],
+  ]);
+  assert.deepEqual(of("c"), [
+    ["tokens", null],
+    ["spend", null],
+  ]);
+  assert.deepEqual(of("d"), []);
+});
