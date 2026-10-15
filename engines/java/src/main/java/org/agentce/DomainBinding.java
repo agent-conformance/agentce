@@ -178,15 +178,15 @@ public final class DomainBinding {
     /** A declared budget limit: a non-negative number, a whole one for tokens; anything else is null. */
     private static Double limit(String dimension, JsonNode value) {
         if ("tokens".equals(dimension)) {
-            Long tokens = tokenCount(value);
+            Long tokens = wholeNumber(value);
             return tokens == null || tokens > MAX_COUNT ? null : tokens.doubleValue();
         }
         return value.isNumber() && value.doubleValue() >= 0 ? value.doubleValue() : null;
     }
 
-    /** A token count as CND-07 sums it: a non-negative whole number ({@code 5}, or {@code 5.0} as another engine's
-     * reader may give it), saturated at {@link #TOKEN_CAP} so no sum of them overflows; else null. */
-    static Long tokenCount(JsonNode value) {
+    /** A non-negative whole number ({@code 5}, or {@code 5.0} as another engine's reader may give it), else null;
+     * one past {@link #MAX_COUNT} reads {@link #TOKEN_CAP}, as a long cannot hold every such number. */
+    static Long wholeNumber(JsonNode value) {
         if (value == null || !value.isNumber()) {
             return null;
         }

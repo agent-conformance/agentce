@@ -70,7 +70,7 @@ public final class Ingest {
      * The record's canonical digest, null when it has no canonical form: a schema-invalid record may hold a number the
      * canonical form refuses, or a lone surrogate, which UTF-8 cannot carry (Python's {@code _digest} refuses it as well).
      */
-    private static String digestOf(JsonNode event) {
+    static String digestOf(JsonNode event) {
         try {
             String text = Canonical.canonicalString(event);
             return LONE_SURROGATE.matcher(text).find()

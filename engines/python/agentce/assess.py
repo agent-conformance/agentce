@@ -17,11 +17,10 @@ from typing import Any
 
 from .applicability import effective_roles
 from .assertions import Assertion, EvidencePointer
-from .canonical import CanonicalizationError, sha256_hex
 from .catalog import Catalog, ControlSpec
 from .domain import DomainBinding
 from .graph import build_graph
-from .ingest import Withheld
+from .ingest import Withheld, record_digest
 from .iri import event_iri
 from .profile import Profile, Subject
 from .readiness import parse_date
@@ -124,9 +123,8 @@ def _evidence(
         event = events_by_iri.get(focus)
         if event is None:
             continue
-        try:
-            digest = sha256_hex(event)
-        except CanonicalizationError:
+        digest = record_digest(event)
+        if digest is None:
             # a record with no canonical form (an integer past 2^53) has no digest to cite
             continue
         pointers.append(

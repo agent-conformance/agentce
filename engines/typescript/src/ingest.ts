@@ -152,7 +152,7 @@ const LONE_SURROGATE_RE = /[\uD800-\uDFFF]/u;
 
 /** The record's canonical digest, `null` when it has no canonical form: a schema-invalid record may hold a number the
  * canonical form refuses, or a lone surrogate, which UTF-8 cannot carry (Python's `_digest` refuses it as well). */
-function digestOf(event: Record<string, unknown>): string | null {
+export function digestOf(event: Record<string, unknown>): string | null {
   try {
     const text = canonicalString(event);
     return LONE_SURROGATE_RE.test(text)

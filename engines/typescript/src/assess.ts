@@ -11,11 +11,10 @@
 
 import { effectiveRoles } from "./applicability";
 import { type Assertion, type EvidencePointer, makeAssertion } from "./assertions";
-import { CanonicalizationError, sha256Hex } from "./canonical";
 import { type Catalog, type ControlSpec, evidenceShapeFor, shapeFor } from "./catalog";
 import type { DomainBinding } from "./domain";
 import { buildGraph } from "./graph";
-import type { Withheld } from "./ingest";
+import { type Withheld, digestOf } from "./ingest";
 import { eventIri } from "./iri";
 import type { Profile, Subject } from "./profile";
 import { compareDate, parseDate } from "./readiness";
@@ -131,13 +130,10 @@ function evidence(eventsByIri: Map<string, Event>, focusNodes: string[]): Eviden
     if (event === undefined) {
       continue;
     }
-    let digest: string;
-    try {
-      digest = sha256Hex(event);
-    } catch (error) {
+    const digest = digestOf(event);
+    if (digest === null) {
       // a record with no canonical form (an integer past 2^53) has no digest to cite
-      if (error instanceof CanonicalizationError) continue;
-      throw error;
+      continue;
     }
     pointers.push({
       ref: focus,

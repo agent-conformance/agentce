@@ -323,18 +323,20 @@ def ingest(
     # Only ids that were delivered twice are compared, so only their held records are hashed.
     ids = {str(raw_event["id"]) for _, raw_event in duplicates}
     held = {
-        str(e["id"]): _digest(e) for e in result.raw_accepted if str(e["id"]) in ids
+        str(e["id"]): record_digest(e)
+        for e in result.raw_accepted
+        if str(e["id"]) in ids
     }
     result.withheld.extend(
         duplicate
         for duplicate, raw_event in duplicates
-        if (digest := _digest(raw_event)) is None
+        if (digest := record_digest(raw_event)) is None
         or held.get(str(raw_event["id"])) != digest
     )
     return result
 
 
-def _digest(event: dict[str, Any]) -> str | None:
+def record_digest(event: dict[str, Any]) -> str | None:
     """The record's canonical digest, ``None`` when it has no canonical form (a schema-invalid record may hold a
     number the canonical form refuses, or one too long to print)."""
     try:
@@ -344,7 +346,7 @@ def _digest(event: dict[str, Any]) -> str | None:
 
 
 def _readable(record: QuarantineRecord, event: dict[str, Any]) -> Withheld:
-    return Withheld(record, event, _opt(event, "subject"), _digest(event))
+    return Withheld(record, event, _opt(event, "subject"), record_digest(event))
 
 
 def _unreadable(
@@ -354,7 +356,7 @@ def _unreadable(
         record,
         None,
         _opt(event, "subject") if event is not None else None,
-        _digest(event) if event is not None else None,
+        record_digest(event) if event is not None else None,
     )
 
 

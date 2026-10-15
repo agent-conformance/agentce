@@ -175,10 +175,8 @@ public final class Assess {
             if (event == null) {
                 continue;
             }
-            String digest;
-            try {
-                digest = Canonical.sha256Hex(event);
-            } catch (Canonical.CanonicalizationError e) {
+            String digest = Ingest.digestOf(event);
+            if (digest == null) {
                 // a record with no canonical form (an integer past 2^53) has no digest to cite
                 continue;
             }
