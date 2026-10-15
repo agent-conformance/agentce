@@ -9,71 +9,6 @@
     "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
     "status": "GAP"
   },
-  "c04-acted-Decision_only-en-missing": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-acted-Decision_only-en-tool_output": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-acted-Decision_only-en-user": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-acted-Decision_only-se-missing": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-acted-Decision_only-se-tool_output": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-acted-Decision_only-se-user": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-acted-consequential_ToolCall-en-missing": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-acted-consequential_ToolCall-en-tool_output": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-acted-consequential_ToolCall-en-user": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-deleg-en-ep_unverified-none": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-deleg-en-none-none": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-deleg-se-ep_unverified-ep_pd_principal": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-deleg-se-none-ep_pd_principal": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
   "c04-integ-failed-gateway": {
     "owner": "18.132",
     "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
@@ -102,61 +37,6 @@
   "c04-integ-weak_chained-ingress": {
     "owner": "18.132",
     "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c04-lineage-held-not_held": {
-    "owner": "18.122",
-    "reason": "MISMATCH at 78bdb0da; closed by 18.122's matrix check",
-    "status": "MISMATCH"
-  },
-  "c04-noprincipal-en-agent_identified": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-noprincipal-en-operator": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-noprincipal-en-service": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-noprincipal-en-user": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-strip-en-agent_unidentified": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-strip-en-memory_trusted": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-strip-en-memory_untrusted": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-strip-en-missing": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-strip-en-retrieved": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
-    "status": "GAP"
-  },
-  "c04-strip-en-tool_output": {
-    "owner": "18.122",
-    "reason": "GAP at 78bdb0da; closed by 18.122's matrix check",
     "status": "GAP"
   },
   "c05-integ-failed-gateway-user": {

@@ -67,42 +67,18 @@ TIER_ENV, ONLY_ENV, OUT_ENV = (
     "AGENTCE_TRUST_MATRIX_OUT",
 )
 #: SHA-256 of fixtures/trust_matrix/matrix.yaml: a matrix edit is deliberate.
-DIGEST = "ae57cb845659c80279c00619987434174a969938ada0f2d6110d5712197b43c0"
+DIGEST = "320f5f5427995641ea964c6cdc9b2a8ec36b3d19b4ec99ce0872e8b1bcd2e620"
 #: The cell ids open.json may hold. Closing a cell removes it here and from open.json in one commit; nothing is added.
 OPEN_PINNED: frozenset[str] = frozenset(
     {
         "anchor-cnd05-direct-user",
         "anchor-rob02-clean-memory",
-        "c04-acted-Decision_only-en-missing",
-        "c04-acted-Decision_only-en-tool_output",
-        "c04-acted-Decision_only-en-user",
-        "c04-acted-Decision_only-se-missing",
-        "c04-acted-Decision_only-se-tool_output",
-        "c04-acted-Decision_only-se-user",
-        "c04-acted-consequential_ToolCall-en-missing",
-        "c04-acted-consequential_ToolCall-en-tool_output",
-        "c04-acted-consequential_ToolCall-en-user",
-        "c04-deleg-en-ep_unverified-none",
-        "c04-deleg-en-none-none",
-        "c04-deleg-se-ep_unverified-ep_pd_principal",
-        "c04-deleg-se-none-ep_pd_principal",
         "c04-integ-failed-gateway",
         "c04-integ-failed-ingress",
         "c04-integ-missing-gateway",
         "c04-integ-missing-ingress",
         "c04-integ-weak_chained-gateway",
         "c04-integ-weak_chained-ingress",
-        "c04-lineage-held-not_held",
-        "c04-noprincipal-en-agent_identified",
-        "c04-noprincipal-en-operator",
-        "c04-noprincipal-en-service",
-        "c04-noprincipal-en-user",
-        "c04-strip-en-agent_unidentified",
-        "c04-strip-en-memory_trusted",
-        "c04-strip-en-memory_untrusted",
-        "c04-strip-en-missing",
-        "c04-strip-en-retrieved",
-        "c04-strip-en-tool_output",
         "c05-integ-failed-gateway-user",
         "c05-integ-failed-ingress-user",
         "c05-integ-failed-policy-SR-user-corr",

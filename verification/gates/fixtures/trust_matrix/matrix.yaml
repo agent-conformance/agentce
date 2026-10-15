@@ -85,6 +85,37 @@ quick:
   - fx-CND-01-se-pass-uea
   - fx-CND-01-se-fail-uea
   - fx-CND-01-se-fail-uep
+  - c04-role-en-declared_match
+  - c04-role-en-declared_other
+  - c04-role-en-not_declared
+  - c04-role-en-no_role
+  - c04-role-en-no_scope
+  - c04-role-en-unverified-not_declared
+  - c04-role-se-pd_match
+  - c04-role-se-pd_other
+  - c04-role-se-pd_none
+  - c04-role-se-twin_other
+  - c04-role-se-twin_none
+  - c05-held-absent-en-user
+  - c05-held-absent-en-tool_output
+  - c05-held-absent-en-memory_trusted
+  - c05-held-absent-se-user
+  - c05-held-absent-se-tool_output
+  - c05-held-absent-se-memory_trusted
+  - c05-held-null-en-user
+  - c05-held-null-en-tool_output
+  - c05-held-null-en-memory_trusted
+  - c05-held-null-se-user
+  - c05-held-null-se-tool_output
+  - c05-held-null-se-memory_trusted
+  - c05-origin-en-user-modelcall
+  - c05-origin-en-tool_output-modelcall
+  - c05-origin-en-memory_trusted-modelcall
+  - c05-origin-en-memory_untrusted-modelcall
+  - c05-origin-se-user-modelcall
+  - c05-origin-se-tool_output-modelcall
+  - c05-origin-se-memory_trusted-modelcall
+  - c05-origin-se-memory_untrusted-modelcall
 dimensions:
   - name: instruction_class   # the acted-on Instruction's own agentcesourceclass (SPEC §6.2.1, §6.4)
     values: ["enforcement_point", "self_report", "independent_system"]
@@ -93,7 +124,7 @@ dimensions:
   - name: principal   # Instruction.principal (SPEC §6.2.3: MUST for user, operator, service, agent_identified)
     values: ["absent", "present"]
   - name: origin   # refs.origin of the chain's root instruction (SPEC §6.2.3, §6.3 agentce:derivedFrom)
-    values: ["none", "ep_read_trusted", "ep_read_untrusted", "ep_read_no_trustmin", "sr_read", "tool_call", "resource_access", "not_held", "bare_id", "quarantined"]
+    values: ["none", "ep_read_trusted", "ep_read_untrusted", "ep_read_no_trustmin", "sr_read", "tool_call", "resource_access", "not_held", "bare_id", "quarantined", "modelcall"]
   - name: chain_depth   # instructions in the refs.parent chain, the acted-on one included (1 is direct)
     values: ["1", "2", "3"]
   - name: parent_class   # class of the parent instructions
@@ -101,7 +132,7 @@ dimensions:
   - name: parent_source_class   # declared class of the chain's root parent
     values: ["same", "user", "tool_output", "missing"]
   - name: instruction_held   # how refs.instruction names the acted-on instruction (Appendix F danglingRef, quarantine)
-    values: ["held", "not_held", "bare_id", "quarantined_schema", "quarantined_time_order", "other_subject"]
+    values: ["held", "not_held", "bare_id", "quarantined_schema", "quarantined_time_order", "other_subject", "absent", "null"]
   - name: acted_on   # the event acting on the instruction (SPEC §6.3 agentce:actsOn)
     values: ["ToolCall", "consequential_ToolCall", "consequential_Decision", "Decision_only", "both", "minor_Decision", "ModelCall"]
   - name: call_class   # the acting ToolCall's own class
@@ -124,6 +155,12 @@ dimensions:
     values: ["as_recorded", "forged_late"]
   - name: parent_cycle   # a refs.parent cycle through the acted-on instruction (KD-283)
     values: ["none", "self", "pair"]
+  - name: principal_role   # whether the binding authorises the chain's last principal's role for the task (CND-04, row 355)
+    values: ["declared_match", "declared_other", "not_declared", "no_role", "no_scope"]
+  - name: pd_role   # the role the corroborating PolicyDecision records for the principal (CND-04 role witness, row 358)
+    values: ["match", "other", "none"]
+  - name: twin_role   # the role the relabel twin records for the principal (CND-04 role witness, row 358)
+    values: ["match", "other", "none"]
   - name: delegation   # a DelegationIssued named by the call (SPEC §6.3 agentce:chainVerified)
     values: ["none", "ep_verified", "ep_unverified", "sr_verified"]
   - name: refusal   # a Refusal of the acted-on instruction (CND-06; an enforcement-point Refusal is c06-refusal-en's focus)
@@ -1073,6 +1110,13 @@ cells:
     expected: "not_conformant"
     spec_ref: "SPEC §8.1 ingest (quarantine is an output with a reason, never a silent drop); 18.119 rule (quarantine never gives a better outcome); SPEC §7.7.2 (every action acts on an instruction whose provenance terminates in an authorised principal); Appendix F dangling reference facts"
     note: "refs.origin of the acted-on instruction (direct)"
+  - id: c05-origin-en-memory_trusted-modelcall
+    controls: ["CND-05"]
+    dims: {instruction_class: "enforcement_point", source_class: "memory_trusted", origin: "modelcall", principal: "absent"}
+    fixture: "instruction_chain"
+    expected: "not_conformant"
+    spec_ref: "SPEC §6.2.3 (Instruction.source_class required; principal MUST for user/operator/service/agent_identified; refs.origin the ToolCall/ResourceAccess/MemoryRead that produced the content); SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
+    note: "refs.origin of the acted-on instruction (direct)"
   - id: c05-origin-en-user-ep_read_trusted
     controls: ["CND-05"]
     dims: {instruction_class: "enforcement_point", source_class: "user", origin: "ep_read_trusted", principal: "present"}
@@ -1136,6 +1180,13 @@ cells:
     expected: "not_conformant"
     spec_ref: "SPEC §8.1 ingest (quarantine is an output with a reason, never a silent drop); 18.119 rule (quarantine never gives a better outcome); SPEC §7.7.2 (every action acts on an instruction whose provenance terminates in an authorised principal); Appendix F dangling reference facts"
     note: "refs.origin of the acted-on instruction (direct)"
+  - id: c05-origin-en-user-modelcall
+    controls: ["CND-05"]
+    dims: {instruction_class: "enforcement_point", source_class: "user", origin: "modelcall", principal: "present"}
+    fixture: "instruction_chain"
+    expected: "not_conformant"
+    spec_ref: "SPEC §6.2.3 (Instruction.source_class required; principal MUST for user/operator/service/agent_identified; refs.origin the ToolCall/ResourceAccess/MemoryRead that produced the content); SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
+    note: "refs.origin of the acted-on instruction (direct)"
   - id: c05-origin-en-tool_output-ep_read_trusted
     controls: ["CND-05"]
     dims: {instruction_class: "enforcement_point", source_class: "tool_output", origin: "ep_read_trusted", principal: "absent"}
@@ -1195,6 +1246,13 @@ cells:
   - id: c05-origin-en-tool_output-quarantined
     controls: ["CND-05"]
     dims: {instruction_class: "enforcement_point", source_class: "tool_output", origin: "quarantined", principal: "absent"}
+    fixture: "instruction_chain"
+    expected: "non_conformant"
+    spec_ref: "SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class); SPEC Appendix F (authorised: user, operator, service, agent_identified; untrusted: agent_unidentified, tool_output, retrieved, memory_untrusted)"
+    note: "refs.origin of the acted-on instruction (direct)"
+  - id: c05-origin-en-tool_output-modelcall
+    controls: ["CND-05"]
+    dims: {instruction_class: "enforcement_point", source_class: "tool_output", origin: "modelcall", principal: "absent"}
     fixture: "instruction_chain"
     expected: "non_conformant"
     spec_ref: "SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class); SPEC Appendix F (authorised: user, operator, service, agent_identified; untrusted: agent_unidentified, tool_output, retrieved, memory_untrusted)"
@@ -1262,6 +1320,13 @@ cells:
     expected: "non_conformant"
     spec_ref: "SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class); SPEC Appendix F (authorised: user, operator, service, agent_identified; untrusted: agent_unidentified, tool_output, retrieved, memory_untrusted)"
     note: "refs.origin of the acted-on instruction (direct)"
+  - id: c05-origin-en-memory_untrusted-modelcall
+    controls: ["CND-05"]
+    dims: {instruction_class: "enforcement_point", source_class: "memory_untrusted", origin: "modelcall", principal: "absent"}
+    fixture: "instruction_chain"
+    expected: "non_conformant"
+    spec_ref: "SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class); SPEC Appendix F (authorised: user, operator, service, agent_identified; untrusted: agent_unidentified, tool_output, retrieved, memory_untrusted)"
+    note: "refs.origin of the acted-on instruction (direct)"
   - id: c05-origin-se-memory_trusted-ep_read_trusted
     controls: ["CND-05"]
     dims: {instruction_class: "self_report", source_class: "memory_trusted", origin: "ep_read_trusted", principal: "absent"}
@@ -1324,6 +1389,13 @@ cells:
     fixture: "instruction_chain"
     expected: "not_conformant"
     spec_ref: "SPEC §8.1 ingest (quarantine is an output with a reason, never a silent drop); 18.119 rule (quarantine never gives a better outcome); SPEC §7.7.2 (every action acts on an instruction whose provenance terminates in an authorised principal); Appendix F dangling reference facts"
+    note: "refs.origin of the acted-on instruction (direct)"
+  - id: c05-origin-se-memory_trusted-modelcall
+    controls: ["CND-05"]
+    dims: {instruction_class: "self_report", source_class: "memory_trusted", origin: "modelcall", principal: "absent"}
+    fixture: "instruction_chain"
+    expected: "not_conformant"
+    spec_ref: "SPEC §6.2.3 (Instruction.source_class required; principal MUST for user/operator/service/agent_identified; refs.origin the ToolCall/ResourceAccess/MemoryRead that produced the content); SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
     note: "refs.origin of the acted-on instruction (direct)"
   - id: c05-origin-se-user-ep_read_trusted
     controls: ["CND-05"]
@@ -1388,6 +1460,13 @@ cells:
     expected: "not_conformant"
     spec_ref: "SPEC §8.1 ingest (quarantine is an output with a reason, never a silent drop); 18.119 rule (quarantine never gives a better outcome); SPEC §7.7.2 (every action acts on an instruction whose provenance terminates in an authorised principal); Appendix F dangling reference facts"
     note: "refs.origin of the acted-on instruction (direct)"
+  - id: c05-origin-se-user-modelcall
+    controls: ["CND-05"]
+    dims: {instruction_class: "self_report", source_class: "user", origin: "modelcall", principal: "present"}
+    fixture: "instruction_chain"
+    expected: "not_conformant"
+    spec_ref: "SPEC §6.2.3 (Instruction.source_class required; principal MUST for user/operator/service/agent_identified; refs.origin the ToolCall/ResourceAccess/MemoryRead that produced the content); SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
+    note: "refs.origin of the acted-on instruction (direct)"
   - id: c05-origin-se-tool_output-ep_read_trusted
     controls: ["CND-05"]
     dims: {instruction_class: "self_report", source_class: "tool_output", origin: "ep_read_trusted", principal: "absent"}
@@ -1451,6 +1530,13 @@ cells:
     expected: "non_conformant"
     spec_ref: "SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class); SPEC Appendix F (authorised: user, operator, service, agent_identified; untrusted: agent_unidentified, tool_output, retrieved, memory_untrusted)"
     note: "refs.origin of the acted-on instruction (direct)"
+  - id: c05-origin-se-tool_output-modelcall
+    controls: ["CND-05"]
+    dims: {instruction_class: "self_report", source_class: "tool_output", origin: "modelcall", principal: "absent"}
+    fixture: "instruction_chain"
+    expected: "non_conformant"
+    spec_ref: "SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class); SPEC Appendix F (authorised: user, operator, service, agent_identified; untrusted: agent_unidentified, tool_output, retrieved, memory_untrusted)"
+    note: "refs.origin of the acted-on instruction (direct)"
   - id: c05-origin-se-memory_untrusted-ep_read_trusted
     controls: ["CND-05"]
     dims: {instruction_class: "self_report", source_class: "memory_untrusted", origin: "ep_read_trusted", principal: "absent"}
@@ -1510,6 +1596,13 @@ cells:
   - id: c05-origin-se-memory_untrusted-quarantined
     controls: ["CND-05"]
     dims: {instruction_class: "self_report", source_class: "memory_untrusted", origin: "quarantined", principal: "absent"}
+    fixture: "instruction_chain"
+    expected: "non_conformant"
+    spec_ref: "SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class); SPEC Appendix F (authorised: user, operator, service, agent_identified; untrusted: agent_unidentified, tool_output, retrieved, memory_untrusted)"
+    note: "refs.origin of the acted-on instruction (direct)"
+  - id: c05-origin-se-memory_untrusted-modelcall
+    controls: ["CND-05"]
+    dims: {instruction_class: "self_report", source_class: "memory_untrusted", origin: "modelcall", principal: "absent"}
     fixture: "instruction_chain"
     expected: "non_conformant"
     spec_ref: "SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class); SPEC Appendix F (authorised: user, operator, service, agent_identified; untrusted: agent_unidentified, tool_output, retrieved, memory_untrusted)"
@@ -2025,6 +2118,90 @@ cells:
     expected: "not_conformant"
     spec_ref: "SPEC §7.7.2 (every action acts on an instruction whose provenance terminates in an authorised principal); Appendix F dangling reference facts"
     note: "how refs.instruction names the acted-on instruction (18.124, 18.119, subject); ruled 2026-10-12: 4, reading A"
+  - id: c05-held-absent-en-user
+    controls: ["CND-05"]
+    dims: {instruction_class: "enforcement_point", source_class: "user", instruction_held: "absent", principal: "present"}
+    fixture: "instruction_chain"
+    expected: "not_conformant"
+    spec_ref: "SPEC §7.7.2 (every action acts on an instruction whose provenance terminates in an authorised principal); Appendix F dangling reference facts; SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
+    note: "how refs.instruction names the acted-on instruction (18.124, 18.119, subject)"
+  - id: c05-held-absent-en-tool_output
+    controls: ["CND-05"]
+    dims: {instruction_class: "enforcement_point", source_class: "tool_output", instruction_held: "absent", principal: "absent"}
+    fixture: "instruction_chain"
+    expected: "not_conformant"
+    spec_ref: "SPEC §7.7.2 (every action acts on an instruction whose provenance terminates in an authorised principal); Appendix F dangling reference facts; SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
+    note: "how refs.instruction names the acted-on instruction (18.124, 18.119, subject)"
+  - id: c05-held-absent-en-memory_trusted
+    controls: ["CND-05"]
+    dims: {instruction_class: "enforcement_point", source_class: "memory_trusted", instruction_held: "absent", principal: "absent"}
+    fixture: "instruction_chain"
+    expected: "not_conformant"
+    spec_ref: "SPEC §7.7.2 (every action acts on an instruction whose provenance terminates in an authorised principal); Appendix F dangling reference facts; SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
+    note: "how refs.instruction names the acted-on instruction (18.124, 18.119, subject)"
+  - id: c05-held-absent-se-user
+    controls: ["CND-05"]
+    dims: {instruction_class: "self_report", source_class: "user", instruction_held: "absent", principal: "present"}
+    fixture: "instruction_chain"
+    expected: "not_conformant"
+    spec_ref: "SPEC §7.7.2 (every action acts on an instruction whose provenance terminates in an authorised principal); Appendix F dangling reference facts; SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
+    note: "how refs.instruction names the acted-on instruction (18.124, 18.119, subject)"
+  - id: c05-held-absent-se-tool_output
+    controls: ["CND-05"]
+    dims: {instruction_class: "self_report", source_class: "tool_output", instruction_held: "absent", principal: "absent"}
+    fixture: "instruction_chain"
+    expected: "not_conformant"
+    spec_ref: "SPEC §7.7.2 (every action acts on an instruction whose provenance terminates in an authorised principal); Appendix F dangling reference facts; SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
+    note: "how refs.instruction names the acted-on instruction (18.124, 18.119, subject)"
+  - id: c05-held-absent-se-memory_trusted
+    controls: ["CND-05"]
+    dims: {instruction_class: "self_report", source_class: "memory_trusted", instruction_held: "absent", principal: "absent"}
+    fixture: "instruction_chain"
+    expected: "not_conformant"
+    spec_ref: "SPEC §7.7.2 (every action acts on an instruction whose provenance terminates in an authorised principal); Appendix F dangling reference facts; SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
+    note: "how refs.instruction names the acted-on instruction (18.124, 18.119, subject)"
+  - id: c05-held-null-en-user
+    controls: ["CND-05"]
+    dims: {instruction_class: "enforcement_point", source_class: "user", instruction_held: "null", principal: "present"}
+    fixture: "instruction_chain"
+    expected: "not_conformant"
+    spec_ref: "SPEC §7.7.2 (every action acts on an instruction whose provenance terminates in an authorised principal); Appendix F dangling reference facts; SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
+    note: "how refs.instruction names the acted-on instruction (18.124, 18.119, subject)"
+  - id: c05-held-null-en-tool_output
+    controls: ["CND-05"]
+    dims: {instruction_class: "enforcement_point", source_class: "tool_output", instruction_held: "null", principal: "absent"}
+    fixture: "instruction_chain"
+    expected: "not_conformant"
+    spec_ref: "SPEC §7.7.2 (every action acts on an instruction whose provenance terminates in an authorised principal); Appendix F dangling reference facts; SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
+    note: "how refs.instruction names the acted-on instruction (18.124, 18.119, subject)"
+  - id: c05-held-null-en-memory_trusted
+    controls: ["CND-05"]
+    dims: {instruction_class: "enforcement_point", source_class: "memory_trusted", instruction_held: "null", principal: "absent"}
+    fixture: "instruction_chain"
+    expected: "not_conformant"
+    spec_ref: "SPEC §7.7.2 (every action acts on an instruction whose provenance terminates in an authorised principal); Appendix F dangling reference facts; SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
+    note: "how refs.instruction names the acted-on instruction (18.124, 18.119, subject)"
+  - id: c05-held-null-se-user
+    controls: ["CND-05"]
+    dims: {instruction_class: "self_report", source_class: "user", instruction_held: "null", principal: "present"}
+    fixture: "instruction_chain"
+    expected: "not_conformant"
+    spec_ref: "SPEC §7.7.2 (every action acts on an instruction whose provenance terminates in an authorised principal); Appendix F dangling reference facts; SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
+    note: "how refs.instruction names the acted-on instruction (18.124, 18.119, subject)"
+  - id: c05-held-null-se-tool_output
+    controls: ["CND-05"]
+    dims: {instruction_class: "self_report", source_class: "tool_output", instruction_held: "null", principal: "absent"}
+    fixture: "instruction_chain"
+    expected: "not_conformant"
+    spec_ref: "SPEC §7.7.2 (every action acts on an instruction whose provenance terminates in an authorised principal); Appendix F dangling reference facts; SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
+    note: "how refs.instruction names the acted-on instruction (18.124, 18.119, subject)"
+  - id: c05-held-null-se-memory_trusted
+    controls: ["CND-05"]
+    dims: {instruction_class: "self_report", source_class: "memory_trusted", instruction_held: "null", principal: "absent"}
+    fixture: "instruction_chain"
+    expected: "not_conformant"
+    spec_ref: "SPEC §7.7.2 (every action acts on an instruction whose provenance terminates in an authorised principal); Appendix F dangling reference facts; SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
+    note: "how refs.instruction names the acted-on instruction (18.124, 18.119, subject)"
   - id: c05-acted-consequential_ToolCall-en-user
     controls: ["CND-05"]
     dims: {instruction_class: "enforcement_point", source_class: "user", acted_on: "consequential_ToolCall", principal: "present"}
@@ -3170,8 +3347,8 @@ cells:
     controls: ["CND-04"]
     dims: {instruction_class: "enforcement_point", source_class: "user", principal: "present", acted_on: "both", delegation: "ep_verified", instruction_held: "held", origin: "not_held"}
     fixture: "instruction_chain"
-    expected: "conformant"
-    spec_ref: "SPEC §7.7.4 CND-04 (every ToolCall and consequential Decision acts on an Instruction whose derivedFrom chain terminates in an authorised principal, delegation chain verified); SPEC §7.7.5 (evidence classes: high-severity controls require EP PolicyDecision corroboration, principal and decision; ingress attestation lifts CND-04/05 from partial single_source to conformant; relabelling is CND.instruction_relabelled); SPEC §6.6 (EP streams must be source_signed or export_anchored to verify; export_chained EP stream is verified_weak and every rung-2 outcome depending on it is capped at partial, weak_integrity)"
+    expected: "insufficient_evidence"
+    spec_ref: "SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met); SPEC §7.7.2 (every action acts on an instruction whose provenance terminates in an authorised principal); Appendix F dangling reference facts; SPEC §7.7.4 CND-04 (every ToolCall and consequential Decision acts on an Instruction whose derivedFrom chain terminates in an authorised principal, delegation chain verified)"
     note: "lineage that does not reach an authorised principal"
   - id: c04-integ-weak_chained-ingress
     controls: ["CND-04"]
@@ -3236,6 +3413,83 @@ cells:
     expected: "conformant"
     spec_ref: "SPEC §7.7.4 CND-04 (every ToolCall and consequential Decision acts on an Instruction whose derivedFrom chain terminates in an authorised principal, delegation chain verified); SPEC §7.7.5 (evidence classes: high-severity controls require EP PolicyDecision corroboration, principal and decision; ingress attestation lifts CND-04/05 from partial single_source to conformant; relabelling is CND.instruction_relabelled); SPEC §6.6 (EP streams must be source_signed or export_anchored to verify; export_chained EP stream is verified_weak and every rung-2 outcome depending on it is capped at partial, weak_integrity)"
     note: "the verified twin's streams weak or broken (policy carries the delegation record)"
+  - id: c04-role-en-unverified-not_declared
+    controls: ["CND-04"]
+    dims: {instruction_class: "enforcement_point", source_class: "user", principal: "present", acted_on: "both", delegation: "ep_unverified", principal_role: "not_declared"}
+    fixture: "instruction_chain"
+    expected: "non_conformant"
+    spec_ref: "SPEC §7.7.4 CND-04 (every ToolCall and consequential Decision acts on an Instruction whose derivedFrom chain terminates in an authorised principal, delegation chain verified); SPEC §6.3 agentce:chainVerified (engine-computed from verification and attenuation check)"
+    note: "18.122 critic r2 F3: an unverified delegation fails the control though the role cannot be judged"
+  - id: c04-role-se-pd_match
+    controls: ["CND-04"]
+    dims: {instruction_class: "self_report", source_class: "user", principal: "present", acted_on: "both", delegation: "ep_verified", corroboration: "ep_pd_principal", pd_role: "match"}
+    fixture: "instruction_chain"
+    expected: "conformant"
+    spec_ref: "SPEC §7.7.4 CND-04 (every ToolCall and consequential Decision acts on an Instruction whose derivedFrom chain terminates in an authorised principal, delegation chain verified); SPEC §7.7.5 (evidence classes: high-severity controls require EP PolicyDecision corroboration, principal and decision; ingress attestation lifts CND-04/05 from partial single_source to conformant; relabelling is CND.instruction_relabelled); SPEC §6.6 (EP streams must be source_signed or export_anchored to verify; export_chained EP stream is verified_weak and every rung-2 outcome depending on it is capped at partial, weak_integrity)"
+    note: "18.122 critic r2 F1: the EP PolicyDecision's role for the agent-reported principal (inbox 358)"
+  - id: c04-role-se-pd_other
+    controls: ["CND-04"]
+    dims: {instruction_class: "self_report", source_class: "user", principal: "present", acted_on: "both", delegation: "ep_verified", corroboration: "ep_pd_principal", pd_role: "other"}
+    fixture: "instruction_chain"
+    expected: "non_conformant"
+    spec_ref: "SPEC §7.7.4 CND-04 (every ToolCall and consequential Decision acts on an Instruction whose derivedFrom chain terminates in an authorised principal, delegation chain verified); SPEC §7.7.4 CND-04 'an authorised principal for the task type'; §7.7.6 task_scopes authorised_principal_roles; inbox row 355 (ruled 2026-10-15 10:02: no scope, no declared roles or a principal with no role read insufficient_evidence, a role outside the list non_conformant)"
+    note: "18.122 critic r2 F1: the EP PolicyDecision's role for the agent-reported principal (inbox 358)"
+  - id: c04-role-se-pd_none
+    controls: ["CND-04"]
+    dims: {instruction_class: "self_report", source_class: "user", principal: "present", acted_on: "both", delegation: "ep_verified", corroboration: "ep_pd_principal", pd_role: "none"}
+    fixture: "instruction_chain"
+    expected: "insufficient_evidence"
+    spec_ref: "SPEC §7.7.4 CND-04 (every ToolCall and consequential Decision acts on an Instruction whose derivedFrom chain terminates in an authorised principal, delegation chain verified); SPEC §7.7.4 CND-04 'an authorised principal for the task type'; §7.7.6 task_scopes authorised_principal_roles; inbox row 355 (ruled 2026-10-15 10:02: no scope, no declared roles or a principal with no role read insufficient_evidence, a role outside the list non_conformant); SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met)"
+    note: "18.122 critic r2 F1: the EP PolicyDecision's role for the agent-reported principal (inbox 358)"
+  - id: c04-role-se-twin_other
+    controls: ["CND-04"]
+    dims: {instruction_class: "self_report", source_class: "user", principal: "present", acted_on: "both", delegation: "ep_verified", relabel: "ep_twin_agrees", twin_role: "other"}
+    fixture: "instruction_chain"
+    expected: "non_conformant"
+    spec_ref: "SPEC §7.7.4 CND-04 (every ToolCall and consequential Decision acts on an Instruction whose derivedFrom chain terminates in an authorised principal, delegation chain verified); SPEC §7.7.4 CND-04 'an authorised principal for the task type'; §7.7.6 task_scopes authorised_principal_roles; inbox row 355 (ruled 2026-10-15 10:02: no scope, no declared roles or a principal with no role read insufficient_evidence, a role outside the list non_conformant)"
+    note: "18.122 critic r2 F1: the EP twin records another role, or none, for the agent-reported principal (inbox 358)"
+  - id: c04-role-se-twin_none
+    controls: ["CND-04"]
+    dims: {instruction_class: "self_report", source_class: "user", principal: "present", acted_on: "both", delegation: "ep_verified", relabel: "ep_twin_agrees", twin_role: "none"}
+    fixture: "instruction_chain"
+    expected: "insufficient_evidence"
+    spec_ref: "SPEC §7.7.4 CND-04 (every ToolCall and consequential Decision acts on an Instruction whose derivedFrom chain terminates in an authorised principal, delegation chain verified); SPEC §7.7.4 CND-04 'an authorised principal for the task type'; §7.7.6 task_scopes authorised_principal_roles; inbox row 355 (ruled 2026-10-15 10:02: no scope, no declared roles or a principal with no role read insufficient_evidence, a role outside the list non_conformant); SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met)"
+    note: "18.122 critic r2 F1: the EP twin records another role, or none, for the agent-reported principal (inbox 358)"
+  - id: c04-role-en-declared_match
+    controls: ["CND-04"]
+    dims: {instruction_class: "enforcement_point", source_class: "user", principal: "present", acted_on: "both", delegation: "ep_verified", principal_role: "declared_match"}
+    fixture: "instruction_chain"
+    expected: "conformant"
+    spec_ref: "SPEC §7.7.4 CND-04 (every ToolCall and consequential Decision acts on an Instruction whose derivedFrom chain terminates in an authorised principal, delegation chain verified); SPEC §7.7.5 (evidence classes: high-severity controls require EP PolicyDecision corroboration, principal and decision; ingress attestation lifts CND-04/05 from partial single_source to conformant; relabelling is CND.instruction_relabelled); SPEC §6.6 (EP streams must be source_signed or export_anchored to verify; export_chained EP stream is verified_weak and every rung-2 outcome depending on it is capped at partial, weak_integrity)"
+    note: "18.122 critic r1 F1: the chain's last principal's role for the task type (inbox row 355)"
+  - id: c04-role-en-declared_other
+    controls: ["CND-04"]
+    dims: {instruction_class: "enforcement_point", source_class: "user", principal: "present", acted_on: "both", delegation: "ep_verified", principal_role: "declared_other"}
+    fixture: "instruction_chain"
+    expected: "non_conformant"
+    spec_ref: "SPEC §7.7.4 CND-04 (every ToolCall and consequential Decision acts on an Instruction whose derivedFrom chain terminates in an authorised principal, delegation chain verified); SPEC §7.7.4 CND-04 'an authorised principal for the task type'; §7.7.6 task_scopes authorised_principal_roles; inbox row 355 (ruled 2026-10-15 10:02: no scope, no declared roles or a principal with no role read insufficient_evidence, a role outside the list non_conformant)"
+    note: "18.122 critic r1 F1: the chain's last principal's role for the task type (inbox row 355)"
+  - id: c04-role-en-not_declared
+    controls: ["CND-04"]
+    dims: {instruction_class: "enforcement_point", source_class: "user", principal: "present", acted_on: "both", delegation: "ep_verified", principal_role: "not_declared"}
+    fixture: "instruction_chain"
+    expected: "insufficient_evidence"
+    spec_ref: "SPEC §7.7.4 CND-04 (every ToolCall and consequential Decision acts on an Instruction whose derivedFrom chain terminates in an authorised principal, delegation chain verified); SPEC §7.7.4 CND-04 'an authorised principal for the task type'; §7.7.6 task_scopes authorised_principal_roles; inbox row 355 (ruled 2026-10-15 10:02: no scope, no declared roles or a principal with no role read insufficient_evidence, a role outside the list non_conformant); SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met)"
+    note: "18.122 critic r1 F1: the chain's last principal's role for the task type (inbox row 355)"
+  - id: c04-role-en-no_role
+    controls: ["CND-04"]
+    dims: {instruction_class: "enforcement_point", source_class: "user", principal: "present", acted_on: "both", delegation: "ep_verified", principal_role: "no_role"}
+    fixture: "instruction_chain"
+    expected: "insufficient_evidence"
+    spec_ref: "SPEC §7.7.4 CND-04 (every ToolCall and consequential Decision acts on an Instruction whose derivedFrom chain terminates in an authorised principal, delegation chain verified); SPEC §7.7.4 CND-04 'an authorised principal for the task type'; §7.7.6 task_scopes authorised_principal_roles; inbox row 355 (ruled 2026-10-15 10:02: no scope, no declared roles or a principal with no role read insufficient_evidence, a role outside the list non_conformant); SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met)"
+    note: "18.122 critic r1 F1: the chain's last principal's role for the task type (inbox row 355)"
+  - id: c04-role-en-no_scope
+    controls: ["CND-04"]
+    dims: {instruction_class: "enforcement_point", source_class: "user", principal: "present", acted_on: "both", delegation: "ep_verified", principal_role: "no_scope"}
+    fixture: "instruction_chain"
+    expected: "insufficient_evidence"
+    spec_ref: "SPEC §7.7.4 CND-04 (every ToolCall and consequential Decision acts on an Instruction whose derivedFrom chain terminates in an authorised principal, delegation chain verified); SPEC §7.7.4 CND-04 'an authorised principal for the task type'; §7.7.6 task_scopes authorised_principal_roles; inbox row 355 (ruled 2026-10-15 10:02: no scope, no declared roles or a principal with no role read insufficient_evidence, a role outside the list non_conformant); SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met)"
+    note: "18.122 critic r1 F1: the chain's last principal's role for the task type (inbox row 355)"
   - id: c04-relabel-SR-user-untrusted-twin
     controls: ["CND-04"]
     dims: {instruction_class: "self_report", source_class: "user", principal: "present", acted_on: "both", delegation: "ep_verified", relabel: "ep_twin_untrusted"}
