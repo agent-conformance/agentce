@@ -31,6 +31,7 @@ import {
 } from "./project";
 import { byteCompare, formatTemplate, jsonStringifyAscii, pyStr, sortKeysDeep } from "./util";
 import { gapText, summarize as summarizeVerdict } from "./verdict";
+import type { CatalogFiles } from "./verify";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 
 const ZERO_DIGEST = `sha256:${"0".repeat(64)}`;
@@ -120,12 +121,25 @@ export function coveredFiles(dir: string, exclude: ReadonlySet<string> = new Set
  * (`coveredFiles`). Recomputed from the directory's real bytes every call -- never read from a
  * catalog's stored `provenance.digest` field. */
 export function digestTree(dir: string, exclude: ReadonlySet<string> = new Set()): string {
-  const lines = coveredFiles(dir, exclude).map((rel) => {
-    const fileHash = createHash("sha256")
-      .update(readFileSync(join(dir, rel)))
-      .digest("hex");
-    return Buffer.from(`${rel}\0${fileHash}`, "utf-8");
-  });
+  return digestFiles(
+    new Map(coveredFiles(dir, exclude).map((rel) => [rel, readFileSync(join(dir, rel))])),
+  );
+}
+
+/** `digestTree` over bytes already read: the same digest, for the same relpaths and contents. */
+export function digestFiles(
+  files: ReadonlyMap<string, Buffer>,
+  exclude: ReadonlySet<string> = new Set(),
+): string {
+  const lines = [...files.keys()]
+    .filter((rel) => !exclude.has(rel))
+    .sort(byteCompare)
+    .map((rel) => {
+      const fileHash = createHash("sha256")
+        .update(files.get(rel) as Buffer)
+        .digest("hex");
+      return Buffer.from(`${rel}\0${fileHash}`, "utf-8");
+    });
   const joined = Buffer.concat(
     lines.flatMap((line, i) => (i === 0 ? [line] : [Buffer.from("\n"), line])),
   );
@@ -134,9 +148,12 @@ export function digestTree(dir: string, exclude: ReadonlySet<string> = new Set()
 
 /** The catalog's real content digest (SPEC §14.5 CP-3): the same recomputation a reader can
  * independently verify against the catalog directory (mirrors the Python reference's
- * `catalog.catalog_provenance_digest`). */
-export function catalogProvenanceDigest(directory: string): string {
-  return digestTree(directory, PROVENANCE_EXCLUDE);
+ * `catalog.catalog_provenance_digest`). `source` is the folder, or the files a load read from it
+ * (18.171), whose bytes are then the ones digested. */
+export function catalogProvenanceDigest(source: string | CatalogFiles): string {
+  return typeof source === "string"
+    ? digestTree(source, PROVENANCE_EXCLUDE)
+    : digestFiles(source.files, PROVENANCE_EXCLUDE);
 }
 
 const SARIF_LEVEL: Record<string, string> = {
@@ -1209,7 +1226,10 @@ export function buildManifest(options: ManifestOptions): Record<string, unknown>
     const cid = at >= 0 ? entry.slice(0, at) : entry;
     const version = at >= 0 ? entry.slice(at + 1) : "";
     const catalog = byLabel.get(entry);
-    const digest = catalog !== undefined ? catalogProvenanceDigest(catalog.directory) : ZERO_DIGEST;
+    const digest =
+      catalog !== undefined
+        ? catalogProvenanceDigest(catalog.files ?? catalog.directory)
+        : ZERO_DIGEST;
     return { id: cid, version: version || "0", digest };
   });
   const inputs: Record<string, unknown> = {

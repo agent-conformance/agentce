@@ -30,10 +30,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { canonicalString } from "./canonical";
-import { evidenceShapeFor, loadCatalog, shapeFor } from "./catalog";
+import { type ControlSpec, evidenceShapeFor, loadCatalog, shapeFor } from "./catalog";
 import { DomainBinding } from "./domain";
 import { buildGraph } from "./graph";
-import { coveredFiles, digestTree } from "./report";
+import { catalogProvenanceDigest, coveredFiles, digestFiles, digestTree } from "./report";
 import { controlOutcomeToJson, evaluateControl } from "./structural";
 
 const REPO = join(__dirname, "..", "..", "..");
@@ -292,4 +292,21 @@ test("covered path: a symlinked shape inside the catalog loads; a null shape is 
   const nulled = withControlValue("DOC-01", "shape", "null", null).dir;
   assert.equal(loadCatalog(nulled).controls.find((c) => c.id === "DOC-01")?.shapePath, null);
   rmSync(join(nulled, ".."), { recursive: true, force: true });
+});
+
+test("read once: loadCatalog keeps the bytes it read, and a later edit on disk changes none of its digests", () => {
+  const dir = join(mkdtempSync(join(tmpdir(), "agentce-read-once-")), "c");
+  cpSync(BASE, dir, { recursive: true });
+  const before = catalogProvenanceDigest(dir);
+  const catalog = loadCatalog(dir);
+  const control = catalog.controls[0] as ControlSpec;
+  const file = join(dir, "controls", `${control.id}.yaml`);
+  writeFileSync(file, `${readFileSync(file, "utf-8")}\n# changed after the read\n`);
+  assert.ok(catalog.files !== undefined);
+  assert.equal(catalogProvenanceDigest(catalog.files), before);
+  assert.notEqual(catalogProvenanceDigest(dir), before);
+  assert.equal(
+    digestFiles(catalog.files.files, new Set(["catalog.sig.json"])),
+    digestTree(BASE, new Set(["catalog.sig.json"])),
+  );
 });

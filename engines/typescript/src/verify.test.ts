@@ -28,6 +28,8 @@ import {
   type ReleaseResult,
   TrustRoot,
   publicKeyFromRaw,
+  readCatalogFiles,
+  vendoredTrust,
   vendoredTrustPath,
   verifyCatalog,
   verifyEnvelope,
@@ -1172,4 +1174,20 @@ test("verify unreadable input: a catalog subdirectory is named", { skip: asRoot 
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("read once: verifyCatalog over given files decides on those bytes, whatever the folder holds by then", () => {
+  const dir = join(mkdtempSync(join(tmpdir(), "agentce-read-once-")), "c");
+  cpSync(join(__dirname, "..", "..", "..", "spec", "catalogs", "base", "baseline"), dir, {
+    recursive: true,
+  });
+  const files = readCatalogFiles(dir);
+  const file = join(dir, "controls", "DOC-01.yaml");
+  const signed = readFileSync(file);
+  writeFileSync(file, Buffer.concat([signed, Buffer.from("# changed after the read\n")]));
+  assert.equal(verifyCatalog(files, vendoredTrust()).verified, true);
+  assert.equal(verifyCatalog(dir, vendoredTrust()).verified, false);
+  const edited = readCatalogFiles(dir);
+  writeFileSync(file, signed);
+  assert.equal(verifyCatalog(edited, vendoredTrust()).verified, false);
 });

@@ -434,7 +434,3 @@ export function parseShapesTtl(text: string, shown = "(inline)"): Map<string, Sh
   }
   return parseShapes(store);
 }
-
-export function loadShapes(path: string, shown: string): Map<string, Shape> {
-  return parseShapesTtl(readFileSync(path, "utf-8"), shown);
-}

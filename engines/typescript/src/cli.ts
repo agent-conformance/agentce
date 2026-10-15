@@ -380,7 +380,8 @@ function verifyCatalogDirs(
 ): string[] {
   const limitations: string[] = [];
   for (const catalog of loaded) {
-    const outcome = verifyCatalog(catalog.directory, trust);
+    // The bytes the load read (18.171), so what verifies is what is assessed.
+    const outcome = verifyCatalog(catalog.files ?? catalog.directory, trust);
     if (outcome.verified) {
       continue;
     }

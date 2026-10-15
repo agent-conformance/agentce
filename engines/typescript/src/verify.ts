@@ -25,12 +25,34 @@ import {
 } from "./errors";
 import { NonCanonicalNumber, parseJson } from "./json";
 import { pyTruthy } from "./readiness";
-import { digestTree } from "./report";
+import { coveredFiles, digestFiles } from "./report";
 import { dssePae, keyidFor } from "./sign";
 import { b64dStrict, decodeUtf8Strict, formatTemplate, pyRepr } from "./util";
 
 /** The detached signature a signed catalog (or corpus) directory carries (SPEC §8.7). */
 export const CATALOG_SIGNATURE_NAME = "catalog.sig.json";
+
+/** One read of a catalog folder (18.171): every file the catalog digest covers, by POSIX relpath,
+ * read once. The signature check and the loader both read these bytes, never the folder again, so a
+ * file changed on disk during a run cannot be loaded unverified or verified unloaded. */
+export interface CatalogFiles {
+  root: string;
+  files: ReadonlyMap<string, Buffer>;
+}
+
+/** Read every file the catalog digest covers under `root` (`coveredFiles`, less the signature) once.
+ * `first` holds files the caller has already read (the loader reads `catalog.yaml` first, so a missing
+ * one is refused as before); those bytes are kept, never read a second time. */
+export function readCatalogFiles(
+  root: string,
+  first: ReadonlyMap<string, Buffer> = new Map(),
+): CatalogFiles {
+  const rels = coveredFiles(root, new Set([CATALOG_SIGNATURE_NAME]));
+  return {
+    root,
+    files: new Map(rels.map((rel) => [rel, first.get(rel) ?? readFileSync(join(root, rel))])),
+  };
+}
 
 /** A verify refusal: its text, and the catalogue keys the text was built from in reading order (one
  * key for a leaf refusal, a wrapper's own key followed by its inner refusal's keys). `verify --json`
@@ -531,10 +553,15 @@ export interface CatalogVerifyResult {
 
 /** Verifies a catalog directory's detached signature against `trust` (mirrors `_verify_catalog`/
  * `verify_catalog_directory`, `signing.py:426-461`, `commands/__init__.py:321-352`). */
-export function verifyCatalog(dir: string, trust: TrustRoot): CatalogVerifyResult {
+export function verifyCatalog(
+  source: string | CatalogFiles,
+  trust: TrustRoot,
+): CatalogVerifyResult {
+  const dir = typeof source === "string" ? source : source.root;
   let digest: string;
   try {
-    digest = digestTree(dir, new Set([CATALOG_SIGNATURE_NAME]));
+    // One read (18.171): the digest checked is the digest of the bytes given, or of one read of `dir`.
+    digest = digestFiles((typeof source === "string" ? readCatalogFiles(source) : source).files);
   } catch (err) {
     throw catalogUnreadable(dir, err);
   }

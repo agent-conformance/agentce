@@ -12,11 +12,10 @@ import { join, sep } from "node:path";
 import { load } from "js-yaml";
 import { errorCause, errorFix } from "./errorCatalogue";
 import { AgentceError, InputError, catalogUnreadable } from "./errors";
-import { type Shape, loadShapes } from "./psp";
-import { coveredFiles } from "./report";
+import { type Shape, parseShapesTtl } from "./psp";
 import { SOURCE_CLASS_FROM, SOURCE_CLASS_RANK } from "./sourceClass";
 import { byteCompare, formatTemplate } from "./util";
-import { CATALOG_SIGNATURE_NAME } from "./verify";
+import { type CatalogFiles, readCatalogFiles } from "./verify";
 
 const EVIDENCE_SHAPE_UNRESOLVED = "catalog.evidence_shape.unresolved";
 const SHAPE_UNRESOLVED = "catalog.shape.unresolved";
@@ -50,19 +49,17 @@ export interface Catalog {
   shapes: Map<string, Shape>;
   /** Each declared `evaluation.evidence_shape` path -> the IRI of the one node shape it holds. */
   evidenceShapeIris: Map<string, string>;
+  /** The bytes the catalog was loaded from (18.171): its signature check and provenance digest read
+   * these, never the folder again. Absent only for a catalog built in memory. */
+  files?: CatalogFiles;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** The catalog files the digest covers (`coveredFiles`, less the signature): the only files load reads. */
-function covered(directory: string): Set<string> {
-  return new Set(coveredFiles(directory, new Set([CATALOG_SIGNATURE_NAME])));
-}
-
 /** The covered `controls/<name>.yaml` files, one level deep as the listing always was, sorted. */
-function controlFiles(files: Set<string>): string[] {
+function controlFiles(files: Iterable<string>): string[] {
   return [...files]
     .filter(
       (rel) => rel.startsWith("controls/") && rel.split("/").length === 2 && rel.endsWith(".yaml"),
@@ -203,13 +200,13 @@ function fileInside(directory: string, path: string): string | null {
  * outside the catalog folder, is refused, so a declared evidence shape can never be skipped and read as a
  * pass. */
 function loadEvidenceShape(
-  directory: string,
+  files: CatalogFiles,
   control: ControlSpec,
-  files: Set<string>,
 ): [string, Map<string, Shape>] {
   const path = control.evidenceShapePath ?? "";
-  const file = files.has(path) ? fileInside(directory, path) : null;
-  const loaded = file === null ? new Map<string, Shape>() : loadShapes(file, path);
+  const bytes = files.files.get(path);
+  const inside = bytes !== undefined && fileInside(files.root, path) !== null;
+  const loaded = inside ? parseShapesTtl(bytes.toString("utf-8"), path) : new Map<string, Shape>();
   const targeted = [...loaded].filter(([, shape]) => hasTarget(shape)).map(([iri]) => iri);
   if (targeted.length !== 1) {
     throw refuseUncovered(EVIDENCE_SHAPE_UNRESOLVED, control, path);
@@ -237,32 +234,33 @@ export function loadCatalog(directory: string): Catalog {
 }
 
 function loadCovered(directory: string): Catalog {
-  const meta = load(readFileSync(join(directory, "catalog.yaml"), "utf-8"));
+  // catalog.yaml first, as before: a folder without one is refused naming it. Every covered file is
+  // then read once (18.171) and kept as `files`, which the signature check and provenance digest read.
+  const metaBytes = readFileSync(join(directory, "catalog.yaml"));
+  const meta = load(metaBytes.toString("utf-8"));
   const metaRecord = isRecord(meta) ? meta : {};
   const controls: ControlSpec[] = [];
   const shapes = new Map<string, Shape>();
   const evidenceShapeIris = new Map<string, string>();
-  const files = covered(directory);
-  for (const rel of controlFiles(files)) {
-    const data = load(readFileSync(join(directory, rel), "utf-8"));
+  const files = readCatalogFiles(directory, new Map([["catalog.yaml", metaBytes]]));
+  const text = (rel: string): string => (files.files.get(rel) as Buffer).toString("utf-8");
+  for (const rel of controlFiles(files.files.keys())) {
+    const data = load(text(rel));
     if (!isRecord(data)) {
       continue;
     }
     const control = controlFromDict(data);
     controls.push(control);
     if (control.shapePath !== null) {
-      if (!files.has(control.shapePath)) {
+      if (!files.files.has(control.shapePath)) {
         throw refuseUncovered(SHAPE_UNRESOLVED, control, control.shapePath);
       }
-      for (const [iri, shape] of loadShapes(
-        join(directory, control.shapePath),
-        control.shapePath,
-      )) {
+      for (const [iri, shape] of parseShapesTtl(text(control.shapePath), control.shapePath)) {
         shapes.set(iri, shape);
       }
     }
     if (control.evidenceShapePath !== null) {
-      const [iri, loaded] = loadEvidenceShape(directory, control, files);
+      const [iri, loaded] = loadEvidenceShape(files, control);
       evidenceShapeIris.set(control.evidenceShapePath, iri);
       for (const [shapeIri, shape] of loaded) {
         shapes.set(shapeIri, shape);
@@ -276,6 +274,7 @@ function loadCovered(directory: string): Catalog {
     controls,
     shapes,
     evidenceShapeIris,
+    files,
   };
 }
 
