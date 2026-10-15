@@ -230,11 +230,25 @@ class SourceClassJudge:
         return True
 
     def _decision_witnesses(self, focus: str, event: dict[str, Any]) -> bool:
-        """(iv) by an enforcement-point PolicyDecision allow whose refs.request is the focus and whose principal is
-        the instruction's (both present), recorded at or before the focus's clock."""
+        """(iv) by an enforcement-point PolicyDecision allow whose refs.request is the focus (for a Decision, the focus
+        or an enforcement-point ToolCall executing it) and whose principal is the instruction's (both present),
+        recorded at or before the focus's clock."""
         principal = _principal_id(_data(event).get("principal"))
-        return principal is not None and any(
-            self._in_time(focus, at) for at in self._allows.get((focus, principal), ())
+        if principal is None:
+            return False
+        # A Decision, the agent's own account, is allowed through the enforcement-point calls executing it (the calls
+        # its clock reads).
+        named = [focus]
+        if _type(self.events.get(focus) or {}) == "Decision":
+            named += [
+                call
+                for call in self.store.subjects("agentce:executes", focus)
+                if call in self.events and self._own_rank(call) > 0
+            ]
+        return any(
+            self._in_time(focus, at)
+            for request in named
+            for at in self._allows.get((request, principal), ())
         )
 
     def _attested_rank(self, focus: str, node: str, kind: str) -> tuple[int, str]:

@@ -27,6 +27,8 @@ from .structural import compare_literals
 BOOL = "xsd:boolean"
 #: CND-02's population (SPEC §7.7.4), materialised by :meth:`_Builder._conduct_gate`.
 GATED_ACTION = "agentce:GatedAction"
+#: CND-04's population (SPEC §7.7.4), materialised by :meth:`_Builder._conduct_provenance`.
+CONSEQUENTIAL_ACTION = "agentce:ConsequentialAction"
 #: A ModelCall in a task: consumption CND-07 judges against the task's budgets.
 TASK_MODEL_CALL = "agentce:TaskModelCall"
 #: An action whose task budgets the records cannot tell (CND-07's evidence shape).
@@ -71,6 +73,10 @@ _GENERIC_REFS: dict[str, str] = {
 _TRUSTED_INSTRUCTION: frozenset[str] = frozenset(
     {"user", "operator", "service", "agent_identified", "memory_trusted"}
 )
+
+#: The Appendix F classes that name an authorised principal: CND-04's chain must end at one (memory_trusted does
+#: not, ruling 12 A of 2026-10-12).
+_AUTHORISED_INSTRUCTION: frozenset[str] = _TRUSTED_INSTRUCTION - {"memory_trusted"}
 
 #: A memory record's trust, or a read's ``trust_min``, that ROB-02 treats as untrusted, and the memory
 #: guard verdicts that mark a record untrusted whatever its trust field says (SPEC §7.4).
@@ -131,6 +137,11 @@ _INCIDENT_RESPONSES: tuple[str, ...] = (
 def _untrusted_source_class(value: Any) -> bool:
     """An Appendix F source class outside the trusted set (CND-05's rule, also ROB-02's)."""
     return isinstance(value, str) and value not in _TRUSTED_INSTRUCTION
+
+
+#: The own classes whose record of an instruction's principal is read as recorded (SPEC §6.4 order, at or above
+#: enforcement_point); below them a principal's role needs an enforcement-point witness (CND-04).
+_AT_OR_ABOVE_EP = frozenset({"enforcement_point", "independent_system"})
 
 
 def _is_one_of(value: Any, values: frozenset[str]) -> bool:
@@ -393,6 +404,7 @@ class _Builder:
             "prov:Activity",
             "prov:Entity",
             GATED_ACTION,
+            CONSEQUENTIAL_ACTION,
             TASK_MODEL_CALL,
             BUDGET_UNJUDGED,
         }
@@ -815,6 +827,207 @@ class _Builder:
             ):
                 self._gate(decision, met=True, judged=False)
 
+    def _conduct_provenance(self, events: list[dict[str, Any]]) -> None:
+        """Materialise CND-04's population and judgment (SPEC §7.7.4; rulings 9 to 14 of 2026-10-12). A ToolCall that
+        executes a held consequential decision, and every consequential Decision, is a ``ConsequentialAction``. It
+        meets the control (``agentce:provenanceMet``) when its refs.instruction names a held Instruction whose
+        refs.parent chain declares only authorised Appendix F classes (user, operator, service, agent_identified) with
+        a principal on each, whose refs.origin is no tool call, resource access or memory read at an untrusted
+        trust_min, and no delegation it rests on is held unverified (``agentce:chainVerified`` false). A ToolCall rests
+        on the delegation its refs.delegation names; a Decision on those of the ToolCalls executing it. The records
+        cannot judge it (``agentce:provenanceJudged`` false) when a parent or origin is not held or not of a type SPEC
+        §6.2.3 allows there, or when it rests on no delegation, or on one the bundle does not hold."""
+        by_iri = {event_iri(str(e["id"])): e for e in events}
+        executing: dict[str, list[dict[str, Any]]] = {}
+        foci: list[tuple[str, dict[str, Any]]] = []
+        for node, event in sorted(by_iri.items()):
+            ptype = self._ptype(event)
+            if ptype == "ToolCall":
+                decision = self._held_decision(_refs(event).get("decision"))
+                if decision is not None:
+                    executing.setdefault(decision, []).append(event)
+                    if (
+                        self.decision_type.get(decision, "")
+                        in self.domain.consequential
+                    ):
+                        foci.append((node, event))
+            elif ptype == "Decision" and self.store.is_a(
+                node, "agentce:ConsequentialDecision"
+            ):
+                foci.append((node, event))
+        for node, event in foci:
+            met, judged, terminus = self._instruction_chain(
+                by_iri, _refs(event).get("instruction")
+            )
+            calls = (
+                executing.get(node, []) if self._ptype(event) == "Decision" else [event]
+            )
+            if terminus is not None:
+                role_met, role_judged = self._role_authorised(
+                    by_iri, node, event, calls, terminus
+                )
+                met, judged = met and role_met, judged and role_judged
+            delegations = [_refs(call).get("delegation") for call in calls]
+            delegations = [d for d in delegations if d is not None] if calls else []
+            for ref in delegations:
+                held = by_iri.get(ref) if isinstance(ref, str) else None
+                if held is None or self._ptype(held) != "DelegationIssued":
+                    judged = False
+                elif "true" not in self.store.literal_values(
+                    str(ref), "agentce:chainVerified"
+                ):
+                    met = False
+            if not delegations:
+                judged = False
+            # A definite failure beats a reading the records cannot finish (critic r2 F3).
+            judged = judged or not met
+            self.store.add_type(node, CONSEQUENTIAL_ACTION)
+            self._literal(node, "agentce:provenanceMet", met)
+            self._literal(node, "agentce:provenanceJudged", judged)
+
+    def _instruction_chain(
+        self, by_iri: dict[str, dict[str, Any]], instruction: Any
+    ) -> tuple[bool, bool, dict[str, Any] | None]:
+        """(met, judged, the chain's last Instruction) for CND-04's instruction chain from ``instruction`` (see
+        :meth:`_conduct_provenance`). A parent cycle never terminates, so it is unjudged and has no last Instruction."""
+        start = by_iri.get(instruction) if isinstance(instruction, str) else None
+        if start is None or self._ptype(start) != "Instruction":
+            return False, True, None
+        met, judged = True, True
+        seen: set[str] = set()
+        node: Any = instruction
+        terminus: dict[str, Any] | None = None
+        while isinstance(node, str):
+            if node in seen:
+                judged, terminus = False, None
+                break
+            seen.add(node)
+            event = by_iri.get(node)
+            if event is None or self._ptype(event) != "Instruction":
+                judged, terminus = False, None
+                break
+            terminus = event
+            data, refs = _data(event), _refs(event)
+            if not _is_one_of(
+                data.get("source_class"), _AUTHORISED_INSTRUCTION
+            ) or not (
+                isinstance(data.get("principal"), dict)
+                and (_text(data["principal"].get("id")) or "").strip()
+            ):
+                met = False
+            origin = refs.get("origin")
+            if origin is not None:
+                held = by_iri.get(origin) if isinstance(origin, str) else None
+                otype = self._ptype(held) if held is not None else None
+                trust = (
+                    _data(held).get("trust_min")
+                    if held is not None and otype == "MemoryRead"
+                    else None
+                )
+                if otype in ("ToolCall", "ResourceAccess") or (
+                    otype == "MemoryRead" and _is_one_of(trust, _UNTRUSTED_TRUST)
+                ):
+                    met = False
+                elif otype != "MemoryRead" or trust != "trusted":
+                    judged = False
+            node = refs.get("parent")
+            if node is not None and not isinstance(node, str):
+                judged, terminus = False, None
+        return met, judged, terminus
+
+    def _role_authorised(
+        self,
+        by_iri: dict[str, dict[str, Any]],
+        node: str,
+        event: dict[str, Any],
+        calls: list[dict[str, Any]],
+        terminus: dict[str, Any],
+    ) -> tuple[bool, bool]:
+        """(met, judged): whether the chain's last principal holds a role every scope of the action's task authorises
+        (SPEC §7.7.4 "for the task type", §7.7.6 ``authorised_principal_roles``). A Decision naming no task takes the
+        tasks of the calls executing it. No scope, a scope that declares no roles, or a principal with no role cannot
+        be judged (fail closed, HR-5); a role outside a declared list does not meet the control. Below
+        enforcement_point the role is the agent's word, so each enforcement-point witness of the same principal must
+        record the same role (:meth:`_witness_roles`; inbox row 358)."""
+        tasks = self._action_tasks(event)
+        if not tasks and self._ptype(event) == "Decision":
+            tasks = set().union(*(self._action_tasks(c) for c in calls))
+        lists = [self.domain.scopes_for(t) for t in sorted(tasks)] or [
+            self.domain.scopes_for("")
+        ]
+        scopes = [s for ss in lists for s in ss]
+        if not all(lists) or any(s.authorised_principal_roles is None for s in scopes):
+            return True, False
+        principal = _data(terminus).get("principal")
+        if (
+            not isinstance(principal, dict)
+            or not (_text(principal.get("id")) or "").strip()
+        ):
+            return True, True  # no principal already fails the chain (met false)
+        role = principal.get("role")
+        if not isinstance(role, str) or not role.strip():
+            return True, False
+        role = role.strip()
+        met = all(role in (s.authorised_principal_roles or ()) for s in scopes)
+        judged = True
+        if terminus.get("agentcesourceclass") not in _AT_OR_ABOVE_EP:
+            for witnessed in self._witness_roles(by_iri, node, calls, terminus):
+                if witnessed is None:
+                    judged = False
+                elif witnessed != role:
+                    met = False
+        return met, judged
+
+    def _witness_roles(
+        self,
+        by_iri: dict[str, dict[str, Any]],
+        node: str,
+        calls: list[dict[str, Any]],
+        terminus: dict[str, Any],
+    ) -> list[str | None]:
+        """The role (trimmed, None when absent or blank) each enforcement-point witness records for the terminus's
+        principal: a PolicyDecision allow whose refs.request is the action or a call executing it, and a twin
+        Instruction of the same content_ref, refs.task, source_class and principal id (SPEC §7.7.5)."""
+        data, refs = _data(terminus), _refs(terminus)
+        pid = (_text(data["principal"].get("id")) or "").strip()
+        requests = {node} | {event_iri(str(c["id"])) for c in calls}
+        roles: list[str | None] = []
+        for other in by_iri.values():
+            if (
+                other is terminus
+                or other.get("agentcesourceclass") != "enforcement_point"
+            ):
+                continue
+            odata, orefs = _data(other), _refs(other)
+            witness = odata.get("principal")
+            if (
+                not isinstance(witness, dict)
+                or (_text(witness.get("id")) or "").strip() != pid
+            ):
+                continue
+            ptype = self._ptype(other)
+            if not (
+                (
+                    ptype == "PolicyDecision"
+                    and odata.get("decision") == "allow"
+                    and orefs.get("request") in requests
+                )
+                or (
+                    ptype == "Instruction"
+                    and data.get("content_ref") is not None
+                    and refs.get("task") is not None
+                    and odata.get("content_ref") == data.get("content_ref")
+                    and orefs.get("task") == refs.get("task")
+                    and odata.get("source_class") == data.get("source_class")
+                )
+            ):
+                continue
+            role = witness.get("role")
+            roles.append(
+                role.strip() if isinstance(role, str) and role.strip() else None
+            )
+        return roles
+
     def _gate(self, node: str, *, met: bool, judged: bool) -> None:
         self.store.add_type(node, GATED_ACTION)
         self._literal(node, "agentce:gateMet", met)
@@ -1029,6 +1242,7 @@ class _Builder:
         self._acts_on_untrusted(events, self._robust_to_untrusted(events))
         self._conduct_scope_budget(events)
         self._conduct_gate(events)
+        self._conduct_provenance(events)
         self._preceded_by()
 
     @staticmethod

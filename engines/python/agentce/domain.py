@@ -29,6 +29,14 @@ def _strings(value: Any) -> frozenset[str]:
     )
 
 
+def _roles(value: Any) -> frozenset[str] | None:
+    """A scope's authorised_principal_roles, trimmed; None when absent or unreadable (not a list of strings), so a
+    bare string, null or a non-string element never reads as a shorter list (CND-04, inbox row 358)."""
+    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+        return None
+    return frozenset(v.strip() for v in value)
+
+
 #: The resource budgets a task scope declares (SPEC §7.7.6 ``budgets``), in the order CND-07 reads them.
 BUDGET_DIMENSIONS = ("tokens", "compute_seconds", "spend")
 
@@ -89,6 +97,9 @@ class TaskScope:
     requires_approval: frozenset[str] = frozenset()
     #: the declared budgets, (dimension, limit) in BUDGET_DIMENSIONS order; a None limit is unreadable.
     budgets: tuple[tuple[str, int | float | None], ...] = ()
+    #: the principal roles CND-04 accepts at the end of an instruction chain; None when the scope declares none or
+    #: declares them unreadably.
+    authorised_principal_roles: frozenset[str] | None = None
 
     def allows(self, tool: Any, effect_class: Any) -> bool:
         if self.allowed_tools is not None and tool not in self.allowed_tools:
@@ -149,6 +160,7 @@ class DomainBinding:
                     _strings(entry.get("allowed_effect_classes")),
                     _strings(entry.get("requires_approval")),
                     _budgets(entry.get("budgets")),
+                    _roles(entry.get("authorised_principal_roles")),
                 )
             )
         return binding

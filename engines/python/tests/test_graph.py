@@ -1724,3 +1724,344 @@ def test_cnd02_released_by_links_the_approvals_the_gate_rests_on() -> None:
     assert released(_gate_events("external_communication", "require_approval")) == [
         event_iri("ap1")
     ]
+
+
+def _roles_domain(roles: Any = ("credit_officer",)) -> DomainBinding:
+    scope: dict[str, Any] = {"task_type": "review", "allowed_effect_classes": ["read"]}
+    if roles is not None:
+        scope["authorised_principal_roles"] = list(roles)
+    return DomainBinding.from_dict(
+        {
+            "decision_types": [
+                {
+                    "id": CREDIT,
+                    "subclass_of": "agentce:ConsequentialDecision",
+                    "consequential": True,
+                },
+                {
+                    "id": MINOR,
+                    "subclass_of": "agentce:Decision",
+                    "consequential": False,
+                },
+            ],
+            "task_scopes": [scope],
+        }
+    )
+
+
+def _provenance_events(
+    *,
+    instruction: Any = "agentce:event/i1",
+    source_class: Any = "user",
+    principal: Any = {"id": "user:alice", "role": "credit_officer"},
+    parent: dict[str, Any] | None = None,
+    origin: dict[str, Any] | None = None,
+    delegation: str | None = "verified",
+    dtype: str = CREDIT,
+) -> list[dict[str, Any]]:
+    """A consequential decision d1 executed by tc1, both acting on i1 (CND-04, SPEC §7.7.4)."""
+    data: dict[str, Any] = {"source_class": source_class}
+    if principal is not None:
+        data["principal"] = principal
+    events = [
+        _event(
+            "d1",
+            "Decision",
+            {"decision_type": dtype, "refs": {"instruction": instruction}},
+        ),
+        _event("i1", "Instruction", data),
+    ]
+    refs: dict[str, Any] = {"decision": "agentce:event/d1", "instruction": instruction}
+    if delegation is not None:
+        refs["delegation"] = "agentce:event/g1"
+        if delegation != "unheld":
+            events.append(
+                _event(
+                    "g1", "DelegationIssued", {"verification": {"status": delegation}}
+                )
+            )
+    events.append(_event("tc1", "ToolCall", {"tool": {"name": "book"}, "refs": refs}))
+    for key, event in (("parent", parent), ("origin", origin)):
+        if event is not None:
+            events.append(event)
+            events[1]["data"].setdefault("refs", {})[key] = event_iri(event["id"])
+    return events
+
+
+def _provenance(
+    events: list[dict[str, Any]], node: str = "tc1", domain: DomainBinding | None = None
+) -> tuple[bool, str | None, str | None]:
+    store = build_graph(events, domain=domain or _roles_domain())
+    iri = event_iri(node)
+    met = store.literal_values(iri, "agentce:provenanceMet")
+    judged = store.literal_values(iri, "agentce:provenanceJudged")
+    return (
+        store.is_a(iri, "agentce:ConsequentialAction"),
+        met[0] if met else None,
+        judged[0] if judged else None,
+    )
+
+
+def test_cnd04_population_is_consequential_actions() -> None:
+    events = _provenance_events()
+    assert _provenance(events) == (True, "true", "true")
+    assert _provenance(events, "d1") == (True, "true", "true")
+    # a call executing a minor decision, and the minor decision, are outside CND-04
+    minor = _provenance_events(dtype=MINOR)
+    assert _provenance(minor) == (False, None, None)
+    assert _provenance(minor, "d1") == (False, None, None)
+
+
+def test_cnd04_chain_must_end_at_an_authorised_principal() -> None:
+    for cls in ("user", "operator", "service", "agent_identified"):
+        assert _provenance(_provenance_events(source_class=cls)) == (
+            True,
+            "true",
+            "true",
+        )
+    bad_classes: tuple[str | None, ...] = (
+        "tool_output",
+        "retrieved",
+        "memory_untrusted",
+        "memory_trusted",
+        "agent_unidentified",
+        None,
+    )
+    for bad in bad_classes:
+        assert _provenance(_provenance_events(source_class=bad)) == (
+            True,
+            "false",
+            "true",
+        )
+    for principal in (None, {}, {"id": ""}, "user:alice"):
+        assert _provenance(_provenance_events(principal=principal)) == (
+            True,
+            "false",
+            "true",
+        )
+    # every instruction on the parent chain counts, not only the acted-on one
+    bad_parent = _event("i0", "Instruction", {"source_class": "tool_output"})
+    assert _provenance(_provenance_events(parent=bad_parent)) == (True, "false", "true")
+    # the role is read at the chain's end, the parent here
+    good_parent = _event(
+        "i0",
+        "Instruction",
+        {
+            "source_class": "operator",
+            "principal": {"id": "op:1", "role": "credit_officer"},
+        },
+    )
+    assert _provenance(_provenance_events(parent=good_parent)) == (True, "true", "true")
+    # three hops: a user parent whose own parent is tool_output still fails
+    root = _event("i9", "Instruction", {"source_class": "tool_output"})
+    middle = _event(
+        "i0",
+        "Instruction",
+        {**good_parent["data"], "refs": {"parent": event_iri("i9")}},
+    )
+    deep = _provenance_events(parent=middle) + [root]
+    assert _provenance(deep) == (True, "false", "true")
+    # arrival order does not change the reading
+    assert _provenance(deep[::-1]) == (True, "false", "true")
+    assert _provenance(_provenance_events(parent=good_parent)[::-1]) == (
+        True,
+        "true",
+        "true",
+    )
+    # a parent cycle never ends at a principal: unjudged
+    cycle = _provenance_events(
+        parent=_event("i0", "Instruction", dict(good_parent["data"]))
+    )
+    cycle[-1]["data"]["refs"] = {"parent": event_iri("i1")}
+    assert _provenance(cycle) == (True, "true", "false")
+    assert _provenance(
+        _provenance_events(principal={"id": "  ", "role": "credit_officer"})
+    ) == (True, "false", "true")
+
+
+def test_cnd04_principal_role_must_be_authorised_for_the_task_type() -> None:
+    events = _provenance_events()
+    assert _provenance(events, domain=_roles_domain(["claims_supervisor"])) == (
+        True,
+        "false",
+        "true",
+    )
+    # no roles declared, no role on the principal, or no scope for the task: the records cannot show it
+    assert _provenance(events, domain=_roles_domain(None)) == (True, "true", "false")
+    assert _provenance(_provenance_events(principal={"id": "user:alice"})) == (
+        True,
+        "true",
+        "false",
+    )
+    assert _provenance(events, domain=_GATED) == (True, "true", "false")
+    # an empty list authorises no role
+    assert _provenance(events, domain=_roles_domain([])) == (True, "false", "true")
+    # the Decision takes the task of the call executing it
+    tasked = _provenance_events()
+    tasked[-1]["agentcetask"] = "review"
+    assert _provenance(tasked, "d1", _roles_domain(["claims_supervisor"])) == (
+        True,
+        "false",
+        "true",
+    )
+
+
+def test_cnd04_an_instruction_that_is_not_held_fails() -> None:
+    for ref in (None, "agentce:event/i-missing", "i1", "agentce:event/g1"):
+        assert _provenance(_provenance_events(instruction=ref)) == (
+            True,
+            "false",
+            "true",
+        )
+
+
+def test_cnd04_origin_from_a_tool_call_or_untrusted_read_fails() -> None:
+    call = _event("o1", "ToolCall", {"tool": {"name": "fetch"}})
+    assert _provenance(_provenance_events(origin=call)) == (True, "false", "true")
+    read = _event("o1", "MemoryRead", {"trust_min": "untrusted"})
+    assert _provenance(_provenance_events(origin=read)) == (True, "false", "true")
+    trusted = _event("o1", "MemoryRead", {"trust_min": "trusted"})
+    assert _provenance(_provenance_events(origin=trusted)) == (True, "true", "true")
+    for trust in (None, "", "unknown", "Untrusted", ["untrusted"]):
+        unread = _event(
+            "o1", "MemoryRead", {} if trust is None else {"trust_min": trust}
+        )
+        assert _provenance(_provenance_events(origin=unread)) == (True, "true", "false")
+    access = _event("o1", "ResourceAccess", {})
+    assert _provenance(_provenance_events(origin=access)) == (True, "false", "true")
+    # an origin of a type §6.2.3 does not allow there cannot be judged
+    other = _event("o1", "SessionStart", {})
+    assert _provenance(_provenance_events(origin=other)) == (True, "true", "false")
+
+
+def _self_reported(
+    events: list[dict[str, Any]], *witnesses: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """``events`` with i1 recorded by the agent (self_report) and the enforcement-point witnesses appended."""
+    events[1]["agentcesourceclass"] = "self_report"
+    return events + list(witnesses)
+
+
+def _pd_allow(principal: Any, request: str = "agentce:event/tc1") -> dict[str, Any]:
+    return _event(
+        "pd1",
+        "PolicyDecision",
+        {"decision": "allow", "principal": principal, "refs": {"request": request}},
+    )
+
+
+def test_cnd04_a_self_reported_role_must_match_the_enforcement_point_record() -> None:
+    alice = {"id": "user:alice", "role": "credit_officer"}
+    for node in ("tc1", "d1"):
+        # the policy decision allowing the call records the same role: read as recorded
+        events = _self_reported(_provenance_events(), _pd_allow(alice))
+        assert _provenance(events, node) == (True, "true", "true")
+        # another role for the same principal: the agent's word is contradicted
+        other = {"id": "user:alice", "role": "loan_manager"}
+        events = _self_reported(_provenance_events(), _pd_allow(other))
+        assert _provenance(events, node) == (True, "false", "true")
+        # no role on the witness: the records cannot show the role
+        events = _self_reported(_provenance_events(), _pd_allow({"id": "user:alice"}))
+        assert _provenance(events, node) == (True, "true", "false")
+    # an enforcement-point twin of the instruction (same content_ref, task and class) recording another role
+    same = {"content_ref": "sha256:aa", "refs": {"task": "task-1"}}
+    twin = _event(
+        "i1-ep",
+        "Instruction",
+        {
+            "source_class": "user",
+            "principal": {"id": "user:alice", "role": "loan_manager"},
+            **same,
+        },
+    )
+    events = _provenance_events()
+    events[1]["data"].update(same)
+    assert _provenance(_self_reported(events, twin)) == (True, "false", "true")
+    # an instruction with no content_ref has no twin
+    assert _provenance(_self_reported(_provenance_events(), twin)) == (
+        True,
+        "true",
+        "true",
+    )
+    # a witness for another principal, or allowing another request, is no witness of this role
+    mallory = {"id": "user:mallory", "role": "loan_manager"}
+    events = _self_reported(_provenance_events(), _pd_allow(mallory))
+    assert _provenance(events) == (True, "true", "true")
+    events = _self_reported(
+        _provenance_events(),
+        _pd_allow({"id": "user:alice"}, "agentce:event/tc9"),
+    )
+    assert _provenance(events) == (True, "true", "true")
+    # an enforcement-point instruction is read as recorded, whatever a policy decision says
+    events = _provenance_events() + [_pd_allow({"id": "user:alice"})]
+    assert _provenance(events) == (True, "true", "true")
+
+
+def test_cnd04_a_definite_failure_beats_an_unjudged_role() -> None:
+    events = _provenance_events(delegation="unverified")
+    assert _provenance(events, domain=_roles_domain(None)) == (True, "false", "true")
+    assert _provenance(events, domain=_GATED) == (True, "false", "true")
+
+
+def test_cnd04_reads_authorised_principal_roles_strictly() -> None:
+    events = _provenance_events()
+    # padding is trimmed on both sides; the comparison is case-sensitive
+    assert _provenance(events, domain=_roles_domain([" credit_officer "])) == (
+        True,
+        "true",
+        "true",
+    )
+    padded = _provenance_events(
+        principal={"id": "user:alice", "role": " credit_officer"}
+    )
+    assert _provenance(padded) == (True, "true", "true")
+    assert _provenance(events, domain=_roles_domain(["Credit_Officer"])) == (
+        True,
+        "false",
+        "true",
+    )
+    # a bare string, null or a list with a non-string member is unreadable, never a shorter list
+    for roles in (
+        "credit_officer",
+        None,
+        ["credit_officer", 7],
+        ["loan_manager", None],
+    ):
+        scope: dict[str, Any] = {
+            "task_type": "review",
+            "allowed_effect_classes": ["read"],
+            "authorised_principal_roles": roles,
+        }
+        domain = DomainBinding.from_dict(
+            {
+                "decision_types": [
+                    {
+                        "id": CREDIT,
+                        "subclass_of": "agentce:ConsequentialDecision",
+                        "consequential": True,
+                    }
+                ],
+                "task_scopes": [scope],
+            }
+        )
+        assert _provenance(events, domain=domain) == (True, "true", "false"), roles
+
+
+def test_cnd04_reads_the_delegation_chain() -> None:
+    assert _provenance(_provenance_events(delegation="unverified")) == (
+        True,
+        "false",
+        "true",
+    )
+    assert _provenance(_provenance_events(delegation="unverified"), "d1") == (
+        True,
+        "false",
+        "true",
+    )
+    # no delegation, or one the bundle does not hold: the records cannot judge it (fail closed)
+    assert _provenance(_provenance_events(delegation=None)) == (True, "true", "false")
+    assert _provenance(_provenance_events(delegation="unheld")) == (
+        True,
+        "true",
+        "false",
+    )
