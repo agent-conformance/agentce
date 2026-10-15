@@ -3,6 +3,20 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.108.0
+
+- `VG-CATALOG-READ-ONCE` (18.171, added). `assess --catalog-dir --trust-root` loaded a catalog's files in one read and
+  checked its signature over a second read, so a writer who swapped a control file between the two reads got the edited
+  control into a report that exited 0 and said the catalog verified. Each engine now reads a catalog's covered files
+  once and loads, checks the signature over, and digests those same bytes; Python's `catalog lint`, `catalog sign` and
+  packaging take them too. The gate runs the three real CLIs with a writer that changes `controls/DOC-01.yaml` right
+  after the engine's first read of it: each engine reads the file once, assesses only the signed bytes, and refuses the
+  signed bytes put back after the read as `input.catalog_unverified`. Four seeded faults: the loader in each engine
+  reads the control from disk again, and Python's `catalog sign` signs a fresh read instead of the bytes it linted.
+- `VG-BYO-CATALOG-WALK` and `VG-BYO-CATALOG-PARITY` (18.171, changed). Their faults searched for loader and
+  signature-check lines that the one-read change rewrote; they now search for the new lines and still break the same
+  checks.
+
 ## 0.107.0
 
 - `VG-TASK-BUDGET` (18.175, added). The domain binding declares each task type's budgets (`task_scopes[].budgets`:
