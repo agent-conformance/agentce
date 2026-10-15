@@ -30,9 +30,17 @@ export const BUDGET_DIMENSIONS = ["tokens", "compute_seconds", "spend"] as const
 /** A declared budget: the dimension and its limit; a null limit is unreadable. */
 export type Budget = readonly [dimension: string, limit: number | null];
 
-/** A declared budget limit: a non-negative number; anything else is null, a limit no usage can be
- * shown to stay within. */
-function limit(value: unknown): number | null {
+/** A non-negative whole number (`5`, or `5.0` as another engine's reader may give it), else null. */
+export function wholeNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+/** A declared budget limit: a non-negative number, a whole one for tokens; anything else is null, a
+ * limit no usage can be shown to stay within. */
+function limit(dimension: string, value: unknown): number | null {
+  if (dimension === "tokens") {
+    return wholeNumber(value);
+  }
   return typeof value === "number" && value >= 0 ? value : null;
 }
 
@@ -45,7 +53,7 @@ function budgets(value: unknown): Budget[] {
   if (!isRecord(value)) {
     return BUDGET_DIMENSIONS.map((d) => [d, null] as const);
   }
-  return BUDGET_DIMENSIONS.filter((d) => d in value).map((d) => [d, limit(value[d])] as const);
+  return BUDGET_DIMENSIONS.filter((d) => d in value).map((d) => [d, limit(d, value[d])] as const);
 }
 
 /**

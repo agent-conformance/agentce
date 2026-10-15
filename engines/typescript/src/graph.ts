@@ -13,7 +13,7 @@
  * This is a faithful port of the Python reference; it must build byte-identical graphs.
  */
 
-import { DomainBinding } from "./domain";
+import { DomainBinding, wholeNumber } from "./domain";
 import { ZERO_KEY, eventIri, isEventRef, principalIri } from "./iri";
 import { GraphStore } from "./store";
 import { compareLiterals } from "./structural";
@@ -29,40 +29,31 @@ export const BUDGET_UNJUDGED = "agentce:BudgetUnjudged";
 const DATETIME = "xsd:dateTime";
 const INTEGER = "xsd:integer";
 
-/** A non-negative whole number (`5`, or `5.0` as another engine's reader may give it), else null. */
-function whole(value: unknown): number | null {
-  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
-}
-
 /** What each task's records show it consumed (SPEC §7.7.3 budget row); the Python engine's `_TaskUsage`
  * documents the reading. */
 class TaskUsage {
   readonly tokens = new Map<string, number>();
   readonly tokensUnread = new Set<string>();
-  readonly spendCalls = new Map<string, number>();
+  readonly spendTasks = new Set<string>();
   readonly spendUnknown = new Set<string>();
 
   add(ptype: string, data: Record<string, unknown>, tasks: Set<string>): void {
-    for (const task of tasks) {
-      if (ptype === "ToolCall") {
-        const effect = data.effect_class;
-        if (effect === "spend") {
-          this.spendCalls.set(task, (this.spendCalls.get(task) ?? 0) + 1);
-        } else if (typeof effect !== "string") {
-          this.spendUnknown.add(task);
-        }
-        continue;
+    if (ptype === "ToolCall") {
+      const effect = data.effect_class;
+      if (effect === "spend") {
+        for (const task of tasks) this.spendTasks.add(task);
+      } else if (typeof effect !== "string") {
+        for (const task of tasks) this.spendUnknown.add(task);
       }
+      return;
+    }
+    const usage = isRecord(data.usage) ? data.usage : {};
+    const usedIn = wholeNumber(usage.input_tokens);
+    const usedOut = wholeNumber(usage.output_tokens);
+    for (const task of tasks) {
       this.spendUnknown.add(task);
-      const usage = data.usage;
-      const counts = ["input_tokens", "output_tokens"].map((k) =>
-        isRecord(usage) ? whole(usage[k]) : null,
-      );
-      if (counts.every((n) => n !== null)) {
-        this.tokens.set(
-          task,
-          (this.tokens.get(task) ?? 0) + counts.reduce((a, n) => a + (n ?? 0), 0),
-        );
+      if (usedIn !== null && usedOut !== null) {
+        this.tokens.set(task, (this.tokens.get(task) ?? 0) + usedIn + usedOut);
       } else {
         this.tokensUnread.add(task);
       }
@@ -72,11 +63,10 @@ class TaskUsage {
   /** true within the limit, false over it, null when the records cannot tell. */
   verdict(task: string, dimension: string, limit: number | null): boolean | null {
     if (dimension === "tokens") {
-      const cap = whole(limit);
-      if (cap === null) {
+      if (limit === null) {
         return null;
       }
-      if ((this.tokens.get(task) ?? 0) > cap) {
+      if ((this.tokens.get(task) ?? 0) > limit) {
         return false;
       }
       // no readable usage for the task, or a model call without one: the records cannot tell
@@ -86,7 +76,7 @@ class TaskUsage {
       if (limit === null) {
         return null;
       }
-      if (this.spendCalls.get(task)) {
+      if (this.spendTasks.has(task)) {
         return limit === 0 ? false : null;
       }
       return this.spendUnknown.has(task) ? null : true;

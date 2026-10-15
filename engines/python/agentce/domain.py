@@ -33,9 +33,20 @@ def _strings(value: Any) -> frozenset[str]:
 BUDGET_DIMENSIONS = ("tokens", "compute_seconds", "spend")
 
 
-def _limit(value: Any) -> int | float | None:
-    """A declared budget limit: a non-negative number (a whole number for tokens is checked by the reader);
-    anything else is None, a limit no usage can be shown to stay within."""
+def whole_number(value: Any) -> int | None:
+    """A non-negative whole number (``5`` or ``5.0``, as a JSON or YAML reader in any engine may give it), else None."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if value < 0 or (isinstance(value, float) and not value.is_integer()):
+        return None
+    return int(value)
+
+
+def _limit(dimension: str, value: Any) -> int | float | None:
+    """A declared budget limit: a non-negative number, a whole one for tokens; anything else is None, a limit
+    no usage can be shown to stay within."""
+    if dimension == "tokens":
+        return whole_number(value)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     return value if value >= 0 else None
@@ -48,7 +59,7 @@ def _budgets(value: Any) -> tuple[tuple[str, int | float | None], ...]:
         return ()
     if not isinstance(value, dict):
         return tuple((d, None) for d in BUDGET_DIMENSIONS)
-    return tuple((d, _limit(value[d])) for d in BUDGET_DIMENSIONS if d in value)
+    return tuple((d, _limit(d, value[d])) for d in BUDGET_DIMENSIONS if d in value)
 
 
 @dataclass(frozen=True)

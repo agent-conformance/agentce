@@ -3649,8 +3649,8 @@
         {
           "description": "a Python-only graph-builder change: every ToolCall and ResourceAccess reads withinScope true even when an authorization denied it or its task's declared scope does not allow it, which the conduct-overlay golden (CND-01) captured before; the TypeScript and Java tests would stay green on the old snapshot",
           "file": "engines/python/agentce/graph.py",
-          "search": "node, \"agentce:withinScope\", \"true\" if in_scope else \"false\", BOOL",
-          "replace": "node, \"agentce:withinScope\", \"true\", BOOL"
+          "search": "self._literal(node, \"agentce:withinScope\", in_scope)",
+          "replace": "self._literal(node, \"agentce:withinScope\", True)"
         },
         {
           "description": "a Python-only state-directory change: state.json stops carrying last_outcomes, so the state golden the ports' state tests read no longer matches what Python writes",
@@ -4532,13 +4532,13 @@
         {
           "description": "Python's token verdict never reads over, so a task's 5000 tokens against a 1000-token budget read CND-07 within budget",
           "file": "engines/python/agentce/graph.py",
-          "search": "            if self.tokens.get(task, 0) > cap:\n",
+          "search": "            if self.tokens.get(task, 0) > limit:\n",
           "replace": "            if False:\n"
         },
         {
           "description": "TypeScript's token verdict never reads over, so a task's 5000 tokens against a 1000-token budget read CND-07 within budget",
           "file": "engines/typescript/src/graph.ts",
-          "search": "if ((this.tokens.get(task) ?? 0) > cap) {",
+          "search": "if ((this.tokens.get(task) ?? 0) > limit) {",
           "replace": "if (false) {"
         },
         {

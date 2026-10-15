@@ -16,6 +16,8 @@ fails if a gate in `gates.json` is not named in this file.
   CLIs, among them a readable overrun beside an unreadable usage, a second subject's overrun, an untasked model call,
   a Refusal naming an event not held and a limit written 1000.0. Three seeded faults, one per engine, make the token
   verdict never read over.
+- `VG-ENGINE-GOLDENS-FRESH` (18.175, changed). Its Python graph-builder fault searched for the `withinScope` line
+  18.175 rewrote; it now edits the new line and still makes every ToolCall and ResourceAccess read within scope.
 - `VG-TRUST-MATRIX` (18.175, changed). `fx-CND-07-en-fail` (5000 tokens against a 1000-token budget and a spend call
   against spend 0) now reads non-conformant, its expected word, in all three engines.
 

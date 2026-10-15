@@ -151,38 +151,30 @@ public final class Graph {
         return node == null || node.isNull();
     }
 
-    /** A non-negative whole number ({@code 5}, or {@code 5.0} as another engine's reader may give it), else null. */
-    static Long whole(JsonNode value) {
-        if (value == null || !value.isNumber()) {
-            return null;
-        }
-        double d = value.doubleValue();
-        return d >= 0 && d == Math.rint(d) && !Double.isInfinite(d) ? value.longValue() : null;
-    }
-
     /** What each task's records show it consumed (SPEC §7.7.3 budget row); the Python engine's
      * {@code _TaskUsage} documents the reading. */
     static final class TaskUsage {
         final Map<String, Long> tokens = new LinkedHashMap<>();
         final Set<String> tokensUnread = new LinkedHashSet<>();
-        final Map<String, Integer> spendCalls = new LinkedHashMap<>();
+        final Set<String> spendTasks = new LinkedHashSet<>();
         final Set<String> spendUnknown = new LinkedHashSet<>();
 
         void add(String ptype, JsonNode data, Set<String> tasks) {
-            for (String task : tasks) {
-                if ("ToolCall".equals(ptype)) {
-                    JsonNode effect = data.get("effect_class");
-                    if (effect != null && effect.isTextual() && "spend".equals(effect.asText())) {
-                        spendCalls.merge(task, 1, Integer::sum);
-                    } else if (effect == null || !effect.isTextual()) {
-                        spendUnknown.add(task);
-                    }
-                    continue;
+            if ("ToolCall".equals(ptype)) {
+                JsonNode effect = data.get("effect_class");
+                if (effect != null && effect.isTextual() && "spend".equals(effect.asText())) {
+                    spendTasks.addAll(tasks);
+                } else if (effect == null || !effect.isTextual()) {
+                    spendUnknown.addAll(tasks);
                 }
-                spendUnknown.add(task);
-                JsonNode usage = data.get("usage");
-                Long in = usage != null && usage.isObject() ? whole(usage.get("input_tokens")) : null;
-                Long out = usage != null && usage.isObject() ? whole(usage.get("output_tokens")) : null;
+                return;
+            }
+            spendUnknown.addAll(tasks);
+            JsonNode usage = data.get("usage");
+            boolean object = usage != null && usage.isObject();
+            Long in = object ? DomainBinding.wholeNumber(usage.get("input_tokens")) : null;
+            Long out = object ? DomainBinding.wholeNumber(usage.get("output_tokens")) : null;
+            for (String task : tasks) {
                 if (in != null && out != null) {
                     tokens.merge(task, in + out, Long::sum);
                 } else {
@@ -194,7 +186,7 @@ public final class Graph {
         /** TRUE within the limit, FALSE over it, null when the records cannot tell. */
         Boolean verdict(String task, String dimension, Double limit) {
             if ("tokens".equals(dimension)) {
-                if (limit == null || limit != Math.rint(limit) || limit.isInfinite()) {
+                if (limit == null) {
                     return null;
                 }
                 if (tokens.getOrDefault(task, 0L) > limit) {
@@ -207,7 +199,7 @@ public final class Graph {
                 if (limit == null) {
                     return null;
                 }
-                if (spendCalls.containsKey(task)) {
+                if (spendTasks.contains(task)) {
                     return limit == 0 ? Boolean.FALSE : null;
                 }
                 return spendUnknown.contains(task) ? null : Boolean.TRUE;

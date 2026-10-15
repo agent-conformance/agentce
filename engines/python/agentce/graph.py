@@ -19,7 +19,7 @@ from collections import Counter
 from collections.abc import Collection, Iterable
 from typing import Any
 
-from .domain import DomainBinding
+from .domain import DomainBinding, whole_number
 from .iri import ZERO_KEY, event_iri, is_event_ref, principal_iri
 from .store import GraphStore
 from .structural import compare_literals
@@ -283,15 +283,6 @@ def _after_every(time: str, actions: Collection[str]) -> bool:
     )
 
 
-def _whole(value: Any) -> int | None:
-    """A non-negative whole number (``5`` or ``5.0``, as a JSON or YAML reader in any engine may give it), else None."""
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return None
-    if value < 0 or (isinstance(value, float) and not value.is_integer()):
-        return None
-    return int(value)
-
-
 class _TaskUsage:
     """What each task's records show it consumed (SPEC §7.7.3 budget row): the input and output tokens of
     its ModelCalls with a readable usage, whether one of them carried none, its spend calls, and whether
@@ -301,27 +292,26 @@ class _TaskUsage:
     def __init__(self) -> None:
         self.tokens: dict[str, int] = {}
         self.tokens_unread: set[str] = set()
-        self.spend_calls: dict[str, int] = {}
+        self.spend_tasks: set[str] = set()
         self.spend_unknown: set[str] = set()
 
     def add(self, ptype: str, data: dict[str, Any], tasks: set[str]) -> None:
+        if ptype == "ToolCall":
+            effect = data.get("effect_class")
+            if effect == "spend":
+                self.spend_tasks |= tasks
+            elif not isinstance(effect, str):
+                self.spend_unknown |= tasks
+            return
+        self.spend_unknown |= tasks
+        usage = data.get("usage")
+        usage = usage if isinstance(usage, dict) else {}
+        used_in, used_out = (
+            whole_number(usage.get(k)) for k in ("input_tokens", "output_tokens")
+        )
         for task in tasks:
-            if ptype == "ToolCall":
-                effect = data.get("effect_class")
-                if effect == "spend":
-                    self.spend_calls[task] = self.spend_calls.get(task, 0) + 1
-                elif not isinstance(effect, str):
-                    self.spend_unknown.add(task)
-                continue
-            self.spend_unknown.add(task)
-            usage = data.get("usage")
-            counts = [
-                _whole(usage.get(k)) if isinstance(usage, dict) else None
-                for k in ("input_tokens", "output_tokens")
-            ]
-            read = [n for n in counts if n is not None]
-            if len(read) == len(counts):
-                self.tokens[task] = self.tokens.get(task, 0) + sum(read)
+            if used_in is not None and used_out is not None:
+                self.tokens[task] = self.tokens.get(task, 0) + used_in + used_out
             else:
                 self.tokens_unread.add(task)
 
@@ -330,10 +320,9 @@ class _TaskUsage:
     ) -> bool | None:
         """True within the limit, False over it, None when the records cannot tell."""
         if dimension == "tokens":
-            cap = _whole(limit)
-            if cap is None:
+            if limit is None:
                 return None
-            if self.tokens.get(task, 0) > cap:
+            if self.tokens.get(task, 0) > limit:
                 return False
             # no readable usage for the task, or a model call without one: the records cannot tell
             return (
@@ -342,7 +331,7 @@ class _TaskUsage:
         if dimension == "spend":
             if limit is None:
                 return None
-            if self.spend_calls.get(task):
+            if task in self.spend_tasks:
                 return False if limit == 0 else None
             return None if task in self.spend_unknown else True
         return None
@@ -693,19 +682,14 @@ class _Builder:
                 in_scope = node not in denied and (
                     ptype != "ToolCall" or self._within_task_scope(event)
                 )
-                self.store.add_literal(
-                    node, "agentce:withinScope", "true" if in_scope else "false", BOOL
-                )
+                self._literal(node, "agentce:withinScope", in_scope)
             within, judged = self._task_budget(tasks, usage)
-            self.store.add_literal(
-                node,
-                "agentce:withinBudget",
-                "true" if within and node not in over_budget else "false",
-                BOOL,
+            self._literal(
+                node, "agentce:withinBudget", within and node not in over_budget
             )
             if not judged:
                 self.store.add_type(node, BUDGET_UNJUDGED)
-                self.store.add_literal(node, "agentce:budgetJudged", "false", BOOL)
+                self._literal(node, "agentce:budgetJudged", False)
 
     def _task_budget(self, tasks: set[str], usage: _TaskUsage) -> tuple[bool, bool]:
         """Whether an action's tasks stayed within every budget their scopes declare (SPEC §7.7.4 CND-07,
@@ -714,7 +698,7 @@ class _Builder:
         record carries an amount; no record carries compute time. A task held to no scope while the
         binding declares scopes cannot be told; a binding declaring none sets no budget."""
         within, judged = True, True
-        for task in sorted(tasks):
+        for task in tasks:
             scopes = self.domain.scopes_for(task)
             if not scopes:
                 judged = judged and not (

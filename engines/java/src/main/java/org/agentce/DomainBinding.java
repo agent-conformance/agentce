@@ -156,16 +156,36 @@ public final class DomainBinding {
         if (value == null || value.isNull()) {
             return out;
         }
-        for (String dimension : BUDGET_DIMENSIONS) {
-            if (!value.isObject()) {
+        if (!value.isObject()) {
+            for (String dimension : BUDGET_DIMENSIONS) {
                 out.add(new Budget(dimension, null));
-            } else if (value.has(dimension)) {
-                JsonNode limit = value.get(dimension);
-                boolean readable = limit.isNumber() && limit.doubleValue() >= 0;
-                out.add(new Budget(dimension, readable ? limit.doubleValue() : null));
+            }
+            return out;
+        }
+        for (String dimension : BUDGET_DIMENSIONS) {
+            if (value.has(dimension)) {
+                out.add(new Budget(dimension, limit(dimension, value.get(dimension))));
             }
         }
         return out;
+    }
+
+    /** A declared budget limit: a non-negative number, a whole one for tokens; anything else is null. */
+    private static Double limit(String dimension, JsonNode value) {
+        if ("tokens".equals(dimension)) {
+            Long whole = wholeNumber(value);
+            return whole == null ? null : whole.doubleValue();
+        }
+        return value.isNumber() && value.doubleValue() >= 0 ? value.doubleValue() : null;
+    }
+
+    /** A non-negative whole number ({@code 5}, or {@code 5.0} as another engine's reader may give it), else null. */
+    static Long wholeNumber(JsonNode value) {
+        if (value == null || !value.isNumber()) {
+            return null;
+        }
+        double d = value.doubleValue();
+        return d >= 0 && d == Math.rint(d) && !Double.isInfinite(d) ? value.longValue() : null;
     }
 
     /** The string members of a declared list; anything else declares none. */
