@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.106.0",
+  "suite_version": "0.107.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -4504,6 +4504,50 @@
         }
       ],
       "fix_hint": "Run verification/gates/pathlib_predicates.sh and read the site it names: route the call through signing.is_regular_file or signing.is_directory (unreadable_is_absent=True where 'not there' is the right answer and safe, the default where the caller must report the folder as unreadable), or, if the call is on an engine-owned path, add it to verification/gates/fixtures/pathlib_predicates/baseline.json in review."
+    },
+    {
+      "id": "VG-TASK-BUDGET",
+      "title": "CND-07 holds every tool call, and every model call in a task, to the resource budgets the task's declared scopes set in all three engines: a task's ModelCall input and output tokens are summed against its tokens budget, a spend call fails a spend budget of 0, and a budget the records cannot tell (compute time, spend above 0, a missing usage, an unreadable limit) reads insufficient_evidence, never within (18.175)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/task_budget.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/task_budget/cases.json (tokens under, at and over a limit in one call or summed, a zero budget; a usage absent, partial, or unreadable beside a readable overrun; a task with no model call; spend 0 with and without a spend call, above 0 with and without one, beside a call with no effect class or a model call; compute_seconds alone and beside a tokens overrun; a limit written as a string, negative, fraction, 1000.0, boolean or null, budgets as a list, empty, with an unknown key or absent; a task named by agentcetask or refs.task, an untasked model call; a record before the profile window; a budget_exceeded Refusal naming a held call and one naming an event not held; no scopes, a single type under another name, several types none named, a type declared twice; another task within its budget; a second subject's overrun) gives CND-07 its expected outcome, source-class marker and failing records from the real Python, TypeScript and Java CLIs, with nothing quarantined",
+        "fail": "any case gives CND-07 another outcome, marker or set of failing records in any engine, or quarantines a record"
+      },
+      "fix_hint": "Run verification/gates/task_budget.sh; it names the engine, the case, CND-07's outcome and failing records it gave and the ones expected. Budgets are read by DomainBinding (domain.py, domain.ts, DomainBinding.java: TaskScope.budgets); usage and the per-task verdict are _TaskUsage/TaskUsage and _task_budget/taskBudget in each graph builder's conduct scope pass; CND-07-evidence.ttl reads budgetJudged.",
+      "faults": [
+        {
+          "description": "Python's token verdict never reads over, so a task's 5000 tokens against a 1000-token budget read CND-07 within budget",
+          "file": "engines/python/agentce/graph.py",
+          "search": "            if self.tokens.get(task, 0) > cap:\n",
+          "replace": "            if False:\n"
+        },
+        {
+          "description": "TypeScript's token verdict never reads over, so a task's 5000 tokens against a 1000-token budget read CND-07 within budget",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "if ((this.tokens.get(task) ?? 0) > cap) {",
+          "replace": "if (false) {"
+        },
+        {
+          "description": "Java's token verdict never reads over, so a task's 5000 tokens against a 1000-token budget read CND-07 within budget",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "if (tokens.getOrDefault(task, 0L) > limit) {",
+          "replace": "if (false) {"
+        }
+      ]
     },
     {
       "id": "VG-TASK-SCOPE",

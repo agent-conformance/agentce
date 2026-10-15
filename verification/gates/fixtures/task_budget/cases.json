@@ -1,0 +1,1141 @@
+{
+  "_description": "VG-TASK-BUDGET cases (18.175): each case is a domain binding and the records of one subject; verification/gates/task_budget.sh builds the bundle, the real Python, TypeScript and Java CLIs assess it against the baseline catalog and the Conduct overlay, and CND-07's outcome and failing records must be the expected ones in every engine. A record's kind is ToolCall, ModelCall or Refusal; class is its source class (default independent_system, a provider usage export); agentcetask is the CloudEvents task attribute and refs_task its refs.task; a ModelCall's usage is written as given; a Refusal names the record in request; subject \"other\" records it under a second subject, whose CND-07 reading is expected_other; time, when given, replaces the record's place-in-list time. The outcome \"insufficient_evidence/class\" is a subject the budgets were judged for and met, read insufficient_evidence only because the ToolCall is below CND-07's independent_system minimum (source_class_satisfied false); a bare \"insufficient_evidence\" is the evidence shape: the records cannot tell a budget.",
+  "cases": {
+    "tokens-within": {
+      "why": "input and output tokens of the task's model calls sum to 900, under a 1000-token budget",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 400,
+            "output_tokens": 500
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence/class",
+        "failing": []
+      }
+    },
+    "tokens-at-limit": {
+      "why": "the task uses exactly its 1000-token budget, which is within it",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 500,
+            "output_tokens": 500
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence/class",
+        "failing": []
+      }
+    },
+    "tokens-over-one-call": {
+      "why": "one model call uses 5000 tokens against a 1000-token budget; every action of the task fails",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 4990,
+            "output_tokens": 10
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "mc1",
+          "tc1"
+        ]
+      }
+    },
+    "tokens-over-summed": {
+      "why": "three model calls each under the budget sum to 1200 tokens, over the task's 1000",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 200,
+            "output_tokens": 200
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc2",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 200,
+            "output_tokens": 200
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc3",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 200,
+            "output_tokens": 200
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "mc1",
+          "mc2",
+          "mc3",
+          "tc1"
+        ]
+      }
+    },
+    "tokens-over-model-only": {
+      "why": "a task with model calls only, over its token budget: the model call is judged, so CND-07 is not left not applicable",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n",
+      "records": [
+        {
+          "id": "tc0",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 3000,
+            "output_tokens": 0
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "mc1"
+        ]
+      }
+    },
+    "tokens-zero-budget": {
+      "why": "a 0-token budget and a model call that used tokens",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 0}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 1,
+            "output_tokens": 0
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "mc1",
+          "tc1"
+        ]
+      }
+    },
+    "tokens-refs-task": {
+      "why": "the task is named by refs.task, not the agentcetask attribute",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "refs_task": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 900,
+            "output_tokens": 900
+          },
+          "refs_task": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "mc1",
+          "tc1"
+        ]
+      }
+    },
+    "tokens-other-task-untouched": {
+      "why": "the research task overruns; a call in a payments task with its own budget stays within",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n  - {task_type: payments, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 2000,
+            "output_tokens": 0
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "tc2",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "payments"
+        },
+        {
+          "id": "mc2",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 10,
+            "output_tokens": 10
+          },
+          "agentcetask": "payments"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "mc1",
+          "tc1"
+        ]
+      }
+    },
+    "tokens-untasked-model-call": {
+      "why": "a model call in no task counts against no budget and is not a CND-07 record, so the task's own token use cannot be told",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9000,
+            "output_tokens": 9000
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": []
+      }
+    },
+    "tokens-no-model-call": {
+      "why": "a token budget and no model call in the task: its token use cannot be told",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": []
+      }
+    },
+    "window-outside": {
+      "why": "a model call recorded before the profile's observation window still counts: CND-07 reads the bundle's records, as every control does (the window labels the assertion)",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n",
+      "records": [
+        {
+          "id": "mc0",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 5000,
+            "output_tokens": 0
+          },
+          "agentcetask": "research",
+          "time": "2025-06-01T00:00:00Z"
+        },
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 1,
+            "output_tokens": 1
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "mc0",
+          "mc1",
+          "tc1"
+        ]
+      }
+    },
+    "tokens-usage-missing": {
+      "why": "the task's only model call has no usage, so its token use cannot be told",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": []
+      }
+    },
+    "tokens-usage-partial": {
+      "why": "a usage with input tokens only cannot be summed",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 10
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": []
+      }
+    },
+    "tokens-unread-but-over": {
+      "why": "one readable model call already exceeds the budget beside one with no usage: over, whatever the unreadable one used",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc2",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 1500,
+            "output_tokens": 0
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "mc1",
+          "mc2",
+          "tc1"
+        ]
+      }
+    },
+    "spend-zero-no-call": {
+      "why": "a zero spend budget and no spend call",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {spend: 0}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence/class",
+        "failing": []
+      }
+    },
+    "spend-zero-model-call": {
+      "why": "a model call in a task whose spend budget is zero: the provider bills it, and no record carries the amount, so spend cannot be told (critic r2 B5)",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {spend: 0}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 1,
+            "output_tokens": 1
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": []
+      }
+    },
+    "spend-zero-call-and-model-call": {
+      "why": "a spend call under a zero spend budget is over, whatever a model call cost",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {spend: 0}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "spend",
+          "tool": "pay",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 1,
+            "output_tokens": 1
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "mc1",
+          "tc1"
+        ]
+      }
+    },
+    "spend-positive-model-call": {
+      "why": "a model call under a spend budget above zero cannot be told",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {spend: 50}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 1,
+            "output_tokens": 1
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": []
+      }
+    },
+    "spend-zero-call": {
+      "why": "a spend call in a task whose spend budget is zero, with no refusal or policy decision",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {spend: 0}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "spend",
+          "tool": "pay",
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "spend-zero-effect-unknown": {
+      "why": "a tool call with no effect class in a task whose spend budget is zero: it may have spent, so the budget cannot be told",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {spend: 0}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "tool": "pay",
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": []
+      }
+    },
+    "spend-positive-call": {
+      "why": "a spend call under a spend budget above zero: no record carries the amount, so it cannot be told",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {spend: 50}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "spend",
+          "tool": "pay",
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": []
+      }
+    },
+    "spend-positive-no-call": {
+      "why": "a spend budget above zero and no spend call",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {spend: 50}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence/class",
+        "failing": []
+      }
+    },
+    "compute-declared": {
+      "why": "a compute_seconds budget: no record carries compute time, so it cannot be told",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {compute_seconds: 60}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 1,
+            "output_tokens": 1
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": []
+      }
+    },
+    "compute-and-tokens-over": {
+      "why": "compute cannot be told but tokens are over: non-conformant",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 10, compute_seconds: 60}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 100,
+            "output_tokens": 0
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "mc1",
+          "tc1"
+        ]
+      }
+    },
+    "limit-string": {
+      "why": "a tokens limit written as a string is no limit any usage can be shown to stay within",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: \"1000\"}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 1,
+            "output_tokens": 1
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": []
+      }
+    },
+    "limit-negative": {
+      "why": "a negative tokens limit",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: -1}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 1,
+            "output_tokens": 1
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": []
+      }
+    },
+    "limit-fraction-tokens": {
+      "why": "a fractional tokens limit",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 10.5}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 1,
+            "output_tokens": 1
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": []
+      }
+    },
+    "limit-whole-decimal": {
+      "why": "a tokens limit written 1000.0 reads as 1000 in every engine",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000.0}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 1000,
+            "output_tokens": 1
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "mc1",
+          "tc1"
+        ]
+      }
+    },
+    "limit-boolean": {
+      "why": "a boolean tokens limit",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: true}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 1,
+            "output_tokens": 1
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": []
+      }
+    },
+    "limit-null": {
+      "why": "a tokens limit left empty",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: null}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 1,
+            "output_tokens": 1
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": []
+      }
+    },
+    "budgets-not-mapping": {
+      "why": "budgets written as a list",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: [1000]}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 1,
+            "output_tokens": 1
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": []
+      }
+    },
+    "budgets-empty": {
+      "why": "an empty budgets mapping declares no limit",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9000,
+            "output_tokens": 9000
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence/class",
+        "failing": []
+      }
+    },
+    "budgets-unknown-key": {
+      "why": "an unknown budget key sets no limit beside a tokens budget that is kept",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000, dollars: 0}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 1000,
+            "output_tokens": 1
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "mc1",
+          "tc1"
+        ]
+      }
+    },
+    "budgets-absent": {
+      "why": "a scope with no budgets declares none",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend]}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9000,
+            "output_tokens": 9000
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence/class",
+        "failing": []
+      }
+    },
+    "no-task-scopes": {
+      "why": "a binding with no task scopes sets no budget",
+      "domain": "{}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9000,
+            "output_tokens": 9000
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence/class",
+        "failing": []
+      }
+    },
+    "single-type-other-name": {
+      "why": "the binding declares one type, so a task of any name is held to it",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "t-42"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 2000,
+            "output_tokens": 0
+          },
+          "agentcetask": "t-42"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "mc1",
+          "tc1"
+        ]
+      }
+    },
+    "several-types-none-named": {
+      "why": "several types declared and the task names none of them: its budgets cannot be told",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n  - {task_type: payments, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend]}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "t-42"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 1,
+            "output_tokens": 1
+          },
+          "agentcetask": "t-42"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": []
+      }
+    },
+    "duplicate-type-narrower": {
+      "why": "a type declared twice, the second with a narrower budget: both apply",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 100}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 100,
+            "output_tokens": 100
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "mc1",
+          "tc1"
+        ]
+      }
+    },
+    "refusal-budget-exceeded": {
+      "why": "a budget_exceeded Refusal names the call: it reads over budget, as before 18.175",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend]}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "rf1",
+          "kind": "Refusal",
+          "class": "enforcement_point",
+          "reason_class": "budget_exceeded",
+          "request": "tc1"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ]
+      }
+    },
+    "refusal-unheld-request": {
+      "why": "a budget_exceeded Refusal naming an event the bundle does not hold changes nothing",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 1,
+            "output_tokens": 1
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "rf1",
+          "kind": "Refusal",
+          "class": "enforcement_point",
+          "reason_class": "budget_exceeded",
+          "request": "not-held"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence/class",
+        "failing": []
+      }
+    },
+    "second-subject": {
+      "why": "the other subject's task overruns; this subject's same-named task is judged on its own records",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 100,
+            "output_tokens": 100
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "tc2",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research",
+          "subject": "other"
+        },
+        {
+          "id": "mc2",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 5000,
+            "output_tokens": 0
+          },
+          "agentcetask": "research",
+          "subject": "other"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence/class",
+        "failing": []
+      },
+      "expected_other": {
+        "outcome": "non-conformant",
+        "failing": [
+          "mc2",
+          "tc2"
+        ]
+      }
+    }
+  }
+}

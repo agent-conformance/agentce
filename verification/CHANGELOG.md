@@ -3,6 +3,22 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.107.0
+
+- `VG-TASK-BUDGET` (18.175, added). The domain binding declares each task type's budgets (`task_scopes[].budgets`:
+  tokens, compute_seconds, spend), but no engine read them. A spend call where the spend budget is 0, or 5000 tokens
+  against a 1000-token budget, never failed CND-07, which read an action over budget only when a `budget_exceeded`
+  Refusal named it. All three engines now sum the input and output tokens of each task's ModelCalls against its tokens
+  budget, fail a spend call against a spend budget of 0, and fail every action of a task once it is over. A budget the
+  records cannot tell reads insufficient_evidence through a new evidence shape: compute time and spend amounts (no
+  record carries them), a usage left out, a task with no model call, or a limit the binding writes as a string, a
+  negative or a fraction. A ModelCall in a task is now in CND-07's population. The gate runs 41 cases in the three
+  CLIs, among them a readable overrun beside an unreadable usage, a second subject's overrun, an untasked model call,
+  a Refusal naming an event not held and a limit written 1000.0. Three seeded faults, one per engine, make the token
+  verdict never read over.
+- `VG-TRUST-MATRIX` (18.175, changed). `fx-CND-07-en-fail` (5000 tokens against a 1000-token budget and a spend call
+  against spend 0) now reads non-conformant, its expected word, in all three engines.
+
 ## 0.106.0
 
 - `VG-TASK-SCOPE` (18.174, added). The domain binding declares each task type's effect scope (`task_scopes`: the

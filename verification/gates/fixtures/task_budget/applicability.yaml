@@ -1,0 +1,18 @@
+# Applicability profile for the VG-TASK-BUDGET gate fixture (verification/gates/task_budget.sh): the baseline catalog
+# and the Conduct overlay, so CND-07 judges each case's actions against the budgets of the case's declared task scopes.
+profile_version: 1
+observation_window:
+  start: "2026-01-01T00:00:00Z"
+  end: "2026-02-01T00:00:00Z"
+content_capture:
+  mode: hashes_only
+catalogs:
+  - "baseline@2026.09"
+  - "conduct@2026.09"
+subjects:
+  - id: "spiffe://corp/agents/task-budget-fixture"
+    name: "VG-TASK-BUDGET gate fixture subject"
+    role: "both"
+  - id: "spiffe://corp/agents/task-budget-other"
+    name: "VG-TASK-BUDGET second subject"
+    role: "both"
