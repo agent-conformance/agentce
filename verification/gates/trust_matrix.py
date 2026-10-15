@@ -124,7 +124,6 @@ OPEN_PINNED: frozenset[str] = frozenset(
         "c06-ep-deny-no-refusal",
         "c06-ep-deny-sr-refusal",
         "fx-CND-01-EP-integ-weak",
-        "fx-CND-02-in-loginin-pass",
         "fx-DOC-03-en-pass-uea",
         "fx-DOC-03-en-pass-uep",
         "fx-INC-02-IS-integ-failed",

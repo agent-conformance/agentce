@@ -264,11 +264,6 @@
     "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
     "status": "GAP"
   },
-  "fx-CND-02-in-loginin-pass": {
-    "owner": "18.187",
-    "reason": "GAP at 78bdb0da; closed by 18.187 (CND-02 implements \u00a77.7.4; approvals cell c02-consequential-irreversible-none-appr)",
-    "status": "GAP"
-  },
   "fx-DOC-03-en-pass-uea": {
     "owner": "18.37e",
     "reason": "GAP at 78bdb0da; closed by 18.37e's matrix check",
