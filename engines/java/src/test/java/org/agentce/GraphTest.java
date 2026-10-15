@@ -849,4 +849,181 @@ class GraphTest {
         expected.put("untasked", "true");
         assertEquals(expected, got);
     }
+
+    // --- CND-02: actions are the population, and each one's gate (SPEC §7.7.4; 18.187) ------------------
+
+    private static final JsonNode GATED_DOMAIN = Json.parse("{\"decision_types\":["
+            + "{\"id\":\"agentce:CreditDecision\",\"subclass_of\":\"agentce:ConsequentialDecision\",\"consequential\":true},"
+            + "{\"id\":\"agentce:MinorDecision\",\"subclass_of\":\"agentce:Decision\",\"consequential\":false}],"
+            + "\"task_scopes\":["
+            + "{\"task_type\":\"review\",\"allowed_effect_classes\":[\"read\",\"write\"],"
+            + "\"requires_approval\":[\"irreversible\",\"write\"]},"
+            + "{\"task_type\":\"payout\",\"allowed_effect_classes\":[\"spend\"]}]}");
+
+    /** The options of {@link #gateEvents}; each {@code with} method returns a changed copy. */
+    private record GateOpts(
+            boolean approved, String dtype, String task, String decisionRef, String policyClass, String request,
+            String ptype) {
+        static final GateOpts DEFAULT = new GateOpts(
+                true, "agentce:CreditDecision", "review", "\"agentce:event/d1\"", "enforcement_point", "tc1", "ToolCall");
+
+        GateOpts unapproved() {
+            return new GateOpts(false, dtype, task, decisionRef, policyClass, request, ptype);
+        }
+
+        GateOpts dtype(String d) {
+            return new GateOpts(approved, d, task, decisionRef, policyClass, request, ptype);
+        }
+
+        GateOpts task(String t) {
+            return new GateOpts(approved, dtype, t, decisionRef, policyClass, request, ptype);
+        }
+
+        /** {@code ref} is the JSON of refs.decision ({@code null} leaves refs empty). */
+        GateOpts decisionRef(String ref) {
+            return new GateOpts(approved, dtype, task, ref, policyClass, request, ptype);
+        }
+
+        GateOpts policyClass(String c) {
+            return new GateOpts(approved, dtype, task, decisionRef, c, request, ptype);
+        }
+
+        GateOpts request(String r) {
+            return new GateOpts(approved, dtype, task, decisionRef, policyClass, r, ptype);
+        }
+
+        GateOpts ptype(String t) {
+            return new GateOpts(approved, dtype, task, decisionRef, policyClass, request, t);
+        }
+    }
+
+    /** A decision d1, alice's approval of it (unless unapproved), a PolicyDecision pd1 ruling {@code policy} on
+     * {@code request}, and the action tc1 executing d1 with {@code effect} (none when null). */
+    private static List<JsonNode> gateEvents(String effect, String policy, GateOpts o) {
+        List<JsonNode> events = new ArrayList<>();
+        events.add(event("d1", "Decision", "\"decision_type\": \"" + o.dtype() + "\""));
+        if (o.approved()) {
+            events.add(login("login-alice", "independent_system", IDP));
+            events.add(Json.parse("{\"id\": \"ap1\", \"time\": \"2026-01-01T00:00:01Z\", "
+                    + "\"agentcesourceclass\": \"enforcement_point\", \"data\": {\"@type\": \"ApprovalDecided\", "
+                    + decisionRef("d1") + ", \"outcome\": \"approve\", " + human("alice") + "}}"));
+        }
+        if (policy != null) {
+            events.add(Json.parse("{\"id\": \"pd1\", \"time\": \"2026-01-01T00:00:00Z\", \"agentcesourceclass\": \""
+                    + o.policyClass() + "\", \"data\": {\"@type\": \"PolicyDecision\", \"decision\": \"" + policy
+                    + "\", \"refs\": {\"request\": \"agentce:event/" + o.request() + "\"}}}"));
+        }
+        String refs = o.decisionRef() == null ? "{}" : "{\"decision\": " + o.decisionRef() + "}";
+        String effectJson = effect == null ? "" : ", \"effect_class\": \"" + effect + "\"";
+        String task = o.task() == null ? "" : ", \"agentcetask\": \"" + o.task() + "\"";
+        events.add(Json.parse("{\"id\": \"tc1\", \"time\": \"2026-01-01T00:00:02Z\", "
+                + "\"agentcesourceclass\": \"enforcement_point\"" + task + ", \"data\": {\"@type\": \"" + o.ptype()
+                + "\", \"tool\": {\"name\": \"book\"}, \"refs\": " + refs + effectJson + "}}"));
+        return events;
+    }
+
+    private static List<JsonNode> gateEvents(String effect, String policy) {
+        return gateEvents(effect, policy, GateOpts.DEFAULT);
+    }
+
+    private static List<Object> gate(List<JsonNode> events, String node) {
+        GraphStore store = Graph.buildGraph(events, DomainBinding.fromDict(GATED_DOMAIN));
+        String iri = "agentce:event/" + node;
+        List<String> met = store.literalValues(iri, "agentce:gateMet");
+        List<String> judged = store.literalValues(iri, "agentce:gateJudged");
+        return java.util.Arrays.asList(
+                store.isA(iri, "agentce:GatedAction"),
+                met.isEmpty() ? null : met.get(0),
+                judged.isEmpty() ? null : judged.get(0));
+    }
+
+    private static List<Object> gate(List<JsonNode> events) {
+        return gate(events, "tc1");
+    }
+
+    private static final List<Object> SHUT = List.of(true, "false", "true");
+    private static final List<Object> OPEN = List.of(true, "true", "true");
+    private static final List<Object> OUTSIDE = java.util.Arrays.asList(false, null, null);
+    private static final List<Object> UNJUDGED = List.of(true, "true", "false");
+
+    @Test
+    void cnd02ARequiresApprovalActionNeedsAnEnforcementPointDecisionAndAnApproval() {
+        assertEquals(OPEN, gate(gateEvents("irreversible", "require_approval")));
+        assertEquals(OPEN, gate(gateEvents("irreversible", "allow")));
+        assertEquals(SHUT, gate(gateEvents("irreversible", "require_approval", GateOpts.DEFAULT.unapproved())));
+        // the agent's own allow, an allow naming another call, and no PolicyDecision at all are no gate
+        assertEquals(SHUT, gate(gateEvents("irreversible", "require_approval", GateOpts.DEFAULT.policyClass("self_report"))));
+        assertEquals(SHUT, gate(gateEvents("irreversible", "require_approval", GateOpts.DEFAULT.request("tcx"))));
+        assertEquals(SHUT, gate(gateEvents("irreversible", null)));
+    }
+
+    @Test
+    void cnd02ADenyClosesTheGateWhateverWasApproved() {
+        assertEquals(SHUT, gate(gateEvents("irreversible", "deny")));
+        assertEquals(SHUT, gate(gateEvents("external_communication", "deny")));
+    }
+
+    @Test
+    void cnd02TheApprovalIsTiedToTheDecisionTheActionNames() {
+        for (String ref : new String[] {"null", "\"agentce:event/d-missing\"", "\"agentce:event/d2\"", null}) {
+            assertEquals(SHUT, gate(gateEvents("irreversible", "require_approval", GateOpts.DEFAULT.decisionRef(ref))));
+        }
+    }
+
+    @Test
+    void cnd02OtherHighEffectClassesNeedAnAllowOrAReleasedRequireApproval() {
+        for (String effect : List.of("external_communication", "spend", "physical")) {
+            assertEquals(OPEN, gate(gateEvents(effect, "allow", GateOpts.DEFAULT.unapproved())));
+            assertEquals(OPEN, gate(gateEvents(effect, "require_approval")));
+            assertEquals(SHUT, gate(gateEvents(effect, "require_approval", GateOpts.DEFAULT.unapproved())));
+            assertEquals(SHUT, gate(gateEvents(effect, "allow", GateOpts.DEFAULT.policyClass("self_report"))));
+        }
+    }
+
+    @Test
+    void cnd02TheScopeMarksThePopulationAndReadStaysOutside() {
+        assertEquals(OUTSIDE, gate(gateEvents("read", null, GateOpts.DEFAULT.unapproved())));
+        // write is no high-effect class, but this scope marks it requires_approval
+        assertEquals(SHUT, gate(gateEvents("write", "allow", GateOpts.DEFAULT.unapproved())));
+        assertEquals(OPEN, gate(gateEvents("write", "allow")));
+        // the decision's own type does not matter: the action is what CND-02 counts
+        assertEquals(OPEN, gate(gateEvents("irreversible", "require_approval", GateOpts.DEFAULT.dtype("agentce:MinorDecision"))));
+    }
+
+    @Test
+    void cnd02AHighEffectActionInNoDeclaredScopeIsHeldToTheApprovalPath() {
+        for (String task : java.util.Arrays.asList(null, "unknown-task")) {
+            GateOpts o = GateOpts.DEFAULT.unapproved().task(task);
+            assertEquals(SHUT, gate(gateEvents("external_communication", "allow", o)));
+            assertEquals(OUTSIDE, gate(gateEvents("write", "allow", o)));
+        }
+    }
+
+    @Test
+    void cnd02AnActionWithNoEffectClassAndAnUnexecutedDecisionAreUnjudged() {
+        assertEquals(UNJUDGED, gate(gateEvents(null, "require_approval")));
+        List<JsonNode> events = gateEvents("irreversible", "require_approval");
+        assertEquals(UNJUDGED, gate(events.subList(0, events.size() - 1), "d1"));
+        // a minor decision no action executes is not in the population
+        List<JsonNode> minor =
+                gateEvents("irreversible", "require_approval", GateOpts.DEFAULT.dtype("agentce:MinorDecision"));
+        assertEquals(OUTSIDE, gate(minor.subList(0, minor.size() - 1), "d1"));
+    }
+
+    @Test
+    void cnd02AResourceAccessCountsOnlyWithAnEffectClass() {
+        assertEquals(OPEN, gate(gateEvents("irreversible", "require_approval", GateOpts.DEFAULT.ptype("ResourceAccess"))));
+        assertEquals(OUTSIDE, gate(gateEvents(null, "require_approval", GateOpts.DEFAULT.ptype("ResourceAccess"))));
+    }
+
+    @Test
+    void cnd02ReleasedByLinksTheApprovalsTheGateRestsOn() {
+        java.util.function.Function<List<JsonNode>, List<String>> released = events -> Graph.buildGraph(
+                        events, DomainBinding.fromDict(GATED_DOMAIN))
+                .objects("agentce:event/tc1", "agentce:releasedBy");
+        assertEquals(List.of("agentce:event/ap1"), released.apply(gateEvents("irreversible", "require_approval")));
+        // an allow-path action passed on the enforcement point's allow rests on no approval
+        assertEquals(List.of(), released.apply(gateEvents("external_communication", "allow")));
+        assertEquals(List.of("agentce:event/ap1"), released.apply(gateEvents("external_communication", "require_approval")));
+    }
 }

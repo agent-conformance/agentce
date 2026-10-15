@@ -573,4 +573,62 @@ class SourceClassTest {
         assertEquals("{\"k\": true}", Catalog.pyDumps(Json.parse("{\"k\": true}")));
         assertEquals("\"é\"", Catalog.pyDumps(text("é")));
     }
+
+    // --- CND-02: the minimum governs the approvals that release an action's gate (SPEC §7.7.4; 18.187) ------
+
+    private static List<ObjectNode> cnd02Events(List<String> approvals, String callClass, String decision) {
+        List<ObjectNode> events = new ArrayList<>();
+        events.add(event("d1", "Decision", SR, "\"decision_type\": \"dom:CreditDecision\""));
+        for (int i = 0; i < approvals.size(); i++) {
+            int n = i + 1;
+            String human = "{\"id\": \"user:approver-" + n + "\", \"kind\": \"human\"}";
+            events.add(event("login" + n, "SessionStart", IS,
+                    "\"agent\": {\"id\": \"urn:example:service:identity-provider\"}, "
+                            + "\"environment\": \"idp-login\", \"principal\": " + human));
+            events.add(event("ap" + n, "ApprovalDecided", approvals.get(i),
+                    "\"outcome\": \"approve\", \"refs\": {\"decision\": \"" + iri("d1") + "\"}, \"actor\": " + human
+                            + ", \"session_ref\": \"" + iri("login" + n) + "\""));
+        }
+        events.add(policy(EP, decision, "{\"id\": \"" + SUBJECT + "\", \"kind\": \"agent\"}", "tc1"));
+        events.add(event("tc1", "ToolCall", callClass, "\"agent\": {\"id\": \"" + SUBJECT + "\"}, "
+                + "\"tool\": {\"name\": \"book\", \"protocol\": \"native\"}, \"effect_class\": \"irreversible\", "
+                + "\"refs\": {\"decision\": \"" + iri("d1") + "\", \"authorization\": \"" + iri("pd1") + "\"}"));
+        for (int n = 0; n < events.size(); n++) {
+            events.get(n).put("time", String.format("2026-01-02T00:00:%02dZ", n));
+        }
+        return events;
+    }
+
+    private static List<ObjectNode> cnd02Events(List<String> approvals, String callClass) {
+        return cnd02Events(approvals, callClass, "require_approval");
+    }
+
+    private static List<ObjectNode> cnd02Events(List<String> approvals) {
+        return cnd02Events(approvals, EP);
+    }
+
+    @Test
+    void cnd02AnActionRestsOnTheBestApprovalThatReleasesIt() {
+        String focus = iri("tc1");
+        List<String> from = List.of("releasedBy");
+        assertEquals(new SourceClass.Judged(SourceClass.RANK.get(IS), List.of("ApprovalDecided")),
+                judge(cnd02Events(List.of(IS))).judgedClass(focus, from));
+        assertEquals(new SourceClass.Judged(SourceClass.RANK.get(EP), List.of("ApprovalDecided")),
+                judge(cnd02Events(List.of(EP))).judgedClass(focus, from));
+        // one approval meeting the minimum releases the gate beside a weaker one
+        assertEquals((int) SourceClass.RANK.get(IS), judge(cnd02Events(List.of(EP, IS))).judgedClass(focus, from).rank());
+        // an action only the agent recorded stays self_report, whatever approved it
+        assertEquals(new SourceClass.Judged(SourceClass.RANK.get(SR), List.of("ToolCall")),
+                judge(cnd02Events(List.of(IS), SR)).judgedClass(focus, from));
+    }
+
+    @Test
+    void cnd02OutcomesThroughAssess() {
+        assertEquals("conformant", assess(cnd02Events(List.of(IS)), "CND-02").outcome);
+        assertEquals("insufficient_evidence", assess(cnd02Events(List.of(EP)), "CND-02").outcome);
+        assertEquals("conformant", assess(cnd02Events(List.of(SR, IS)), "CND-02").outcome);
+        assertEquals("insufficient_evidence", assess(cnd02Events(List.of(IS), SR), "CND-02").outcome);
+        assertEquals("non-conformant", assess(cnd02Events(List.of()), "CND-02").outcome);
+        assertEquals("non-conformant", assess(cnd02Events(List.of(IS), EP, "deny"), "CND-02").outcome);
+    }
 }

@@ -41,7 +41,11 @@ public final class SourceClass {
     /** The graph links {@code evaluation.source_class_from} may name, each one hop from the focus (SPEC §6.3), and
      * the record type each one names. */
     public static final Map<String, String> FROM =
-            Map.of("actsOn", "Instruction", "delegatedVia", "DelegationIssued", "approvedBy", "ApprovalDecided");
+            Map.of(
+                    "actsOn", "Instruction",
+                    "delegatedVia", "DelegationIssued",
+                    "approvedBy", "ApprovalDecided",
+                    "releasedBy", "ApprovalDecided");
 
     /** The outcome an assertion takes when a focus's judged class is below the control's minimum (HR-5). One
      * constant, so a later reading of single-source evidence (SPEC §10.4 {@code partial}) changes it in one place. */
@@ -344,11 +348,37 @@ public final class SourceClass {
                 if (contributors.isEmpty()) {
                     contributors = List.of(Map.entry(0, "Decision"));
                 }
+            } else if (sourceClassFrom.contains("releasedBy")) {
+                return releasedClass(focus, event);
             } else {
                 contributors = new ArrayList<>();
                 contributors.add(Map.entry(ownRank(focus), event != null ? type(event) : ""));
                 contributors.addAll(reached(focus, sourceClassFrom));
             }
+            return lowestOf(contributors);
+        }
+
+        /** CND-02's reading (SPEC §7.7.3, §7.7.4): the action rests on the best approval that releases its gate,
+         * and on its own record only when that is below enforcement_point; an action no approval releases passed
+         * only on an enforcement-point allow, which the control itself holds to enforcement_point. */
+        private Judged releasedClass(String focus, JsonNode event) {
+            int own = ownRank(focus);
+            List<Map.Entry<Integer, String>> contributors = new ArrayList<>();
+            if (own < RANK.get(ENFORCEMENT_POINT)) {
+                contributors.add(Map.entry(own, event != null ? type(event) : ""));
+            }
+            List<Map.Entry<Integer, String>> released = reached(focus, List.of("releasedBy"));
+            if (!released.isEmpty()) {
+                int best = released.stream().mapToInt(Map.Entry::getKey).max().getAsInt();
+                released.stream().filter(r -> r.getKey() == best).forEach(contributors::add);
+            }
+            if (contributors.isEmpty()) {
+                return new Judged(RANK.values().stream().mapToInt(Integer::intValue).max().getAsInt(), List.of());
+            }
+            return lowestOf(contributors);
+        }
+
+        private static Judged lowestOf(List<Map.Entry<Integer, String>> contributors) {
             int rank = contributors.stream().mapToInt(Map.Entry::getKey).min().getAsInt();
             Set<String> lowest = new TreeSet<>(Json::byteCompare);
             for (Map.Entry<Integer, String> c : contributors) {

@@ -54,9 +54,9 @@
       },
       "violations": [
         {
-          "focus": "agentce:event/d1",
-          "path": "agentce:approvedBy",
-          "constraint": "sh:minCount",
+          "focus": "agentce:event/tc1",
+          "path": "agentce:gateMet",
+          "constraint": "sh:hasValue",
           "message_key": "CND-02.S1"
         }
       ]

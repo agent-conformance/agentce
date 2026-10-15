@@ -27,6 +27,8 @@ public final class Graph {
     private Graph() {}
 
     private static final String BOOL = "xsd:boolean";
+    /** CND-02's population (SPEC §7.7.4), materialised by {@code conductGate}. */
+    static final String GATED_ACTION = "agentce:GatedAction";
     private static final String DATETIME = "xsd:dateTime";
     private static final String INTEGER = "xsd:integer";
 
@@ -96,6 +98,9 @@ public final class Graph {
             Set.of("stop_button", "kill_switch", "circuit_breaker", "manual");
     /** The stream classes an identity-provider login record must come from (SPEC §6.2 ApprovalDecided.session_ref, §10.4). */
     private static final Set<String> LOGIN_CLASSES = Set.of("independent_system", "enforcement_point");
+    /** The effect classes SPEC §7.7.4 holds to CND-02 whatever the task scope marks (ruling Q6). */
+    private static final Set<String> HIGH_EFFECT =
+            Set.of("irreversible", "external_communication", "spend", "physical");
     /** The records the SPEC §10.4 human-actor rule applies to. */
     private static final Set<String> OVERSIGHT_TYPES = Set.of("ApprovalDecided", "Override", "Interrupt");
     /** The Incident members that record a response after detection (SPEC §6.2; ROB-07). */
@@ -424,6 +429,7 @@ public final class Graph {
             usedClasses.add("prov:Agent");
             usedClasses.add("prov:Activity");
             usedClasses.add("prov:Entity");
+            usedClasses.add(GATED_ACTION);
             for (JsonNode event : events) {
                 String node = Iri.eventIri(event.get("id").asText());
                 eventIris.add(node);
@@ -721,23 +727,131 @@ public final class Graph {
          * and its effect class. A task held to no scope, or a call with no effect class, is out of
          * scope. */
         private boolean withinTaskScope(JsonNode event) {
-            Set<String> tasks = new LinkedHashSet<>();
-            for (JsonNode task : new JsonNode[] {refsOf(event).get("task"), event.get("agentcetask")}) {
-                if (task != null && task.isTextual()) {
-                    tasks.add(task.asText());
-                }
-            }
             JsonNode data = dataOf(event);
             JsonNode tool = data.get("tool");
             String name = tool != null && tool.isObject() ? str(tool.get("name")) : null;
             String effectClass = str(data.get("effect_class"));
-            for (String task : tasks) {
+            for (String task : actionTasks(event)) {
                 List<DomainBinding.TaskScope> scopes = domain.scopesFor(task);
                 if (scopes.isEmpty() || !scopes.stream().allMatch(s -> s.allows(name, effectClass))) {
                     return false;
                 }
             }
             return true;
+        }
+
+        /** The tasks an action names, by {@code refs.task} or the {@code agentcetask} attribute. */
+        private Set<String> actionTasks(JsonNode event) {
+            Set<String> tasks = new LinkedHashSet<>();
+            for (JsonNode task : new JsonNode[] {refsOf(event).get("task"), event.get("agentcetask")}) {
+                if (task != null && task.isTextual()) {
+                    tasks.add(task.asText());
+                }
+            }
+            return tasks;
+        }
+
+        /** Materialise CND-02's population and gate (SPEC §7.7.4, rulings Q5 to Q10); the Python engine's
+         * {@code _conduct_gate} documents the reading. An action whose effect class a scope of its task marks
+         * {@code requires_approval}, or whose class is high-effect, is a {@code GatedAction}; a high-effect action
+         * in no task, or in a task held to no scope, is held to the approval path. The approval path needs an
+         * enforcement-point PolicyDecision naming it that allows it or asks for approval and an approval of the
+         * held decision it executes; any other high-effect action needs an enforcement-point allow, or a
+         * require_approval such an approval released. A deny naming it closes the gate. A ToolCall with no
+         * effect class, and a consequential decision no ToolCall executes, are unjudged. */
+        private void conductGate(List<JsonNode> events) {
+            Map<String, JsonNode> policies = new LinkedHashMap<>();
+            for (JsonNode e : events) {
+                if ("PolicyDecision".equals(ptype(e))) {
+                    policies.put(Iri.eventIri(e.get("id").asText()), e);
+                }
+            }
+            Map<String, List<JsonNode>> named = new LinkedHashMap<>();
+            for (JsonNode policy : policies.values()) {
+                JsonNode request = refsOf(policy).get("request");
+                if (request != null && request.isTextual()) {
+                    named.computeIfAbsent(request.asText(), k -> new ArrayList<>()).add(policy);
+                }
+            }
+            Set<String> executed = new LinkedHashSet<>();
+            for (JsonNode event : events) {
+                String ptype = ptype(event);
+                if (!"ToolCall".equals(ptype) && !"ResourceAccess".equals(ptype)) {
+                    continue;
+                }
+                String node = Iri.eventIri(event.get("id").asText());
+                JsonNode refs = refsOf(event);
+                String decision = heldDecision(refs.get("decision"));
+                if ("ToolCall".equals(ptype) && decision != null) {
+                    executed.add(decision);
+                }
+                JsonNode effectNode = dataOf(event).get("effect_class");
+                if (effectNode == null || !effectNode.isTextual()) {
+                    if ("ToolCall".equals(ptype)) {
+                        gate(node, true, false);
+                    }
+                    continue;
+                }
+                String effect = effectNode.asText();
+                List<List<DomainBinding.TaskScope>> scopes = new ArrayList<>();
+                for (String task : actionTasks(event)) {
+                    scopes.add(domain.scopesFor(task));
+                }
+                boolean approval = scopes.stream()
+                        .anyMatch(ss -> ss.stream().anyMatch(sc -> sc.requiresApproval().contains(effect)));
+                boolean high = HIGH_EFFECT.contains(effect);
+                if (high && (scopes.isEmpty() || scopes.stream().anyMatch(List::isEmpty))) {
+                    approval = true;
+                }
+                if (!approval && !high) {
+                    continue;
+                }
+                List<JsonNode> gating = new ArrayList<>(named.getOrDefault(node, List.of()));
+                JsonNode authorization = refs.get("authorization");
+                if (authorization != null && authorization.isTextual() && policies.containsKey(authorization.asText())) {
+                    gating.add(policies.get(authorization.asText()));
+                }
+                Set<String> rulings = new LinkedHashSet<>();
+                boolean denied = false;
+                for (JsonNode p : gating) {
+                    JsonNode decided = dataOf(p).get("decision");
+                    String ruling = decided != null && decided.isTextual() ? decided.asText() : null;
+                    JsonNode sourceClass = p.get("agentcesourceclass");
+                    if (sourceClass != null && sourceClass.isTextual() && LOGIN_CLASSES.contains(sourceClass.asText())) {
+                        rulings.add(ruling);
+                    }
+                    denied |= "deny".equals(ruling);
+                }
+                List<String> approvals = decision != null ? store.objects(decision, "agentce:approvedBy") : List.of();
+                boolean released = approval
+                        ? rulings.contains("allow") || rulings.contains("require_approval")
+                        : !rulings.contains("allow") && rulings.contains("require_approval");
+                if (released || approval) {
+                    for (String approved : approvals) {
+                        store.addEdge(node, "agentce:releasedBy", approved);
+                    }
+                }
+                boolean met = !denied
+                        && ((rulings.contains("allow") && !approval) || (released && !approvals.isEmpty()));
+                gate(node, met, true);
+                if (!met && decision != null && store.humanActorFailed.contains(decision)) {
+                    // An approval that fails SPEC §10.4 left the gate shut: the deviation register cannot waive it.
+                    store.humanActorFailed.add(node);
+                }
+            }
+            List<String> decisions = new ArrayList<>(decisionTime.keySet());
+            decisions.sort(Json::byteCompare);
+            for (String decision : decisions) {
+                if (!executed.contains(decision) && store.isA(decision, "agentce:ConsequentialDecision")) {
+                    gate(decision, true, false);
+                }
+            }
+        }
+
+        private void gate(String node, boolean met, boolean judged) {
+            store.addType(node, GATED_ACTION);
+            literal(node, "agentce:gateMet", met);
+            literal(node, "agentce:gateJudged", judged);
         }
 
         /** Compute the Conduct within-scope and within-budget flags (SPEC §7.7, CND-01/CND-07): an
@@ -1037,6 +1151,7 @@ public final class Graph {
             }
             actsOnUntrusted(events, robustToUntrusted(events));
             conductScopeBudget(events);
+            conductGate(events);
             precededBy();
         }
 
