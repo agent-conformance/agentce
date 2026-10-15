@@ -750,8 +750,8 @@ class Builder {
       if (ptype !== "ToolCall" && ptype !== "ResourceAccess") continue;
       const node = eventIri(String(event.id));
       const refs = refsOf(event);
-      const decision = this.heldDecision(refs.decision);
-      if (ptype === "ToolCall" && decision !== null) executed.add(decision);
+      const held = this.heldDecision(refs.decision);
+      if (ptype === "ToolCall" && held !== null) executed.add(held);
       const effect = dataOf(event).effect_class;
       if (typeof effect !== "string") {
         if (ptype === "ToolCall") this.gate(node, true, false);
@@ -780,7 +780,7 @@ class Builder {
           .map((p) => dataOf(p).decision),
       );
       const denied = gating.some((p) => dataOf(p).decision === "deny");
-      const approvals = decision !== null ? this.store.objects(decision, "agentce:approvedBy") : [];
+      const approvals = held !== null ? this.store.objects(held, "agentce:approvedBy") : [];
       const released = approval
         ? rulings.has("allow") || rulings.has("require_approval")
         : !rulings.has("allow") && rulings.has("require_approval");
@@ -790,7 +790,7 @@ class Builder {
       const met =
         !denied && ((rulings.has("allow") && !approval) || (released && approvals.length > 0));
       this.gate(node, met, true);
-      if (!met && decision !== null && this.store.humanActorFailed.has(decision)) {
+      if (!met && held !== null && this.store.humanActorFailed.has(held)) {
         // An approval that fails SPEC §10.4 left the gate shut: the deviation register cannot waive it.
         this.store.humanActorFailed.add(node);
       }
