@@ -25,6 +25,7 @@
   "max_chunk_seconds": 240,
   "lane_bound_minutes": 12.0,
   "gates": {
+    "VG-CATALOG-READ-ONCE": 120,
     "VG-DEMO-SHARD-COVERAGE": 4,
     "VG-CRYPTO-INTEL-WHEEL": 2,
     "VG-ATTESTATION-SIGNATURES": 4,
