@@ -4,6 +4,7 @@ C	agentce:Agent	agentce:Agent
 C	agentce:Agent	prov:Agent
 C	agentce:Agent	prov:SoftwareAgent
 C	agentce:ApprovalDecided	agentce:ApprovalDecided
+C	agentce:BudgetUnjudged	agentce:BudgetUnjudged
 C	agentce:ComponentRecord	agentce:ComponentRecord
 C	agentce:ConsequentialDecision	agentce:Activity
 C	agentce:ConsequentialDecision	agentce:ConsequentialDecision
@@ -49,6 +50,7 @@ C	agentce:ServicePrincipal	agentce:Principal
 C	agentce:ServicePrincipal	agentce:ServicePrincipal
 C	agentce:ServicePrincipal	prov:Agent
 C	agentce:SessionStart	agentce:SessionStart
+C	agentce:TaskModelCall	agentce:TaskModelCall
 C	agentce:ToolCall	agentce:Activity
 C	agentce:ToolCall	agentce:ToolCall
 C	agentce:ToolCall	prov:Activity

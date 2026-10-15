@@ -1413,6 +1413,111 @@ def test_task_scope_within_scope() -> None:
     }
 
 
+def _model_call(eid: str, task: str | None, usage: Any) -> dict[str, Any]:
+    event: dict[str, Any] = {
+        "id": eid,
+        "source": "urn:src:agent",
+        "subject": "spiffe://corp/agents/a",
+        "type": "org.agent-conformance.evidence.ModelCall.v1",
+        "data": {"@type": "ModelCall", "usage": usage},
+    }
+    if task is not None:
+        event["agentcetask"] = task
+    return event
+
+
+def _budget_flags(
+    events: list[dict[str, Any]], budgets: Any, **binding: Any
+) -> dict[str, tuple[str, bool]]:
+    """Each action's withinBudget and whether the records could tell (no agentce:BudgetUnjudged type)."""
+    entry: dict[str, Any] = {
+        "task_type": "review",
+        "allowed_effect_classes": ["read", "spend"],
+    }
+    if budgets is not None:
+        entry["budgets"] = budgets
+    store = build_graph(
+        events, domain=DomainBinding.from_dict({"task_scopes": [entry], **binding})
+    )
+    return {
+        e["id"]: (
+            store.literal_values(event_iri(e["id"]), "agentce:withinBudget")[0],
+            not store.is_a(event_iri(e["id"]), "agentce:BudgetUnjudged"),
+        )
+        for e in events
+    }
+
+
+def test_task_budget_tokens() -> None:
+    """CND-07 (18.175): a task's ModelCall tokens are summed against its tokens budget; every action of the task
+    reads over budget once the sum exceeds it, and an unreadable usage leaves an under-limit task untold."""
+    under = [
+        _model_call("m1", "review", {"input_tokens": 400, "output_tokens": 100}),
+        _scoped_call("t1", "lookup", "read", agentcetask="review"),
+    ]
+    assert _budget_flags(under, {"tokens": 500}) == {
+        "m1": ("true", True),
+        "t1": ("true", True),
+    }
+    over = [
+        *under,
+        _model_call("m2", "review", {"input_tokens": 1, "output_tokens": 0}),
+    ]
+    assert set(_budget_flags(over, {"tokens": 500}).values()) == {("false", True)}
+    unread = [*under, _model_call("m2", "review", {"input_tokens": 1})]
+    assert set(_budget_flags(unread, {"tokens": 500}).values()) == {("true", False)}
+    # an overrun the readable usage already shows is told, whatever else is unreadable
+    assert set(_budget_flags([*over, unread[-1]], {"tokens": 500}).values()) == {
+        ("false", True)
+    }
+    for limit in (500.0, "500", True, -1):
+        assert set(_budget_flags(under, {"tokens": limit}).values()) == {
+            ("true", False)
+        }
+
+
+def test_task_budget_spend_compute_and_scope() -> None:
+    """Spend is told only against a zero budget; compute time is never recorded; a task held to no scope cannot be
+    told while the binding declares scopes; an untasked call and a budget left out set no limit."""
+    spend = [_scoped_call("s1", "pay", "spend", agentcetask="review")]
+    assert _budget_flags(spend, {"spend": 0}) == {"s1": ("false", True)}
+    assert _budget_flags(spend, {"spend": 10}) == {"s1": ("true", False)}
+    read = [_scoped_call("r1", "lookup", "read", agentcetask="review")]
+    assert _budget_flags(read, {"spend": 10}) == {"r1": ("true", True)}
+    # a call with no effect class may have spent, and a task with no model call shows no token use (critic r1 B1, B2)
+    unknown = [_scoped_call("x1", "pay", None, agentcetask="review")]  # type: ignore[arg-type]
+    assert _budget_flags(unknown, {"spend": 0}) == {"x1": ("true", False)}
+    assert _budget_flags(read, {"tokens": 5}) == {"r1": ("true", False)}
+    # a model call may have cost an amount no record carries (critic r2 B5)
+    billed = [
+        *read,
+        _model_call("m1", "review", {"input_tokens": 1, "output_tokens": 1}),
+    ]
+    assert set(_budget_flags(billed, {"spend": 0}).values()) == {("true", False)}
+    assert _budget_flags(read, {"compute_seconds": 60}) == {"r1": ("true", False)}
+    assert _budget_flags(read, "lots") == {"r1": ("true", False)}
+    assert _budget_flags(read, None) == {"r1": ("true", True)}
+    other = [
+        _scoped_call("o1", "lookup", "read", agentcetask="elsewhere"),
+        _scoped_call("u1", "lookup", "read"),
+    ]
+    flags = _budget_flags(
+        other,
+        {"tokens": 5},
+        task_scopes=[
+            {"task_type": "review", "budgets": {"tokens": 5}},
+            {"task_type": "pay"},
+        ],
+    )
+    assert flags == {"o1": ("true", False), "u1": ("true", True)}
+    store = build_graph(other, domain=DomainBinding.from_dict({}))
+    assert not store.is_a(event_iri("o1"), "agentce:BudgetUnjudged")
+    untasked = _model_call("m0", None, {"input_tokens": 9, "output_tokens": 9})
+    assert not build_graph([untasked], domain=_SCOPES).is_a(
+        event_iri("m0"), "agentce:TaskModelCall"
+    )
+
+
 # --- CND-02: actions are the population, and each one's gate (SPEC §7.7.4; 18.187) ---------------------------------
 
 _GATED = DomainBinding.from_dict(

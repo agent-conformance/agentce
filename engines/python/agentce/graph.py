@@ -27,6 +27,10 @@ from .structural import compare_literals
 BOOL = "xsd:boolean"
 #: CND-02's population (SPEC §7.7.4), materialised by :meth:`_Builder._conduct_gate`.
 GATED_ACTION = "agentce:GatedAction"
+#: A ModelCall in a task: consumption CND-07 judges against the task's budgets.
+TASK_MODEL_CALL = "agentce:TaskModelCall"
+#: An action whose task budgets the records cannot tell (CND-07's evidence shape).
+BUDGET_UNJUDGED = "agentce:BudgetUnjudged"
 DATETIME = "xsd:dateTime"
 INTEGER = "xsd:integer"
 
@@ -279,6 +283,65 @@ def _after_every(time: str, actions: Collection[str]) -> bool:
     )
 
 
+class _TaskUsage:
+    """What each task's records show it consumed (SPEC §7.7.3 budget row): the input and output tokens of
+    its ModelCalls with a readable usage, whether one of them carried none, its spend calls, and whether
+    it holds a record that may have spent an amount no record carries: a ToolCall with no effect class, or a
+    ModelCall (a provider's usage export bills it; SPEC §7.7.3 budget row)."""
+
+    def __init__(self) -> None:
+        self.tokens: dict[str, int] = {}
+        self.tokens_unread: set[str] = set()
+        self.spend_calls: dict[str, int] = {}
+        self.spend_unknown: set[str] = set()
+
+    def add(self, ptype: str, data: dict[str, Any], tasks: set[str]) -> None:
+        for task in tasks:
+            if ptype == "ToolCall":
+                effect = data.get("effect_class")
+                if effect == "spend":
+                    self.spend_calls[task] = self.spend_calls.get(task, 0) + 1
+                elif not isinstance(effect, str):
+                    self.spend_unknown.add(task)
+                continue
+            self.spend_unknown.add(task)
+            usage = data.get("usage")
+            counts = [
+                usage.get(k) if isinstance(usage, dict) else None
+                for k in ("input_tokens", "output_tokens")
+            ]
+            read = [
+                n
+                for n in counts
+                if isinstance(n, int) and not isinstance(n, bool) and n >= 0
+            ]
+            if len(read) == len(counts):
+                self.tokens[task] = self.tokens.get(task, 0) + sum(read)
+            else:
+                self.tokens_unread.add(task)
+
+    def verdict(
+        self, task: str, dimension: str, limit: int | float | None
+    ) -> bool | None:
+        """True within the limit, False over it, None when the records cannot tell."""
+        if dimension == "tokens":
+            if not isinstance(limit, int):
+                return None
+            if self.tokens.get(task, 0) > limit:
+                return False
+            # no readable usage for the task, or a model call without one: the records cannot tell
+            return (
+                None if task in self.tokens_unread or task not in self.tokens else True
+            )
+        if dimension == "spend":
+            if limit is None:
+                return None
+            if self.spend_calls.get(task):
+                return False if limit == 0 else None
+            return None if task in self.spend_unknown else True
+        return None
+
+
 class _Builder:
     def __init__(self, store: GraphStore, domain: DomainBinding, key: bytes) -> None:
         self.store = store
@@ -333,6 +396,8 @@ class _Builder:
             "prov:Activity",
             "prov:Entity",
             GATED_ACTION,
+            TASK_MODEL_CALL,
+            BUDGET_UNJUDGED,
         }
         for event in events:
             node = event_iri(str(event["id"]))
@@ -584,9 +649,11 @@ class _Builder:
         action is out of scope when a ``PolicyDecision`` denies its request, or when it is a ToolCall
         in a task whose declared effect scope does not allow its tool and effect class
         (:meth:`_within_task_scope`); it is over budget when a ``Refusal`` with reason class
-        ``budget_exceeded`` names it. An action in no task and never denied reads within scope."""
+        ``budget_exceeded`` names it, or when its task's recorded usage exceeds a budget a scope of the
+        task declares (:meth:`_task_budget`). An action in no task and never denied reads within scope."""
         denied: set[str] = set()
         over_budget: set[str] = set()
+        usage = _TaskUsage()
         for event in events:
             ptype = self._ptype(event)
             data, refs = _data(event), _refs(event)
@@ -603,23 +670,57 @@ class _Builder:
                 and isinstance(request, str)
             ):
                 over_budget.add(request)
+            if ptype in ("ModelCall", "ToolCall"):
+                usage.add(ptype, data, self._action_tasks(event))
         for event in events:
             ptype = self._ptype(event)
-            if ptype not in ("ToolCall", "ResourceAccess"):
+            if ptype not in ("ToolCall", "ResourceAccess", "ModelCall"):
                 continue
             node = event_iri(str(event["id"]))
-            in_scope = node not in denied and (
-                ptype != "ToolCall" or self._within_task_scope(event)
-            )
-            self.store.add_literal(
-                node, "agentce:withinScope", "true" if in_scope else "false", BOOL
-            )
+            tasks = self._action_tasks(event)
+            if ptype == "ModelCall":
+                if not tasks:
+                    continue
+                # A model call in a task is consumption CND-07 judges (SPEC §7.7.3 ModelCall.usage).
+                self.store.add_type(node, TASK_MODEL_CALL)
+            else:
+                in_scope = node not in denied and (
+                    ptype != "ToolCall" or self._within_task_scope(event)
+                )
+                self.store.add_literal(
+                    node, "agentce:withinScope", "true" if in_scope else "false", BOOL
+                )
+            within, judged = self._task_budget(tasks, usage)
             self.store.add_literal(
                 node,
                 "agentce:withinBudget",
-                "false" if node in over_budget else "true",
+                "true" if within and node not in over_budget else "false",
                 BOOL,
             )
+            if not judged:
+                self.store.add_type(node, BUDGET_UNJUDGED)
+                self.store.add_literal(node, "agentce:budgetJudged", "false", BOOL)
+
+    def _task_budget(self, tasks: set[str], usage: _TaskUsage) -> tuple[bool, bool]:
+        """Whether an action's tasks stayed within every budget their scopes declare (SPEC §7.7.4 CND-07,
+        §7.7.6 budgets), and whether the records can tell. Tokens are the input and output tokens of the
+        task's ModelCalls; spend is told only against a zero budget (a spend call exceeds it), since no
+        record carries an amount; no record carries compute time. A task held to no scope while the
+        binding declares scopes cannot be told; a binding declaring none sets no budget."""
+        within, judged = True, True
+        for task in sorted(tasks):
+            scopes = self.domain.scopes_for(task)
+            if not scopes:
+                judged = judged and not (
+                    self.domain.task_scopes or self.domain.task_scopes_malformed
+                )
+                continue
+            for scope in scopes:
+                for dimension, limit in scope.budgets:
+                    verdict = usage.verdict(task, dimension, limit)
+                    within = within and verdict is not False
+                    judged = judged and verdict is not None
+        return within, judged
 
     def _within_task_scope(self, event: dict[str, Any]) -> bool:
         """Whether a ToolCall stays within the declared effect scope of every task it names, by

@@ -113,3 +113,37 @@ def test_task_scope_unreadable_entry_keeps_single_type_from_standing_for_all() -
     assert not DomainBinding.from_dict(
         {"task_scopes": [{"task_type": "a"}]}
     ).task_scopes_malformed
+
+
+def test_task_scope_budgets() -> None:
+    """The budgets a scope declares (18.175): a non-negative number per known dimension, None when unreadable."""
+    binding = DomainBinding.from_dict(
+        {
+            "task_scopes": [
+                {
+                    "task_type": "a",
+                    "budgets": {
+                        "spend": 0,
+                        "tokens": 10,
+                        "cost": 3,
+                        "compute_seconds": "60",
+                    },
+                },
+                {"task_type": "b", "budgets": [1]},
+                {"task_type": "c", "budgets": {"tokens": True, "spend": -1}},
+                {"task_type": "d"},
+            ]
+        }
+    )
+    assert binding.task_scopes["a"][0].budgets == (
+        ("tokens", 10),
+        ("compute_seconds", None),
+        ("spend", 0),
+    )
+    assert binding.task_scopes["b"][0].budgets == (
+        ("tokens", None),
+        ("compute_seconds", None),
+        ("spend", None),
+    )
+    assert binding.task_scopes["c"][0].budgets == (("tokens", None), ("spend", None))
+    assert binding.task_scopes["d"][0].budgets == ()

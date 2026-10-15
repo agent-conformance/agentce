@@ -4,4 +4,5 @@
 
 agentce:CND-07-Shape a sh:NodeShape ;
   sh:targetClass agentce:ToolCall ;
+  sh:targetClass agentce:TaskModelCall ;
   sh:property [ sh:path agentce:withinBudget ; sh:hasValue true ; sh:name "S1" ] .

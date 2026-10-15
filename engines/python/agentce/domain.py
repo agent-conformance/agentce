@@ -4,7 +4,7 @@ The binding subclasses ``agentce:Decision`` and ``agentce:ContextItem`` for the 
 which decision types are consequential and the oversight modality each requires; for the Conduct
 overlay it declares each task type's effect scope (SPEC §7.7.6 ``task_scopes``). The graph builder
 uses it to materialise ``agentce:executesConsequential``, ``agentce:oversightModalityMatchesDeclared``
-and ``agentce:withinScope`` and to extend the ``rdfs:subClassOf*`` closure. A run with no binding is
+``agentce:withinScope`` and ``agentce:withinBudget`` and to extend the ``rdfs:subClassOf*`` closure. A run with no binding is
 valid (an empty binding).
 """
 
@@ -29,11 +29,33 @@ def _strings(value: Any) -> frozenset[str]:
     )
 
 
+#: The resource budgets a task scope declares (SPEC §7.7.6 ``budgets``), in the order CND-07 reads them.
+BUDGET_DIMENSIONS = ("tokens", "compute_seconds", "spend")
+
+
+def _limit(value: Any) -> int | float | None:
+    """A declared budget limit: a non-negative number (a whole number for tokens is checked by the reader);
+    anything else is None, a limit no usage can be shown to stay within."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return value if value >= 0 else None
+
+
+def _budgets(value: Any) -> tuple[tuple[str, int | float | None], ...]:
+    """The budgets a scope declares, as (dimension, limit) pairs; a dimension left out declares no limit. A
+    ``budgets`` value that is not a mapping declares every dimension unreadable."""
+    if value is None:
+        return ()
+    if not isinstance(value, dict):
+        return tuple((d, None) for d in BUDGET_DIMENSIONS)
+    return tuple((d, _limit(value[d])) for d in BUDGET_DIMENSIONS if d in value)
+
+
 @dataclass(frozen=True)
 class TaskScope:
-    """One task type's declared effect scope (SPEC §7.7.6), as CND-01 reads it: the tools and the
-    effect classes an action of the task may use. ``requires_approval`` marks classes for CND-02 and
-    allows none by itself."""
+    """One task type's declared effect scope (SPEC §7.7.6): the tools and the effect classes an action
+    of the task may use, as CND-01 reads them, and the resource budgets CND-07 reads.
+    ``requires_approval`` marks classes for CND-02 and allows none by itself."""
 
     #: None when the scope lists no tools (any tool); otherwise the tools it allows.
     allowed_tools: frozenset[str] | None
@@ -41,6 +63,8 @@ class TaskScope:
     allowed_effect_classes: frozenset[str]
     #: the effect classes that need a human's approval (CND-02's marker; allows none for CND-01).
     requires_approval: frozenset[str] = frozenset()
+    #: the declared budgets, (dimension, limit) in BUDGET_DIMENSIONS order; a None limit is unreadable.
+    budgets: tuple[tuple[str, int | float | None], ...] = ()
 
     def allows(self, tool: Any, effect_class: Any) -> bool:
         if self.allowed_tools is not None and tool not in self.allowed_tools:
@@ -100,6 +124,7 @@ class DomainBinding:
                     None if tools is None else _strings(tools),
                     _strings(entry.get("allowed_effect_classes")),
                     _strings(entry.get("requires_approval")),
+                    _budgets(entry.get("budgets")),
                 )
             )
         return binding
