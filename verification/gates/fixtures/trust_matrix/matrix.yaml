@@ -937,15 +937,15 @@ cells:
     controls: ["CND-05"]
     dims: {instruction_class: "self_report", source_class: "user", principal: "present", relabel: "ep_twin_agrees", acted_on: "consequential_Decision", witness_time: "before"}
     fixture: "instruction_chain"
-    expected: "conformant"
-    spec_ref: "SPEC §7.7.5 (evidence classes: high-severity controls require EP PolicyDecision corroboration, principal and decision; ingress attestation lifts CND-04/05 from partial single_source to conformant; relabelling is CND.instruction_relabelled); SPEC Appendix F (authorised: user, operator, service, agent_identified; untrusted: agent_unidentified, tool_output, retrieved, memory_untrusted); SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
+    expected: "insufficient_evidence"
+    spec_ref: "SPEC §6.2.3 (ToolCall refs.instruction is required, Ref->Instruction with no '?': a call that names none cannot show where it came from, so CND-05 reads it insufficient_evidence, HR-5); SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met); SPEC §7.7.5 (evidence classes: high-severity controls require EP PolicyDecision corroboration, principal and decision; ingress attestation lifts CND-04/05 from partial single_source to conformant; relabelling is CND.instruction_relabelled); SPEC Appendix F (authorised: user, operator, service, agent_identified; untrusted: agent_unidentified, tool_output, retrieved, memory_untrusted); SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
     note: "a Decision acting on it; the twin before against the call executing it (18.176)"
   - id: c05-dec-twin-same-instant
     controls: ["CND-05"]
     dims: {instruction_class: "self_report", source_class: "user", principal: "present", relabel: "ep_twin_agrees", acted_on: "consequential_Decision", witness_time: "same_instant"}
     fixture: "instruction_chain"
-    expected: "conformant"
-    spec_ref: "SPEC §7.7.5 (evidence classes: high-severity controls require EP PolicyDecision corroboration, principal and decision; ingress attestation lifts CND-04/05 from partial single_source to conformant; relabelling is CND.instruction_relabelled); SPEC Appendix F (authorised: user, operator, service, agent_identified; untrusted: agent_unidentified, tool_output, retrieved, memory_untrusted); SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
+    expected: "insufficient_evidence"
+    spec_ref: "SPEC §6.2.3 (ToolCall refs.instruction is required, Ref->Instruction with no '?': a call that names none cannot show where it came from, so CND-05 reads it insufficient_evidence, HR-5); SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met); SPEC §7.7.5 (evidence classes: high-severity controls require EP PolicyDecision corroboration, principal and decision; ingress attestation lifts CND-04/05 from partial single_source to conformant; relabelling is CND.instruction_relabelled); SPEC Appendix F (authorised: user, operator, service, agent_identified; untrusted: agent_unidentified, tool_output, retrieved, memory_untrusted); SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
     note: "a Decision acting on it; the twin same instant against the call executing it (18.176)"
   - id: c05-dec-twin-after-call
     controls: ["CND-05"]
@@ -2071,8 +2071,8 @@ cells:
     controls: ["CND-05"]
     dims: {instruction_class: "enforcement_point", source_class: "user", acted_on: "consequential_Decision", principal: "present"}
     fixture: "instruction_chain"
-    expected: "conformant"
-    spec_ref: "SPEC §7.7.5 (evidence classes: high-severity controls require EP PolicyDecision corroboration, principal and decision; ingress attestation lifts CND-04/05 from partial single_source to conformant; relabelling is CND.instruction_relabelled); SPEC Appendix F (authorised: user, operator, service, agent_identified; untrusted: agent_unidentified, tool_output, retrieved, memory_untrusted); SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
+    expected: "insufficient_evidence"
+    spec_ref: "SPEC §6.2.3 (ToolCall refs.instruction is required, Ref->Instruction with no '?': a call that names none cannot show where it came from, so CND-05 reads it insufficient_evidence, HR-5); SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met); SPEC §7.7.5 (evidence classes: high-severity controls require EP PolicyDecision corroboration, principal and decision; ingress attestation lifts CND-04/05 from partial single_source to conformant; relabelling is CND.instruction_relabelled); SPEC Appendix F (authorised: user, operator, service, agent_identified; untrusted: agent_unidentified, tool_output, retrieved, memory_untrusted); SPEC §7.7.4 CND-05 (no ToolCall or Decision acts on an Instruction whose chain passes through an untrusted source class)"
     note: "the event acting on the instruction (Decision equals ToolCall for CND-05 since 18.121)"
   - id: c05-acted-consequential_Decision-en-tool_output
     controls: ["CND-05"]

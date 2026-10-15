@@ -38,17 +38,14 @@ EP, SR, IS = "enforcement_point", "self_report", "independent_system"
 ALICE = {"id": "user:alice", "kind": "human"}
 MALLORY = {"id": "user:mallory", "kind": "human"}
 CONTENT = "sha256:" + "a" * 64
-DOMAIN = DomainBinding.from_dict(
+DOMAIN_TYPES = [
     {
-        "decision_types": [
-            {
-                "id": "dom:CreditDecision",
-                "subclass_of": "agentce:ConsequentialDecision",
-                "consequential": True,
-            }
-        ]
+        "id": "dom:CreditDecision",
+        "subclass_of": "agentce:ConsequentialDecision",
+        "consequential": True,
     }
-)
+]
+DOMAIN = DomainBinding.from_dict({"decision_types": DOMAIN_TYPES})
 
 
 def _event(
@@ -422,11 +419,15 @@ def _conduct() -> Catalog:
     return load_catalog(_CATALOGS / "overlays" / "conduct")
 
 
-def _assess(events: list[dict[str, Any]], control: str = "CND-05") -> Any:
+def _assess(
+    events: list[dict[str, Any]],
+    control: str = "CND-05",
+    domain: DomainBinding = DOMAIN,
+) -> Any:
     profile = Profile.from_dict(
         {"subjects": [{"id": SUBJECT, "role": "both"}, {"id": OTHER, "role": "both"}]}
     )
-    assertions = assess_subjects(events, profile, [_conduct()], DOMAIN, withheld=())
+    assertions = assess_subjects(events, profile, [_conduct()], domain, withheld=())
     return next(a for a in assertions if a.control == control and a.subject == SUBJECT)
 
 
@@ -477,28 +478,68 @@ def test_a_decision_acting_on_nothing_is_not_held_to_a_class() -> None:
 
 
 def test_cnd04_reads_the_delegation_it_rests_on() -> None:
-    decision = _event("d1", "Decision", SR, decision_type="dom:CreditDecision")
-    delegation = _event(
-        "dl1",
-        "DelegationIssued",
+    # CND-04 reads the chain's last principal's role against the task type's scope (SPEC §7.7.4, inbox 355).
+    roles = DomainBinding.from_dict(
+        {
+            "decision_types": DOMAIN_TYPES,
+            "task_scopes": [
+                {
+                    "task_type": "review",
+                    "authorised_principal_roles": ["credit_officer"],
+                }
+            ],
+        }
+    )
+    officer = {**ALICE, "role": "credit_officer"}
+    decision = _event(
+        "d1",
+        "Decision",
         SR,
-        token_ref="jti-1",
-        issuer="https://idp.example",
-        chain=[{"id": "user:alice", "kind": "human"}, {"id": SUBJECT, "kind": "agent"}],
-        verification={"status": "verified", "method": "rfc8693"},
+        decision_type="dom:CreditDecision",
+        refs={"instruction": event_iri("i1")},
     )
-    call = _call(decision=event_iri("d1"))
-    assert _assess([_instruction(), call, decision], "CND-04").outcome == "conformant"
-    call = _call(decision=event_iri("d1"), delegation=event_iri("dl1"))
-    assert (
-        _assess([_instruction(), call, decision], "CND-04").outcome
-        == (
-            "insufficient_evidence"  # a delegation the records do not hold counts as self_report
+
+    def delegation(cls: str, status: str = "verified") -> dict[str, Any]:
+        return _event(
+            "dl1",
+            "DelegationIssued",
+            cls,
+            token_ref="jti-1",
+            issuer="https://idp.example",
+            chain=[
+                {"id": "user:alice", "kind": "human"},
+                {"id": SUBJECT, "kind": "agent"},
+            ],
+            verification={"status": status, "method": "rfc8693"},
         )
+
+    call = _call(decision=event_iri("d1"))
+    # No delegation the action rests on: the records cannot show the chain verified (ruling 14 B).
+    assert (
+        _assess(
+            [_instruction(principal=officer), call, decision], "CND-04", roles
+        ).outcome
+        == "insufficient_evidence"
     )
-    downgraded = _assess([_instruction(), call, decision, delegation], "CND-04")
+    call = _call(decision=event_iri("d1"), delegation=event_iri("dl1"))
+    # A delegation the records do not hold.
+    assert (
+        _assess(
+            [_instruction(principal=officer), call, decision], "CND-04", roles
+        ).outcome
+        == "insufficient_evidence"
+    )
+    downgraded = _assess(
+        [_instruction(principal=officer), call, decision, delegation(SR)],
+        "CND-04",
+        roles,
+    )
     assert downgraded.outcome == "insufficient_evidence"
     assert downgraded.class_gap == ("DelegationIssued",)
+    events = [_instruction(principal=officer), call, decision, delegation(EP)]
+    assert _assess(events, "CND-04", roles).outcome == "conformant"
+    failed = _assess([*events[:3], delegation(EP, "failed")], "CND-04", roles)
+    assert failed.outcome == "non-conformant"
 
 
 def test_a_blind_spot_names_the_record_below_the_minimum() -> None:

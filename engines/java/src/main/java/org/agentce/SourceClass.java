@@ -291,16 +291,30 @@ public final class SourceClass {
             return true;
         }
 
-        /** (iv) by an enforcement-point PolicyDecision allow whose refs.request is the focus and whose principal
-         * is the instruction's (both present), recorded at or before the focus's clock. */
+        /** (iv) by an enforcement-point PolicyDecision allow whose refs.request is the focus (for a Decision, the
+         * focus or an enforcement-point ToolCall executing it) and whose principal is the instruction's (both
+         * present), recorded at or before the focus's clock. */
         private boolean decisionWitnesses(String focus, JsonNode event) {
             String principal = principalId(dataOf(event).get("principal"));
             if (principal == null) {
                 return false;
             }
-            for (JsonNode at : allows.getOrDefault(List.of(focus, principal), List.of())) {
-                if (inTime(focus, at)) {
-                    return true;
+            // A Decision, the agent's own account, is allowed through the enforcement-point calls executing it (the
+            // calls its clock reads).
+            List<String> named = new ArrayList<>(List.of(focus));
+            JsonNode held = events.get(focus);
+            if (held != null && "Decision".equals(type(held))) {
+                for (String call : store.subjects("agentce:executes", focus)) {
+                    if (events.containsKey(call) && ownRank(call) > 0) {
+                        named.add(call);
+                    }
+                }
+            }
+            for (String request : named) {
+                for (JsonNode at : allows.getOrDefault(List.of(request, principal), List.of())) {
+                    if (inTime(focus, at)) {
+                        return true;
+                    }
                 }
             }
             return false;

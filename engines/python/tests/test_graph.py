@@ -785,6 +785,28 @@ def test_acts_on_untrusted_when_the_guard_never_ruled_on_the_origin_read() -> No
     assert _acts([ruled, derived, _call()]) == ["false"]
 
 
+def _judged(events: list[dict[str, Any]], acting: str = "tc1") -> list[str]:
+    """CND-05's evidence flag on ``acting``: whether the records show which instruction it acted on."""
+    store = build_graph(events, domain=DOMAIN)
+    return store.literal_values(event_iri(acting), "agentce:actsOnJudged")
+
+
+def test_cnd05_a_tool_call_naming_no_instruction_is_not_judged() -> None:
+    absent = _event("tc1", "ToolCall", {"refs": {}})
+    null = _event("tc1", "ToolCall", {"refs": {"instruction": None}})
+    for call in (absent, null):
+        assert _judged([_instruction("i1", "user"), call]) == ["false"]
+        assert _acts([_instruction("i1", "user"), call]) == ["false"]
+
+
+def test_cnd05_a_tool_call_on_a_held_trusted_instruction_is_judged() -> None:
+    assert _judged([_instruction("i1", "user"), _call()]) == ["true"]
+
+
+def test_cnd05_a_decision_naming_no_instruction_is_judged() -> None:
+    assert _judged([decision("d1", "t")], acting="d1") == ["true"]
+
+
 # --- INC-03, OVS-07, OVS-08 and ROB-07 literals ---
 
 # Reviewers outside the decisions' delegation chain (acted_for alice), each with an identity-provider login.

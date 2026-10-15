@@ -25,4 +25,5 @@ authorised instruction classes).
   given, and the refusal key is `catalog.control.source_class_from_unknown`.
 
 `applicability.yaml` names the baseline catalog and the Conduct overlay and two subjects (the other one holds the
-twin recorded under another subject); `domain.linkml.yaml` makes `dom:CreditDecision` consequential.
+twin recorded under another subject); `domain.linkml.yaml` makes `dom:CreditDecision` consequential and declares one task type whose authorised principal
+role is `credit_officer` (CND-04).

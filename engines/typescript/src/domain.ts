@@ -9,6 +9,7 @@
 
 import { readFileSync } from "node:fs";
 import { load } from "js-yaml";
+import { pyStrip } from "./failOn";
 
 export const DECISION_ROOT = "agentce:Decision";
 export const CONTEXT_ROOT = "agentce:ContextItem";
@@ -22,6 +23,15 @@ function strings(value: unknown): Set<string> {
   return new Set(
     Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [],
   );
+}
+
+/** A scope's authorised_principal_roles, trimmed; null when absent or unreadable (not a list of strings), so a
+ * bare string, null or a non-string element never reads as a shorter list (CND-04, inbox row 358). */
+function roles(value: unknown): Set<string> | null {
+  if (!Array.isArray(value) || !value.every((v) => typeof v === "string")) {
+    return null;
+  }
+  return new Set(value.map((v: string) => pyStrip(v)));
 }
 
 /** The resource budgets a task scope declares (SPEC §7.7.6 `budgets`), in the order CND-07 reads them. */
@@ -83,6 +93,9 @@ export class TaskScope {
     readonly requiresApproval: Set<string> = new Set(),
     /** the declared budgets, in BUDGET_DIMENSIONS order. */
     readonly budgets: readonly Budget[] = [],
+    /** the principal roles CND-04 accepts at the end of an instruction chain; null when the scope declares none
+     * or declares them unreadably. */
+    readonly authorisedPrincipalRoles: Set<string> | null = null,
   ) {}
 
   allows(tool: unknown, effectClass: unknown): boolean {
@@ -152,6 +165,7 @@ export class DomainBinding {
           strings(entry.allowed_effect_classes),
           strings(entry.requires_approval),
           budgets(entry.budgets),
+          roles(entry.authorised_principal_roles),
         ),
       );
       binding.taskScopes.set(entry.task_type, list);

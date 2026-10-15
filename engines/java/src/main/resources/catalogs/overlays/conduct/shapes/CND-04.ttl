@@ -3,6 +3,5 @@
 @prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
 
 agentce:CND-04-Shape a sh:NodeShape ;
-  sh:targetClass agentce:ToolCall ;
-  agentce:targetWhere [ agentce:executesConsequential true ] ;
-  sh:property [ sh:path agentce:actsOn ; sh:minCount 1 ; sh:name "S1" ] .
+  sh:targetClass agentce:ConsequentialAction ;
+  sh:property [ sh:path agentce:provenanceMet ; sh:hasValue true ; sh:name "S1" ] .

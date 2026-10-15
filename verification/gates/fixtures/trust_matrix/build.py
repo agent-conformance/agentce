@@ -518,7 +518,8 @@ def instruction_chain(
       on it and no call executes it. both: the call and the decision both act on it. ModelCall: a model call carries
       refs.instruction. minor_Decision: a non-consequential decision acts on it.
     - call_class: enforcement_point | self_report. The acting ToolCall's own class.
-    - unrelated_ep: absent | present. An enforcement-point ToolCall elsewhere in the subject, acting on nothing.
+    - unrelated_ep: absent | present. An enforcement-point ToolCall elsewhere in the subject, acting on its own
+      enforcement-point user instruction (ix) and on nothing else.
     - corroboration: none | ep_pd_principal | ep_pd_other_principal | ep_pd_no_principal | sr_pd_principal |
       ep_pd_deny | is_pd_principal. A PolicyDecision on the acting call (SPEC §7.7.3, §7.7.5).
     - relabel: none | ep_twin_untrusted | ep_twin_agrees. An enforcement-point ingress Instruction with the same
@@ -575,6 +576,7 @@ def instruction_chain(
             "not_held",
             "bare_id",
             "quarantined",
+            "modelcall",
         ),
         who,
     )
@@ -598,6 +600,8 @@ def instruction_chain(
             "quarantined_schema",
             "quarantined_time_order",
             "other_subject",
+            "absent",
+            "null",
         ),
         who,
     )
@@ -776,6 +780,17 @@ def instruction_chain(
             record_refs=["mem:r1"],
             trust_min="sometimes",
         )
+    elif (
+        origin == "modelcall"
+    ):  # model output named as the origin (no type SPEC §6.2.3 allows)
+        origin_ref = ev.add(
+            "mc0",
+            "ModelCall",
+            "agent",
+            agent={"id": SUBJECT},
+            operation="chat",
+            model={"provider": "p", "name": "m", "version_or_digest": "1"},
+        )
     elif origin == "not_held":
         origin_ref = "agentce:event/gone"
     elif origin == "bare_id":
@@ -919,6 +934,8 @@ def instruction_chain(
         "quarantined_schema": parent,
         "quarantined_time_order": parent,
         "other_subject": parent,
+        "absent": None,
+        "null": None,
     }[held]
 
     deleg_ref: str | None = None
@@ -996,7 +1013,7 @@ def instruction_chain(
         dtype = "dom:Minor" if acted_on == "minor_Decision" else "dom:CreditDecision"
         decision_refs = (
             {"instruction": instruction}
-            if acted_on != "consequential_ToolCall"
+            if acted_on != "consequential_ToolCall" and held != "absent"
             else None
         )
         decision = ev.add(
@@ -1010,9 +1027,12 @@ def instruction_chain(
             refs=decision_refs,
         )
     if has_call:
-        call_refs: dict[str, str] = {}
-        if acted_on in ("ToolCall", "consequential_ToolCall", "both"):
-            call_refs["instruction"] = str(instruction)
+        call_refs: dict[str, Any] = {}
+        if (
+            acted_on in ("ToolCall", "consequential_ToolCall", "both")
+            and held != "absent"
+        ):
+            call_refs["instruction"] = None if held == "null" else str(instruction)
         if decision and acted_on != "minor_Decision":
             call_refs["decision"] = decision
         if deleg_ref:
@@ -1042,6 +1062,8 @@ def instruction_chain(
         "ModelCall",
         "minor_Decision",
     ):
+        # The bystander acts on its own attested user instruction (ix, written last so no stream's order moves):
+        # a ToolCall that names no instruction reads insufficient_evidence for CND-05 (SPEC §6.2.3, HR-5).
         ev.add(
             "tcx",
             "ToolCall",
@@ -1049,6 +1071,7 @@ def instruction_chain(
             agent={"id": SUBJECT},
             tool={"name": "ping", "protocol": "native"},
             effect_class="read",
+            refs={"instruction": "agentce:event/ix"},
         )
     _retime(ev, witness_time, call_time, decision_time)
     if refusal != "none":
@@ -1059,6 +1082,15 @@ def instruction_chain(
             agent={"id": SUBJECT},
             reason_class="untrusted_source",
             refs={"instruction": str(instruction)},
+        )
+    if any(e["id"] == "tcx" for e in ev.items):
+        ev.add(
+            "ix",
+            "Instruction",
+            "ingress",
+            source_class="user",
+            principal=PRINCIPAL,
+            content_ref="sha256:" + "7" * 64,
         )
 
     write_bundle(

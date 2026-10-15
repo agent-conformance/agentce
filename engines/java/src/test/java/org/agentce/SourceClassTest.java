@@ -423,10 +423,15 @@ class SourceClassTest {
     }
 
     private static Assertions.Assertion assess(List<? extends JsonNode> events, String control) {
+        return assess(events, control, DOMAIN);
+    }
+
+    private static Assertions.Assertion assess(
+            List<? extends JsonNode> events, String control, DomainBinding domain) {
         Profile profile = Profile.fromDict(Json.parse("{\"subjects\": [{\"id\": \"" + SUBJECT
                 + "\", \"role\": \"both\"}, {\"id\": \"" + OTHER + "\", \"role\": \"both\"}]}"));
         for (Assertions.Assertion a : Assess.assessSubjects(
-                new ArrayList<>(events), profile, List.of(conduct()), DOMAIN, List.of())) {
+                new ArrayList<>(events), profile, List.of(conduct()), domain, List.of())) {
             if (a.control.equals(control) && a.subject.equals(SUBJECT)) {
                 return a;
             }
@@ -488,19 +493,44 @@ class SourceClassTest {
 
     @Test
     void cnd04ReadsTheDelegationItRestsOn() {
-        ObjectNode decision = event("d1", "Decision", SR, "\"decision_type\": \"dom:CreditDecision\"");
-        ObjectNode delegation = event("dl1", "DelegationIssued", SR, "\"token_ref\": \"jti-1\", "
-                + "\"issuer\": \"https://idp.example\", \"chain\": [{\"id\": \"user:alice\", \"kind\": \"human\"}, "
-                + "{\"id\": \"" + SUBJECT + "\", \"kind\": \"agent\"}], "
-                + "\"verification\": {\"status\": \"verified\", \"method\": \"rfc8693\"}");
+        // CND-04 reads the chain's last principal's role against the task type's scope (SPEC §7.7.4, inbox 355).
+        DomainBinding roles = DomainBinding.fromDict(Json.parse(
+                "{\"decision_types\": [{\"id\": \"dom:CreditDecision\", "
+                        + "\"subclass_of\": \"agentce:ConsequentialDecision\", \"consequential\": true}], "
+                        + "\"task_scopes\": [{\"task_type\": \"review\", "
+                        + "\"authorised_principal_roles\": [\"credit_officer\"]}]}"));
+        ObjectNode decision = event("d1", "Decision", SR, "\"decision_type\": \"dom:CreditDecision\", "
+                + "\"refs\": {\"instruction\": \"" + iri("i1") + "\"}");
         ObjectNode call = withRef(call(), "decision", iri("d1"));
-        assertEquals("conformant", assess(List.of(instruction(EP), call, decision), "CND-04").outcome);
+        // No delegation the action rests on: the records cannot show the chain verified (ruling 14 B).
+        assertEquals("insufficient_evidence",
+                assess(List.of(officer(), call, decision), "CND-04", roles).outcome);
         ObjectNode delegated = withRef(withRef(call(), "decision", iri("d1")), "delegation", iri("dl1"));
-        // A delegation the records do not hold counts as self_report.
-        assertEquals("insufficient_evidence", assess(List.of(instruction(EP), delegated, decision), "CND-04").outcome);
-        Assertions.Assertion downgraded = assess(List.of(instruction(EP), delegated, decision, delegation), "CND-04");
+        // A delegation the records do not hold.
+        assertEquals("insufficient_evidence",
+                assess(List.of(officer(), delegated, decision), "CND-04", roles).outcome);
+        Assertions.Assertion downgraded =
+                assess(List.of(officer(), delegated, decision, delegation(SR, "verified")), "CND-04", roles);
         assertEquals("insufficient_evidence", downgraded.outcome);
         assertEquals(List.of("DelegationIssued"), downgraded.classGap);
+        assertEquals("conformant", assess(
+                List.of(officer(), delegated, decision, delegation(EP, "verified")), "CND-04", roles).outcome);
+        assertEquals("non-conformant", assess(
+                List.of(officer(), delegated, decision, delegation(EP, "failed")), "CND-04", roles).outcome);
+    }
+
+    /** An enforcement-point instruction whose principal, alice, holds the credit_officer role. */
+    private static ObjectNode officer() {
+        ObjectNode i = instruction(EP);
+        ((ObjectNode) data(i).get("principal")).put("role", "credit_officer");
+        return i;
+    }
+
+    private static ObjectNode delegation(String cls, String status) {
+        return event("dl1", "DelegationIssued", cls, "\"token_ref\": \"jti-1\", "
+                + "\"issuer\": \"https://idp.example\", \"chain\": [{\"id\": \"user:alice\", \"kind\": \"human\"}, "
+                + "{\"id\": \"" + SUBJECT + "\", \"kind\": \"agent\"}], "
+                + "\"verification\": {\"status\": \"" + status + "\", \"method\": \"rfc8693\"}");
     }
 
     @Test

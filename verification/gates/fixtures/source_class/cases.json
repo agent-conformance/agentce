@@ -235,7 +235,7 @@
       }
     },
     "decision-no-instruction-self-report": {
-      "why": "the agent's own consequential decision names no instruction and nothing executes it: it is judged as the self_report record it is, never left unjudged",
+      "why": "the agent's own consequential decision names no instruction and nothing executes it: it is judged as the self_report record it is, never left unjudged; tcx acts on its own enforcement-point instruction ix, so CND-05 judges it (a ToolCall naming no instruction reads insufficient_evidence)",
       "control": "CND-05",
       "events": [
         {
@@ -287,6 +287,30 @@
           "agentcesourceclass": "enforcement_point",
           "data": {
             "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "user"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "ix",
+          "source": "urn:src:enforcement_point",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "time": "2026-01-02T00:00:27Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
             "@type": "ToolCall",
             "acted_for": [
               "user:alice"
@@ -298,6 +322,9 @@
             "tool": {
               "name": "ping",
               "protocol": "native"
+            },
+            "refs": {
+              "instruction": "agentce:event/ix"
             }
           },
           "datacontenttype": "application/ld+json",
@@ -316,7 +343,7 @@
       }
     },
     "hostile-base-attested-policy-decision": {
-      "why": "base: an enforcement-point PolicyDecision allows the acting call for the instruction's principal, recorded before the call",
+      "why": "base: an enforcement-point PolicyDecision allows the acting call for the instruction's principal, recorded before the call; tcx acts on its own enforcement-point instruction ix, so CND-05 judges it (a ToolCall naming no instruction reads insufficient_evidence)",
       "control": "CND-05",
       "events": [
         {
@@ -401,6 +428,30 @@
           }
         },
         {
+          "id": "ix",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
           "id": "tcx",
           "source": "urn:src:enforcement_point",
           "subject": "spiffe://corp/agents/source-class-fixture",
@@ -422,7 +473,10 @@
               "name": "ping",
               "protocol": "native"
             },
-            "effect_class": "read"
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/ix"
+            }
           }
         }
       ],
@@ -433,7 +487,7 @@
       }
     },
     "hostile-base-attested-policy-decision-after-call": {
-      "why": "base: an enforcement-point PolicyDecision allows the acting call for the instruction's principal, but recorded after the call: it cannot have gated it (18.176)",
+      "why": "base: an enforcement-point PolicyDecision allows the acting call for the instruction's principal, but recorded after the call: it cannot have gated it (18.176); tcx acts on its own enforcement-point instruction ix, so CND-05 judges it (a ToolCall naming no instruction reads insufficient_evidence)",
       "control": "CND-05",
       "events": [
         {
@@ -489,6 +543,30 @@
           }
         },
         {
+          "id": "ix",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
           "id": "tcx",
           "source": "urn:src:enforcement_point",
           "subject": "spiffe://corp/agents/source-class-fixture",
@@ -510,7 +588,10 @@
               "name": "ping",
               "protocol": "native"
             },
-            "effect_class": "read"
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/ix"
+            }
           }
         },
         {
@@ -550,7 +631,7 @@
       }
     },
     "hostile-base-attested-policy-decision-ep-parent": {
-      "why": "base: the acted-on instruction's parent is an enforcement-point user instruction, recorded before the call",
+      "why": "base: the acted-on instruction's parent is an enforcement-point user instruction, recorded before the call; tcx acts on its own enforcement-point instruction ix, so CND-05 judges it (a ToolCall naming no instruction reads insufficient_evidence)",
       "control": "CND-05",
       "events": [
         {
@@ -660,6 +741,30 @@
           }
         },
         {
+          "id": "ix",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
           "id": "tcx",
           "source": "urn:src:enforcement_point",
           "subject": "spiffe://corp/agents/source-class-fixture",
@@ -681,7 +786,10 @@
               "name": "ping",
               "protocol": "native"
             },
-            "effect_class": "read"
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/ix"
+            }
           }
         }
       ],
@@ -692,7 +800,7 @@
       }
     },
     "hostile-base-attested-policy-decision-ep-parent-after-call": {
-      "why": "base: the acted-on instruction's parent is an enforcement-point user instruction, but recorded after the call: it cannot have gated it (18.176)",
+      "why": "base: the acted-on instruction's parent is an enforcement-point user instruction, but recorded after the call: it cannot have gated it (18.176); tcx acts on its own enforcement-point instruction ix, so CND-05 judges it (a ToolCall naming no instruction reads insufficient_evidence)",
       "control": "CND-05",
       "events": [
         {
@@ -773,6 +881,30 @@
           }
         },
         {
+          "id": "ix",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
           "id": "tcx",
           "source": "urn:src:enforcement_point",
           "subject": "spiffe://corp/agents/source-class-fixture",
@@ -794,7 +926,10 @@
               "name": "ping",
               "protocol": "native"
             },
-            "effect_class": "read"
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/ix"
+            }
           }
         },
         {
@@ -1158,7 +1293,7 @@
       }
     },
     "hostile-pd-other-request": {
-      "why": "the PolicyDecision's refs.request names another tool call",
+      "why": "the PolicyDecision's refs.request names another tool call; tcx acts on its own enforcement-point instruction ix, so CND-05 judges it (a ToolCall naming no instruction reads insufficient_evidence)",
       "control": "CND-05",
       "events": [
         {
@@ -1214,6 +1349,30 @@
           }
         },
         {
+          "id": "ix",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
           "id": "tcx",
           "source": "urn:src:enforcement_point",
           "subject": "spiffe://corp/agents/source-class-fixture",
@@ -1235,7 +1394,10 @@
               "name": "ping",
               "protocol": "native"
             },
-            "effect_class": "read"
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/ix"
+            }
           }
         },
         {
@@ -1275,7 +1437,7 @@
       }
     },
     "hostile-pd-self-report": {
-      "why": "the PolicyDecision is the agent's own record",
+      "why": "the PolicyDecision is the agent's own record; tcx acts on its own enforcement-point instruction ix, so CND-05 judges it (a ToolCall naming no instruction reads insufficient_evidence)",
       "control": "CND-05",
       "events": [
         {
@@ -1331,6 +1493,30 @@
           }
         },
         {
+          "id": "ix",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
           "id": "tcx",
           "source": "urn:src:enforcement_point",
           "subject": "spiffe://corp/agents/source-class-fixture",
@@ -1352,7 +1538,10 @@
               "name": "ping",
               "protocol": "native"
             },
-            "effect_class": "read"
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/ix"
+            }
           }
         },
         {
@@ -1392,7 +1581,7 @@
       }
     },
     "hostile-pd-sr-parent": {
-      "why": "the acted-on instruction's parent is the agent's own record",
+      "why": "the acted-on instruction's parent is the agent's own record; tcx acts on its own enforcement-point instruction ix, so CND-05 judges it (a ToolCall naming no instruction reads insufficient_evidence)",
       "control": "CND-05",
       "events": [
         {
@@ -1473,6 +1662,30 @@
           }
         },
         {
+          "id": "ix",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
           "id": "tcx",
           "source": "urn:src:enforcement_point",
           "subject": "spiffe://corp/agents/source-class-fixture",
@@ -1494,7 +1707,10 @@
               "name": "ping",
               "protocol": "native"
             },
-            "effect_class": "read"
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/ix"
+            }
           }
         },
         {
@@ -3111,7 +3327,7 @@
       }
     },
     "probe-d-attested-enforcement-point": {
-      "why": "twin of D: the instruction and the acting call recorded by enforcement points",
+      "why": "twin of D: the instruction and the acting call recorded by enforcement points; tcx acts on its own enforcement-point instruction ix, so CND-05 judges it (a ToolCall naming no instruction reads insufficient_evidence)",
       "control": "CND-05",
       "events": [
         {
@@ -3229,6 +3445,30 @@
           }
         },
         {
+          "id": "ix",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
           "id": "tcx",
           "source": "urn:src:enforcement_point",
           "subject": "spiffe://corp/agents/source-class-fixture",
@@ -3250,7 +3490,10 @@
               "name": "ping",
               "protocol": "native"
             },
-            "effect_class": "read"
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/ix"
+            }
           }
         }
       ],
@@ -3261,7 +3504,7 @@
       }
     },
     "probe-d-self-report-beside-unrelated-ep": {
-      "why": "D: acting call, decision and instruction all self_report, beside an unrelated enforcement-point call and read",
+      "why": "D: acting call, decision and instruction all self_report, beside an unrelated enforcement-point call and read; tcx acts on its own enforcement-point instruction ix, so CND-05 judges it (a ToolCall naming no instruction reads insufficient_evidence)",
       "control": "CND-05",
       "events": [
         {
@@ -3379,6 +3622,30 @@
           }
         },
         {
+          "id": "ix",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
           "id": "tcx",
           "source": "urn:src:enforcement_point",
           "subject": "spiffe://corp/agents/source-class-fixture",
@@ -3400,7 +3667,10 @@
               "name": "ping",
               "protocol": "native"
             },
-            "effect_class": "read"
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/ix"
+            }
           }
         }
       ],
@@ -3456,7 +3726,50 @@
             "decision_type": "dom:CreditDecision",
             "acted_for": [
               "user:alice"
-            ]
+            ],
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "dl1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "DelegationIssued",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "token_ref": "jti-1",
+            "issuer": "https://idp.example",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/source-class-fixture",
+                "kind": "agent"
+              }
+            ],
+            "subject_principal": "user:alice",
+            "actor_principal": "spiffe://corp/agents/source-class-fixture",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "verification": {
+              "status": "verified",
+              "method": "rfc8693"
+            }
           }
         },
         {
@@ -3484,7 +3797,8 @@
             "effect_class": "read",
             "refs": {
               "instruction": "agentce:event/i1",
-              "decision": "agentce:event/d1"
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1"
             }
           }
         }
@@ -3496,9 +3810,33 @@
       }
     },
     "probe-e1-instruction-not-held": {
-      "why": "E1: a consequential call names an instruction the bundle does not hold",
+      "why": "E1: a consequential call names an instruction the bundle does not hold; since 18.122 CND-04 reads an action on an unheld instruction non-conformant outright (the decision acts on a held, attested one)",
       "control": "CND-04",
       "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
         {
           "id": "d1",
           "source": "urn:src:self_report",
@@ -3517,7 +3855,50 @@
             "decision_type": "dom:CreditDecision",
             "acted_for": [
               "user:alice"
-            ]
+            ],
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "dl1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "DelegationIssued",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "token_ref": "jti-1",
+            "issuer": "https://idp.example",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/source-class-fixture",
+                "kind": "agent"
+              }
+            ],
+            "subject_principal": "user:alice",
+            "actor_principal": "spiffe://corp/agents/source-class-fixture",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "verification": {
+              "status": "verified",
+              "method": "rfc8693"
+            }
           }
         },
         {
@@ -3545,14 +3926,17 @@
             "effect_class": "read",
             "refs": {
               "instruction": "agentce:event/gone",
-              "decision": "agentce:event/d1"
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1"
             }
           }
         }
       ],
       "expected": {
-        "outcome": "insufficient_evidence",
-        "failing": [],
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ],
         "exit": 2
       }
     },
@@ -3846,7 +4230,50 @@
             "decision_type": "dom:CreditDecision",
             "acted_for": [
               "user:alice"
-            ]
+            ],
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "dl1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "DelegationIssued",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "token_ref": "jti-1",
+            "issuer": "https://idp.example",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/source-class-fixture",
+                "kind": "agent"
+              }
+            ],
+            "subject_principal": "user:alice",
+            "actor_principal": "spiffe://corp/agents/source-class-fixture",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "verification": {
+              "status": "verified",
+              "method": "rfc8693"
+            }
           }
         },
         {
@@ -3874,7 +4301,8 @@
             "effect_class": "read",
             "refs": {
               "instruction": "agentce:event/i1",
-              "decision": "agentce:event/d1"
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1"
             }
           }
         }
@@ -3886,7 +4314,7 @@
       }
     },
     "probe-h-decision-no-instruction": {
-      "why": "H: a consequential decision acts on no instruction, and the enforcement-point call executing it names none",
+      "why": "H: a consequential decision acts on no instruction, and the enforcement-point call executing it names none; since 18.122 CND-04 judges the decision itself, which fails for naming no instruction",
       "control": "CND-04",
       "events": [
         {
@@ -3908,6 +4336,46 @@
             "acted_for": [
               "user:alice"
             ]
+          }
+        },
+        {
+          "id": "dl1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "DelegationIssued",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "token_ref": "jti-1",
+            "issuer": "https://idp.example",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/source-class-fixture",
+                "kind": "agent"
+              }
+            ],
+            "subject_principal": "user:alice",
+            "actor_principal": "spiffe://corp/agents/source-class-fixture",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "verification": {
+              "status": "verified",
+              "method": "rfc8693"
+            }
           }
         },
         {
@@ -3934,7 +4402,8 @@
             },
             "effect_class": "read",
             "refs": {
-              "decision": "agentce:event/d1"
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1"
             }
           }
         }
@@ -3942,6 +4411,7 @@
       "expected": {
         "outcome": "non-conformant",
         "failing": [
+          "d1",
           "tc1"
         ],
         "exit": 2
@@ -3967,6 +4437,11 @@
             "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "refs": {
               "task": "task-1"
+            },
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
             }
           }
         },
@@ -3988,7 +4463,10 @@
             "decision_type": "dom:CreditDecision",
             "acted_for": [
               "user:alice"
-            ]
+            ],
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
           }
         },
         {
@@ -4069,7 +4547,7 @@
       }
     },
     "probe-i-unverified-delegation-no-principal": {
-      "why": "I: a consequential call under a delegation whose verification failed, acting on a self_report instruction with no principal",
+      "why": "I: a consequential call under a delegation whose verification failed, acting on a self_report instruction with no principal; since 18.122 CND-04 fails both outright, the call and the decision resting on it",
       "control": "CND-04",
       "events": [
         {
@@ -4109,7 +4587,10 @@
             "decision_type": "dom:CreditDecision",
             "acted_for": [
               "user:alice"
-            ]
+            ],
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
           }
         },
         {
@@ -4184,8 +4665,11 @@
         }
       ],
       "expected": {
-        "outcome": "insufficient_evidence",
-        "failing": [],
+        "outcome": "non-conformant",
+        "failing": [
+          "d1",
+          "tc1"
+        ],
         "exit": 2
       }
     },
@@ -4246,6 +4730,11 @@
             "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "refs": {
               "task": "task-1"
+            },
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
             }
           }
         },
@@ -4277,6 +4766,46 @@
           }
         },
         {
+          "id": "dl1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "DelegationIssued",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "token_ref": "jti-1",
+            "issuer": "https://idp.example",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/source-class-fixture",
+                "kind": "agent"
+              }
+            ],
+            "subject_principal": "user:alice",
+            "actor_principal": "spiffe://corp/agents/source-class-fixture",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "verification": {
+              "status": "verified",
+              "method": "rfc8693"
+            }
+          }
+        },
+        {
           "id": "tc1",
           "source": "urn:src:enforcement_point",
           "subject": "spiffe://corp/agents/source-class-fixture",
@@ -4301,7 +4830,8 @@
             "effect_class": "read",
             "refs": {
               "instruction": "agentce:event/i1",
-              "decision": "agentce:event/d1"
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1"
             }
           }
         }
@@ -4313,7 +4843,7 @@
       }
     },
     "probe-j-cnd-04-no-source-class": {
-      "why": "J (CND-04): the acted-on instruction declares no source_class and is the agent's own record",
+      "why": "J (CND-04): the acted-on instruction declares no source_class and is the agent's own record; since 18.122 CND-04 fails an instruction of no authorised class outright, for the call and the decision acting on it",
       "control": "CND-04",
       "events": [
         {
@@ -4429,8 +4959,11 @@
         }
       ],
       "expected": {
-        "outcome": "insufficient_evidence",
-        "failing": [],
+        "outcome": "non-conformant",
+        "failing": [
+          "d1",
+          "tc1"
+        ],
         "exit": 2
       }
     },
@@ -4926,6 +5459,135 @@
         "failing": [
           "d1"
         ],
+        "exit": 2
+      }
+    },
+    "probe-k-cnd-04-self-report-unattested": {
+      "why": "K (CND-04): a self_report user instruction whose principal holds the authorised role, acted on by the decision and by an enforcement-point call resting on a verified delegation, with no enforcement-point twin or PolicyDecision allow to attest it, so the outcome turns on attestation alone",
+      "control": "CND-04",
+      "events": [
+        {
+          "id": "i1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Instruction",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          }
+        },
+        {
+          "id": "dl1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "DelegationIssued",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "token_ref": "jti-1",
+            "issuer": "https://idp.example",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/source-class-fixture",
+                "kind": "agent"
+              }
+            ],
+            "subject_principal": "user:alice",
+            "actor_principal": "spiffe://corp/agents/source-class-fixture",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "verification": {
+              "status": "verified",
+              "method": "rfc8693"
+            }
+          }
+        },
+        {
+          "id": "tc1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/source-class-fixture",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "ToolCall",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "agent": {
+              "id": "spiffe://corp/agents/source-class-fixture"
+            },
+            "acted_for": [
+              "user:alice"
+            ],
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/i1",
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
         "exit": 2
       }
     },

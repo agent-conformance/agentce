@@ -299,15 +299,29 @@ export class SourceClassJudge {
     return true;
   }
 
-  /** (iv) by an enforcement-point PolicyDecision allow whose refs.request is the focus and whose principal
-   * is the instruction's (both present), recorded at or before the focus's clock. */
+  /** (iv) by an enforcement-point PolicyDecision allow whose refs.request is the focus (for a Decision, the
+   * focus or an enforcement-point ToolCall executing it) and whose principal is the instruction's (both
+   * present), recorded at or before the focus's clock. */
   private decisionWitnesses(focus: string, event: Event): boolean {
     const principal = principalId(dataOf(event).principal);
-    return (
-      principal !== null &&
-      (this.allows.get(JSON.stringify([focus, principal])) ?? []).some((at) =>
+    if (principal === null) {
+      return false;
+    }
+    // A Decision, the agent's own account, is allowed through the enforcement-point calls executing it (the
+    // calls its clock reads).
+    const named = [focus];
+    const record = this.events.get(focus);
+    if (record !== undefined && typeOf(record) === "Decision") {
+      named.push(
+        ...this.store
+          .subjects("agentce:executes", focus)
+          .filter((call) => this.events.has(call) && this.ownRank(call) > 0),
+      );
+    }
+    return named.some((request) =>
+      (this.allows.get(JSON.stringify([request, principal])) ?? []).some((at) =>
         this.inTime(focus, at),
-      )
+      ),
     );
   }
 

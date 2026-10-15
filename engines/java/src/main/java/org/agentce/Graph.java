@@ -2,6 +2,7 @@ package org.agentce;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -29,6 +30,8 @@ public final class Graph {
     private static final String BOOL = "xsd:boolean";
     /** CND-02's population (SPEC §7.7.4), materialised by {@code conductGate}. */
     static final String GATED_ACTION = "agentce:GatedAction";
+    /** CND-04's population (SPEC §7.7.4), materialised by {@code conductProvenance}. */
+    static final String CONSEQUENTIAL_ACTION = "agentce:ConsequentialAction";
     /** A ModelCall in a task: consumption CND-07 judges against the task's budgets. */
     static final String TASK_MODEL_CALL = "agentce:TaskModelCall";
     /** An action whose task budgets the records cannot tell (CND-07's evidence shape). */
@@ -81,6 +84,15 @@ public final class Graph {
      * controls. */
     static final Set<String> TRUSTED_INSTRUCTION =
             Set.of("user", "operator", "service", "agent_identified", "memory_trusted");
+
+    /** The Appendix F classes that name an authorised principal: CND-04's chain must end at one (memory_trusted does
+     * not, ruling 12 A of 2026-10-12). */
+    private static final Set<String> AUTHORISED_INSTRUCTION =
+            Set.of("user", "operator", "service", "agent_identified");
+
+    /** The own classes whose record of an instruction's principal is read as recorded (SPEC §6.4 order, at or above
+     * enforcement_point); below them a principal's role needs an enforcement-point witness (CND-04). */
+    private static final Set<String> AT_OR_ABOVE_EP = Set.of("enforcement_point", "independent_system");
 
     /** A memory record's trust, or a read's {@code trust_min}, that ROB-02 treats as untrusted, and
      * the memory guard verdicts that mark a record untrusted whatever its trust field says (SPEC §7.4). */
@@ -149,6 +161,23 @@ public final class Graph {
     /** A field the record leaves out or sets to null (Python's None). */
     private static boolean isAbsent(JsonNode node) {
         return node == null || node.isNull();
+    }
+
+    /** Python's {@code ==} over two JSON values: absent and null are both None, numbers compare by value. */
+    private static boolean pyEquals(JsonNode a, JsonNode b) {
+        if (isAbsent(a) || isAbsent(b)) {
+            return isAbsent(a) && isAbsent(b);
+        }
+        if (a.isNumber() && b.isNumber()) {
+            return a.decimalValue().compareTo(b.decimalValue()) == 0;
+        }
+        return a.equals(b);
+    }
+
+    /** A principal's id as CND-04 reads it: Python's strip of a non-empty string id, else empty. */
+    private static String principalKey(JsonNode principal) {
+        String id = principal != null && principal.isObject() ? text(principal.get("id")) : null;
+        return id == null ? "" : Conformance.pyStrip(id);
     }
 
     /** What each task's records show it consumed (SPEC §7.7.3 budget row); the Python engine's
@@ -491,6 +520,7 @@ public final class Graph {
             usedClasses.add("prov:Activity");
             usedClasses.add("prov:Entity");
             usedClasses.add(GATED_ACTION);
+            usedClasses.add(CONSEQUENTIAL_ACTION);
             usedClasses.add(TASK_MODEL_CALL);
             usedClasses.add(BUDGET_UNJUDGED);
             for (JsonNode event : events) {
@@ -911,6 +941,228 @@ public final class Graph {
             }
         }
 
+        /** Materialise CND-04's population and judgment (SPEC §7.7.4; rulings 9 to 14 of 2026-10-12); the Python
+         * engine's {@code _conduct_provenance} documents the reading. A ToolCall that executes a held consequential
+         * decision, and every consequential Decision, is a {@code ConsequentialAction}. It meets the control when its
+         * instruction chain declares only authorised classes with a principal and no untrusted origin, its last
+         * principal's role is authorised for the task, and no delegation it rests on is held unverified. */
+        private void conductProvenance(List<JsonNode> events) {
+            Map<String, JsonNode> byIri = new LinkedHashMap<>();
+            for (JsonNode e : events) {
+                byIri.put(Iri.eventIri(e.get("id").asText()), e);
+            }
+            List<String> nodes = new ArrayList<>(byIri.keySet());
+            nodes.sort(Json::byteCompare);
+            Map<String, List<JsonNode>> executing = new LinkedHashMap<>();
+            List<String> foci = new ArrayList<>();
+            for (String node : nodes) {
+                JsonNode event = byIri.get(node);
+                String ptype = ptype(event);
+                if ("ToolCall".equals(ptype)) {
+                    String decision = heldDecision(refsOf(event).get("decision"));
+                    if (decision != null) {
+                        executing.computeIfAbsent(decision, k -> new ArrayList<>()).add(event);
+                        if (domain.consequential.contains(decisionType.getOrDefault(decision, ""))) {
+                            foci.add(node);
+                        }
+                    }
+                } else if ("Decision".equals(ptype) && store.isA(node, "agentce:ConsequentialDecision")) {
+                    foci.add(node);
+                }
+            }
+            for (String node : foci) {
+                JsonNode event = byIri.get(node);
+                Chain chain = instructionChain(byIri, refsOf(event).get("instruction"));
+                boolean met = chain.met();
+                boolean judged = chain.judged();
+                List<JsonNode> calls = "Decision".equals(ptype(event))
+                        ? executing.getOrDefault(node, List.of())
+                        : List.of(event);
+                if (chain.terminus() != null) {
+                    boolean[] role = roleAuthorised(byIri, node, event, calls, chain.terminus());
+                    met = met && role[0];
+                    judged = judged && role[1];
+                }
+                List<JsonNode> delegations = new ArrayList<>();
+                for (JsonNode call : calls) {
+                    JsonNode ref = refsOf(call).get("delegation");
+                    if (!isAbsent(ref)) {
+                        delegations.add(ref);
+                    }
+                }
+                for (JsonNode ref : delegations) {
+                    JsonNode held = ref.isTextual() ? byIri.get(ref.textValue()) : null;
+                    if (held == null || !"DelegationIssued".equals(ptype(held))) {
+                        judged = false;
+                    } else if (!store.literalValues(ref.textValue(), "agentce:chainVerified").contains("true")) {
+                        met = false;
+                    }
+                }
+                if (delegations.isEmpty()) {
+                    judged = false;
+                }
+                // A definite failure beats a reading the records cannot finish (critic r2 F3).
+                judged = judged || !met;
+                store.addType(node, CONSEQUENTIAL_ACTION);
+                literal(node, "agentce:provenanceMet", met);
+                literal(node, "agentce:provenanceJudged", judged);
+            }
+        }
+
+        /** CND-04's reading of an instruction chain: whether it meets and can be judged, and its last Instruction
+         * (null when it has none to read: a parent cycle, an unheld parent, a non-string parent). */
+        private record Chain(boolean met, boolean judged, JsonNode terminus) {}
+
+        /** CND-04's instruction chain from {@code instruction} (see {@link #conductProvenance}); the Python engine's
+         * {@code _instruction_chain} documents the reading. A parent cycle never terminates, so it is unjudged and
+         * has no last Instruction. */
+        private Chain instructionChain(Map<String, JsonNode> byIri, JsonNode instruction) {
+            JsonNode start = instruction != null && instruction.isTextual() ? byIri.get(instruction.textValue()) : null;
+            if (start == null || !"Instruction".equals(ptype(start))) {
+                return new Chain(false, true, null);
+            }
+            boolean met = true;
+            boolean judged = true;
+            Set<String> seen = new HashSet<>();
+            JsonNode node = instruction;
+            JsonNode terminus = null;
+            while (node != null && node.isTextual()) {
+                String iri = node.textValue();
+                if (!seen.add(iri)) {
+                    judged = false;
+                    terminus = null;
+                    break;
+                }
+                JsonNode event = byIri.get(iri);
+                if (event == null || !"Instruction".equals(ptype(event))) {
+                    judged = false;
+                    terminus = null;
+                    break;
+                }
+                terminus = event;
+                JsonNode data = dataOf(event);
+                JsonNode refs = refsOf(event);
+                if (!isOneOf(data.get("source_class"), AUTHORISED_INSTRUCTION)
+                        || principalKey(data.get("principal")).isEmpty()) {
+                    met = false;
+                }
+                JsonNode origin = refs.get("origin");
+                if (!isAbsent(origin)) {
+                    JsonNode held = origin.isTextual() ? byIri.get(origin.textValue()) : null;
+                    String otype = held != null ? ptype(held) : null;
+                    JsonNode trust = held != null && "MemoryRead".equals(otype) ? dataOf(held).get("trust_min") : null;
+                    if ("ToolCall".equals(otype) || "ResourceAccess".equals(otype)
+                            || ("MemoryRead".equals(otype) && isOneOf(trust, UNTRUSTED_TRUST))) {
+                        met = false;
+                    } else if (!"MemoryRead".equals(otype) || !"trusted".equals(str(trust))) {
+                        judged = false;
+                    }
+                }
+                node = refs.get("parent");
+                if (!isAbsent(node) && !node.isTextual()) {
+                    judged = false;
+                    terminus = null;
+                }
+            }
+            return new Chain(met, judged, terminus);
+        }
+
+        /** {met, judged}: whether the chain's last principal holds a role every scope of the action's task authorises
+         * (SPEC §7.7.4 "for the task type", §7.7.6 {@code authorised_principal_roles}); the Python engine's
+         * {@code _role_authorised} documents the reading. Below enforcement_point the role is the agent's word, so
+         * each enforcement-point witness of the same principal must record the same role ({@link #witnessRoles}). */
+        private boolean[] roleAuthorised(
+                Map<String, JsonNode> byIri, String node, JsonNode event, List<JsonNode> calls, JsonNode terminus) {
+            Set<String> tasks = actionTasks(event);
+            if (tasks.isEmpty() && "Decision".equals(ptype(event))) {
+                for (JsonNode call : calls) {
+                    tasks.addAll(actionTasks(call));
+                }
+            }
+            List<String> ordered = new ArrayList<>(tasks);
+            ordered.sort(Json::byteCompare);
+            List<List<DomainBinding.TaskScope>> lists = new ArrayList<>();
+            for (String task : ordered) {
+                lists.add(domain.scopesFor(task));
+            }
+            if (lists.isEmpty()) {
+                lists.add(domain.scopesFor(""));
+            }
+            List<DomainBinding.TaskScope> scopes = new ArrayList<>();
+            lists.forEach(scopes::addAll);
+            if (lists.stream().anyMatch(List::isEmpty)
+                    || scopes.stream().anyMatch(sc -> sc.authorisedPrincipalRoles() == null)) {
+                return new boolean[] {true, false};
+            }
+            JsonNode principal = dataOf(terminus).get("principal");
+            if (principalKey(principal).isEmpty()) {
+                return new boolean[] {true, true}; // no principal already fails the chain (met false)
+            }
+            String declared = str(principal.get("role"));
+            String role = declared == null ? "" : Conformance.pyStrip(declared);
+            if (role.isEmpty()) {
+                return new boolean[] {true, false};
+            }
+            boolean met = scopes.stream().allMatch(sc -> sc.authorisedPrincipalRoles().contains(role));
+            boolean judged = true;
+            if (!isOneOf(terminus.get("agentcesourceclass"), AT_OR_ABOVE_EP)) {
+                for (String witnessed : witnessRoles(byIri, node, calls, terminus)) {
+                    if (witnessed == null) {
+                        judged = false;
+                    } else if (!witnessed.equals(role)) {
+                        met = false;
+                    }
+                }
+            }
+            return new boolean[] {met, judged};
+        }
+
+        /** The role (trimmed, null when absent or blank) each enforcement-point witness records for the terminus's
+         * principal: a PolicyDecision allow whose refs.request is the action or a call executing it, and a twin
+         * Instruction of the same content_ref, refs.task, source_class and principal id (SPEC §7.7.5). */
+        private List<String> witnessRoles(
+                Map<String, JsonNode> byIri, String node, List<JsonNode> calls, JsonNode terminus) {
+            JsonNode data = dataOf(terminus);
+            JsonNode refs = refsOf(terminus);
+            String pid = principalKey(data.get("principal"));
+            Set<String> requests = new HashSet<>();
+            requests.add(node);
+            for (JsonNode call : calls) {
+                requests.add(Iri.eventIri(call.get("id").asText()));
+            }
+            List<String> roles = new ArrayList<>();
+            for (JsonNode other : byIri.values()) {
+                if (other == terminus || !"enforcement_point".equals(str(other.get("agentcesourceclass")))) {
+                    continue;
+                }
+                JsonNode odata = dataOf(other);
+                JsonNode orefs = refsOf(other);
+                JsonNode witness = odata.get("principal");
+                if (witness == null || !witness.isObject() || !principalKey(witness).equals(pid)) {
+                    continue;
+                }
+                String ptype = ptype(other);
+                String request = str(orefs.get("request"));
+                boolean allow = "PolicyDecision".equals(ptype)
+                        && "allow".equals(str(odata.get("decision")))
+                        && request != null
+                        && requests.contains(request);
+                boolean twin = "Instruction".equals(ptype)
+                        && !isAbsent(data.get("content_ref"))
+                        && !isAbsent(refs.get("task"))
+                        && pyEquals(odata.get("content_ref"), data.get("content_ref"))
+                        && pyEquals(orefs.get("task"), refs.get("task"))
+                        && pyEquals(odata.get("source_class"), data.get("source_class"));
+                if (!allow && !twin) {
+                    continue;
+                }
+                String role = str(witness.get("role"));
+                String trimmed = role == null ? "" : Conformance.pyStrip(role);
+                roles.add(trimmed.isEmpty() ? null : trimmed);
+            }
+            return roles;
+        }
+
         private void gate(String node, boolean met, boolean judged) {
             store.addType(node, GATED_ACTION);
             literal(node, "agentce:gateMet", met);
@@ -1006,8 +1258,11 @@ public final class Graph {
          * class is not a declared trusted one (none given, say) cannot show a trusted root either, so it
          * fails closed. So does an action whose {@code refs.instruction} names no held Instruction (nothing
          * the bundle holds, or an event or record of another type: SPEC §6.2.3 types the ref
-         * Ref→Instruction). A closure over all events, so the acting event may precede its instruction and
-         * cycles end. */
+         * Ref→Instruction). A ToolCall that names no instruction at all ({@code refs.instruction} absent,
+         * null or not a string, though SPEC §6.2.3 requires it) is not flagged, but the records cannot
+         * show where it came from, so {@code agentce:actsOnJudged} is false and CND-05 reads
+         * insufficient_evidence for it (HR-5); a Decision's ref is optional, so it is always judged. A
+         * closure over all events, so the acting event may precede its instruction and cycles end. */
         private void actsOnUntrusted(List<JsonNode> events, Set<String> tainted) {
             Set<String> untrusted = new LinkedHashSet<>(tainted);
             Map<String, Set<String>> derived = new LinkedHashMap<>();
@@ -1037,13 +1292,12 @@ public final class Graph {
                     continue;
                 }
                 String instruction = str(refsOf(event).get("instruction"));
-                boolean acts = instruction != null
+                boolean named = instruction != null;
+                boolean acts = named
                         && (untrusted.contains(instruction) || !instructionUntrusted.containsKey(instruction));
-                store.addLiteral(
-                        Iri.eventIri(event.get("id").asText()),
-                        "agentce:actsOnUntrusted",
-                        acts ? "true" : "false",
-                        BOOL);
+                String node = Iri.eventIri(event.get("id").asText());
+                literal(node, "agentce:actsOnUntrusted", acts);
+                literal(node, "agentce:actsOnJudged", named || "Decision".equals(ptype));
             }
         }
 
@@ -1257,6 +1511,7 @@ public final class Graph {
             actsOnUntrusted(events, robustToUntrusted(events));
             conductScopeBudget(events);
             conductGate(events);
+            conductProvenance(events);
             precededBy();
         }
 

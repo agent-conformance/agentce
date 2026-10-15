@@ -1047,8 +1047,11 @@ class _Builder:
         class is not a declared trusted one (none given, say) cannot show a trusted root either, so
         it fails closed. So does an action whose ``refs.instruction`` names no held Instruction
         (nothing the bundle holds, or an event or record of another type: SPEC §6.2.3 types the ref
-        Ref→Instruction). A closure over all events, so the acting event may precede its instruction
-        and cycles end."""
+        Ref→Instruction). A ToolCall that names no instruction at all (``refs.instruction`` absent,
+        null or not a string, though SPEC §6.2.3 requires it) is not flagged, but the records cannot
+        show where it came from, so ``agentce:actsOnJudged`` is false and CND-05 reads
+        insufficient_evidence for it (HR-5); a Decision's ref is optional, so it is always judged.
+        A closure over all events, so the acting event may precede its instruction and cycles end."""
         untrusted = set(tainted)
         derived: dict[str, set[str]] = {}
         held: set[str] = set()
@@ -1073,16 +1076,14 @@ class _Builder:
             if ptype not in ("ToolCall", "Decision"):
                 continue
             instruction = _refs(event).get("instruction")
-            acts = isinstance(instruction, str) and (
+            named = isinstance(instruction, str)
+            acts = named and (
                 instruction in untrusted
                 or instruction not in self.instruction_untrusted
             )
-            self.store.add_literal(
-                event_iri(str(event["id"])),
-                "agentce:actsOnUntrusted",
-                "true" if acts else "false",
-                BOOL,
-            )
+            node = event_iri(str(event["id"]))
+            self._literal(node, "agentce:actsOnUntrusted", acts)
+            self._literal(node, "agentce:actsOnJudged", named or ptype == "Decision")
 
     def _robust_to_untrusted(self, events: list[dict[str, Any]]) -> set[str]:
         """Flag whether each Decision kept untrusted content out, and whether the memory guard

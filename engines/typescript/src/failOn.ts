@@ -44,6 +44,20 @@ const PY_WHITESPACE = new Set([
 /** Whether code point `cp` is one Python's `str.isspace()` (and so `str.strip()`) treats as space. */
 export const isPySpace = (cp: number): boolean => PY_WHITESPACE.has(cp);
 
+/** Python's `str.strip()` (JavaScript's `trim` differs on a few code points). */
+export function pyStrip(text: string): string {
+  const chars = [...text];
+  let start = 0;
+  let end = chars.length;
+  while (start < end && isPySpace(chars[start]?.codePointAt(0) as number)) {
+    start++;
+  }
+  while (end > start && isPySpace(chars[end - 1]?.codePointAt(0) as number)) {
+    end--;
+  }
+  return chars.slice(start, end).join("");
+}
+
 /** The fields whose values are a closed vocabulary (SPEC §8.5; spec/report/auditor.schema.json for outcome and
  * mode, spec/rules/control.schema.json for severity). A literal outside it could never match, so it is refused
  * rather than read as a rule that holds nothing to account. control, subject, family and rung stay free text. */

@@ -14,6 +14,7 @@
  */
 
 import { DomainBinding, TOKEN_CAP, tokenCount } from "./domain";
+import { pyStrip } from "./failOn";
 import { ZERO_KEY, eventIri, isEventRef, principalIri } from "./iri";
 import { GraphStore } from "./store";
 import { compareLiterals } from "./structural";
@@ -22,6 +23,8 @@ import { byteCompare } from "./util";
 const BOOL = "xsd:boolean";
 /** CND-02's population (SPEC §7.7.4), materialised by `conductGate`. */
 export const GATED_ACTION = "agentce:GatedAction";
+/** CND-04's population (SPEC §7.7.4), materialised by `conductProvenance`. */
+export const CONSEQUENTIAL_ACTION = "agentce:ConsequentialAction";
 /** A ModelCall in a task: consumption CND-07 judges against the task's budgets. */
 export const TASK_MODEL_CALL = "agentce:TaskModelCall";
 /** An action whose task budgets the records cannot tell (CND-07's evidence shape). */
@@ -128,6 +131,12 @@ export const TRUSTED_INSTRUCTION: ReadonlySet<string> = new Set([
   "memory_trusted",
 ]);
 
+/** The Appendix F classes that name an authorised principal: CND-04's chain must end at one (memory_trusted
+ * does not, ruling 12 A of 2026-10-12). */
+const AUTHORISED_INSTRUCTION: ReadonlySet<string> = new Set(
+  [...TRUSTED_INSTRUCTION].filter((c) => c !== "memory_trusted"),
+);
+
 /** A memory record's trust, or a read's `trust_min`, that ROB-02 treats as untrusted, and the memory guard
  * verdicts that mark a record untrusted whatever its trust field says (SPEC §7.4). */
 const UNTRUSTED_TRUST = new Set(["untrusted", "quarantined"]);
@@ -151,6 +160,15 @@ const REFS_IN = ["origin", "instruction", "parent"];
 /** An Appendix F source class outside the trusted set (CND-05's rule, also ROB-02's). */
 function untrustedSourceClass(value: unknown): boolean {
   return typeof value === "string" && !TRUSTED_INSTRUCTION.has(value);
+}
+
+/** The own classes whose record of an instruction's principal is read as recorded (SPEC §6.4 order, at or above
+ * enforcement_point); below them a principal's role needs an enforcement-point witness (CND-04). */
+const AT_OR_ABOVE_EP = new Set(["enforcement_point", "independent_system"]);
+
+/** A principal's id, trimmed; "" when absent or blank. */
+function principalKey(principal: Record<string, unknown>): string {
+  return pyStrip(text(principal.id) ?? "");
 }
 
 function isOneOf(value: unknown, values: ReadonlySet<string>): boolean {
@@ -440,6 +458,7 @@ class Builder {
     usedClasses.add("prov:Activity");
     usedClasses.add("prov:Entity");
     usedClasses.add(GATED_ACTION);
+    usedClasses.add(CONSEQUENTIAL_ACTION);
     usedClasses.add(TASK_MODEL_CALL);
     usedClasses.add(BUDGET_UNJUDGED);
     for (const event of events) {
@@ -865,6 +884,222 @@ class Builder {
     }
   }
 
+  /** Materialise CND-04's population and judgment (SPEC §7.7.4; rulings 9 to 14 of 2026-10-12); the Python
+   * engine's `_conduct_provenance` documents the reading. A ToolCall that executes a held consequential decision,
+   * and every consequential Decision, is a `ConsequentialAction`, judged on its refs.instruction chain
+   * (`instructionChain`), the chain's last principal's role (`roleAuthorised`) and the delegations it rests on: a
+   * ToolCall's refs.delegation, a Decision's those of the ToolCalls executing it. */
+  private conductProvenance(events: Event[]): void {
+    const byIri = new Map<string, Event>();
+    for (const e of events) byIri.set(eventIri(String(e.id)), e);
+    const executing = new Map<string, Event[]>();
+    const foci: [string, Event][] = [];
+    for (const node of [...byIri.keys()].sort(byteCompare)) {
+      const event = byIri.get(node) as Event;
+      const ptype = this.ptype(event);
+      if (ptype === "ToolCall") {
+        const decision = this.heldDecision(refsOf(event).decision);
+        if (decision !== null) {
+          const list = executing.get(decision) ?? [];
+          list.push(event);
+          executing.set(decision, list);
+          if (this.domain.consequential.has(this.decisionType.get(decision) ?? "")) {
+            foci.push([node, event]);
+          }
+        }
+      } else if (ptype === "Decision" && this.store.isA(node, "agentce:ConsequentialDecision")) {
+        foci.push([node, event]);
+      }
+    }
+    for (const [node, event] of foci) {
+      let [met, judged, terminus] = this.instructionChain(byIri, refsOf(event).instruction);
+      const calls = this.ptype(event) === "Decision" ? (executing.get(node) ?? []) : [event];
+      if (terminus !== null) {
+        const [roleMet, roleJudged] = this.roleAuthorised(byIri, node, event, calls, terminus);
+        met = met && roleMet;
+        judged = judged && roleJudged;
+      }
+      const delegations = calls.map((call) => refsOf(call).delegation).filter((d) => !isAbsent(d));
+      for (const ref of delegations) {
+        const held = typeof ref === "string" ? byIri.get(ref) : undefined;
+        if (held === undefined || this.ptype(held) !== "DelegationIssued") {
+          judged = false;
+        } else if (
+          !this.store.literalValues(ref as string, "agentce:chainVerified").includes("true")
+        ) {
+          met = false;
+        }
+      }
+      if (delegations.length === 0) {
+        judged = false;
+      }
+      // A definite failure beats a reading the records cannot finish (critic r2 F3).
+      judged = judged || !met;
+      this.store.addType(node, CONSEQUENTIAL_ACTION);
+      this.literal(node, "agentce:provenanceMet", met);
+      this.literal(node, "agentce:provenanceJudged", judged);
+    }
+  }
+
+  /** [met, judged, the chain's last Instruction] for CND-04's instruction chain from `instruction` (see
+   * `conductProvenance`). A parent cycle never terminates, so it is unjudged and has no last Instruction. */
+  private instructionChain(
+    byIri: Map<string, Event>,
+    instruction: unknown,
+  ): [boolean, boolean, Event | null] {
+    const start = typeof instruction === "string" ? byIri.get(instruction) : undefined;
+    if (start === undefined || this.ptype(start) !== "Instruction") {
+      return [false, true, null];
+    }
+    let met = true;
+    let judged = true;
+    const seen = new Set<string>();
+    let node: unknown = instruction;
+    let terminus: Event | null = null;
+    while (typeof node === "string") {
+      if (seen.has(node)) {
+        judged = false;
+        terminus = null;
+        break;
+      }
+      seen.add(node);
+      const event = byIri.get(node);
+      if (event === undefined || this.ptype(event) !== "Instruction") {
+        judged = false;
+        terminus = null;
+        break;
+      }
+      terminus = event;
+      const data = dataOf(event);
+      const refs = refsOf(event);
+      if (
+        !isOneOf(data.source_class, AUTHORISED_INSTRUCTION) ||
+        !(isRecord(data.principal) && principalKey(data.principal))
+      ) {
+        met = false;
+      }
+      const origin = refs.origin;
+      if (!isAbsent(origin)) {
+        const held = typeof origin === "string" ? byIri.get(origin) : undefined;
+        const otype = held !== undefined ? this.ptype(held) : null;
+        const trust =
+          held !== undefined && otype === "MemoryRead" ? dataOf(held).trust_min : undefined;
+        if (
+          otype === "ToolCall" ||
+          otype === "ResourceAccess" ||
+          (otype === "MemoryRead" && isOneOf(trust, UNTRUSTED_TRUST))
+        ) {
+          met = false;
+        } else if (otype !== "MemoryRead" || trust !== "trusted") {
+          judged = false;
+        }
+      }
+      node = refs.parent;
+      if (!isAbsent(node) && typeof node !== "string") {
+        judged = false;
+        terminus = null;
+      }
+    }
+    return [met, judged, terminus];
+  }
+
+  /** [met, judged]: whether the chain's last principal holds a role every scope of the action's task authorises
+   * (SPEC §7.7.4 "for the task type", §7.7.6 `authorised_principal_roles`). A Decision naming no task takes the
+   * tasks of the calls executing it. No scope, a scope that declares no roles, or a principal with no role cannot
+   * be judged (fail closed, HR-5); a role outside a declared list does not meet the control. Below
+   * enforcement_point the role is the agent's word, so each enforcement-point witness of the same principal must
+   * record the same role (`witnessRoles`; inbox row 358). */
+  private roleAuthorised(
+    byIri: Map<string, Event>,
+    node: string,
+    event: Event,
+    calls: Event[],
+    terminus: Event,
+  ): [boolean, boolean] {
+    let tasks = this.actionTasks(event);
+    if (tasks.size === 0 && this.ptype(event) === "Decision") {
+      tasks = new Set(calls.flatMap((c) => [...this.actionTasks(c)]));
+    }
+    let lists = [...tasks].sort(byteCompare).map((t) => this.domain.scopesFor(t));
+    if (lists.length === 0) {
+      lists = [this.domain.scopesFor("")];
+    }
+    const scopes = lists.flat();
+    if (
+      lists.some((l) => l.length === 0) ||
+      scopes.some((s) => s.authorisedPrincipalRoles === null)
+    ) {
+      return [true, false];
+    }
+    const principal = dataOf(terminus).principal;
+    if (!isRecord(principal) || !principalKey(principal)) {
+      return [true, true]; // no principal already fails the chain (met false)
+    }
+    const declared = principal.role;
+    const role = typeof declared === "string" ? pyStrip(declared) : "";
+    if (!role) {
+      return [true, false];
+    }
+    let met = scopes.every((s) => s.authorisedPrincipalRoles?.has(role) ?? false);
+    let judged = true;
+    if (!isOneOf(terminus.agentcesourceclass, AT_OR_ABOVE_EP)) {
+      for (const witnessed of this.witnessRoles(byIri, node, calls, terminus)) {
+        if (witnessed === null) {
+          judged = false;
+        } else if (witnessed !== role) {
+          met = false;
+        }
+      }
+    }
+    return [met, judged];
+  }
+
+  /** The role (trimmed, null when absent or blank) each enforcement-point witness records for the terminus's
+   * principal: a PolicyDecision allow whose refs.request is the action or a call executing it, and a twin
+   * Instruction of the same content_ref, refs.task, source_class and principal id (SPEC §7.7.5). */
+  private witnessRoles(
+    byIri: Map<string, Event>,
+    node: string,
+    calls: Event[],
+    terminus: Event,
+  ): (string | null)[] {
+    const data = dataOf(terminus);
+    const refs = refsOf(terminus);
+    const pid = principalKey(data.principal as Record<string, unknown>);
+    const requests = new Set([node, ...calls.map((c) => eventIri(String(c.id)))]);
+    const roles: (string | null)[] = [];
+    for (const other of byIri.values()) {
+      if (other === terminus || other.agentcesourceclass !== "enforcement_point") {
+        continue;
+      }
+      const odata = dataOf(other);
+      const orefs = refsOf(other);
+      const witness = odata.principal;
+      if (!isRecord(witness) || principalKey(witness) !== pid) {
+        continue;
+      }
+      const ptype = this.ptype(other);
+      const allows =
+        ptype === "PolicyDecision" &&
+        odata.decision === "allow" &&
+        typeof orefs.request === "string" &&
+        requests.has(orefs.request);
+      const twin =
+        ptype === "Instruction" &&
+        !isAbsent(data.content_ref) &&
+        !isAbsent(refs.task) &&
+        pyEquals(odata.content_ref ?? null, data.content_ref ?? null) &&
+        pyEquals(orefs.task ?? null, refs.task ?? null) &&
+        pyEquals(odata.source_class ?? null, data.source_class ?? null);
+      if (!allows && !twin) {
+        continue;
+      }
+      const role = typeof witness.role === "string" ? pyStrip(witness.role) : "";
+      roles.push(role || null);
+    }
+    return roles;
+  }
+
   private gate(node: string, met: boolean, judged: boolean): void {
     this.store.addType(node, GATED_ACTION);
     this.literal(node, "agentce:gateMet", met);
@@ -959,8 +1194,11 @@ class Builder {
    * whose source class is not a declared trusted one (none given, say) cannot show a trusted root
    * either, so it fails closed. So does an action whose `refs.instruction` names no held Instruction
    * (nothing the bundle holds, or an event or record of another type: SPEC §6.2.3 types the ref
-   * Ref→Instruction). A closure over all events, so the acting event may precede its instruction and
-   * cycles end. */
+   * Ref→Instruction). A ToolCall that names no instruction at all (`refs.instruction` absent, null or
+   * not a string, though SPEC §6.2.3 requires it) is not flagged, but the records cannot show where it
+   * came from, so `agentce:actsOnJudged` is false and CND-05 reads insufficient_evidence for it (HR-5);
+   * a Decision's ref is optional, so it is always judged. A closure over all events, so the acting
+   * event may precede its instruction and cycles end. */
   private actsOnUntrusted(events: Event[], tainted: Set<string>): void {
     const untrusted = new Set(tainted);
     const derived = new Map<string, Set<string>>();
@@ -994,15 +1232,12 @@ class Builder {
         continue;
       }
       const instruction = refsOf(event).instruction;
+      const named = typeof instruction === "string";
       const acts =
-        typeof instruction === "string" &&
-        (untrusted.has(instruction) || !this.instructionUntrusted.has(instruction));
-      this.store.addLiteral(
-        eventIri(String(event.id)),
-        "agentce:actsOnUntrusted",
-        acts ? "true" : "false",
-        BOOL,
-      );
+        named && (untrusted.has(instruction) || !this.instructionUntrusted.has(instruction));
+      const node = eventIri(String(event.id));
+      this.literal(node, "agentce:actsOnUntrusted", acts);
+      this.literal(node, "agentce:actsOnJudged", named || ptype === "Decision");
     }
   }
 
@@ -1202,6 +1437,7 @@ class Builder {
     this.actsOnUntrusted(events, this.robustToUntrusted(events));
     this.conductScopeBudget(events);
     this.conductGate(events);
+    this.conductProvenance(events);
     this.precededBy();
   }
 

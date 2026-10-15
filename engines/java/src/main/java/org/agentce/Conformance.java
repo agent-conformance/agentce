@@ -216,7 +216,7 @@ public final class Conformance {
 
     /** Python's {@code str.strip()}: trims exactly {@link FailOn#isPySpace} code points, where
      * {@link String#strip()} uses the JVM's own whitespace set. */
-    private static String pyStrip(String text) {
+    static String pyStrip(String text) {
         int start = 0;
         int end = text.length();
         while (start < end && FailOn.isPySpace(text.codePointAt(start))) {

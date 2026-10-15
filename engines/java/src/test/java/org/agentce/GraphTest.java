@@ -336,6 +336,31 @@ class GraphTest {
         assertEquals(List.of("true"), acts(events, "d1"));
     }
 
+    /** CND-05's evidence flag on {@code acting}: whether the records show which instruction it acted on. */
+    private static List<String> judged(List<JsonNode> events, String acting) {
+        GraphStore store = Graph.buildGraph(events, DomainBinding.fromDict(CREDIT_DOMAIN));
+        return store.literalValues("agentce:event/" + acting, "agentce:actsOnJudged");
+    }
+
+    @Test
+    void cnd05AToolCallNamingNoInstructionIsNotJudged() {
+        for (String refs : List.of("\"refs\": {}", "\"refs\": {\"instruction\": null}")) {
+            List<JsonNode> events = List.of(instruction("i1", "user", ""), event("tc1", "ToolCall", refs));
+            assertEquals(List.of("false"), judged(events, "tc1"), refs);
+            assertEquals(List.of("false"), acts(events, "tc1"), refs);
+        }
+    }
+
+    @Test
+    void cnd05AToolCallOnAHeldTrustedInstructionIsJudged() {
+        assertEquals(List.of("true"), judged(List.of(instruction("i1", "user", ""), call("tc1", "i1")), "tc1"));
+    }
+
+    @Test
+    void cnd05ADecisionNamingNoInstructionIsJudged() {
+        assertEquals(List.of("true"), judged(List.of(decisionEvent("d1")), "d1"));
+    }
+
     @Test
     void cnd05AParentOrOriginTheBundleDoesNotHoldFailsClosed() {
         for (String key : List.of("parent", "origin")) {
@@ -1133,5 +1158,292 @@ class GraphTest {
                 List.of(modelCall("m0", null, "{\"input_tokens\":9,\"output_tokens\":9}")),
                 DomainBinding.fromDict(Json.parse("{\"task_scopes\":[{\"task_type\":\"review\"}]}")));
         assertTrue(!untasked.isA("agentce:event/m0", "agentce:TaskModelCall"));
+    }
+
+    // --- CND-04: the instruction chain, the principal's role and the delegation (SPEC §7.7.4; 18.122) ---------
+
+    private static final String DECISION_TYPES = "\"decision_types\":["
+            + "{\"id\":\"agentce:CreditDecision\",\"subclass_of\":\"agentce:ConsequentialDecision\",\"consequential\":true},"
+            + "{\"id\":\"agentce:MinorDecision\",\"subclass_of\":\"agentce:Decision\",\"consequential\":false}]";
+
+    /** A domain whose one scope, review, authorises {@code rolesJson} (the key left out when null). */
+    private static DomainBinding rolesDomain(String rolesJson) {
+        String roles = rolesJson == null ? "" : ",\"authorised_principal_roles\":" + rolesJson;
+        return DomainBinding.fromDict(Json.parse("{" + DECISION_TYPES + ",\"task_scopes\":[{\"task_type\":\"review\","
+                + "\"allowed_effect_classes\":[\"read\"]" + roles + "}]}"));
+    }
+
+    private static DomainBinding rolesDomain() {
+        return rolesDomain("[\"credit_officer\"]");
+    }
+
+    /** The options of {@link #provenanceEvents}: JSON literals for refs.instruction, i1's source_class and
+     * principal (null leaves it out), i1's parent and origin events (none when null), the delegation's status
+     * (null: no refs.delegation; "unheld": a ref to no held event) and d1's decision type. */
+    private record ProvOpts(
+            String instruction, String sourceClass, String principal, JsonNode parent, JsonNode origin,
+            String delegation, String dtype) {
+        static final ProvOpts DEFAULT = new ProvOpts("\"agentce:event/i1\"", "\"user\"",
+                "{\"id\": \"user:alice\", \"role\": \"credit_officer\"}", null, null, "verified",
+                "agentce:CreditDecision");
+
+        ProvOpts instruction(String i) {
+            return new ProvOpts(i, sourceClass, principal, parent, origin, delegation, dtype);
+        }
+
+        ProvOpts sourceClass(String c) {
+            return new ProvOpts(instruction, c, principal, parent, origin, delegation, dtype);
+        }
+
+        ProvOpts principal(String p) {
+            return new ProvOpts(instruction, sourceClass, p, parent, origin, delegation, dtype);
+        }
+
+        ProvOpts parent(JsonNode p) {
+            return new ProvOpts(instruction, sourceClass, principal, p, origin, delegation, dtype);
+        }
+
+        ProvOpts origin(JsonNode o) {
+            return new ProvOpts(instruction, sourceClass, principal, parent, o, delegation, dtype);
+        }
+
+        ProvOpts delegation(String d) {
+            return new ProvOpts(instruction, sourceClass, principal, parent, origin, d, dtype);
+        }
+
+        ProvOpts dtype(String d) {
+            return new ProvOpts(instruction, sourceClass, principal, parent, origin, delegation, d);
+        }
+    }
+
+    /** A consequential decision d1 executed by tc1, both acting on i1 (CND-04, SPEC §7.7.4). */
+    private static List<JsonNode> provenanceEvents(ProvOpts o) {
+        List<JsonNode> events = new ArrayList<>();
+        events.add(event("d1", "Decision", "\"decision_type\": \"" + o.dtype() + "\", "
+                + "\"refs\": {\"instruction\": " + o.instruction() + "}"));
+        String principal = o.principal() == null ? "" : ", \"principal\": " + o.principal();
+        events.add(event("i1", "Instruction", "\"source_class\": " + o.sourceClass() + principal));
+        String refs = "\"decision\": \"agentce:event/d1\", \"instruction\": " + o.instruction();
+        if (o.delegation() != null) {
+            refs += ", \"delegation\": \"agentce:event/g1\"";
+            if (!"unheld".equals(o.delegation())) {
+                events.add(event("g1", "DelegationIssued",
+                        "\"verification\": {\"status\": \"" + o.delegation() + "\"}"));
+            }
+        }
+        events.add(event("tc1", "ToolCall", "\"tool\": {\"name\": \"book\"}, \"refs\": {" + refs + "}"));
+        ObjectNode data = (ObjectNode) events.get(1).get("data");
+        for (Map.Entry<String, JsonNode> e : java.util.Arrays.asList(
+                Map.entry("parent", o.parent() == null ? Json.nodes().nullNode() : o.parent()),
+                Map.entry("origin", o.origin() == null ? Json.nodes().nullNode() : o.origin()))) {
+            if (!e.getValue().isNull()) {
+                events.add(e.getValue());
+                if (!data.has("refs")) {
+                    data.set("refs", Json.nodes().objectNode());
+                }
+                ((ObjectNode) data.get("refs")).put(e.getKey(), "agentce:event/" + e.getValue().get("id").asText());
+            }
+        }
+        return events;
+    }
+
+    private static List<JsonNode> provenanceEvents() {
+        return provenanceEvents(ProvOpts.DEFAULT);
+    }
+
+    private static List<Object> provenance(List<JsonNode> events, String node, DomainBinding domain) {
+        GraphStore store = Graph.buildGraph(events, domain);
+        String iri = "agentce:event/" + node;
+        List<String> met = store.literalValues(iri, "agentce:provenanceMet");
+        List<String> judged = store.literalValues(iri, "agentce:provenanceJudged");
+        return java.util.Arrays.asList(
+                store.isA(iri, "agentce:ConsequentialAction"),
+                met.isEmpty() ? null : met.get(0),
+                judged.isEmpty() ? null : judged.get(0));
+    }
+
+    private static List<Object> provenance(List<JsonNode> events, String node) {
+        return provenance(events, node, rolesDomain());
+    }
+
+    private static List<Object> provenance(List<JsonNode> events) {
+        return provenance(events, "tc1");
+    }
+
+    private static List<Object> provenance(ProvOpts o) {
+        return provenance(provenanceEvents(o));
+    }
+
+    private static List<JsonNode> reversed(List<JsonNode> events) {
+        List<JsonNode> out = new ArrayList<>(events);
+        Collections.reverse(out);
+        return out;
+    }
+
+    @Test
+    void cnd04PopulationIsConsequentialActions() {
+        List<JsonNode> events = provenanceEvents();
+        assertEquals(OPEN, provenance(events));
+        assertEquals(OPEN, provenance(events, "d1"));
+        // a call executing a minor decision, and the minor decision, are outside CND-04
+        List<JsonNode> minor = provenanceEvents(ProvOpts.DEFAULT.dtype("agentce:MinorDecision"));
+        assertEquals(OUTSIDE, provenance(minor));
+        assertEquals(OUTSIDE, provenance(minor, "d1"));
+    }
+
+    @Test
+    void cnd04ChainMustEndAtAnAuthorisedPrincipal() {
+        for (String cls : List.of("user", "operator", "service", "agent_identified")) {
+            assertEquals(OPEN, provenance(ProvOpts.DEFAULT.sourceClass("\"" + cls + "\"")));
+        }
+        for (String bad : List.of("\"tool_output\"", "\"retrieved\"", "\"memory_untrusted\"", "\"memory_trusted\"",
+                "\"agent_unidentified\"", "null")) {
+            assertEquals(SHUT, provenance(ProvOpts.DEFAULT.sourceClass(bad)));
+        }
+        for (String principal : java.util.Arrays.asList(null, "{}", "{\"id\": \"\"}", "\"user:alice\"")) {
+            assertEquals(SHUT, provenance(ProvOpts.DEFAULT.principal(principal)));
+        }
+        // every instruction on the parent chain counts, not only the acted-on one
+        JsonNode badParent = event("i0", "Instruction", "\"source_class\": \"tool_output\"");
+        assertEquals(SHUT, provenance(ProvOpts.DEFAULT.parent(badParent)));
+        // the role is read at the chain's end, the parent here
+        String goodData = "\"source_class\": \"operator\", \"principal\": {\"id\": \"op:1\", \"role\": \"credit_officer\"}";
+        assertEquals(OPEN, provenance(ProvOpts.DEFAULT.parent(event("i0", "Instruction", goodData))));
+        // three hops: a user parent whose own parent is tool_output still fails
+        JsonNode root = event("i9", "Instruction", "\"source_class\": \"tool_output\"");
+        JsonNode middle = event("i0", "Instruction", goodData + ", \"refs\": {\"parent\": \"agentce:event/i9\"}");
+        List<JsonNode> deep = new ArrayList<>(provenanceEvents(ProvOpts.DEFAULT.parent(middle)));
+        deep.add(root);
+        assertEquals(SHUT, provenance(deep));
+        // arrival order does not change the reading
+        assertEquals(SHUT, provenance(reversed(deep)));
+        assertEquals(OPEN, provenance(reversed(provenanceEvents(
+                ProvOpts.DEFAULT.parent(event("i0", "Instruction", goodData))))));
+        // a parent cycle never ends at a principal: unjudged
+        List<JsonNode> cycle = provenanceEvents(ProvOpts.DEFAULT.parent(event("i0", "Instruction", goodData)));
+        ((ObjectNode) cycle.get(cycle.size() - 1).get("data"))
+                .set("refs", Json.parse("{\"parent\": \"agentce:event/i1\"}"));
+        assertEquals(UNJUDGED, provenance(cycle));
+        assertEquals(SHUT, provenance(ProvOpts.DEFAULT.principal("{\"id\": \"  \", \"role\": \"credit_officer\"}")));
+    }
+
+    @Test
+    void cnd04PrincipalRoleMustBeAuthorisedForTheTaskType() {
+        List<JsonNode> events = provenanceEvents();
+        assertEquals(SHUT, provenance(events, "tc1", rolesDomain("[\"claims_supervisor\"]")));
+        // no roles declared, no role on the principal, or no scope for the task: the records cannot show it
+        assertEquals(UNJUDGED, provenance(events, "tc1", rolesDomain(null)));
+        assertEquals(UNJUDGED, provenance(ProvOpts.DEFAULT.principal("{\"id\": \"user:alice\"}")));
+        assertEquals(UNJUDGED, provenance(events, "tc1", DomainBinding.fromDict(GATED_DOMAIN)));
+        // an empty list authorises no role
+        assertEquals(SHUT, provenance(events, "tc1", rolesDomain("[]")));
+        // the Decision takes the task of the call executing it
+        List<JsonNode> tasked = provenanceEvents();
+        ((ObjectNode) tasked.get(tasked.size() - 1)).put("agentcetask", "review");
+        assertEquals(SHUT, provenance(tasked, "d1", rolesDomain("[\"claims_supervisor\"]")));
+    }
+
+    @Test
+    void cnd04AnInstructionThatIsNotHeldFails() {
+        for (String ref : List.of("null", "\"agentce:event/i-missing\"", "\"i1\"", "\"agentce:event/g1\"")) {
+            assertEquals(SHUT, provenance(ProvOpts.DEFAULT.instruction(ref)));
+        }
+    }
+
+    @Test
+    void cnd04OriginFromAToolCallOrUntrustedReadFails() {
+        assertEquals(SHUT, provenance(ProvOpts.DEFAULT.origin(event("o1", "ToolCall", "\"tool\": {\"name\": \"fetch\"}"))));
+        assertEquals(SHUT, provenance(ProvOpts.DEFAULT.origin(event("o1", "MemoryRead", "\"trust_min\": \"untrusted\""))));
+        assertEquals(OPEN, provenance(ProvOpts.DEFAULT.origin(event("o1", "MemoryRead", "\"trust_min\": \"trusted\""))));
+        for (String trust : java.util.Arrays.asList(null, "\"\"", "\"unknown\"", "\"Untrusted\"", "[\"untrusted\"]")) {
+            JsonNode unread = event("o1", "MemoryRead", trust == null ? "" : "\"trust_min\": " + trust);
+            assertEquals(UNJUDGED, provenance(ProvOpts.DEFAULT.origin(unread)));
+        }
+        assertEquals(SHUT, provenance(ProvOpts.DEFAULT.origin(event("o1", "ResourceAccess", ""))));
+        // an origin of a type §6.2.3 does not allow there cannot be judged
+        assertEquals(UNJUDGED, provenance(ProvOpts.DEFAULT.origin(event("o1", "SessionStart", ""))));
+    }
+
+    /** {@code events} with i1 recorded by the agent (self_report) and the enforcement-point witnesses appended. */
+    private static List<JsonNode> selfReported(List<JsonNode> events, JsonNode... witnesses) {
+        ((ObjectNode) events.get(1)).put("agentcesourceclass", "self_report");
+        List<JsonNode> out = new ArrayList<>(events);
+        out.addAll(List.of(witnesses));
+        return out;
+    }
+
+    private static JsonNode pdAllow(String principal, String request) {
+        return event("pd1", "PolicyDecision", "\"decision\": \"allow\", \"principal\": " + principal
+                + ", \"refs\": {\"request\": \"" + request + "\"}");
+    }
+
+    private static JsonNode pdAllow(String principal) {
+        return pdAllow(principal, "agentce:event/tc1");
+    }
+
+    @Test
+    void cnd04ASelfReportedRoleMustMatchTheEnforcementPointRecord() {
+        String alice = "{\"id\": \"user:alice\", \"role\": \"credit_officer\"}";
+        for (String node : List.of("tc1", "d1")) {
+            // the policy decision allowing the call records the same role: read as recorded
+            assertEquals(OPEN, provenance(selfReported(provenanceEvents(), pdAllow(alice)), node));
+            // another role for the same principal: the agent's word is contradicted
+            String other = "{\"id\": \"user:alice\", \"role\": \"loan_manager\"}";
+            assertEquals(SHUT, provenance(selfReported(provenanceEvents(), pdAllow(other)), node));
+            // no role on the witness: the records cannot show the role
+            assertEquals(UNJUDGED,
+                    provenance(selfReported(provenanceEvents(), pdAllow("{\"id\": \"user:alice\"}")), node));
+        }
+        // an enforcement-point twin of the instruction (same content_ref, task and class) recording another role
+        String same = "\"content_ref\": \"sha256:aa\", \"refs\": {\"task\": \"task-1\"}";
+        JsonNode twin = event("i1-ep", "Instruction", "\"source_class\": \"user\", "
+                + "\"principal\": {\"id\": \"user:alice\", \"role\": \"loan_manager\"}, " + same);
+        List<JsonNode> events = provenanceEvents();
+        ((ObjectNode) events.get(1).get("data")).setAll((ObjectNode) Json.parse("{" + same + "}"));
+        assertEquals(SHUT, provenance(selfReported(events, twin)));
+        // an instruction with no content_ref has no twin
+        assertEquals(OPEN, provenance(selfReported(provenanceEvents(), twin)));
+        // a witness for another principal, or allowing another request, is no witness of this role
+        String mallory = "{\"id\": \"user:mallory\", \"role\": \"loan_manager\"}";
+        assertEquals(OPEN, provenance(selfReported(provenanceEvents(), pdAllow(mallory))));
+        assertEquals(OPEN, provenance(selfReported(
+                provenanceEvents(), pdAllow("{\"id\": \"user:alice\"}", "agentce:event/tc9"))));
+        // an enforcement-point instruction is read as recorded, whatever a policy decision says
+        List<JsonNode> recorded = new ArrayList<>(provenanceEvents());
+        recorded.add(pdAllow("{\"id\": \"user:alice\"}"));
+        assertEquals(OPEN, provenance(recorded));
+    }
+
+    @Test
+    void cnd04ADefiniteFailureBeatsAnUnjudgedRole() {
+        List<JsonNode> events = provenanceEvents(ProvOpts.DEFAULT.delegation("unverified"));
+        assertEquals(SHUT, provenance(events, "tc1", rolesDomain(null)));
+        assertEquals(SHUT, provenance(events, "tc1", DomainBinding.fromDict(GATED_DOMAIN)));
+    }
+
+    @Test
+    void cnd04ReadsAuthorisedPrincipalRolesStrictly() {
+        List<JsonNode> events = provenanceEvents();
+        // padding is trimmed on both sides; the comparison is case-sensitive
+        assertEquals(OPEN, provenance(events, "tc1", rolesDomain("[\" credit_officer \"]")));
+        assertEquals(OPEN, provenance(ProvOpts.DEFAULT.principal("{\"id\": \"user:alice\", \"role\": \" credit_officer\"}")));
+        assertEquals(SHUT, provenance(events, "tc1", rolesDomain("[\"Credit_Officer\"]")));
+        // a bare string, null or a list with a non-string member is unreadable, never a shorter list
+        for (String roles : List.of("\"credit_officer\"", "null", "[\"credit_officer\", 7]", "[\"loan_manager\", null]")) {
+            DomainBinding domain = DomainBinding.fromDict(Json.parse("{\"decision_types\":[{\"id\":\"agentce:CreditDecision\","
+                    + "\"subclass_of\":\"agentce:ConsequentialDecision\",\"consequential\":true}],"
+                    + "\"task_scopes\":[{\"task_type\":\"review\",\"allowed_effect_classes\":[\"read\"],"
+                    + "\"authorised_principal_roles\":" + roles + "}]}"));
+            assertEquals(UNJUDGED, provenance(events, "tc1", domain), roles);
+        }
+    }
+
+    @Test
+    void cnd04ReadsTheDelegationChain() {
+        assertEquals(SHUT, provenance(ProvOpts.DEFAULT.delegation("unverified")));
+        assertEquals(SHUT, provenance(provenanceEvents(ProvOpts.DEFAULT.delegation("unverified")), "d1"));
+        // no delegation, or one the bundle does not hold: the records cannot judge it (fail closed)
+        assertEquals(UNJUDGED, provenance(ProvOpts.DEFAULT.delegation(null)));
+        assertEquals(UNJUDGED, provenance(ProvOpts.DEFAULT.delegation("unheld")));
     }
 }

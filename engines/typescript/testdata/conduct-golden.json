@@ -76,15 +76,21 @@
       "control": "CND-04",
       "outcome": "non-conformant",
       "population": {
-        "applicable": 1,
-        "failed": 1
+        "applicable": 2,
+        "failed": 2
       },
       "violations": [
         {
-          "constraint": "sh:minCount",
+          "constraint": "sh:hasValue",
+          "focus": "agentce:event/d1",
+          "message_key": "CND-04.S1",
+          "path": "agentce:provenanceMet"
+        },
+        {
+          "constraint": "sh:hasValue",
           "focus": "agentce:event/tc1",
           "message_key": "CND-04.S1",
-          "path": "agentce:actsOn"
+          "path": "agentce:provenanceMet"
         }
       ]
     },
@@ -101,7 +107,7 @@
       "control": "CND-04",
       "outcome": "conformant",
       "population": {
-        "applicable": 1,
+        "applicable": 2,
         "failed": 0
       },
       "violations": []

@@ -52,12 +52,15 @@ public final class DomainBinding {
      * @param allowedEffectClasses the effect classes it allows; none when the scope lists none
      * @param requiresApproval the effect classes that need a human's approval (CND-02's marker)
      * @param budgets the declared budgets, in {@link #BUDGET_DIMENSIONS} order
+     * @param authorisedPrincipalRoles the principal roles CND-04 accepts at the end of an instruction chain; null
+     *     when the scope declares none or declares them unreadably
      */
     public record TaskScope(
             Set<String> allowedTools,
             Set<String> allowedEffectClasses,
             Set<String> requiresApproval,
-            List<Budget> budgets) {
+            List<Budget> budgets,
+            Set<String> authorisedPrincipalRoles) {
 
         public boolean allows(String tool, String effectClass) {
             if (allowedTools != null && (tool == null || !allowedTools.contains(tool))) {
@@ -116,7 +119,8 @@ public final class DomainBinding {
                                 tools == null || tools.isNull() ? null : strings(tools),
                                 strings(entry.get("allowed_effect_classes")),
                                 strings(entry.get("requires_approval")),
-                                budgets(entry.get("budgets"))));
+                                budgets(entry.get("budgets")),
+                                roles(entry.get("authorised_principal_roles"))));
             }
         }
         return binding;
@@ -206,6 +210,22 @@ public final class DomainBinding {
                     out.add(member.asText());
                 }
             }
+        }
+        return out;
+    }
+
+    /** A scope's authorised_principal_roles, trimmed; null when absent or unreadable (not a list of strings), so a
+     * bare string, null or a non-string element never reads as a shorter list (CND-04, inbox row 358). */
+    private static Set<String> roles(JsonNode value) {
+        if (value == null || !value.isArray()) {
+            return null;
+        }
+        Set<String> out = new HashSet<>();
+        for (JsonNode member : value) {
+            if (!member.isTextual()) {
+                return null;
+            }
+            out.add(Conformance.pyStrip(member.textValue()));
         }
         return out;
     }

@@ -39,11 +39,10 @@ const IS = "independent_system";
 const ALICE = { id: "user:alice", kind: "human" };
 const MALLORY = { id: "user:mallory", kind: "human" };
 const CONTENT = `sha256:${"a".repeat(64)}`;
-const DOMAIN = DomainBinding.fromDict({
-  decision_types: [
-    { id: "dom:CreditDecision", subclass_of: "agentce:ConsequentialDecision", consequential: true },
-  ],
-});
+const DOMAIN_TYPES = [
+  { id: "dom:CreditDecision", subclass_of: "agentce:ConsequentialDecision", consequential: true },
+];
+const DOMAIN = DomainBinding.fromDict({ decision_types: DOMAIN_TYPES });
 
 function event(
   eid: string,
@@ -433,14 +432,14 @@ function conduct(): Catalog {
   return loadCatalog(join(CATALOGS, "overlays", "conduct"));
 }
 
-function assess(events: Event[], control = "CND-05"): Assertion {
+function assess(events: Event[], control = "CND-05", domain: DomainBinding = DOMAIN): Assertion {
   const profile = profileFromDict({
     subjects: [
       { id: SUBJECT, role: "both" },
       { id: OTHER, role: "both" },
     ],
   });
-  const assertions = assessSubjects(events, profile, [conduct()], DOMAIN, true, []);
+  const assertions = assessSubjects(events, profile, [conduct()], domain, true, []);
   const found = assertions.find((a) => a.control === control && a.subject === SUBJECT);
   assert.ok(found);
   return found;
@@ -499,25 +498,50 @@ test("a decision acting on nothing is not held to a class", () => {
   assert.equal(assess([instruction(), c, decision]).outcome, "conformant");
 });
 
-test("CND-04 reads the delegation it rests on", () => {
-  const decision = event("d1", "Decision", SR, { decision_type: "dom:CreditDecision" });
-  const delegation = event("dl1", "DelegationIssued", SR, {
-    token_ref: "jti-1",
-    issuer: "https://idp.example",
-    chain: [
-      { id: "user:alice", kind: "human" },
-      { id: SUBJECT, kind: "agent" },
-    ],
-    verification: { status: "verified", method: "rfc8693" },
+test("cnd04 reads the delegation it rests on", () => {
+  // CND-04 reads the chain's last principal's role against the task type's scope (SPEC §7.7.4, inbox 355).
+  const roles = DomainBinding.fromDict({
+    decision_types: DOMAIN_TYPES,
+    task_scopes: [{ task_type: "review", authorised_principal_roles: ["credit_officer"] }],
   });
+  const officer = { ...ALICE, role: "credit_officer" };
+  const decision = event("d1", "Decision", SR, {
+    decision_type: "dom:CreditDecision",
+    refs: { instruction: eventIri("i1") },
+  });
+  const delegation = (cls: string, status = "verified"): Event =>
+    event("dl1", "DelegationIssued", cls, {
+      token_ref: "jti-1",
+      issuer: "https://idp.example",
+      chain: [
+        { id: "user:alice", kind: "human" },
+        { id: SUBJECT, kind: "agent" },
+      ],
+      verification: { status, method: "rfc8693" },
+    });
   let c = call(EP, { decision: eventIri("d1") });
-  assert.equal(assess([instruction(), c, decision], "CND-04").outcome, "conformant");
+  // No delegation the action rests on: the records cannot show the chain verified (ruling 14 B).
+  assert.equal(
+    assess([instruction({ principal: officer }), c, decision], "CND-04", roles).outcome,
+    "insufficient_evidence",
+  );
   c = call(EP, { decision: eventIri("d1"), delegation: eventIri("dl1") });
-  // A delegation the records do not hold counts as self_report.
-  assert.equal(assess([instruction(), c, decision], "CND-04").outcome, "insufficient_evidence");
-  const downgraded = assess([instruction(), c, decision, delegation], "CND-04");
+  // A delegation the records do not hold.
+  assert.equal(
+    assess([instruction({ principal: officer }), c, decision], "CND-04", roles).outcome,
+    "insufficient_evidence",
+  );
+  const downgraded = assess(
+    [instruction({ principal: officer }), c, decision, delegation(SR)],
+    "CND-04",
+    roles,
+  );
   assert.equal(downgraded.outcome, "insufficient_evidence");
   assert.deepEqual(downgraded.classGap, ["DelegationIssued"]);
+  const events = [instruction({ principal: officer }), c, decision, delegation(EP)];
+  assert.equal(assess(events, "CND-04", roles).outcome, "conformant");
+  const failed = assess([...events.slice(0, 3), delegation(EP, "failed")], "CND-04", roles);
+  assert.equal(failed.outcome, "non-conformant");
 });
 
 test("a blind spot names the record below the minimum", () => {

@@ -8,3 +8,10 @@ decision_types:
     subclass_of: "agentce:ConsequentialDecision"
     consequential: true
     required_oversight_modality: "dual_control"
+# The one task type: every action is of it, so CND-04 (VG-HELD-DECISION-EVERYWHERE) reads credit_officer as the role
+# authorised to instruct one (SPEC §7.7.6 authorised_principal_roles). No fixture record names a task, so no other
+# control reads this scope.
+task_scopes:
+  - task_type: "credit-review"
+    allowed_effect_classes: ["read"]
+    authorised_principal_roles: ["credit_officer"]

@@ -4,3 +4,9 @@ decision_types:
   - id: "dom:CreditDecision"
     subclass_of: "agentce:ConsequentialDecision"
     consequential: true
+# The one task type: every action is of it, and credit_officer is the role authorised to instruct one, which CND-04
+# reads from the chain's last principal (SPEC §7.7.4, §7.7.6 authorised_principal_roles).
+task_scopes:
+  - task_type: "task-1"
+    allowed_effect_classes: ["read"]
+    authorised_principal_roles: ["credit_officer"]

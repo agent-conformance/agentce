@@ -378,6 +378,29 @@ test("CND-05: a decision acting on a derived untrusted instruction is flagged", 
   assert.deepEqual(acts([...events, decision], "d1"), ["true"]);
 });
 
+/** CND-05's evidence flag on `acting`: whether the records show which instruction it acted on. */
+function judged(events: Record<string, unknown>[], acting = "tc1"): string[] {
+  const store = buildGraph(events, { domain: MINOR_DOMAIN });
+  return store.literalValues(`agentce:event/${acting}`, "agentce:actsOnJudged");
+}
+
+test("cnd05: a tool call naming no instruction is not judged", () => {
+  const absent = memoryEvent("tc1", "ToolCall", { refs: {} });
+  const nulled = memoryEvent("tc1", "ToolCall", { refs: { instruction: null } });
+  for (const call of [absent, nulled]) {
+    assert.deepEqual(judged([instructionEvent("i1", "user"), call]), ["false"]);
+    assert.deepEqual(acts([instructionEvent("i1", "user"), call]), ["false"]);
+  }
+});
+
+test("cnd05: a tool call on a held trusted instruction is judged", () => {
+  assert.deepEqual(judged([instructionEvent("i1", "user"), callEvent()]), ["true"]);
+});
+
+test("cnd05: a decision naming no instruction is judged", () => {
+  assert.deepEqual(judged([decisionEvent("d1")], "d1"), ["true"]);
+});
+
 test("CND-05: a parent or origin the bundle does not hold fails closed", () => {
   for (const key of ["parent", "origin"]) {
     assert.deepEqual(
@@ -1321,4 +1344,279 @@ test("task budget scope: a task held to no scope is untold, an untasked call set
     buildGraph([untasked], { domain: scoped }).isA("agentce:event/m0", "agentce:TaskModelCall"),
     false,
   );
+});
+
+// --- CND-04: consequential actions, their instruction chain, role and delegation (SPEC §7.7.4; 18.122) ------
+
+type Ev = Record<string, unknown> & { data: Record<string, unknown> };
+
+function rolesDomain(roles: unknown[] | null = ["credit_officer"]): DomainBinding {
+  const scope: Record<string, unknown> = { task_type: "review", allowed_effect_classes: ["read"] };
+  if (roles !== null) {
+    scope.authorised_principal_roles = [...roles];
+  }
+  return DomainBinding.fromDict({
+    decision_types: [
+      {
+        id: "agentce:CreditDecision",
+        subclass_of: "agentce:ConsequentialDecision",
+        consequential: true,
+      },
+      { id: "agentce:MinorDecision", subclass_of: "agentce:Decision", consequential: false },
+    ],
+    task_scopes: [scope],
+  });
+}
+
+interface ProvenanceOpts {
+  instruction?: unknown;
+  sourceClass?: unknown;
+  principal?: unknown;
+  parent?: Ev;
+  origin?: Ev;
+  delegation?: string | null;
+  dtype?: string;
+}
+
+/** A consequential decision d1 executed by tc1, both acting on i1 (CND-04, SPEC §7.7.4). */
+function provenanceEvents(opts: ProvenanceOpts = {}): Ev[] {
+  const instruction = "instruction" in opts ? opts.instruction : "agentce:event/i1";
+  const principal =
+    "principal" in opts ? opts.principal : { id: "user:alice", role: "credit_officer" };
+  const delegation = opts.delegation === undefined ? "verified" : opts.delegation;
+  const data: Record<string, unknown> = {
+    source_class: "sourceClass" in opts ? opts.sourceClass : "user",
+  };
+  if (principal !== null) {
+    data.principal = principal;
+  }
+  const events: Ev[] = [
+    memoryEvent("d1", "Decision", {
+      decision_type: opts.dtype ?? "agentce:CreditDecision",
+      refs: { instruction },
+    }),
+    memoryEvent("i1", "Instruction", data),
+  ];
+  const refs: Record<string, unknown> = { decision: "agentce:event/d1", instruction };
+  if (delegation !== null) {
+    refs.delegation = "agentce:event/g1";
+    if (delegation !== "unheld") {
+      events.push(memoryEvent("g1", "DelegationIssued", { verification: { status: delegation } }));
+    }
+  }
+  events.push(memoryEvent("tc1", "ToolCall", { tool: { name: "book" }, refs }));
+  for (const [key, event] of [
+    ["parent", opts.parent],
+    ["origin", opts.origin],
+  ] as const) {
+    if (event !== undefined) {
+      events.push(event);
+      const i1 = (events[1] as Ev).data;
+      i1.refs = {
+        ...((i1.refs as Record<string, unknown>) ?? {}),
+        [key]: `agentce:event/${event.id}`,
+      };
+    }
+  }
+  return events;
+}
+
+function provenance(
+  events: Ev[],
+  node = "tc1",
+  domain: DomainBinding = rolesDomain(),
+): [boolean, unknown, unknown] {
+  const store = buildGraph(events, { domain });
+  const iri = `agentce:event/${node}`;
+  return [
+    store.isA(iri, "agentce:ConsequentialAction"),
+    store.literalValues(iri, "agentce:provenanceMet")[0] ?? null,
+    store.literalValues(iri, "agentce:provenanceJudged")[0] ?? null,
+  ];
+}
+
+const FAILS = [true, "false", "true"];
+const MEETS = [true, "true", "true"];
+const UNJUDGED = [true, "true", "false"];
+
+test("cnd04: the population is consequential actions", () => {
+  const events = provenanceEvents();
+  assert.deepEqual(provenance(events), MEETS);
+  assert.deepEqual(provenance(events, "d1"), MEETS);
+  // a call executing a minor decision, and the minor decision, are outside CND-04
+  const minor = provenanceEvents({ dtype: "agentce:MinorDecision" });
+  assert.deepEqual(provenance(minor), OUTSIDE);
+  assert.deepEqual(provenance(minor, "d1"), OUTSIDE);
+});
+
+test("cnd04: the chain must end at an authorised principal", () => {
+  for (const cls of ["user", "operator", "service", "agent_identified"]) {
+    assert.deepEqual(provenance(provenanceEvents({ sourceClass: cls })), MEETS);
+  }
+  const badClasses = [
+    "tool_output",
+    "retrieved",
+    "memory_untrusted",
+    "memory_trusted",
+    "agent_unidentified",
+    null,
+  ];
+  for (const bad of badClasses) {
+    assert.deepEqual(provenance(provenanceEvents({ sourceClass: bad })), FAILS);
+  }
+  for (const principal of [null, {}, { id: "" }, "user:alice"]) {
+    assert.deepEqual(provenance(provenanceEvents({ principal })), FAILS);
+  }
+  // every instruction on the parent chain counts, not only the acted-on one
+  const badParent = memoryEvent("i0", "Instruction", { source_class: "tool_output" });
+  assert.deepEqual(provenance(provenanceEvents({ parent: badParent })), FAILS);
+  // the role is read at the chain's end, the parent here
+  const goodData = { source_class: "operator", principal: { id: "op:1", role: "credit_officer" } };
+  const goodParent = memoryEvent("i0", "Instruction", goodData);
+  assert.deepEqual(provenance(provenanceEvents({ parent: goodParent })), MEETS);
+  // three hops: a user parent whose own parent is tool_output still fails
+  const root = memoryEvent("i9", "Instruction", { source_class: "tool_output" });
+  const middle = memoryEvent("i0", "Instruction", {
+    ...goodData,
+    refs: { parent: "agentce:event/i9" },
+  });
+  const deep = [...provenanceEvents({ parent: middle }), root];
+  assert.deepEqual(provenance(deep), FAILS);
+  // arrival order does not change the reading
+  assert.deepEqual(provenance([...deep].reverse()), FAILS);
+  assert.deepEqual(provenance(provenanceEvents({ parent: goodParent }).reverse()), MEETS);
+  // a parent cycle never ends at a principal: unjudged
+  const cycle = provenanceEvents({ parent: memoryEvent("i0", "Instruction", { ...goodData }) });
+  (cycle[cycle.length - 1] as Ev).data.refs = { parent: "agentce:event/i1" };
+  assert.deepEqual(provenance(cycle), UNJUDGED);
+  assert.deepEqual(
+    provenance(provenanceEvents({ principal: { id: "  ", role: "credit_officer" } })),
+    FAILS,
+  );
+});
+
+test("cnd04: the principal's role must be authorised for the task type", () => {
+  const events = provenanceEvents();
+  assert.deepEqual(provenance(events, "tc1", rolesDomain(["claims_supervisor"])), FAILS);
+  // no roles declared, no role on the principal, or no scope for the task: the records cannot show it
+  assert.deepEqual(provenance(events, "tc1", rolesDomain(null)), UNJUDGED);
+  assert.deepEqual(provenance(provenanceEvents({ principal: { id: "user:alice" } })), UNJUDGED);
+  assert.deepEqual(provenance(events, "tc1", GATED_DOMAIN), UNJUDGED);
+  // an empty list authorises no role
+  assert.deepEqual(provenance(events, "tc1", rolesDomain([])), FAILS);
+  // the Decision takes the task of the call executing it
+  const tasked = provenanceEvents();
+  (tasked[tasked.length - 1] as Ev).agentcetask = "review";
+  assert.deepEqual(provenance(tasked, "d1", rolesDomain(["claims_supervisor"])), FAILS);
+});
+
+test("cnd04: an instruction that is not held fails", () => {
+  for (const ref of [null, "agentce:event/i-missing", "i1", "agentce:event/g1"]) {
+    assert.deepEqual(provenance(provenanceEvents({ instruction: ref })), FAILS);
+  }
+});
+
+test("cnd04: an origin from a tool call or an untrusted read fails", () => {
+  const call = memoryEvent("o1", "ToolCall", { tool: { name: "fetch" } });
+  assert.deepEqual(provenance(provenanceEvents({ origin: call })), FAILS);
+  const read = memoryEvent("o1", "MemoryRead", { trust_min: "untrusted" });
+  assert.deepEqual(provenance(provenanceEvents({ origin: read })), FAILS);
+  const trusted = memoryEvent("o1", "MemoryRead", { trust_min: "trusted" });
+  assert.deepEqual(provenance(provenanceEvents({ origin: trusted })), MEETS);
+  for (const trust of [null, "", "unknown", "Untrusted", ["untrusted"]]) {
+    const unread = memoryEvent("o1", "MemoryRead", trust === null ? {} : { trust_min: trust });
+    assert.deepEqual(provenance(provenanceEvents({ origin: unread })), UNJUDGED);
+  }
+  const access = memoryEvent("o1", "ResourceAccess", {});
+  assert.deepEqual(provenance(provenanceEvents({ origin: access })), FAILS);
+  // an origin of a type §6.2.3 does not allow there cannot be judged
+  const other = memoryEvent("o1", "SessionStart", {});
+  assert.deepEqual(provenance(provenanceEvents({ origin: other })), UNJUDGED);
+});
+
+/** `events` with i1 recorded by the agent (self_report) and the enforcement-point witnesses appended. */
+function selfReported(events: Ev[], ...witnesses: Ev[]): Ev[] {
+  (events[1] as Ev).agentcesourceclass = "self_report";
+  return [...events, ...witnesses];
+}
+
+function pdAllow(principal: unknown, request = "agentce:event/tc1"): Ev {
+  return memoryEvent("pd1", "PolicyDecision", { decision: "allow", principal, refs: { request } });
+}
+
+test("cnd04: a self-reported role must match the enforcement-point record", () => {
+  const alice = { id: "user:alice", role: "credit_officer" };
+  for (const node of ["tc1", "d1"]) {
+    // the policy decision allowing the call records the same role: read as recorded
+    let events = selfReported(provenanceEvents(), pdAllow(alice));
+    assert.deepEqual(provenance(events, node), MEETS);
+    // another role for the same principal: the agent's word is contradicted
+    events = selfReported(provenanceEvents(), pdAllow({ id: "user:alice", role: "loan_manager" }));
+    assert.deepEqual(provenance(events, node), FAILS);
+    // no role on the witness: the records cannot show the role
+    events = selfReported(provenanceEvents(), pdAllow({ id: "user:alice" }));
+    assert.deepEqual(provenance(events, node), UNJUDGED);
+  }
+  // an enforcement-point twin of the instruction (same content_ref, task and class) recording another role
+  const same = { content_ref: "sha256:aa", refs: { task: "task-1" } };
+  const twin = memoryEvent("i1-ep", "Instruction", {
+    source_class: "user",
+    principal: { id: "user:alice", role: "loan_manager" },
+    ...same,
+  });
+  const events = provenanceEvents();
+  Object.assign((events[1] as Ev).data, same);
+  assert.deepEqual(provenance(selfReported(events, twin)), FAILS);
+  // an instruction with no content_ref has no twin
+  assert.deepEqual(provenance(selfReported(provenanceEvents(), twin)), MEETS);
+  // a witness for another principal, or allowing another request, is no witness of this role
+  const mallory = { id: "user:mallory", role: "loan_manager" };
+  assert.deepEqual(provenance(selfReported(provenanceEvents(), pdAllow(mallory))), MEETS);
+  const elsewhere = pdAllow({ id: "user:alice" }, "agentce:event/tc9");
+  assert.deepEqual(provenance(selfReported(provenanceEvents(), elsewhere)), MEETS);
+  // an enforcement-point instruction is read as recorded, whatever a policy decision says
+  assert.deepEqual(provenance([...provenanceEvents(), pdAllow({ id: "user:alice" })]), MEETS);
+});
+
+test("cnd04: a definite failure beats an unjudged role", () => {
+  const events = provenanceEvents({ delegation: "unverified" });
+  assert.deepEqual(provenance(events, "tc1", rolesDomain(null)), FAILS);
+  assert.deepEqual(provenance(events, "tc1", GATED_DOMAIN), FAILS);
+});
+
+test("cnd04: reads authorised_principal_roles strictly", () => {
+  const events = provenanceEvents();
+  // padding is trimmed on both sides; the comparison is case-sensitive
+  assert.deepEqual(provenance(events, "tc1", rolesDomain([" credit_officer "])), MEETS);
+  const padded = provenanceEvents({ principal: { id: "user:alice", role: " credit_officer" } });
+  assert.deepEqual(provenance(padded), MEETS);
+  assert.deepEqual(provenance(events, "tc1", rolesDomain(["Credit_Officer"])), FAILS);
+  // a bare string, null or a list with a non-string member is unreadable, never a shorter list
+  for (const roles of ["credit_officer", null, ["credit_officer", 7], ["loan_manager", null]]) {
+    const domain = DomainBinding.fromDict({
+      decision_types: [
+        {
+          id: "agentce:CreditDecision",
+          subclass_of: "agentce:ConsequentialDecision",
+          consequential: true,
+        },
+      ],
+      task_scopes: [
+        {
+          task_type: "review",
+          allowed_effect_classes: ["read"],
+          authorised_principal_roles: roles,
+        },
+      ],
+    });
+    assert.deepEqual(provenance(events, "tc1", domain), UNJUDGED, String(roles));
+  }
+});
+
+test("cnd04: reads the delegation chain", () => {
+  assert.deepEqual(provenance(provenanceEvents({ delegation: "unverified" })), FAILS);
+  assert.deepEqual(provenance(provenanceEvents({ delegation: "unverified" }), "d1"), FAILS);
+  // no delegation, or one the bundle does not hold: the records cannot judge it (fail closed)
+  assert.deepEqual(provenance(provenanceEvents({ delegation: null })), UNJUDGED);
+  assert.deepEqual(provenance(provenanceEvents({ delegation: "unheld" })), UNJUDGED);
 });

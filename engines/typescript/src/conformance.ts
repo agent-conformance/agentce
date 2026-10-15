@@ -32,7 +32,7 @@ import { type Catalog, loadCatalog } from "./catalog";
 import { computeCoverage } from "./coverage";
 import { DomainBinding } from "./domain";
 import { InputError } from "./errors";
-import { isPySpace } from "./failOn";
+import { pyStrip } from "./failOn";
 import { ingest } from "./ingest";
 import { verifyBundle } from "./integrity";
 import { NonCanonicalNumber, parseJson } from "./json";
@@ -183,20 +183,6 @@ const runProcess: AdapterRunner = (command, args, cwd) => {
   // strict, as Python's subprocess.run(text=True): bytes that are not UTF-8 raise, never U+FFFD
   return { stdout: decodeUtf8Strict(proc.stdout), stderr: decodeUtf8Strict(proc.stderr) };
 };
-
-/** Python's `str.strip()` (JavaScript's `trim` differs on a few code points). */
-function pyStrip(text: string): string {
-  const chars = [...text];
-  let start = 0;
-  let end = chars.length;
-  while (start < end && isPySpace(chars[start]?.codePointAt(0) as number)) {
-    start++;
-  }
-  while (end > start && isPySpace(chars[end - 1]?.codePointAt(0) as number)) {
-    end--;
-  }
-  return chars.slice(start, end).join("");
-}
 
 /** Run adapter conformance in the adapters directory's own environments (SPEC 11.5, 12.3), as
  * Python's `_adapter_conformance` does: each adapter is a separate environment, so the adapters' own

@@ -1,0 +1,6 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
+
+agentce:CND-04-EvidenceShape a sh:NodeShape ;
+  sh:targetClass agentce:ConsequentialAction ;
+  sh:property [ sh:path agentce:provenanceJudged ; sh:hasValue true ; sh:name "E1" ] .

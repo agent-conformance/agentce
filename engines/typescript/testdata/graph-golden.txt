@@ -6,6 +6,7 @@ C	agentce:Agent	prov:SoftwareAgent
 C	agentce:ApprovalDecided	agentce:ApprovalDecided
 C	agentce:BudgetUnjudged	agentce:BudgetUnjudged
 C	agentce:ComponentRecord	agentce:ComponentRecord
+C	agentce:ConsequentialAction	agentce:ConsequentialAction
 C	agentce:ConsequentialDecision	agentce:Activity
 C	agentce:ConsequentialDecision	agentce:ConsequentialDecision
 C	agentce:ConsequentialDecision	agentce:Decision
@@ -82,11 +83,13 @@ E	agentce:event/dec-1	agentce:sourceClass	agentce:self_report
 E	agentce:event/dec-1	prov:used	ci:app
 E	agentce:event/dec-1	prov:used	ci:score
 E	agentce:event/dec-1	prov:wasAssociatedWith	spiffe://corp/agent-a
+E	agentce:event/dec-1	rdf:type	agentce:ConsequentialAction
 E	agentce:event/dec-1	rdf:type	agentce:Decision
 E	agentce:event/dec-1	rdf:type	credit:LoanApproval
 E	agentce:event/dec-2	agentce:chainTerminus	agentce:principal/4f9618842a3b141eae7bfb7cd81ee43b2ba78b2eef1a7c1d0c13c7ea559ab534
 E	agentce:event/dec-2	agentce:precededBy	agentce:event/dec-1
 E	agentce:event/dec-2	prov:wasAssociatedWith	spiffe://corp/agent-a
+E	agentce:event/dec-2	rdf:type	agentce:ConsequentialAction
 E	agentce:event/dec-2	rdf:type	agentce:Decision
 E	agentce:event/dec-2	rdf:type	agentce:GatedAction
 E	agentce:event/dec-2	rdf:type	credit:LoanApproval
@@ -101,6 +104,7 @@ E	agentce:event/tc-1	agentce:executes	agentce:event/dec-1
 E	agentce:event/tc-1	agentce:releasedBy	agentce:event/appr-1
 E	agentce:event/tc-1	prov:wasAssociatedWith	spiffe://corp/agent-a
 E	agentce:event/tc-1	rdf:type	agentce:ComponentRecord
+E	agentce:event/tc-1	rdf:type	agentce:ConsequentialAction
 E	agentce:event/tc-1	rdf:type	agentce:GatedAction
 E	agentce:event/tc-1	rdf:type	agentce:ToolCall
 E	agentce:principal/4f9618842a3b141eae7bfb7cd81ee43b2ba78b2eef1a7c1d0c13c7ea559ab534	rdf:type	agentce:HumanPrincipal
@@ -113,22 +117,28 @@ E	spiffe://corp/agent-a	prov:actedOnBehalfOf	agentce:principal/4f9618842a3b141ea
 E	spiffe://corp/agent-a	rdf:type	agentce:Agent
 E	urn:example:service:identity-provider	rdf:type	agentce:Agent
 L	agentce:event/appr-1	prov:atTime	2026-06-01T09:04:00.000Z	xsd:dateTime
+L	agentce:event/dec-1	agentce:actsOnJudged	true	xsd:boolean
 L	agentce:event/dec-1	agentce:actsOnUntrusted	false	xsd:boolean
 L	agentce:event/dec-1	agentce:danglingRef	agentce:event/missing-x	xsd:string
 L	agentce:event/dec-1	agentce:explanationReconstructable	false	xsd:boolean
 L	agentce:event/dec-1	agentce:oversightCoverageComplete	true	xsd:boolean
 L	agentce:event/dec-1	agentce:oversightModalityMatchesDeclared	true	xsd:boolean
+L	agentce:event/dec-1	agentce:provenanceJudged	true	xsd:boolean
+L	agentce:event/dec-1	agentce:provenanceMet	false	xsd:boolean
 L	agentce:event/dec-1	agentce:riskReviewed	true	xsd:boolean
 L	agentce:event/dec-1	agentce:robustToUntrustedContent	true	xsd:boolean
 L	agentce:event/dec-1	agentce:triggersIncident	false	xsd:boolean
 L	agentce:event/dec-1	agentce:untrustedContentRuledOn	false	xsd:boolean
 L	agentce:event/dec-1	prov:atTime	2026-06-01T09:00:00.000Z	xsd:dateTime
+L	agentce:event/dec-2	agentce:actsOnJudged	true	xsd:boolean
 L	agentce:event/dec-2	agentce:actsOnUntrusted	false	xsd:boolean
 L	agentce:event/dec-2	agentce:explanationReconstructable	false	xsd:boolean
 L	agentce:event/dec-2	agentce:gateJudged	false	xsd:boolean
 L	agentce:event/dec-2	agentce:gateMet	true	xsd:boolean
 L	agentce:event/dec-2	agentce:oversightCoverageComplete	false	xsd:boolean
 L	agentce:event/dec-2	agentce:oversightModalityMatchesDeclared	false	xsd:boolean
+L	agentce:event/dec-2	agentce:provenanceJudged	true	xsd:boolean
+L	agentce:event/dec-2	agentce:provenanceMet	false	xsd:boolean
 L	agentce:event/dec-2	agentce:riskReviewed	false	xsd:boolean
 L	agentce:event/dec-2	agentce:robustToUntrustedContent	true	xsd:boolean
 L	agentce:event/dec-2	agentce:triggersIncident	false	xsd:boolean
@@ -139,11 +149,14 @@ L	agentce:event/del-1	prov:atTime	2026-06-01T08:00:00.000Z	xsd:dateTime
 L	agentce:event/login-1	prov:atTime	2026-06-01T09:03:00.000Z	xsd:dateTime
 L	agentce:event/out-1	agentce:adverseOutcomeLinked	true	xsd:boolean
 L	agentce:event/out-1	prov:atTime	2026-06-01T09:10:00.000Z	xsd:dateTime
+L	agentce:event/tc-1	agentce:actsOnJudged	false	xsd:boolean
 L	agentce:event/tc-1	agentce:actsOnUntrusted	false	xsd:boolean
 L	agentce:event/tc-1	agentce:componentDeclared	false	xsd:boolean
 L	agentce:event/tc-1	agentce:executesConsequential	true	xsd:boolean
 L	agentce:event/tc-1	agentce:gateJudged	true	xsd:boolean
 L	agentce:event/tc-1	agentce:gateMet	false	xsd:boolean
+L	agentce:event/tc-1	agentce:provenanceJudged	true	xsd:boolean
+L	agentce:event/tc-1	agentce:provenanceMet	false	xsd:boolean
 L	agentce:event/tc-1	agentce:withinBudget	true	xsd:boolean
 L	agentce:event/tc-1	agentce:withinScope	true	xsd:boolean
 L	agentce:event/tc-1	prov:atTime	2026-06-01T09:05:00.000Z	xsd:dateTime

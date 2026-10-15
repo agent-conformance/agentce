@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from approval_events import (  # noqa: E402
     NC,
+    SUBJECT,
     appr,
     case,
     dec,
@@ -64,25 +65,86 @@ def adverse(name):
     return ev("o1", "Outcome", refs={"decision": name}, adverse=True)
 
 
-# CND-04 (Conduct): a ToolCall that executes a consequential decision must act on a named instruction. The ToolCall
-# names no instruction, so it is in CND-04's scope and fails whenever its decision is resolved; with a ref naming no
-# held decision it executes nothing consequential and is out of scope (not_applicable), as at base.
+# CND-04 (Conduct): a ToolCall that executes a consequential decision, and the consequential decision itself, must act
+# on a held instruction from an authorised principal through a verified delegation (SPEC §7.7.4). The decision acts on
+# an enforcement point's user instruction whose principal holds the role the domain authorises, and the ToolCall rests
+# on a verified delegation but names no instruction, so the ToolCall is in CND-04's scope and fails whenever its
+# decision is resolved, while the decision passes through it. With a ref naming no held decision the ToolCall executes
+# nothing consequential and is out of scope, and the decision, which no ToolCall then executes, rests on no delegation
+# (insufficient_evidence, never conformant).
+def instruction(i="i0"):
+    """An enforcement point's record of a user instruction from a principal the domain authorises (credit_officer)."""
+    principal = {"id": "user:alice", "kind": "human", "role": "credit_officer"}
+    return ev(
+        i,
+        "Instruction",
+        cls="enforcement_point",
+        source_class="user",
+        principal=principal,
+    )
+
+
+def delegation():
+    """An enforcement point's record of a verified delegation from the decision's principal to the agent."""
+    return ev(
+        "g0",
+        "DelegationIssued",
+        cls="enforcement_point",
+        token_ref="jti-1",
+        issuer="https://idp.example",
+        chain=[{"id": "user:alice", "kind": "human"}, {"id": SUBJECT, "kind": "agent"}],
+        subject_principal="user:alice",
+        actor_principal=SUBJECT,
+        scope_granted=["credit:read"],
+        scope_parent=["credit:read", "credit:write"],
+        expires="2026-02-01T00:00:00Z",
+        verification={"status": "verified", "method": "rfc8693"},
+    )
+
+
+def acted(i="i0"):
+    """The consequential decision, acting on instruction `i`."""
+    return dec(refs={"instruction": ref(i)})
+
+
+def held(*events):
+    """The instruction and the delegation, then `events`."""
+    return [instruction(), delegation(), *events]
+
+
+def delegated(name, **k):
+    """`tool(name)` resting on the verified delegation."""
+    return tool(name, delegation=ref("g0"), **k)
+
+
+IE = "insufficient_evidence"
 for form, name in FORMS.items():
     case(
         f"cnd04-consequential-toolcall-{form}",
         "CND-04",
-        [dec(), tool(name)],
+        held(acted(), delegated(name)),
         NC,
         ["t0"],
     )
-case("cnd04-bareid-toolcall-before-decision", "CND-04", [tool("d1"), dec()], NC, ["t0"])
-case("cnd04-consequential-toolcall-unheld", "CND-04", [dec(), tool("nope")], NA)
+case(
+    "cnd04-bareid-toolcall-before-decision",
+    "CND-04",
+    held(delegated("d1"), acted()),
+    NC,
+    ["t0"],
+)
+case(
+    "cnd04-consequential-toolcall-unheld",
+    "CND-04",
+    held(acted(), delegated("nope")),
+    IE,
+)
 # Over-match guard: a bare id naming a held event that is no Decision executes nothing consequential.
 case(
     "cnd04-bareid-names-held-non-decision",
     "CND-04",
-    [dec(), ev("o1", "Outcome", refs={"decision": IRI}), tool("o1")],
-    NA,
+    held(acted(), ev("o1", "Outcome", refs={"decision": IRI}), delegated("o1")),
+    IE,
 )
 # Positive twin: the bare-id ToolCall acting on an instruction the bundle holds passes CND-04. The instruction is
 # an enforcement point's record, so it meets CND-04's minimum class (SPEC HR-5, §7.7.5; 18.127).
@@ -90,9 +152,10 @@ case(
     "cnd04-bareid-toolcall-acts-on-instruction",
     "CND-04",
     [
-        dec(),
-        ev("r1", "Instruction", cls="enforcement_point", instruction_id="r1", source_class="tool_output"),
-        tool("d1", instruction=ref("r1")),
+        acted("r1"),
+        instruction("r1"),
+        delegation(),
+        delegated("d1", instruction=ref("r1")),
     ],
     "conformant",
 )
