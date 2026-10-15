@@ -403,12 +403,32 @@ def reconcile(
     }
 
 
+def _task_scopes(roles: str) -> str:
+    """The binding's task_scopes for an instruction_chain ``principal_role`` (SPEC §7.7.6 authorised_principal_roles):
+    credit_officer authorised (declared_match, and no_role, whose principal carries no role); another role authorised
+    (declared_other); no roles declared (not_declared); two task types, so the fixture's task-1 has no scope
+    (no_scope)."""
+    listed = {"declared_other": '["loan_manager"]', "not_declared": None}.get(
+        roles, '["credit_officer"]'
+    )
+    declared = f", authorised_principal_roles: {listed}" if listed else ""
+    types = (
+        ("credit-review", "kyc-review") if roles == "no_scope" else ("credit-review",)
+    )
+    return "".join(
+        f'  - {{task_type: "{t}", allowed_tools: ["lookup"], allowed_effect_classes: ["read"],\n'
+        f'     requires_approval: ["irreversible"], budgets: {{tokens: 1000, compute_seconds: 60, spend: 0}}{declared}}}\n'
+        for t in types
+    )
+
+
 def write_profile(
     dest: Path,
     catalogs: list[str],
     subjects: tuple[str, ...] = (SUBJECT, OTHER),
     oversight: str | None = None,
     denominator: dict[str, Any] | None = None,
+    roles: str = "declared_match",
 ) -> tuple[Path, Path]:
     """An applicability profile (SPEC §6.5) naming the catalogs and subjects (the fixture subject with the coverage
     denominator, when given), and a domain binding in which dom:CreditDecision is consequential and dom:Minor is
@@ -446,9 +466,7 @@ def write_profile(
         "decision_types:\n"
         f'  - {{id: "dom:CreditDecision", subclass_of: "agentce:ConsequentialDecision", consequential: true{extra}}}\n'
         '  - {id: "dom:Minor", subclass_of: "agentce:Decision", consequential: false}\n'
-        "task_scopes:\n"
-        '  - {task_type: "credit-review", allowed_tools: ["lookup"], allowed_effect_classes: ["read"],\n'
-        '     requires_approval: ["irreversible"], budgets: {tokens: 1000, compute_seconds: 60, spend: 0}}\n',
+        "task_scopes:\n" + _task_scopes(roles),
         encoding="utf-8",
     )
     return profile, domain
@@ -458,6 +476,16 @@ CONDUCT = ["baseline@2026.09", "conduct@2026.09"]
 
 
 # --- instruction chains (CND-04, CND-05, CND-06, ROB-02) -------------------------------------------------------------
+
+
+def _with_role(principal: dict[str, Any] | None, role: str) -> dict[str, Any] | None:
+    """A witness's principal with its role as the ``pd_role`` / ``twin_role`` dimension sets it: the acted-on
+    principal's (match), another (other) or none (CND-04 role witness)."""
+    if principal is None or role == "match":
+        return principal
+    if role == "other":
+        return {**principal, "role": "loan_manager"}
+    return {k: v for k, v in principal.items() if k != "role"}
 
 
 def instruction_chain(
@@ -516,6 +544,12 @@ def instruction_chain(
       enforcement-point user instruction whose refs.parent is the acted-on one (KD-283).
     - decision_time: as_recorded | forged_late. The Decision's own time; forged_late stamps it ten seconds after the
       executing call, with the witnesses five seconds after that call.
+    - pd_role, twin_role: match | other | none. The role the corroborating PolicyDecision / relabel twin records
+      for the principal (CND-04's role witness for a self_report terminus).
+    - principal_role: declared_match | declared_other | not_declared | no_role | no_scope. Whether the binding
+      authorises the principal's role for the task (SPEC §7.7.4 "for the task type", §7.7.6): its list names
+      credit_officer; names another role; is not declared; the principal carries no role; task-1 resolves to no
+      scope (see :func:`_task_scopes`).
     - integrity / integrity_stream: see the module docstring; the stream is a SOURCES role.
     """
     who = "instruction_chain"
@@ -629,6 +663,17 @@ def instruction_chain(
     cycle = _pick(dims, "parent_cycle", "none", ("none", "self", "pair"), who)
     integrity = _pick(dims, "integrity", "verified", INTEGRITY, who)
     stream = _pick(dims, "integrity_stream", "ingress", tuple(SOURCES), who)
+    role_decl = _pick(
+        dims,
+        "principal_role",
+        "declared_match",
+        ("declared_match", "declared_other", "not_declared", "no_role", "no_scope"),
+        who,
+    )
+    pd_role = _pick(dims, "pd_role", "match", ("match", "other", "none"), who)
+    twin_role = _pick(dims, "twin_role", "match", ("match", "other", "none"), who)
+    if principal and role_decl == "no_role":
+        principal = {k: v for k, v in principal.items() if k != "role"}
     if twin_kind in MALFORMED_PRINCIPAL:
         principal = MALFORMED_PRINCIPAL[twin_kind]
     if pd_request == "other_call":
@@ -854,6 +899,7 @@ def instruction_chain(
                 content_ref="sha256:" + "b" * 64,
                 refs={"task": "task-1"},
             )
+        twin_principal = _with_role(twin_principal, twin_role)
         ev.add(
             "i1-ingress",
             "Instruction",
@@ -924,6 +970,7 @@ def instruction_chain(
             "ep_pd_other_principal": OTHER_PRINCIPAL,
             "ep_pd_no_principal": None,
         }.get(corroboration, PRINCIPAL)
+        pd_principal = _with_role(pd_principal, pd_role)
         ev.add(
             "pd1",
             "PolicyDecision",
@@ -1018,7 +1065,7 @@ def instruction_chain(
         dest / "bundle", ev.items, integrity=integrity, integrity_stream=stream
     )
     catalogs = list(args.get("catalogs") or CONDUCT)
-    profile, domain = write_profile(dest, catalogs)
+    profile, domain = write_profile(dest, catalogs, roles=role_decl)
     return Fixture(dest / "bundle", profile, domain, SUBJECT)
 
 
