@@ -1337,8 +1337,8 @@ public final class Report {
             String cid = at >= 0 ? entry.substring(0, at) : entry;
             String version = at >= 0 ? entry.substring(at + 1) : "";
             Catalog catalog = byLabel.get(entry);
-            String digest = catalog != null && catalog.directory != null
-                    ? Catalog.provenanceDigest(catalog.directory)
+            String digest = catalog != null && catalog.files != null
+                    ? Catalog.provenanceDigest(catalog.files)
                     : ZERO_DIGEST;
             ObjectNode ref = catalogRefs.addObject();
             ref.put("id", cid);

@@ -569,7 +569,8 @@ global options:
             List<Catalog> loaded, Verify.TrustRoot trust, boolean allowUnverified) {
         List<String> limitations = new ArrayList<>();
         for (Catalog catalog : loaded) {
-            ObjectNode outcome = Verify.verifyCatalog(catalog.directory, trust);
+            // The bytes the load read (18.171), so what verifies is what is assessed.
+            ObjectNode outcome = Verify.verifyCatalog(catalog.files, trust);
             if (outcome.get("verified").booleanValue()) {
                 continue;
             }

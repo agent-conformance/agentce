@@ -662,12 +662,20 @@ public final class Verify {
      * _verify_catalog}/{@code verify_catalog_directory}, {@code signing.py:391-426}, {@code
      * commands/__init__.py:321-352}). */
     public static ObjectNode verifyCatalog(Path dir, TrustRoot trust) {
-        String digest;
+        Catalog.CatalogFiles files;
         try {
-            digest = Catalog.digestTree(dir, Set.of(CATALOG_SIGNATURE_NAME));
+            files = Catalog.readFiles(dir, Map.of());
         } catch (IllegalStateException e) {
             throw catalogUnreadable(dir, e);
         }
+        return verifyCatalog(files, trust);
+    }
+
+    /** {@link #verifyCatalog(Path, TrustRoot)} over the files a load read (18.171): the digest checked is
+     * the digest of those bytes, whatever the folder holds by then. */
+    public static ObjectNode verifyCatalog(Catalog.CatalogFiles files, TrustRoot trust) {
+        Path dir = files.root();
+        String digest = files.digest(Set.of());
         Path sigPath = dir.resolve(CATALOG_SIGNATURE_NAME);
         if (!Files.isRegularFile(sigPath)) {
             return catalogSoftFail(digest, refusal("verify.catalog_unsigned"));

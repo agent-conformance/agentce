@@ -447,12 +447,4 @@ public final class Psp {
     public static Map<String, Shape> parseShapesTtl(String text) {
         return parseShapesTtl(text, "(inline)");
     }
-
-    public static Map<String, Shape> loadShapes(java.nio.file.Path path, String shown) {
-        try {
-            return parseShapesTtl(Files.readString(path, StandardCharsets.UTF_8), shown);
-        } catch (IOException e) {
-            throw new IllegalArgumentException("cannot read shapes " + path + ": " + e.getMessage(), e);
-        }
-    }
 }

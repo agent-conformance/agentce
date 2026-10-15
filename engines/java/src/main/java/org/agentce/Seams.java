@@ -25,6 +25,43 @@ public final class Seams {
     static int run(String[] args) {
         String command = args.length > 0 ? args[0] : null;
 
+        // race-read is the VG-CATALOG-READ-ONCE seam (18.171): `race-read <file> <swap-bytes|-> <count-file>
+        // <agentce args...>` runs the CLI with a writer racing it. Every read of <file> by the catalog loader
+        // is counted and the count written to <count-file>; right after the first, <file> on disk becomes
+        // the bytes of <swap-bytes>, so a second read would see other bytes. A run whose hook never fired
+        // exits 70, so the gate cannot pass on a race that did not run.
+        if ("race-read".equals(command)) {
+            if (args.length < 4) {
+                System.err.println("race-read: <file> <swap-bytes|-> <count-file> <agentce args...> are required");
+                return ExitCode.INPUT_ERROR.code;
+            }
+            try {
+                Path target = Paths.get(args[1]).toRealPath();
+                byte[] swap = "-".equals(args[2]) ? null : Files.readAllBytes(Paths.get(args[2]));
+                int[] count = {0};
+                Catalog.afterRead = path -> {
+                    try {
+                        if (path.toRealPath().equals(target) && ++count[0] == 1 && swap != null) {
+                            Files.write(target, swap);
+                        }
+                    } catch (IOException e) {
+                        throw new java.io.UncheckedIOException(e);
+                    }
+                };
+                int code;
+                try {
+                    code = Cli.run(java.util.Arrays.copyOfRange(args, 4, args.length));
+                } finally {
+                    Catalog.afterRead = null;
+                    Files.writeString(Paths.get(args[3]), Integer.toString(count[0]));
+                }
+                return count[0] == 0 ? 70 : code;
+            } catch (IOException e) {
+                System.err.println("race-read: " + e.getMessage());
+                return 70;
+            }
+        }
+
         // The numerics verb is a plain computation seam for the cross-engine vector check: it reads a
         // numerics-vectors case file and prints {caseName: result} as plain JSON, not the envelope.
         if ("numerics".equals(command)) {

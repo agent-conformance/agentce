@@ -353,4 +353,49 @@ class CatalogTest {
             assertEquals("catalog.evidence_shape.unresolved", err.key, value);
         }
     }
+
+    /** 18.171: the load keeps the bytes it read, so an edit on disk afterwards changes none of its digests. */
+    @Test
+    void readOnceLoadKeepsTheBytesItRead(@TempDir Path tmp) throws IOException {
+        Path dir = tmp.resolve("c");
+        copyTree(Fixtures.BASE, dir);
+        String before = Catalog.provenanceDigest(dir);
+        Catalog catalog = Catalog.load(dir);
+        Path file = dir.resolve("controls/" + catalog.controls.get(0).id + ".yaml");
+        Files.writeString(file, Files.readString(file) + "\n# changed after the read\n");
+        assertEquals(before, Catalog.provenanceDigest(catalog.files));
+        assertNotEquals(before, Catalog.provenanceDigest(dir));
+        assertEquals(
+                Catalog.digestTree(Fixtures.BASE, Set.of(Verify.CATALOG_SIGNATURE_NAME)),
+                catalog.files.digest(Set.of()));
+    }
+
+    /** 18.171: the signature check over given files decides on those bytes, whatever the folder holds. */
+    @Test
+    void readOnceVerifyDecidesOnTheGivenFiles(@TempDir Path tmp) throws IOException {
+        Path dir = tmp.resolve("c");
+        copyTree(TestPaths.repoRoot().resolve("spec/catalogs/base/baseline"), dir);
+        Catalog.CatalogFiles files = Catalog.readFiles(dir, java.util.Map.of());
+        Path file = dir.resolve("controls/DOC-01.yaml");
+        byte[] signed = Files.readAllBytes(file);
+        Files.writeString(file, Files.readString(file) + "# changed after the read\n");
+        assertEquals(true, Verify.verifyCatalog(files, Verify.vendoredTrust()).get("verified").asBoolean());
+        assertEquals(false, Verify.verifyCatalog(dir, Verify.vendoredTrust()).get("verified").asBoolean());
+        Catalog.CatalogFiles edited = Catalog.readFiles(dir, java.util.Map.of());
+        Files.write(file, signed);
+        assertEquals(false, Verify.verifyCatalog(edited, Verify.vendoredTrust()).get("verified").asBoolean());
+    }
+
+    private static void copyTree(Path from, Path to) throws IOException {
+        try (var paths = Files.walk(from)) {
+            for (Path p : (Iterable<Path>) paths::iterator) {
+                Path target = to.resolve(from.relativize(p).toString());
+                if (Files.isDirectory(p)) {
+                    Files.createDirectories(target);
+                } else {
+                    Files.copy(p, target);
+                }
+            }
+        }
+    }
 }

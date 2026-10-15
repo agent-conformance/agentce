@@ -1,10 +1,10 @@
 package org.agentce;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
@@ -14,11 +14,13 @@ import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 /**
@@ -34,6 +36,22 @@ public final class Catalog {
     public final Map<String, Psp.Shape> shapes;
     /** Each declared {@code evaluation.evidence_shape} path -> the IRI of the one node shape it holds. */
     public final Map<String, String> evidenceShapeIris;
+    /** The bytes the catalog was loaded from (18.171): its signature check and provenance digest read
+     * these, never the folder again. */
+    public final CatalogFiles files;
+
+    /** One read of a catalog folder (18.171): every file the catalog digest covers, by POSIX relpath,
+     * read once. The signature check and the loader both read these bytes, never the folder again, so a
+     * file changed on disk during a run cannot be loaded unverified or verified unloaded. */
+    public record CatalogFiles(Path root, Map<String, byte[]> files) {
+        public String digest(Set<String> exclude) {
+            return digestFiles(files, exclude);
+        }
+    }
+
+    /** Test seam for VG-CATALOG-READ-ONCE ({@code Seams race-read}): called with each file's path right
+     * after {@link #readFiles} reads it. Null outside that seam. */
+    static volatile Consumer<Path> afterRead;
 
     private static final String EVIDENCE_SHAPE_UNRESOLVED = "catalog.evidence_shape.unresolved";
     private static final String SHAPE_UNRESOLVED = "catalog.shape.unresolved";
@@ -46,13 +64,15 @@ public final class Catalog {
             Path directory,
             List<ControlSpec> controls,
             Map<String, Psp.Shape> shapes,
-            Map<String, String> evidenceShapeIris) {
+            Map<String, String> evidenceShapeIris,
+            CatalogFiles files) {
         this.id = id;
         this.version = version;
         this.directory = directory;
         this.controls = controls;
         this.shapes = shapes;
         this.evidenceShapeIris = evidenceShapeIris;
+        this.files = files;
     }
 
     public static final class ControlSpec {
@@ -240,31 +260,52 @@ public final class Catalog {
         return control;
     }
 
-    /** The catalog files the digest covers ({@link #coveredFiles}, less the signature): the only files
-     * {@link #load} reads. */
-    private static Set<String> covered(Path directory) {
+    /** Read every file the catalog digest covers under {@code root} ({@link #coveredFiles}, less the
+     * signature) once. {@code first} holds files the caller has already read (the loader reads {@code
+     * catalog.yaml} first, so a missing one is refused as before); those bytes are kept, never read a
+     * second time. A file that cannot be read throws IllegalStateException, as {@link #digestTree}. */
+    public static CatalogFiles readFiles(Path root, Map<String, byte[]> first) {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        for (String rel : coveredFiles(root, Set.of(Verify.CATALOG_SIGNATURE_NAME))) {
+            byte[] content = first.get(rel);
+            if (content == null) {
+                Path path = root.resolve(rel);
+                content = readBytes(path);
+                Consumer<Path> hook = afterRead;
+                if (hook != null) {
+                    hook.accept(path);
+                }
+            }
+            files.put(rel, content);
+        }
+        return new CatalogFiles(root, Collections.unmodifiableMap(files));
+    }
+
+    private static byte[] readBytes(Path path) {
         try {
-            return new HashSet<>(coveredFiles(directory, Set.of(Verify.CATALOG_SIGNATURE_NAME)));
-        } catch (IllegalStateException e) {
-            throw Verify.catalogUnreadable(directory, e);
+            return Files.readAllBytes(path);
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot read " + path + ": " + e.getMessage(), e);
         }
     }
 
-    /** A catalog file read as YAML; a file that cannot be read (not one that does not parse) is refused as
-     * input.catalog_unreadable, as verify and sign refuse it (18.168). */
-    private static JsonNode readYaml(Path directory, String rel) {
+    /** A catalog file's bytes as text: bytes that are not UTF-8 are refused as input.catalog_unreadable,
+     * as a file that cannot be read is (18.168). */
+    private static String text(CatalogFiles files, String rel) {
         try {
-            return Yaml.parseFile(directory.resolve(rel));
-        } catch (IllegalArgumentException e) {
-            if (e.getCause() instanceof IOException io && !(io instanceof JsonProcessingException)) {
-                throw Verify.catalogUnreadable(directory, io);
-            }
-            throw e;
+            return Verify.decodeStrict(files.files().get(rel)).toString();
+        } catch (CharacterCodingException e) {
+            throw Verify.catalogUnreadable(files.root(), e);
         }
+    }
+
+    /** A catalog file read as YAML (one that does not parse throws, as before). */
+    private static JsonNode readYaml(CatalogFiles files, String rel) {
+        return Yaml.parse(text(files, rel), files.root().resolve(rel));
     }
 
     /** The covered {@code controls/<name>.yaml} files, one level deep as the listing always was, sorted. */
-    private static List<String> controlFiles(Set<String> files) {
+    private static List<String> controlFiles(Iterable<String> files) {
         List<String> rels = new ArrayList<>();
         for (String rel : files) {
             if (rel.startsWith("controls/") && rel.indexOf('/', "controls/".length()) < 0 && rel.endsWith(".yaml")) {
@@ -288,27 +329,40 @@ public final class Catalog {
      * cannot change what it loads without changing its digest. The load walks the folder as the digest
      * does, so a folder it cannot read is refused as input.catalog_unreadable, as verify and sign refuse it. */
     public static Catalog load(Path directory) {
-        JsonNode meta = readYaml(directory, "catalog.yaml");
+        // catalog.yaml first, as before: a folder without one is refused naming it. Every covered file is
+        // then read once (18.171) and kept as files, which the signature check and provenance digest read.
+        byte[] metaBytes;
+        try {
+            metaBytes = Files.readAllBytes(directory.resolve("catalog.yaml"));
+        } catch (IOException e) {
+            throw Verify.catalogUnreadable(directory, e);
+        }
+        CatalogFiles files;
+        try {
+            files = readFiles(directory, Map.of("catalog.yaml", metaBytes));
+        } catch (IllegalStateException e) {
+            throw Verify.catalogUnreadable(directory, e);
+        }
+        JsonNode meta = readYaml(files, "catalog.yaml");
         JsonNode metaRecord = meta != null && meta.isObject() ? meta : Json.nodes().objectNode();
         List<ControlSpec> controls = new ArrayList<>();
         Map<String, Psp.Shape> shapes = new LinkedHashMap<>();
         Map<String, String> evidenceShapeIris = new LinkedHashMap<>();
-        Set<String> files = covered(directory);
-        for (String rel : controlFiles(files)) {
-            JsonNode data = readYaml(directory, rel);
+        for (String rel : controlFiles(files.files().keySet())) {
+            JsonNode data = readYaml(files, rel);
             if (data == null || !data.isObject()) {
                 continue;
             }
             ControlSpec control = controlFromDict(data);
             controls.add(control);
             if (control.shapePath != null) {
-                if (!files.contains(control.shapePath)) {
+                if (!files.files().containsKey(control.shapePath)) {
                     throw refuseUncovered(SHAPE_UNRESOLVED, control, control.shapePath);
                 }
-                shapes.putAll(Psp.loadShapes(directory.resolve(control.shapePath), control.shapePath));
+                shapes.putAll(Psp.parseShapesTtl(text(files, control.shapePath), control.shapePath));
             }
             if (control.evidenceShapePath != null) {
-                Map.Entry<String, Map<String, Psp.Shape>> loaded = loadEvidenceShape(directory, control, files);
+                Map.Entry<String, Map<String, Psp.Shape>> loaded = loadEvidenceShape(files, control);
                 evidenceShapeIris.put(control.evidenceShapePath, loaded.getKey());
                 shapes.putAll(loaded.getValue());
             }
@@ -319,7 +373,8 @@ public final class Catalog {
                 directory,
                 controls,
                 shapes,
-                evidenceShapeIris);
+                evidenceShapeIris,
+                files);
     }
 
     private static boolean hasTarget(Psp.Shape shape) {
@@ -335,15 +390,16 @@ public final class Catalog {
      * shape with a target; anything else is refused, so a declared evidence shape can never be skipped and
      * read as a pass. Returns the targeted shape's IRI with the file's shapes. */
     private static Map.Entry<String, Map<String, Psp.Shape>> loadEvidenceShape(
-            Path directory, ControlSpec control, Set<String> files) {
+            CatalogFiles files, ControlSpec control) {
         String path = control.evidenceShapePath;
+        Path directory = files.root();
         Map<String, Psp.Shape> loaded = Map.of();
-        if (files.contains(path)) {
+        if (files.files().containsKey(path)) {
             try {
                 Path root = directory.toRealPath();
                 Path resolved = directory.resolve(path).toRealPath();
                 if (resolved.startsWith(root) && Files.isRegularFile(resolved)) {
-                    loaded = Psp.loadShapes(resolved, path);
+                    loaded = Psp.parseShapesTtl(text(files, path), path);
                 }
             } catch (IOException | java.nio.file.InvalidPathException e) {
                 // A path that does not resolve leaves nothing loaded, which is refused below.
@@ -373,7 +429,8 @@ public final class Catalog {
 
     /** As {@link #forTest(String, String, List)}, read from {@code directory} for its digest only. */
     static Catalog forTest(String id, String version, Path directory, List<ControlSpec> controls) {
-        return new Catalog(id, version, directory, controls, Map.of(), Map.of());
+        CatalogFiles files = directory == null ? null : readFiles(directory, Map.of());
+        return new Catalog(id, version, directory, controls, Map.of(), Map.of(), files);
     }
 
     /** Files left out of a catalog's provenance digest: the detached signature and {@code catalog.yaml}
@@ -479,15 +536,25 @@ public final class Catalog {
      * regardless of {@code exclude} ({@link #coveredFiles}). Recomputed from the directory's real bytes
      * every call -- never read from a catalog's stored {@code provenance.digest} field. */
     public static String digestTree(Path dir, Set<String> exclude) {
-        List<byte[]> lines = new ArrayList<>();
+        Map<String, byte[]> files = new LinkedHashMap<>();
         for (String rel : coveredFiles(dir, exclude)) {
-            byte[] content;
-            try {
-                content = Files.readAllBytes(dir.resolve(rel));
-            } catch (IOException e) {
-                throw new IllegalStateException("cannot read " + dir.resolve(rel) + ": " + e.getMessage(), e);
+            files.put(rel, readBytes(dir.resolve(rel)));
+        }
+        return digestFiles(files, Set.of());
+    }
+
+    /** {@link #digestTree} over bytes already read: the same digest, for the same relpaths and contents. */
+    public static String digestFiles(Map<String, byte[]> files, Set<String> exclude) {
+        List<String> rels = new ArrayList<>();
+        for (String rel : files.keySet()) {
+            if (!exclude.contains(rel)) {
+                rels.add(rel);
             }
-            String fileHash = Canonical.sha256Hex(content);
+        }
+        rels.sort(Json::byteCompare);
+        List<byte[]> lines = new ArrayList<>();
+        for (String rel : rels) {
+            String fileHash = Canonical.sha256Hex(files.get(rel));
             lines.add((rel + "\0" + fileHash).getBytes(StandardCharsets.UTF_8));
         }
         ByteArrayOutputStream joined = new ByteArrayOutputStream();
@@ -506,6 +573,11 @@ public final class Catalog {
      * {@code catalogProvenanceDigest}). */
     public static String provenanceDigest(Path directory) {
         return digestTree(directory, PROVENANCE_EXCLUDE);
+    }
+
+    /** {@link #provenanceDigest} over the files a load read (18.171). */
+    public static String provenanceDigest(CatalogFiles files) {
+        return files.digest(PROVENANCE_EXCLUDE);
     }
 
     /** The PSP shape a control evaluates against (by {@code <id>-Shape} suffix, then any shape with targets). */

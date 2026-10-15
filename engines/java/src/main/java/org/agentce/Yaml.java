@@ -22,6 +22,16 @@ public final class Yaml {
             .enable(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS)
             .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
 
+    /** Parse YAML text read from {@code shown} to a {@link JsonNode}; text that does not parse throws as
+     * {@link #parseFile} does. Returns {@code null} for empty input. */
+    public static JsonNode parse(String text, Path shown) {
+        try {
+            return MAPPER.readTree(text);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("cannot read YAML " + shown + ": " + e.getMessage(), e);
+        }
+    }
+
     /** Parse a YAML file to a {@link JsonNode}; a missing file throws. Returns {@code null} for empty input. */
     public static JsonNode parseFile(Path path) {
         try {
