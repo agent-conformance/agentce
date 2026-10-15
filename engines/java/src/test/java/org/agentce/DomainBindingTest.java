@@ -64,7 +64,7 @@ class DomainBindingTest {
     }
 
     @Test
-    void taskScopeBudgets() {
+    void budgetsOfTaskScope() {
         DomainBinding binding = DomainBinding.fromDict(Json.parse("{\"task_scopes\":["
                 + "{\"task_type\":\"a\",\"budgets\":{\"spend\":0,\"tokens\":10,\"cost\":3,\"compute_seconds\":\"60\"}},"
                 + "{\"task_type\":\"b\",\"budgets\":[1]},"
