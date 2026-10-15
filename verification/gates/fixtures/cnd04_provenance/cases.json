@@ -1,0 +1,2804 @@
+{
+  "_description": "VG-CND04-PROVENANCE cases (18.122): each case is one bundle for the fixture subject; expected is CND-04's outcome, the failing event ids and the assess exit code, with nothing quarantined, the same in Python, TypeScript and Java. A ToolCall or consequential Decision fails CND-04 when the instruction it acts on does not show a chain ending at an authorised principal: the instruction, or one on its refs.parent / refs.origin lineage, is of an untrusted Appendix F class or names nothing the bundle holds; a user, operator, service or agent_identified instruction records no principal; the principal's role is not one the task type's authorised_principal_roles lists; or the delegation the call rests on records agentce:chainVerified false. A delegation only the agent reports, no delegation, or a principal with no role reads insufficient_evidence, never conformant (SPEC §7.7.4, §6.2.3, §6.3, §7.7.5, §7.7.6, HR-5). Generated from the trust matrix's instruction_chain builder (verification/gates/fixtures/trust_matrix/build.py).",
+  "cases": {
+    "toolcall-verified-principal": {
+      "why": "a call and the consequential decision it executes act on an attested user instruction whose principal's role the task type authorises, under an enforcement-point delegation whose chain verified",
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "user"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "verified"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1",
+              "instruction": "agentce:event/i1"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "toolcall-chain-unverified": {
+      "why": "the call's delegation records agentce:chainVerified false",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "d1",
+          "tc1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "user"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "failed"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1",
+              "instruction": "agentce:event/i1"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "toolcall-chain-ends-at-tool-output": {
+      "why": "the acted-on instruction is tool output: the chain ends at no principal",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "d1",
+          "tc1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "tool_output"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "verified"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1",
+              "instruction": "agentce:event/i1"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "toolcall-user-instruction-no-principal": {
+      "why": "a user instruction that records no principal does not end at an authorised principal (SPEC §6.2.3)",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "d1",
+          "tc1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "user"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "verified"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1",
+              "instruction": "agentce:event/i1"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "decision-consequential-chain-unverified": {
+      "why": "the consequential decision acts on the instruction and the call executing it rests on an unverified delegation",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "d1",
+          "tc1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "user"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "failed"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "decision-consequential-verified-principal": {
+      "why": "the consequential decision and its executing call both act on an attested service instruction with a principal, verified delegation",
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "service"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "verified"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1",
+              "instruction": "agentce:event/i1"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "decision-consequential-call-names-no-instruction": {
+      "why": "twin of decision-consequential-chain-unverified: verified delegation, so only the call, which names no instruction, fails; the decision passes",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "tc1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "user"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "verified"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "toolcall-two-hop-ends-at-tool-output": {
+      "why": "the acted-on user instruction derives (refs.parent) from a tool_output instruction",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "d1",
+          "tc1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:0000000000000000000000000000000000000000000000000000000000000002",
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "tool_output"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i2",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "parent": "agentce:event/i2",
+              "task": "task-1"
+            },
+            "source_class": "user"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "verified"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1",
+              "instruction": "agentce:event/i1"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:04Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "toolcall-two-hop-ends-at-user": {
+      "why": "twin: two refs.parent hops, all user with a principal",
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:0000000000000000000000000000000000000000000000000000000000000002",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "user"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i2",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "parent": "agentce:event/i2",
+              "task": "task-1"
+            },
+            "source_class": "user"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "verified"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1",
+              "instruction": "agentce:event/i1"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:04Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "toolcall-operator-principal": {
+      "why": "twin: an operator instruction with a principal",
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "operator"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "verified"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1",
+              "instruction": "agentce:event/i1"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "toolcall-service-no-principal": {
+      "why": "a service instruction with no principal",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "d1",
+          "tc1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "service"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "verified"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1",
+              "instruction": "agentce:event/i1"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "toolcall-agent-identified-no-principal": {
+      "why": "an agent_identified instruction with no principal",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "d1",
+          "tc1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "agent_identified"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "verified"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1",
+              "instruction": "agentce:event/i1"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "toolcall-delegation-self-reported": {
+      "why": "the delegation's chainVerified true is the agent's own record",
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "user"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "verified"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1",
+              "instruction": "agentce:event/i1"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "toolcall-no-delegation": {
+      "why": "the call names no delegation",
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "user"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "instruction": "agentce:event/i1"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "toolcall-role-not-authorised": {
+      "why": "the principal's role is not one the task type authorises",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "d1",
+          "tc1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "loan_manager"
+            },
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "user"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "verified"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1",
+              "instruction": "agentce:event/i1"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "toolcall-role-absent": {
+      "why": "the principal records no role",
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human"
+            },
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "user"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "verified"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1",
+              "instruction": "agentce:event/i1"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "toolcall-self-report-corroborated": {
+      "why": "twin: a self-reported instruction an enforcement-point PolicyDecision names, with the principal and role",
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "user"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "verified"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "decision": "allow",
+            "engine": "custom",
+            "obligations": [],
+            "policy_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+            "policy_id": "ingress",
+            "policy_version": "1",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "reasons": [],
+            "refs": {
+              "request": "agentce:event/tc1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "pd1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1",
+              "instruction": "agentce:event/i1"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:04Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "toolcall-self-report-corroborated-other-role": {
+      "why": "the enforcement point records another role for the principal",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "d1",
+          "tc1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "user"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "verified"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "decision": "allow",
+            "engine": "custom",
+            "obligations": [],
+            "policy_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+            "policy_id": "ingress",
+            "policy_version": "1",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "loan_manager"
+            },
+            "reasons": [],
+            "refs": {
+              "request": "agentce:event/tc1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "pd1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1",
+              "instruction": "agentce:event/i1"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:04Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "toolcall-chain-unverified-corroborated": {
+      "why": "corroboration does not lift an unverified delegation",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "d1",
+          "tc1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "user"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "failed"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "decision": "allow",
+            "engine": "custom",
+            "obligations": [],
+            "policy_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+            "policy_id": "ingress",
+            "policy_version": "1",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "reasons": [],
+            "refs": {
+              "request": "agentce:event/tc1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "pd1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1",
+              "instruction": "agentce:event/i1"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:04Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "toolcall-instruction-not-held": {
+      "why": "refs.instruction names nothing the bundle holds",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "d1",
+          "tc1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "user"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "verified"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/gone"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/dl1",
+              "instruction": "agentce:event/gone"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tc1",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ]
+    },
+    "decision-only-chain-ends-at-tool-output": {
+      "why": "a consequential decision no call executes acts on tool output",
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "d1"
+        ],
+        "exit": 2
+      },
+      "events": [
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "refs": {
+              "task": "task-1"
+            },
+            "source_class": "tool_output"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "i1",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:00Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "actor_principal": "spiffe://corp/agents/cnd04-fixture",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/cnd04-fixture",
+                "kind": "agent"
+              }
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "issuer": "https://idp.example",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read",
+              "credit:write"
+            ],
+            "subject_principal": "user:alice",
+            "token_ref": "jti-1",
+            "verification": {
+              "method": "rfc8693",
+              "status": "verified"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "dl1",
+          "source": "urn:src:policy",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:01Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "self_report",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "acted_for": [
+              "user:alice"
+            ],
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "instruction": "agentce:event/i1"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "d1",
+          "source": "urn:src:agent",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:02Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/cnd04-fixture"
+            },
+            "effect_class": "read",
+            "refs": {
+              "instruction": "agentce:event/ix"
+            },
+            "tool": {
+              "name": "ping",
+              "protocol": "native"
+            }
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "tcx",
+          "source": "urn:src:gateway",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:03Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        },
+        {
+          "agentcesourceclass": "enforcement_point",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "content_ref": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human",
+              "role": "credit_officer"
+            },
+            "source_class": "user"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "ix",
+          "source": "urn:src:ingress",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/cnd04-fixture",
+          "time": "2026-01-02T00:00:04Z",
+          "type": "org.agent-conformance.evidence.Instruction.v1"
+        }
+      ]
+    }
+  }
+}

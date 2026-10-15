@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.108.0",
+  "suite_version": "0.109.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -3471,6 +3471,86 @@
         }
       ],
       "fix_hint": "Run verification/gates/cnd05_chain.sh; it names the engine, the case, the CND-05 outcome and failing events it gave and the ones expected. The rule is actsOnUntrusted in each engine's graph builder: the refs.parent / refs.origin closure over instructions, seeded with tool calls, resource accesses, instructions that declare no trusted source class and ROB-02's two closures (tainted, and never ruled on by the guard); an action also fails when its refs.instruction names no held Instruction event (a key of the builder's instruction-trust map). A decision case that reads conformant points at the PSP parser (psp.py, psp.ts, Psp.java): every sh:targetClass of a shape is read, as a union."
+    },
+    {
+      "id": "VG-CND04-PROVENANCE",
+      "title": "CND-04 checks an action's instruction chain, not only that an instruction exists, in all three engines: a tool call or a consequential decision is non-conformant when the instruction it acts on, or one on its refs.parent / refs.origin lineage, is of an untrusted Appendix F class or is not held, when a user, operator, service or agent_identified instruction records no principal, when the principal's role is not one the task type authorises, or when the delegation the call rests on records agentce:chainVerified false; a delegation only the agent reports, no delegation, or a principal with no role reads insufficient_evidence, never conformant; verified-principal twins read conformant (18.122)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/cnd04_provenance.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/cnd04_provenance/cases.json (a tool call and the consequential decision it executes on an attested user, operator or service instruction with a principal whose role the task type authorises, under a verified enforcement-point delegation, directly or by two refs.parent hops, and on a self-reported instruction an enforcement-point PolicyDecision corroborates, which read conformant; the delegation recording chainVerified false, with and without that corroboration; a tool_output instruction, directly or as the root two hops up; a user, service or agent_identified instruction with no principal; a principal holding another role, or one the PolicyDecision records with another role; a refs.instruction naming nothing held; a consequential decision on an unverified delegation, and its twin where only the call that names no instruction fails; a consequential decision no call executes acting on tool output, which read non-conformant; a self-reported delegation, no delegation and a principal with no role, which read insufficient_evidence) gives the expected CND-04 outcome, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined",
+        "fail": "any case gives another CND-04 outcome, another set of failing events or another exit code in any engine, or quarantines a record"
+      },
+      "faults": [
+        {
+          "description": "Python ignores agentce:chainVerified, so a call resting on a delegation whose chain did not verify passes CND-04",
+          "file": "engines/python/agentce/graph.py",
+          "search": "                    str(ref), \"agentce:chainVerified\"\n                ):\n                    met = False\n",
+          "replace": "                    str(ref), \"agentce:chainVerified\"\n                ):\n                    pass\n"
+        },
+        {
+          "description": "TypeScript ignores agentce:chainVerified, so a call resting on a delegation whose chain did not verify passes CND-04",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "!this.store.literalValues(ref as string, \"agentce:chainVerified\").includes(\"true\")",
+          "replace": "!this.store.literalValues(ref as string, \"agentce:chainVerified\").length"
+        },
+        {
+          "description": "Java ignores agentce:chainVerified, so a call resting on a delegation whose chain did not verify passes CND-04",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "!store.literalValues(ref.textValue(), \"agentce:chainVerified\").contains(\"true\")",
+          "replace": "store.literalValues(ref.textValue(), \"agentce:chainVerified\").isEmpty()"
+        },
+        {
+          "description": "Python takes a user, operator, service or agent_identified instruction as ending at an authorised principal whether or not it records one",
+          "file": "engines/python/agentce/graph.py",
+          "search": "            ) or not (\n                isinstance(data.get(\"principal\"), dict)\n                and (_text(data[\"principal\"].get(\"id\")) or \"\").strip()\n            ):\n",
+          "replace": "            ):\n"
+        },
+        {
+          "description": "TypeScript takes a user, operator, service or agent_identified instruction as ending at an authorised principal whether or not it records one",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "        !isOneOf(data.source_class, AUTHORISED_INSTRUCTION) ||\n        !(isRecord(data.principal) && principalKey(data.principal))\n",
+          "replace": "        !isOneOf(data.source_class, AUTHORISED_INSTRUCTION) ||\n        !(isRecord(data.principal) || !principalKey(data.principal))\n"
+        },
+        {
+          "description": "Java takes a user, operator, service or agent_identified instruction as ending at an authorised principal whether or not it records one",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "                        || principalKey(data.get(\"principal\")).isEmpty()) {\n",
+          "replace": "                        || principalKey(data.get(\"principal\")) == null) {\n"
+        },
+        {
+          "description": "Python drops the role check: a principal whose role the task type does not authorise passes CND-04",
+          "file": "engines/python/agentce/graph.py",
+          "search": "                met, judged = met and role_met, judged and role_judged\n",
+          "replace": "                met, judged = met and (role_met or True), judged and role_judged\n"
+        },
+        {
+          "description": "TypeScript drops the role check: a principal whose role the task type does not authorise passes CND-04",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "        met = met && roleMet;\n",
+          "replace": "        met = met && (roleMet || true);\n"
+        },
+        {
+          "description": "Java drops the role check: a principal whose role the task type does not authorise passes CND-04",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "                    met = met && role[0];\n",
+          "replace": "                    met = met && (role[0] || true);\n"
+        }
+      ],
+      "fix_hint": "Run verification/gates/cnd04_provenance.sh; it names the engine, the case, the CND-04 outcome and failing events it gave and the ones expected. The rule is conductProvenance in each engine's graph builder (graph.py, graph.ts, Graph.java): instructionChain walks refs.parent and refs.origin to the chain's last Instruction (an authorised source class with a principal id), roleAuthorised reads that principal's role against the task type's authorised_principal_roles, and each delegation the acting calls name must be a held DelegationIssued with agentce:chainVerified true."
     },
     {
       "id": "VG-SOURCE-CLASS",

@@ -87,6 +87,12 @@ allow:
     class: legitimate
     justification: "Genesis all-zero prev pointer in the corpus evidence hash chain (no predecessor block)."
 
+  - path: verification/gates/fixtures/cnd04_provenance/cases.json
+    pattern: zero-digest
+    count: 3
+    class: legitimate
+    justification: "Synthetic all-zero policy_digest on the corroborating PolicyDecision of three VG-CND04-PROVENANCE cases; CND-04 reads no digest."
+
   - path: verification/gates/fixtures/deviations_human_actor/approval/bundle/events/subject.jsonl
     pattern: zero-digest
     count: 5

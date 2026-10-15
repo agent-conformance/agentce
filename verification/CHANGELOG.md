@@ -3,6 +3,25 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.109.0
+
+- `VG-CND04-PROVENANCE` (18.122, added). CND-04's shape asked only that a consequential action name an instruction,
+  so a tool call on tool output, or on a user instruction that records no principal, passed. All three engines now
+  follow the instruction's refs.parent and refs.origin chain to its last instruction. A call or consequential decision
+  is non-conformant when that chain holds an untrusted Appendix F class or a reference the bundle does not hold, when
+  the last instruction records no principal, when the principal's role is not one the task type's
+  `authorised_principal_roles` lists, or when the delegation the call rests on records `agentce:chainVerified` false.
+  A delegation only the agent reports, no delegation, or a principal with no role reads insufficient_evidence. The
+  gate runs 21 cases through the three real CLIs, with verified-principal twins that read conformant, and nine seeded
+  faults, three in each engine: the chainVerified check, the principal check and the role check.
+  The seeded-fault demos run in 26 lanes, since this demo put one of 25 over the 12-minute lane bound.
+- `VG-SOURCE-CLASS`, `VG-HELD-DECISION-EVERYWHERE` and `VG-APPROVAL-OUTCOME` (18.122, changed). Their CND-04 cases now
+  carry what the new reading needs: a principal with a role, a task type that authorises it and a verified delegation.
+  VG-SOURCE-CLASS adds `probe-k-cnd-04-self-report-unattested` (62 cases), which reads insufficient_evidence.
+- `VG-TRUST-MATRIX` (18.122, changed). The matrix adds the CND-04 role cells and the CND-05 cells where an action's
+  instruction is absent, null or a model call. CND-05 reads a tool call that names no instruction as
+  insufficient_evidence. The 24 CND-04 cells that now agree leave `open.json`.
+
 ## 0.108.0
 
 - `VG-CATALOG-READ-ONCE` (18.171, added). `assess --catalog-dir --trust-root` loaded a catalog's files in one read and
