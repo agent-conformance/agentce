@@ -283,6 +283,15 @@ def _after_every(time: str, actions: Collection[str]) -> bool:
     )
 
 
+def _whole(value: Any) -> int | None:
+    """A non-negative whole number (``5`` or ``5.0``, as a JSON or YAML reader in any engine may give it), else None."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if value < 0 or (isinstance(value, float) and not value.is_integer()):
+        return None
+    return int(value)
+
+
 class _TaskUsage:
     """What each task's records show it consumed (SPEC §7.7.3 budget row): the input and output tokens of
     its ModelCalls with a readable usage, whether one of them carried none, its spend calls, and whether
@@ -307,14 +316,10 @@ class _TaskUsage:
             self.spend_unknown.add(task)
             usage = data.get("usage")
             counts = [
-                usage.get(k) if isinstance(usage, dict) else None
+                _whole(usage.get(k)) if isinstance(usage, dict) else None
                 for k in ("input_tokens", "output_tokens")
             ]
-            read = [
-                n
-                for n in counts
-                if isinstance(n, int) and not isinstance(n, bool) and n >= 0
-            ]
+            read = [n for n in counts if n is not None]
             if len(read) == len(counts):
                 self.tokens[task] = self.tokens.get(task, 0) + sum(read)
             else:
@@ -325,9 +330,10 @@ class _TaskUsage:
     ) -> bool | None:
         """True within the limit, False over it, None when the records cannot tell."""
         if dimension == "tokens":
-            if not isinstance(limit, int):
+            cap = _whole(limit)
+            if cap is None:
                 return None
-            if self.tokens.get(task, 0) > limit:
+            if self.tokens.get(task, 0) > cap:
                 return False
             # no readable usage for the task, or a model call without one: the records cannot tell
             return (

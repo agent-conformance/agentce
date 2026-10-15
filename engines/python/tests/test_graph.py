@@ -1470,10 +1470,12 @@ def test_task_budget_tokens() -> None:
     assert set(_budget_flags([*over, unread[-1]], {"tokens": 500}).values()) == {
         ("false", True)
     }
-    for limit in (500.0, "500", True, -1):
+    for limit in (500.5, "500", True, -1):
         assert set(_budget_flags(under, {"tokens": limit}).values()) == {
             ("true", False)
         }
+    # a whole number written 500.0 reads as 500, as every engine's reader may give it
+    assert set(_budget_flags(over, {"tokens": 500.0}).values()) == {("false", True)}
 
 
 def test_task_budget_spend_compute_and_scope() -> None:
