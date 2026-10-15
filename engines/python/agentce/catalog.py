@@ -534,7 +534,7 @@ def load_and_lint(
 ) -> tuple[Catalog | None, list[str]]:
     """`lint_catalog`, also returning the catalog it loaded (None when it could not load one), so a
     caller that acts on a clean lint (``catalog sign``) uses the bytes that were linted (18.171)."""
-    if not (directory / "catalog.yaml").is_file():
+    if not signing.is_regular_file(directory / "catalog.yaml"):
         return None, [f"{directory}: no catalog.yaml"]
     try:
         catalog = load_catalog(directory)

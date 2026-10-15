@@ -1242,7 +1242,7 @@ def _package_catalog(catalog: Catalog, dest: Path) -> str:
     assert catalog.files is not None
     files = dict(catalog.files.files)
     sig_path = catalog.directory / signing.CATALOG_SIGNATURE_NAME
-    if sig_path.is_file():
+    if signing.is_regular_file(sig_path):
         files[signing.CATALOG_SIGNATURE_NAME] = sig_path.read_bytes()
     for rel, content in files.items():
         target = dest / rel
