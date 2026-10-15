@@ -172,11 +172,12 @@ public final class Graph {
             spendUnknown.addAll(tasks);
             JsonNode usage = data.get("usage");
             boolean object = usage != null && usage.isObject();
-            Long in = object ? DomainBinding.wholeNumber(usage.get("input_tokens")) : null;
-            Long out = object ? DomainBinding.wholeNumber(usage.get("output_tokens")) : null;
+            Long in = object ? DomainBinding.tokenCount(usage.get("input_tokens")) : null;
+            Long out = object ? DomainBinding.tokenCount(usage.get("output_tokens")) : null;
             for (String task : tasks) {
                 if (in != null && out != null) {
-                    tokens.merge(task, in + out, Long::sum);
+                    tokens.merge(task, Math.min(in + out, DomainBinding.TOKEN_CAP),
+                            (a, b) -> Math.min(a + b, DomainBinding.TOKEN_CAP));
                 } else {
                     tokensUnread.add(task);
                 }

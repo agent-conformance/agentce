@@ -1088,6 +1088,26 @@ class GraphTest {
     }
 
     @Test
+    void taskBudgetTokensPast2To53() {
+        long big = (1L << 53) - 1;
+        String bigUsage = "{\"input_tokens\":" + big + ",\"output_tokens\":" + big + "}";
+        List<JsonNode> many = new ArrayList<>();
+        for (int i = 0; i < 513; i++) {
+            many.add(modelCall("m" + i, "review", bigUsage));
+        }
+        // 513 calls of 2 * (2^53 - 1) would overflow a long; the sum saturates and reads over
+        assertEquals(List.of("false/judged"), budgetFlagSet(many, "{\"tokens\":1000}"));
+        List<JsonNode> huge = List.of(modelCall("m", "review", "{\"input_tokens\":" + (1L << 62) + ",\"output_tokens\":0}"));
+        assertEquals(List.of("false/judged"), budgetFlagSet(huge, "{\"tokens\":" + big + "}"));
+        // past 2^53 - 1 a tokens limit cannot be held exactly in every engine, so it is untold
+        List<JsonNode> past = List.of(modelCall("m", "review", "{\"input_tokens\":18014398509481985,\"output_tokens\":0}"));
+        assertEquals(List.of("true/untold"), budgetFlagSet(past, "{\"tokens\":18014398509481984}"));
+        List<JsonNode> edge = List.of(modelCall("m", "review", "{\"input_tokens\":" + big + ",\"output_tokens\":0}"));
+        assertEquals(List.of("true/judged"), budgetFlagSet(edge, "{\"tokens\":" + big + "}"));
+        assertEquals(List.of("false/judged"), budgetFlagSet(edge, "{\"tokens\":" + (big - 1) + "}"));
+    }
+
+    @Test
     void taskBudgetSpendComputeAndScope() {
         List<JsonNode> spend = List.of(budgetCall("s1", "pay", "spend", "review"));
         assertEquals(Map.of("s1", "false/judged"), budgetFlags(spend, "{\"spend\":0}", null));

@@ -33,6 +33,12 @@ def _strings(value: Any) -> frozenset[str]:
 BUDGET_DIMENSIONS = ("tokens", "compute_seconds", "spend")
 
 
+#: The largest count every engine holds exactly (2^53 - 1); a token limit above it is unreadable, and a token
+#: usage or sum above it saturates to ``TOKEN_CAP``, which exceeds every readable limit.
+MAX_COUNT = 2**53 - 1
+TOKEN_CAP = MAX_COUNT + 1
+
+
 def whole_number(value: Any) -> int | None:
     """A non-negative whole number (``5`` or ``5.0``, as a JSON or YAML reader in any engine may give it), else None."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -42,11 +48,18 @@ def whole_number(value: Any) -> int | None:
     return int(value)
 
 
+def token_count(value: Any) -> int | None:
+    """A token usage as CND-07 sums it: a whole number, saturated at ``TOKEN_CAP``; else None."""
+    count = whole_number(value)
+    return None if count is None else min(count, TOKEN_CAP)
+
+
 def _limit(dimension: str, value: Any) -> int | float | None:
     """A declared budget limit: a non-negative number, a whole one for tokens; anything else is None, a limit
     no usage can be shown to stay within."""
     if dimension == "tokens":
-        return whole_number(value)
+        limit = whole_number(value)
+        return limit if limit is not None and limit <= MAX_COUNT else None
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     return value if value >= 0 else None

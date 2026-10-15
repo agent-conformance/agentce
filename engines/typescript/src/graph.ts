@@ -13,7 +13,7 @@
  * This is a faithful port of the Python reference; it must build byte-identical graphs.
  */
 
-import { DomainBinding, wholeNumber } from "./domain";
+import { DomainBinding, TOKEN_CAP, tokenCount } from "./domain";
 import { ZERO_KEY, eventIri, isEventRef, principalIri } from "./iri";
 import { GraphStore } from "./store";
 import { compareLiterals } from "./structural";
@@ -48,12 +48,13 @@ class TaskUsage {
       return;
     }
     const usage = isRecord(data.usage) ? data.usage : {};
-    const usedIn = wholeNumber(usage.input_tokens);
-    const usedOut = wholeNumber(usage.output_tokens);
+    const usedIn = tokenCount(usage.input_tokens);
+    const usedOut = tokenCount(usage.output_tokens);
     for (const task of tasks) {
       this.spendUnknown.add(task);
       if (usedIn !== null && usedOut !== null) {
-        this.tokens.set(task, (this.tokens.get(task) ?? 0) + usedIn + usedOut);
+        // each term is at most TOKEN_CAP and rounding is monotonic, so a sum at or past 2^53 reads TOKEN_CAP exactly
+        this.tokens.set(task, Math.min((this.tokens.get(task) ?? 0) + usedIn + usedOut, TOKEN_CAP));
       } else {
         this.tokensUnread.add(task);
       }

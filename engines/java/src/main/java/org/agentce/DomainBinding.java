@@ -170,22 +170,31 @@ public final class DomainBinding {
         return out;
     }
 
+    /** The largest count every engine holds exactly (2^53 - 1); a token limit above it is unreadable, and a token
+     * usage or sum above it saturates to {@link #TOKEN_CAP}, which exceeds every readable limit. */
+    static final long MAX_COUNT = (1L << 53) - 1;
+    static final long TOKEN_CAP = MAX_COUNT + 1;
+
     /** A declared budget limit: a non-negative number, a whole one for tokens; anything else is null. */
     private static Double limit(String dimension, JsonNode value) {
         if ("tokens".equals(dimension)) {
-            Long whole = wholeNumber(value);
-            return whole == null ? null : whole.doubleValue();
+            Long tokens = tokenCount(value);
+            return tokens == null || tokens > MAX_COUNT ? null : tokens.doubleValue();
         }
         return value.isNumber() && value.doubleValue() >= 0 ? value.doubleValue() : null;
     }
 
-    /** A non-negative whole number ({@code 5}, or {@code 5.0} as another engine's reader may give it), else null. */
-    static Long wholeNumber(JsonNode value) {
+    /** A token count as CND-07 sums it: a non-negative whole number ({@code 5}, or {@code 5.0} as another engine's
+     * reader may give it), saturated at {@link #TOKEN_CAP} so no sum of them overflows; else null. */
+    static Long tokenCount(JsonNode value) {
         if (value == null || !value.isNumber()) {
             return null;
         }
         double d = value.doubleValue();
-        return d >= 0 && d == Math.rint(d) && !Double.isInfinite(d) ? value.longValue() : null;
+        if (!(d >= 0) || Double.isInfinite(d) || d != Math.rint(d)) {
+            return null;
+        }
+        return d > MAX_COUNT ? TOKEN_CAP : value.longValue();
     }
 
     /** The string members of a declared list; anything else declares none. */

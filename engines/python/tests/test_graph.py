@@ -1478,6 +1478,25 @@ def test_task_budget_tokens() -> None:
     assert set(_budget_flags(over, {"tokens": 500.0}).values()) == {("false", True)}
 
 
+def test_task_budget_tokens_past_2_53() -> None:
+    """CND-07 (18.175): token counts are held to 2^53, the largest every engine holds exactly. A usage or a sum
+    past 2^53 - 1 saturates and reads over every readable limit; a tokens limit past 2^53 - 1 is unreadable."""
+    big = 2**53 - 1
+    many = [
+        _model_call(f"m{i}", "review", {"input_tokens": big, "output_tokens": big})
+        for i in range(513)
+    ]
+    assert set(_budget_flags(many, {"tokens": 1000}).values()) == {("false", True)}
+    huge = [_model_call("m", "review", {"input_tokens": 2**62, "output_tokens": 0})]
+    assert set(_budget_flags(huge, {"tokens": big}).values()) == {("false", True)}
+    # 2^54 + 1 tokens against a 2^54 limit: the limit cannot be held exactly in every engine, so it is untold
+    past = [_model_call("m", "review", {"input_tokens": 2**54 + 1, "output_tokens": 0})]
+    assert set(_budget_flags(past, {"tokens": 2**54}).values()) == {("true", False)}
+    edge = [_model_call("m", "review", {"input_tokens": big, "output_tokens": 0})]
+    assert set(_budget_flags(edge, {"tokens": big}).values()) == {("true", True)}
+    assert set(_budget_flags(edge, {"tokens": big - 1}).values()) == {("false", True)}
+
+
 def test_task_budget_spend_compute_and_scope() -> None:
     """Spend is told only against a zero budget; compute time is never recorded; a task held to no scope cannot be
     told while the binding declares scopes; an untasked call and a budget left out set no limit."""

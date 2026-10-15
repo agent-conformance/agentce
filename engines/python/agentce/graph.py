@@ -19,7 +19,7 @@ from collections import Counter
 from collections.abc import Collection, Iterable
 from typing import Any
 
-from .domain import DomainBinding, whole_number
+from .domain import TOKEN_CAP, DomainBinding, token_count
 from .iri import ZERO_KEY, event_iri, is_event_ref, principal_iri
 from .store import GraphStore
 from .structural import compare_literals
@@ -307,11 +307,13 @@ class _TaskUsage:
         usage = data.get("usage")
         usage = usage if isinstance(usage, dict) else {}
         used_in, used_out = (
-            whole_number(usage.get(k)) for k in ("input_tokens", "output_tokens")
+            token_count(usage.get(k)) for k in ("input_tokens", "output_tokens")
         )
         for task in tasks:
             if used_in is not None and used_out is not None:
-                self.tokens[task] = self.tokens.get(task, 0) + used_in + used_out
+                self.tokens[task] = min(
+                    self.tokens.get(task, 0) + used_in + used_out, TOKEN_CAP
+                )
             else:
                 self.tokens_unread.add(task)
 

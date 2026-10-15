@@ -35,11 +35,23 @@ export function wholeNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
 }
 
+/** The largest count every engine holds exactly (2^53 - 1); a token limit above it is unreadable, and a
+ * token usage or sum above it saturates to `TOKEN_CAP`, which exceeds every readable limit. */
+export const MAX_COUNT = Number.MAX_SAFE_INTEGER;
+export const TOKEN_CAP = MAX_COUNT + 1;
+
+/** A token usage as CND-07 sums it: a whole number, saturated at `TOKEN_CAP`; else null. */
+export function tokenCount(value: unknown): number | null {
+  const count = wholeNumber(value);
+  return count === null ? null : Math.min(count, TOKEN_CAP);
+}
+
 /** A declared budget limit: a non-negative number, a whole one for tokens; anything else is null, a
  * limit no usage can be shown to stay within. */
 function limit(dimension: string, value: unknown): number | null {
   if (dimension === "tokens") {
-    return wholeNumber(value);
+    const tokens = wholeNumber(value);
+    return tokens !== null && tokens <= MAX_COUNT ? tokens : null;
   }
   return typeof value === "number" && value >= 0 ? value : null;
 }

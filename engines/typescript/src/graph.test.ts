@@ -1272,6 +1272,21 @@ test("task budget tokens: an unreadable usage or limit leaves an under-limit tas
   }
 });
 
+test("task budget tokens: counts are held to 2^53, a sum past it reads over, a limit past it is untold", () => {
+  const big = Number.MAX_SAFE_INTEGER;
+  const many = Array.from({ length: 513 }, (_, i) =>
+    modelCall(`m${i}`, "review", { input_tokens: big, output_tokens: big }),
+  );
+  assert.deepEqual(flagSet(budgetFlags(many, { tokens: 1000 })), ['["false",true]']);
+  const huge = [modelCall("m", "review", { input_tokens: 2 ** 62, output_tokens: 0 })];
+  assert.deepEqual(flagSet(budgetFlags(huge, { tokens: big })), ['["false",true]']);
+  const past = [modelCall("m", "review", { input_tokens: 2 ** 54, output_tokens: 1 })];
+  assert.deepEqual(flagSet(budgetFlags(past, { tokens: 2 ** 54 })), ['["true",false]']);
+  const edge = [modelCall("m", "review", { input_tokens: big, output_tokens: 0 })];
+  assert.deepEqual(flagSet(budgetFlags(edge, { tokens: big })), ['["true",true]']);
+  assert.deepEqual(flagSet(budgetFlags(edge, { tokens: big - 1 })), ['["false",true]']);
+});
+
 test("task budget spend and compute: spend told only against zero, compute never", () => {
   const spend = [budgetCall("s1", "pay", "spend", "review")];
   assert.deepEqual(budgetFlags(spend, { spend: 0 }), { s1: ["false", true] });
