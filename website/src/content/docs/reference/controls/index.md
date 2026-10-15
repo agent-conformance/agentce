@@ -27,7 +27,7 @@ Every control across the EU AI Act base catalog and its overlays, and the NIST A
 | [`CND-01`](/reference/controls/cnd-01/) | Every action stays within its declared task effect scope | high | automated | 2 |
 | [`CND-02`](/reference/controls/cnd-02/) | High-effect actions are gated by a recorded approval | high | automated | 2 |
 | [`CND-03`](/reference/controls/cnd-03/) | Harm signals are triaged into an incident or recorded decision | medium | semi-automated | 3 |
-| [`CND-04`](/reference/controls/cnd-04/) | Consequential tool calls act on a recorded instruction | high | automated | 2 |
+| [`CND-04`](/reference/controls/cnd-04/) | Consequential actions trace back to an authorised principal through a verified delegation | high | automated | 2 |
 | [`CND-05`](/reference/controls/cnd-05/) | No action is taken on an untrusted instruction | high | automated | 2 |
 | [`CND-06`](/reference/controls/cnd-06/) | Every untrusted instruction is refused | medium | automated | 2 |
 | [`CND-07`](/reference/controls/cnd-07/) | Task and window resource budgets are not exceeded | medium | automated | 2 |

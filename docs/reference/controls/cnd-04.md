@@ -1,6 +1,6 @@
 # CND-04
 
-Consequential tool calls act on a recorded instruction.
+Consequential actions trace back to an authorised principal through a verified delegation.
 
 | Field | Value |
 |---|---|

@@ -1,9 +1,9 @@
 ---
 title: CND-04
-description: Consequential tool calls act on a recorded instruction (Conduct overlay).
+description: Consequential actions trace back to an authorised principal through a verified delegation (Conduct overlay).
 ---
 
-Consequential tool calls act on a recorded instruction.
+Consequential actions trace back to an authorised principal through a verified delegation.
 
 | Field | Value |
 |---|---|
