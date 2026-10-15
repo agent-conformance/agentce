@@ -557,11 +557,12 @@ export function verifyCatalog(
   source: string | CatalogFiles,
   trust: TrustRoot,
 ): CatalogVerifyResult {
-  const dir = typeof source === "string" ? source : source.root;
+  const given = typeof source === "string" ? null : source;
+  const dir = given?.root ?? (source as string);
   let digest: string;
   try {
     // One read (18.171): the digest checked is the digest of the bytes given, or of one read of `dir`.
-    digest = digestFiles((typeof source === "string" ? readCatalogFiles(source) : source).files);
+    digest = digestFiles((given ?? readCatalogFiles(dir)).files);
   } catch (err) {
     throw catalogUnreadable(dir, err);
   }

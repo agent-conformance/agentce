@@ -358,7 +358,7 @@ class CatalogTest {
     @Test
     void readOnceLoadKeepsTheBytesItRead(@TempDir Path tmp) throws IOException {
         Path dir = tmp.resolve("c");
-        copyTree(Fixtures.BASE, dir);
+        Fixtures.copyTree(Fixtures.BASE, dir);
         String before = Catalog.provenanceDigest(dir);
         Catalog catalog = Catalog.load(dir);
         Path file = dir.resolve("controls/" + catalog.controls.get(0).id + ".yaml");
@@ -374,7 +374,7 @@ class CatalogTest {
     @Test
     void readOnceVerifyDecidesOnTheGivenFiles(@TempDir Path tmp) throws IOException {
         Path dir = tmp.resolve("c");
-        copyTree(TestPaths.repoRoot().resolve("spec/catalogs/base/baseline"), dir);
+        Fixtures.copyTree(TestPaths.repoRoot().resolve("spec/catalogs/base/baseline"), dir);
         Catalog.CatalogFiles files = Catalog.readFiles(dir, java.util.Map.of());
         Path file = dir.resolve("controls/DOC-01.yaml");
         byte[] signed = Files.readAllBytes(file);
@@ -384,18 +384,5 @@ class CatalogTest {
         Catalog.CatalogFiles edited = Catalog.readFiles(dir, java.util.Map.of());
         Files.write(file, signed);
         assertEquals(false, Verify.verifyCatalog(edited, Verify.vendoredTrust()).get("verified").asBoolean());
-    }
-
-    private static void copyTree(Path from, Path to) throws IOException {
-        try (var paths = Files.walk(from)) {
-            for (Path p : (Iterable<Path>) paths::iterator) {
-                Path target = to.resolve(from.relativize(p).toString());
-                if (Files.isDirectory(p)) {
-                    Files.createDirectories(target);
-                } else {
-                    Files.copy(p, target);
-                }
-            }
-        }
     }
 }

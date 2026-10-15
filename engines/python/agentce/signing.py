@@ -369,14 +369,6 @@ def covered_files(root: Path, *, exclude: frozenset[str] = frozenset()) -> list[
     ]
 
 
-def _digest_line(rel: str, content: bytes) -> bytes:
-    return (
-        rel.encode("utf-8")
-        + b"\x00"
-        + hashlib.sha256(content).hexdigest().encode("ascii")
-    )
-
-
 def digest_tree(root: Path, *, exclude: frozenset[str] = frozenset()) -> str:
     """Content-address a directory: ``sha256:`` over the sorted ``<relpath>\\0<filehash>`` lines.
 
@@ -384,11 +376,9 @@ def digest_tree(root: Path, *, exclude: frozenset[str] = frozenset()) -> str:
     sorted by POSIX relative path, and skips dotfiles, ``__pycache__``, and any name in ``exclude`` (e.g. the signature file itself), so the same
     directory yields the same digest on any host — the basis of the offline catalog/release check.
     """
-    lines = [
-        _digest_line(rel, (root / rel).read_bytes())
-        for rel in covered_files(root, exclude=exclude)
-    ]
-    return "sha256:" + hashlib.sha256(b"\n".join(lines)).hexdigest()
+    return digest_files(
+        {rel: (root / rel).read_bytes() for rel in covered_files(root, exclude=exclude)}
+    )
 
 
 def digest_files(
@@ -396,7 +386,11 @@ def digest_files(
 ) -> str:
     """`digest_tree` over bytes already read: the same digest, for the same relpaths and contents."""
     lines = [
-        _digest_line(rel, files[rel]) for rel in sorted(files) if rel not in exclude
+        rel.encode("utf-8")
+        + b"\x00"
+        + hashlib.sha256(files[rel]).hexdigest().encode("ascii")
+        for rel in sorted(files)
+        if rel not in exclude
     ]
     return "sha256:" + hashlib.sha256(b"\n".join(lines)).hexdigest()
 

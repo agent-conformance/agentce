@@ -34,10 +34,12 @@ public final class Yaml {
 
     /** Parse a YAML file to a {@link JsonNode}; a missing file throws. Returns {@code null} for empty input. */
     public static JsonNode parseFile(Path path) {
+        String text;
         try {
-            return MAPPER.readTree(Files.readString(path, StandardCharsets.UTF_8));
+            text = Files.readString(path, StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new IllegalArgumentException("cannot read YAML " + path + ": " + e.getMessage(), e);
         }
+        return parse(text, path);
     }
 }
