@@ -39,7 +39,7 @@ import re
 import stat
 from dataclasses import dataclass, field
 from pathlib import Path
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from typing import Any
 
 from cryptography.exceptions import InvalidSignature
@@ -71,6 +71,9 @@ __all__ = [
     "KeylessSigner",
     "sha256_prefixed",
     "digest_tree",
+    "digest_files",
+    "CatalogFiles",
+    "read_catalog_files",
     "intoto_statement",
     "issue_certificate",
     "sign_statement",
@@ -366,6 +369,14 @@ def covered_files(root: Path, *, exclude: frozenset[str] = frozenset()) -> list[
     ]
 
 
+def _digest_line(rel: str, content: bytes) -> bytes:
+    return (
+        rel.encode("utf-8")
+        + b"\x00"
+        + hashlib.sha256(content).hexdigest().encode("ascii")
+    )
+
+
 def digest_tree(root: Path, *, exclude: frozenset[str] = frozenset()) -> str:
     """Content-address a directory: ``sha256:`` over the sorted ``<relpath>\\0<filehash>`` lines.
 
@@ -373,11 +384,54 @@ def digest_tree(root: Path, *, exclude: frozenset[str] = frozenset()) -> str:
     sorted by POSIX relative path, and skips dotfiles, ``__pycache__``, and any name in ``exclude`` (e.g. the signature file itself), so the same
     directory yields the same digest on any host — the basis of the offline catalog/release check.
     """
-    lines: list[bytes] = []
-    for rel in covered_files(root, exclude=exclude):
-        file_hash = hashlib.sha256((root / rel).read_bytes()).hexdigest()
-        lines.append(rel.encode("utf-8") + b"\x00" + file_hash.encode("ascii"))
+    lines = [
+        _digest_line(rel, (root / rel).read_bytes())
+        for rel in covered_files(root, exclude=exclude)
+    ]
     return "sha256:" + hashlib.sha256(b"\n".join(lines)).hexdigest()
+
+
+def digest_files(
+    files: Mapping[str, bytes], *, exclude: frozenset[str] = frozenset()
+) -> str:
+    """`digest_tree` over bytes already read: the same digest, for the same relpaths and contents."""
+    lines = [
+        _digest_line(rel, files[rel]) for rel in sorted(files) if rel not in exclude
+    ]
+    return "sha256:" + hashlib.sha256(b"\n".join(lines)).hexdigest()
+
+
+@dataclass(frozen=True)
+class CatalogFiles:
+    """One read of a catalog folder (18.171): every file the catalog digest covers, by POSIX relpath,
+    read once. The signature check and the loader both read these bytes, never the folder again, so a
+    file changed on disk during a run cannot be loaded unverified or verified unloaded."""
+
+    root: Path
+    files: Mapping[str, bytes]
+
+    def digest(self, *, exclude: frozenset[str] = frozenset()) -> str:
+        return digest_files(self.files, exclude=exclude)
+
+    def text(self, rel: str) -> str:
+        return self.files[rel].decode("utf-8")
+
+
+def read_catalog_files(
+    root: Path, *, first: Mapping[str, bytes] | None = None
+) -> CatalogFiles:
+    """Read every file the catalog digest covers under ``root`` (`covered_files`, less the signature)
+    once. ``first`` holds files the caller has already read (the loader reads ``catalog.yaml`` first,
+    so a missing one is refused as before); those bytes are kept, never read a second time."""
+    given = first or {}
+    rels = covered_files(root, exclude=frozenset({CATALOG_SIGNATURE_NAME}))
+    return CatalogFiles(
+        root,
+        {
+            rel: given[rel] if rel in given else (root / rel).read_bytes()
+            for rel in rels
+        },
+    )
 
 
 def intoto_statement(
@@ -743,17 +797,21 @@ def statement_subject_digest(payload: bytes) -> str:
     return "sha256:" + sha256
 
 
-def verify_catalog_directory(directory: Path, trust: TrustRoot) -> Verified:
+def verify_catalog_directory(source: Path | CatalogFiles, trust: TrustRoot) -> Verified:
     """Verify a catalog directory's detached signature against ``trust`` (SPEC §8.7).
 
     One place decides whether a catalog on disk may be used: the signature file must be present, the
-    DSSE envelope must verify against the trust root, and the digest it covers must equal a fresh
-    recomputation of the directory's content. Any failure raises :class:`VerificationError` — an
+    DSSE envelope must verify against the trust root, and the digest it covers must equal the digest
+    of the catalog's content. ``source`` is the folder, or the :class:`CatalogFiles` a loader already
+    read from it: then the digest is of exactly those bytes, so what verifies is what was loaded
+    (18.171). Any failure raises :class:`VerificationError` — an
     absent signature raises the :class:`UnsignedError` subclass, so a caller that reports "unsigned"
     differently from "did not verify" can tell them apart. Never contacts the network.
     """
     # Walk first, as TypeScript and Java do: a tree that cannot be read is unreadable, signed or not.
-    recomputed = digest_tree(directory, exclude=frozenset({CATALOG_SIGNATURE_NAME}))
+    files = source if isinstance(source, CatalogFiles) else read_catalog_files(source)
+    directory = files.root
+    recomputed = files.digest()
     sig_path = directory / CATALOG_SIGNATURE_NAME
     if not sig_path.is_file():
         raise UnsignedError.refusal("verify.catalog_unsigned")

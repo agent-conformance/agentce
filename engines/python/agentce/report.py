@@ -2378,7 +2378,7 @@ def _catalog_refs(catalogs: list[Catalog]) -> list[dict[str, str]]:
         {
             "id": c.id,
             "version": c.version,
-            "digest": catalog_provenance_digest(c.directory),
+            "digest": catalog_provenance_digest(c.files or c.directory),
         }
         for c in catalogs
     ]

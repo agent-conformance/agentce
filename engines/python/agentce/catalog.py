@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 from importlib import resources
 from pathlib import Path
+from collections.abc import Iterable
 from typing import Any
 
 import jsonschema
@@ -28,7 +29,7 @@ from .error_catalogue import MESSAGE_KEYS
 from .errors import InputError, catalog_unreadable
 from .graph import build_graph
 from .i18n_format import format_message
-from .psp import PropertyShape, Shape, load_shapes
+from .psp import PropertyShape, Shape, parse_shapes_ttl
 from .source_class import SOURCE_CLASS_FROM, SOURCE_CLASS_RANK
 from .structural import evaluate_control, evaluate_shape
 
@@ -44,16 +45,22 @@ _SOURCE_CLASS_FROM_UNKNOWN = "catalog.control.source_class_from_unknown"
 _PROVENANCE_EXCLUDE = frozenset({signing.CATALOG_SIGNATURE_NAME, "catalog.yaml"})
 
 
-def catalog_provenance_digest(directory: Path) -> str:
+def catalog_provenance_digest(source: Path | signing.CatalogFiles) -> str:
     """The content digest a catalog's provenance block must carry (SPEC §14.5 CP-3).
 
     Content-addresses every catalog file except the detached signature and ``catalog.yaml`` (which
     holds the provenance block), so a rebranded catalog whose rules or shapes differ fails validation.
+    ``source`` is the folder, or the files a load read from it (18.171), whose bytes are then the ones
+    digested.
     """
-    return signing.digest_tree(directory, exclude=_PROVENANCE_EXCLUDE)
+    if isinstance(source, signing.CatalogFiles):
+        return source.digest(exclude=_PROVENANCE_EXCLUDE)
+    return signing.digest_tree(source, exclude=_PROVENANCE_EXCLUDE)
 
 
-def _provenance_problems(directory: Path, meta: dict[str, Any]) -> list[str]:
+def _provenance_problems(
+    files: signing.CatalogFiles, meta: dict[str, Any]
+) -> list[str]:
     """Problems with the catalog's ``provenance`` block (SPEC §14.5 CP-3)."""
     provenance = meta.get("provenance")
     if not isinstance(provenance, dict):
@@ -66,7 +73,7 @@ def _provenance_problems(directory: Path, meta: dict[str, Any]) -> list[str]:
         problems.append(
             "catalog.yaml: provenance.version does not match the catalog version"
         )
-    expected = catalog_provenance_digest(directory)
+    expected = catalog_provenance_digest(files)
     if provenance.get("digest") != expected:
         problems.append(
             f"catalog.yaml: provenance.digest does not match the catalog content (expected {expected})"
@@ -103,6 +110,9 @@ class Catalog:
     shapes: dict[str, Shape]
     #: Each declared ``evaluation.evidence_shape`` path -> the IRI of the one node shape it holds.
     evidence_shape_iris: dict[str, str] = field(default_factory=dict)
+    #: The bytes the catalog was loaded from (18.171): its signature check, provenance digest and
+    #: packaged copy read these, never the folder again. None only for a catalog built in memory.
+    files: signing.CatalogFiles | None = None
 
     def shape_for(self, control: ControlSpec) -> Shape | None:
         if control.shape_path is None:
@@ -205,31 +215,24 @@ def _refuse_uncovered(key: str, control_id: str, path: str) -> InputError:
 
 
 def _load_evidence_shape(
-    directory: Path, control_id: str, path: str, covered: set[str]
+    files: signing.CatalogFiles, control_id: str, path: str
 ) -> tuple[str, dict[str, Shape]]:
     """The shapes in the file a control names as ``evaluation.evidence_shape``. The file must be one the
     catalog digest covers, named exactly (18.168), and hold exactly one node shape with a target, whose IRI
     is returned with the file's shapes; anything else, including a file outside the catalog directory
     (which its signature would not cover), is refused, so a declared evidence shape can never be skipped
     and read as a pass."""
+    directory = files.root
     resolved = (directory / path).resolve()
-    inside = path in covered and resolved.is_relative_to(directory.resolve())
-    loaded = load_shapes(resolved, path) if inside and resolved.is_file() else {}
+    inside = path in files.files and resolved.is_relative_to(directory.resolve())
+    loaded = parse_shapes_ttl(files.text(path), path) if inside else {}
     targeted = [iri for iri, shape in loaded.items() if shape.has_target]
     if len(targeted) != 1:
         raise _refuse_uncovered(_EVIDENCE_SHAPE_UNRESOLVED, control_id, path)
     return targeted[0], loaded
 
 
-def _covered(directory: Path) -> set[str]:
-    return set(
-        signing.covered_files(
-            directory, exclude=frozenset({signing.CATALOG_SIGNATURE_NAME})
-        )
-    )
-
-
-def _control_files(covered: set[str]) -> list[str]:
+def _control_files(covered: Iterable[str]) -> list[str]:
     """The covered ``controls/<name>.yaml`` files, one level deep as the listing always was, sorted."""
     return sorted(
         rel
@@ -243,7 +246,9 @@ def load_catalog(directory: Path) -> Catalog:
     covers are read, each by its exact name (`signing.covered_files`, 18.168): a dot-named control file
     is never loaded, and a shape path that names anything else is refused, so a signed catalog cannot
     change what it loads without changing its digest. The load walks the folder as the digest does, so
-    a folder it cannot read is refused as input.catalog_unreadable, as verify and sign refuse it."""
+    a folder it cannot read is refused as input.catalog_unreadable, as verify and sign refuse it.
+    Every covered file is read once (`signing.read_catalog_files`, 18.171) and kept as
+    ``Catalog.files``, which the signature check and the provenance digest read in turn."""
     try:
         return _load_catalog(directory)
     except (OSError, UnicodeError) as exc:
@@ -251,28 +256,28 @@ def load_catalog(directory: Path) -> Catalog:
 
 
 def _load_catalog(directory: Path) -> Catalog:
-    meta = (
-        yaml.safe_load((directory / "catalog.yaml").read_text(encoding="utf-8")) or {}
-    )
-    covered = _covered(directory)
+    # catalog.yaml first, as before: a folder without one is refused naming it.
+    meta_bytes = (directory / "catalog.yaml").read_bytes()
+    meta = yaml.safe_load(meta_bytes.decode("utf-8")) or {}
+    files = signing.read_catalog_files(directory, first={"catalog.yaml": meta_bytes})
     controls: list[ControlSpec] = []
     shapes: dict[str, Shape] = {}
     evidence_shape_iris: dict[str, str] = {}
-    for rel in _control_files(covered):
-        data = yaml.safe_load((directory / rel).read_text(encoding="utf-8"))
+    for rel in _control_files(files.files):
+        data = yaml.safe_load(files.text(rel))
         control = _control_from_dict(data)
         controls.append(control)
         if control.shape_path is not None:
-            if control.shape_path not in covered:
+            if control.shape_path not in files.files:
                 raise _refuse_uncovered(
                     _SHAPE_UNRESOLVED, control.id, control.shape_path
                 )
             shapes.update(
-                load_shapes(directory / control.shape_path, control.shape_path)
+                parse_shapes_ttl(files.text(control.shape_path), control.shape_path)
             )
         if control.evidence_shape_path is not None:
             iri, loaded = _load_evidence_shape(
-                directory, control.id, control.evidence_shape_path, covered
+                files, control.id, control.evidence_shape_path
             )
             evidence_shape_iris[control.evidence_shape_path] = iri
             shapes.update(loaded)
@@ -283,6 +288,7 @@ def _load_catalog(directory: Path) -> Catalog:
         controls=controls,
         shapes=shapes,
         evidence_shape_iris=evidence_shape_iris,
+        files=files,
     )
 
 
@@ -513,22 +519,49 @@ def lint_catalog(
     ``require_provenance`` (SPEC §14.5 CP-3), ``catalog.yaml`` must carry a ``provenance`` block
     (``source``, ``version``, ``digest``) whose digest matches the catalog content, so a rebranded
     catalog either shows its origin or fails validation."""
-    problems: list[str] = []
+    return load_and_lint(
+        directory,
+        require_verification_flags=require_verification_flags,
+        require_provenance=require_provenance,
+    )[1]
+
+
+def load_and_lint(
+    directory: Path,
+    *,
+    require_verification_flags: bool = False,
+    require_provenance: bool = False,
+) -> tuple[Catalog | None, list[str]]:
+    """`lint_catalog`, also returning the catalog it loaded (None when it could not load one), so a
+    caller that acts on a clean lint (``catalog sign``) uses the bytes that were linted (18.171)."""
     if not (directory / "catalog.yaml").is_file():
-        return [f"{directory}: no catalog.yaml"]
-    schema = _load_control_schema()
+        return None, [f"{directory}: no catalog.yaml"]
     try:
         catalog = load_catalog(directory)
     except (yaml.YAMLError, OSError) as exc:
-        return [f"{directory}: cannot load catalog ({exc})"]
+        return None, [f"{directory}: cannot load catalog ({exc})"]
     except InputError as exc:
-        return [f"{exc.key}: {exc.cause}"]
-
-    meta = (
-        yaml.safe_load((directory / "catalog.yaml").read_text(encoding="utf-8")) or {}
+        return None, [f"{exc.key}: {exc.cause}"]
+    return catalog, _lint_loaded(
+        catalog,
+        require_verification_flags=require_verification_flags,
+        require_provenance=require_provenance,
     )
+
+
+def _lint_loaded(
+    catalog: Catalog, *, require_verification_flags: bool, require_provenance: bool
+) -> list[str]:
+    problems: list[str] = []
+    directory = catalog.directory
+    schema = _load_control_schema()
+
+    # The bytes the load read (18.171): what is linted is what the provenance digest covers.
+    files = catalog.files
+    assert files is not None
+    meta = yaml.safe_load(files.text("catalog.yaml")) or {}
     if require_provenance:
-        problems.extend(_provenance_problems(directory, meta))
+        problems.extend(_provenance_problems(files, meta))
     floor = meta.get("min_crosswalk_frameworks", 0)
     if not isinstance(floor, int) or isinstance(floor, bool) or floor < 0:
         problems.append(
@@ -537,8 +570,8 @@ def lint_catalog(
         floor = 0
 
     domain = _load_test_domain(directory)
-    for rel in _control_files(_covered(directory)):
-        data = yaml.safe_load((directory / rel).read_text(encoding="utf-8"))
+    for rel in _control_files(files.files):
+        data = yaml.safe_load(files.text(rel))
         try:
             jsonschema.validate(data, schema)
         except jsonschema.ValidationError as exc:

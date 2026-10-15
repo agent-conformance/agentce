@@ -57,7 +57,7 @@ from ..assess import (
 from ..blind_spots import catalog_support_view, compute_blind_spots
 from ..bundle import confine_to_root, copy_bundle, load_bundle
 from ..canonical import CanonicalizationError, canonical_string, canonicalize
-from ..catalog import Catalog, lint_catalog, load_catalog
+from ..catalog import Catalog, lint_catalog, load_and_lint, load_catalog
 from ..collect import EnvSecretManager, SourceSpec, load_config, run_collect
 from ..config import resolve as resolve_config
 from ..conformance import run_ecs
@@ -432,9 +432,9 @@ def _refused(result: CommandResult, *refusals: signing.VerificationError) -> Non
 def _verify_catalog(result: CommandResult, catalog_dir: Path) -> CommandResult:
     """Verify a catalog directory's signature offline against the vendored trust root (SPEC §8.7)."""
     try:
-        recomputed = signing.digest_tree(
-            catalog_dir, exclude=frozenset({signing.CATALOG_SIGNATURE_NAME})
-        )
+        # One read (18.171): the digest reported is the digest verified.
+        files = signing.read_catalog_files(catalog_dir)
+        recomputed = files.digest()
     except (
         OSError,
         UnicodeError,
@@ -442,9 +442,7 @@ def _verify_catalog(result: CommandResult, catalog_dir: Path) -> CommandResult:
         raise _catalog_unreadable(catalog_dir, exc) from exc
     result.data.update({"catalog": str(catalog_dir), "digest": recomputed})
     try:
-        verified = signing.verify_catalog_directory(
-            catalog_dir, signing.vendored_trust()
-        )
+        verified = signing.verify_catalog_directory(files, signing.vendored_trust())
     except OSError as exc:
         raise _catalog_unreadable(catalog_dir, exc) from exc
     except signing.UnsignedError as exc:
@@ -1238,6 +1236,22 @@ def _resolve_emit(
     return (emit if emit is not None else ASSESS_DEFAULT_EMIT), None, None
 
 
+def _package_catalog(catalog: Catalog, dest: Path) -> str:
+    """Write ``catalog``'s loaded files and its signature file under ``dest``; return the digest
+    `verify --report` recomputes over the copy (`signing.digest_tree`, the signature included)."""
+    assert catalog.files is not None
+    files = dict(catalog.files.files)
+    sig_path = catalog.directory / signing.CATALOG_SIGNATURE_NAME
+    if sig_path.is_file():
+        files[signing.CATALOG_SIGNATURE_NAME] = sig_path.read_bytes()
+    for rel, content in files.items():
+        target = dest / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+    dest.mkdir(parents=True, exist_ok=True)
+    return signing.digest_files(files)
+
+
 def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="assess")
     out = _opt_str(ns, "out") or DEFAULT_OUT_DIR
@@ -1369,15 +1383,18 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             shutil.copy2(domain_path_early, bundle_out / "domain.linkml.yaml")
         if deviations_path is not None:
             shutil.copy2(deviations_path, bundle_out / "deviations.yaml")
+        # The packaged copy is the bytes the run loaded and verified (18.171), never a second read.
+        by_dir = {c.directory: c for c in catalogs}
         for i, raw_dir in enumerate(raw_catalog_dirs):
             src_dir = _require_dir(
                 raw_dir, key="catalog-dir", what="the catalog directory"
             )
-            cat = load_catalog(src_dir)
+            cat = by_dir[src_dir]
             label = f"{cat.id}@{cat.version}"
             catalog_dir_order.append(label)
-            catalog_dir_digests[label] = signing.digest_tree(src_dir)
-            shutil.copytree(src_dir, bundle_out / "catalog" / str(i))
+            catalog_dir_digests[label] = _package_catalog(
+                cat, bundle_out / "catalog" / str(i)
+            )
     # Stage 2: integrity verification, one IntegrityResult per stream.
     integrity_results = verify_bundle(
         ingested.raw_accepted, loaded.manifest, loaded.root
@@ -1846,7 +1863,8 @@ def _verify_catalog_dirs(
     limitations: list[str] = []
     for catalog in loaded:
         try:
-            signing.verify_catalog_directory(catalog.directory, trust)
+            # The bytes the load read (18.171), so what verifies is what is assessed.
+            signing.verify_catalog_directory(catalog.files or catalog.directory, trust)
         except OSError as exc:
             # Unreadable is not unverified: --allow-unverified-catalog does not cover it (18.68).
             raise _catalog_unreadable(catalog.directory, exc) from exc
@@ -3299,8 +3317,9 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
             f"{directory} has no catalog.yaml.",
             "pass a catalog directory, or scaffold one first: `agentce catalog init <dir>`.",
         )
-    lint_problems = lint_catalog(directory)
-    if lint_problems:
+    # One read (18.171): what is signed is the bytes that were linted.
+    linted, lint_problems = load_and_lint(directory)
+    if linted is None or lint_problems:
         raise InputError(
             "catalog.sign_lint_failed",
             f"{directory} fails `catalog lint`: {'; '.join(lint_problems)}.",
@@ -3379,12 +3398,8 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
     signer = signing.KmsSigner(private_key=key)
 
     catalog_id = catalog_dir.name
-    try:
-        digest = signing.digest_tree(
-            directory, exclude=frozenset({signing.CATALOG_SIGNATURE_NAME})
-        )
-    except (OSError, UnicodeError) as exc:  # as verify --catalog: unreadable or a cycle
-        raise _catalog_unreadable(directory, exc) from exc
+    assert linted.files is not None
+    digest = linted.files.digest()
     statement = signing.intoto_statement(
         subject_name=catalog_id,
         digest=digest,

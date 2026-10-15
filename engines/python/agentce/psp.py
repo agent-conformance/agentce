@@ -15,7 +15,6 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from importlib import resources
-from pathlib import Path
 from typing import Any
 
 from rdflib import RDF, BNode, Graph, Literal, URIRef
@@ -364,7 +363,3 @@ def parse_shapes_ttl(text: str, shown: str = "(inline)") -> dict[str, Shape]:
             key, format_message(entry.cause, path=shown, feature=feature), entry.fix
         )
     return parse_shapes(graph)
-
-
-def load_shapes(path: Path, shown: str) -> dict[str, Shape]:
-    return parse_shapes_ttl(path.read_text(encoding="utf-8"), shown)

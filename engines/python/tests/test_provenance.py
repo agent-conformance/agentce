@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentce import catalog
+from agentce import catalog, signing
 from agentce.catalog import catalog_provenance_digest, lint_catalog
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -18,7 +18,9 @@ def test_base_catalog_provenance_is_valid() -> None:
 def test_missing_provenance_only_matters_when_required(tmp_path: Path) -> None:
     (tmp_path / "controls").mkdir()
     (tmp_path / "controls" / "A.yaml").write_text("x: 1\n", encoding="utf-8")
-    problems = catalog._provenance_problems(tmp_path, {"version": "1"})
+    problems = catalog._provenance_problems(
+        signing.read_catalog_files(tmp_path), {"version": "1"}
+    )
     assert problems == ["catalog.yaml: missing provenance block (SPEC §14.5 CP-3)"]
 
 

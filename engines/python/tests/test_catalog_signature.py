@@ -328,6 +328,145 @@ def test_a_catalog_whose_content_changed_after_signing_is_refused(
     assert not out.exists()
 
 
+_MARKER = "CHANGED-ON-DISK-DURING-THE-RUN-18171"
+
+
+def _race_after_read(
+    monkeypatch: pytest.MonkeyPatch, control: Path, swap_in: bytes
+) -> None:
+    """A writer racing the run: the moment the engine has read the catalog, ``control`` on disk becomes
+    ``swap_in``. A second read of the folder, by the signature check or the loader, would see it."""
+    original = signing.read_catalog_files
+
+    def racing(root: Path, **kwargs: Any) -> signing.CatalogFiles:
+        files = original(root, **kwargs)
+        if control.parent.parent == root:
+            control.write_bytes(swap_in)
+        return files
+
+    monkeypatch.setattr(signing, "read_catalog_files", racing)
+
+
+def _signed_with_edit(tmp_path: Path) -> tuple[Path, Path, bytes, bytes, Path]:
+    key = Ed25519PrivateKey.generate()
+    catalog = _copy_catalog(tmp_path / "testcat")
+    _sign_catalog(catalog, key)
+    control = catalog / "controls" / "DAT-01.yaml"
+    signed = control.read_bytes()
+    edited = signed.replace(b"Consequential decisions record", _MARKER.encode(), 1)
+    assert edited != signed
+    return catalog, control, signed, edited, _trust_root_file(tmp_path / "tr.json", key)
+
+
+def _run_text(out: Path, envelope: dict[str, Any]) -> str:
+    files = [f for f in out.rglob("*") if f.is_file()] if out.is_dir() else []
+    return json.dumps(envelope) + "".join(f.read_text("utf-8", "ignore") for f in files)
+
+
+def test_a_catalog_changed_after_the_read_is_assessed_from_the_bytes_that_verified(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """18.171: the edit lands on disk after the engine read the catalog. The run verifies and
+    assesses the bytes it read, so the edit reaches no output, and the packaged copy is those bytes."""
+    catalog, control, signed, edited, root = _signed_with_edit(tmp_path)
+    expected = catalog_provenance_digest(catalog)
+    _race_after_read(monkeypatch, control, edited)
+    out = tmp_path / "out"
+    code, envelope = _assess(
+        capsys,
+        out,
+        "--catalog",
+        _EU_LABEL,
+        "--catalog-dir",
+        str(catalog),
+        "--trust-root",
+        str(root),
+        "--package-for-sharing",
+    )
+    assert code in (0, 1), envelope
+    assert control.read_bytes() == edited, "the race did not run"
+    assert _MARKER not in _run_text(out, envelope)
+    packaged = out / "bundle" / "catalog" / "0" / "controls" / "DAT-01.yaml"
+    assert packaged.read_bytes() == signed
+    manifest = json.loads((out / "manifest.json").read_text("utf-8"))
+    assert expected in json.dumps(manifest)
+
+
+def test_a_catalog_put_back_after_the_read_is_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """18.171: the edit is on disk when the engine reads the catalog, and the signed bytes go back
+    right after. The signature check reads the bytes the load read, so the run is refused."""
+    catalog, control, signed, edited, root = _signed_with_edit(tmp_path)
+    control.write_bytes(edited)
+    _race_after_read(monkeypatch, control, signed)
+    out = tmp_path / "out"
+    code, envelope = _assess(
+        capsys,
+        out,
+        "--catalog",
+        _EU_LABEL,
+        "--catalog-dir",
+        str(catalog),
+        "--trust-root",
+        str(root),
+    )
+    assert control.read_bytes() == signed, "the race did not run"
+    assert code == 3
+    assert envelope["error"]["key"] == "input.catalog_unverified"
+    assert not out.exists()
+
+
+def test_verify_reads_the_files_it_is_given(tmp_path: Path) -> None:
+    """The check over a load's files decides on those bytes, whatever the folder holds by then."""
+    catalog, control, signed, edited, root = _signed_with_edit(tmp_path)
+    trust = signing.load_trust_root(root)
+    files = signing.read_catalog_files(catalog)
+    control.write_bytes(edited)
+    signing.verify_catalog_directory(files, trust)
+    with pytest.raises(signing.VerificationError):
+        signing.verify_catalog_directory(catalog, trust)
+    edited_files = signing.read_catalog_files(catalog)
+    control.write_bytes(signed)
+    with pytest.raises(signing.VerificationError):
+        signing.verify_catalog_directory(edited_files, trust)
+    assert edited_files.digest() != files.digest()
+    assert files.digest() == signing.digest_tree(
+        catalog, exclude=frozenset({signing.CATALOG_SIGNATURE_NAME})
+    )
+
+
+def test_sign_signs_the_bytes_it_linted(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """18.171: a control that would fail lint lands on disk after `catalog sign` read the catalog.
+    The signature covers the bytes that were linted, so it never verifies the unlinted edit."""
+    catalog = _copy_catalog(tmp_path / "testcat")
+    control = catalog / "controls" / "DAT-01.yaml"
+    linted = control.read_bytes()
+    unlinted = linted + b"unknown_field_18171: 1\n"
+    _race_after_read(monkeypatch, control, unlinted)
+    code = cli.main(
+        [
+            "catalog",
+            "sign",
+            str(catalog),
+            "--new-key",
+            str(tmp_path / "k.pem"),
+            "--write-trust-root",
+            str(tmp_path / "tr.json"),
+            "--json",
+        ]
+    )
+    assert code == 0, capsys.readouterr().out
+    assert control.read_bytes() == unlinted, "the race did not run"
+    trust = signing.load_trust_root(tmp_path / "tr.json")
+    with pytest.raises(signing.VerificationError):
+        signing.verify_catalog_directory(catalog, trust)
+    control.write_bytes(linted)
+    signing.verify_catalog_directory(catalog, trust)
+
+
 def test_a_validly_signed_but_rebranded_catalog_is_refused(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
