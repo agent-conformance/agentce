@@ -45,7 +45,9 @@ def test_wrong_provenance_values_are_flagged(tmp_path: Path) -> None:
         "version": "1",
         "provenance": {"source": "  ", "version": "2", "digest": "sha256:00"},
     }
-    problems = catalog._provenance_problems(tmp_path, meta_bad)
+    problems = catalog._provenance_problems(
+        signing.read_catalog_files(tmp_path), meta_bad
+    )
     assert any("source" in p for p in problems)
     assert any("version" in p for p in problems)
     assert any("digest" in p for p in problems)
@@ -53,4 +55,7 @@ def test_wrong_provenance_values_are_flagged(tmp_path: Path) -> None:
         "version": "1",
         "provenance": {"source": "https://example/x", "version": "1", "digest": good},
     }
-    assert catalog._provenance_problems(tmp_path, meta_ok) == []
+    assert (
+        catalog._provenance_problems(signing.read_catalog_files(tmp_path), meta_ok)
+        == []
+    )
