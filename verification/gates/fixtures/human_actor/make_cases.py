@@ -182,10 +182,14 @@ case("dual-control-one-verified-one-not", "OVS-08",
 case("dual-control-one-in-chain", "OVS-08",
      [dec(oversight_modality="dual_control"), idp("s1"), idp("s2", who=OWNER), appr("a1", actor=human("u2"), s="s1"),
       appr("a2", actor=human(OWNER), s="s2")], NC, ["d1"])
-GW = ev("t0", "ToolCall", tool={"name": "x"}, refs={"decision": ref("d1")})  # CND-02 needs an enforcement-point call
+# CND-02 judges the action (SPEC §7.7.4; 18.187): a high-effect call the enforcement point asked approval for.
+GW = [
+    ev("t0", "ToolCall", tool={"name": "x"}, effect_class="irreversible", refs={"decision": ref("d1")}),
+    ev("t0-gate", "PolicyDecision", decision="require_approval", refs={"request": ref("t0")}, cls="enforcement_point"),
+]
 # The other controls that count a review: CND-02 (Conduct), RSK-02 and INC-03.
-case("cnd02-approval-verified", "CND-02", [dec(), GW, idp(), appr()], "conformant")
-case("cnd02-approval-no-session-ref", "CND-02", [dec(), GW, idp(), appr(s=None)], NC, ["d1"])
+case("cnd02-approval-verified", "CND-02", [dec(), *GW, idp(), appr()], "conformant")
+case("cnd02-approval-no-session-ref", "CND-02", [dec(), *GW, idp(), appr(s=None)], NC, ["t0"])
 case("rsk02-review-verified", "RSK-02", [dec(), idp(), appr()], "conformant")
 case("rsk02-review-in-delegation-chain", "RSK-02", [dec(), idp(who=OWNER), appr(actor=human(OWNER))], NC, ["d1"])
 case("inc03-review-verified", "INC-03", [dec(), idp(), appr(), incident([ref("d1")])], "conformant")
@@ -208,7 +212,7 @@ case("override-login-principal-blank-id", "OVS-07", [dec(), idp(who={"id": " ", 
 case("dual-control-second-login-names-the-first-human", "OVS-08",
      [dec(oversight_modality="dual_control"), idp("s1"), idp("s2"), appr("a1", actor=human("u2"), s="s1"),
       appr("a2", actor=human("u3"), s="s2")], NC, ["d1"])
-case("cnd02-login-names-another-principal", "CND-02", [dec(), GW, idp(who="u3"), appr()], NC, ["d1"])
+case("cnd02-login-names-another-principal", "CND-02", [dec(), *GW, idp(who="u3"), appr()], NC, ["t0"])
 # Row 232: a padded spelling of the owner's id, on the actor and its login, or in the chain, is still the owner.
 case("override-trailing-space-owner-id-variant", "OVS-07",
      [dec(), idp(who=OWNER + " "), override(actor=human(OWNER + " "))], NC, ["v1"])

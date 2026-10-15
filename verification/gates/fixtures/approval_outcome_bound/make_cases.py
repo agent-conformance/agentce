@@ -57,15 +57,14 @@ def reject_at(t, **k):
     return timed(appr("reject", **k), t)
 
 
-def unlinked():
-    """An enforcement-point ToolCall that executes no decision. CND-02 needs one in the bundle (its minimum evidence) to
-    judge anything; it is not d1's action, so d1 stays a decision no ToolCall executes."""
-    return ev("t9", "ToolCall", tool={"name": "lookup"})
-
-
 def cnd02(name, events, outcome, failing=()):
-    """A CND-02 case for a decision no ToolCall executes: the decision, the unlinked ToolCall, then the events."""
-    case(name, "CND-02", [events[0], unlinked(), *events[1:]], outcome, failing)
+    """A CND-02 case whose decisions' own actions run last, after every other record: t9 executes d1 and t8 executes d2
+    at 23:00. CND-02 judges actions (SPEC §7.7.4; 18.187), so a decision needs one to be judged at all; run last, the
+    action's time never bounds the approval and the Outcome's bound is the one under test."""
+    acts = {"d1": "t9", "d2": "t8"}
+    held = [e["id"] for e in events if e["data"]["@type"] == "Decision"]
+    last = [timed(ran(d, acts[d]), "2026-01-10T23:00:00Z") for d in held]
+    case(name, "CND-02", [*events, *last], outcome, failing)
 
 
 # The probe: the Outcome at 01:00 shows the decision took effect; the login and the approval came hours later.

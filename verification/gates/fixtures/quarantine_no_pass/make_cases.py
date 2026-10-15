@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from approval_events import CTX, NC, TWO, C, appr, dec, ran, write  # noqa: E402
+from approval_events import CTX, NC, TWO, C, appr, cnd02, dec, ran, write  # noqa: E402
 from approval_events import SUBJECT as OVS  # noqa: E402
 
 IE = "insufficient_evidence"
@@ -45,7 +45,7 @@ def case(
         "fixture": fixture,
         "subject": subject,
         "control": control,
-        "events": events,
+        "events": cnd02(control, events),
         "expected": {
             "outcome": outcome,
             "failing": list(failing),
@@ -323,7 +323,8 @@ case(
 
 
 # CND-02 (Conduct overlay): d1's own ToolCall reaches the bundle after d2's later one in the enforcement point's
-# stream, so ingest quarantines it for time_order and the approve recorded after it looks like it came first.
+# stream, so ingest quarantines it for time_order (with its CND-02 gate, recorded at its time) and the approve recorded
+# after it looks like it came first.
 def at(e, t):
     e["time"] = f"2026-01-10T{t}Z"
     return e
@@ -338,7 +339,7 @@ LATE_ACTION = [
     at(appr("approve", i="a2", d="d2"), "02:00:00"),
     at(appr("approve"), "02:00:00"),
 ]
-case("cnd02-approve-after-action-quarantined-time-order", "approval_outcome", OVS, "CND-02", LATE_ACTION, IE, quarantined=1, evidence=["t0"], withheld=True)
+case("cnd02-approve-after-action-quarantined-time-order", "approval_outcome", OVS, "CND-02", LATE_ACTION, IE, quarantined=2, evidence=["t0", "t0-gate"], withheld=True)
 case(
     "cnd02-reject-spelled-Reject",
     "approval_outcome",

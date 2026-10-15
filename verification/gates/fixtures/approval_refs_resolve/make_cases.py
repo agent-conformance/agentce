@@ -64,14 +64,15 @@ def reject_at(t, name=ref("d1"), **k):
     return timed(named(appr("reject", **k), name), t)
 
 
-def unlinked():
-    """An enforcement-point ToolCall that executes no decision: CND-02's minimum evidence."""
-    return ev("t9", "ToolCall", tool={"name": "lookup"})
-
-
 def cnd02(name, events, outcome, failing=()):
-    """A CND-02 case: the decision, the unlinked ToolCall, then the events."""
-    case(name, "CND-02", [events[0], unlinked(), *events[1:]], outcome, failing)
+    """A CND-02 case whose decisions' own actions run last, after every other record: t9 executes d1 and t8 executes d2
+    at 23:00. CND-02 judges actions (SPEC §7.7.4; 18.187), so a decision needs one to be judged at all; run last, the
+    action's time never bounds the approval and the bound under test is the Outcome's or the
+    approval's name."""
+    acts = {"d1": "t9", "d2": "t8"}
+    held = [e["id"] for e in events if e["data"]["@type"] == "Decision"]
+    last = [run_at("2026-01-10T23:00:00Z", ref(d), acts[d]) for d in held]
+    case(name, "CND-02", [*events, *last], outcome, failing)
 
 
 # The probes (p2, q14, q15): the decision took effect at 01:00, named in another form; the approval came at 05:00.
@@ -223,9 +224,9 @@ case(
     "CND-02",
     [dec(), run_at(at(1), "urn:decision:d1"), login_at(at(4)), approve_at(at(5))],
     NC,
-    ["d1"],
+    ["t0"],
 )
-# A bare id resolves against held Decisions only: one naming another held event (the unlinked ToolCall t9, an Outcome
+# A bare id resolves against held Decisions only: one naming another held event (d1's own ToolCall t9, an Outcome
 # of no decision) names no held decision and bounds every decision's approvals.
 cnd02(
     "cnd02-approve-after-outcome-names-toolcall-bareid",
@@ -243,7 +244,7 @@ cnd02(
         approve_at(at(5)),
     ],
     NC,
-    ["d1"],
+    ["t0", "t9"],
 )
 cnd02(
     "cnd02-approve-after-outcome-empty-name",
@@ -264,7 +265,7 @@ case(
         reject_at(at(3), i="a2"),
     ],
     NC,
-    ["d1"],
+    ["t0"],
 )
 cnd02(
     "cnd02-unheld-outcome-after-approve",
@@ -471,7 +472,7 @@ case(
     "CND-02",
     [dec(), run_at(at(1), None), login_at(at(4)), approve_at(at(5))],
     NC,
-    ["d1"],
+    ["t0"],
 )
 cnd02(
     "cnd02-approve-after-outcome-null-decision",
@@ -490,7 +491,8 @@ case(
     "cnd02-approve-before-null-decision-toolcall",
     "CND-02",
     [dec(), login_at(at(1)), approve_at(at(1)), run_at(at(2), None)],
-    "conformant",
+    NC,
+    ["t0"],
 )
 cnd02(
     "cnd02-null-outcome-bounds-every-decision",
@@ -516,7 +518,7 @@ case(
         reject_at(at(3), i="a2"),
     ],
     NC,
-    ["d1"],
+    ["t0"],
 )
 cnd02(
     "cnd02-approve-null-decision",
@@ -533,7 +535,8 @@ case(
         login_at(at(4)),
         approve_at(at(5)),
     ],
-    "conformant",
+    NC,
+    ["t1"],
 )
 cnd02(
     "cnd02-approve-after-outcome-without-refs",

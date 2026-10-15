@@ -240,7 +240,8 @@ case(
     ["d1"],
 )
 # d1's ToolCall (01:00) arrives after d2's (03:00) in the enforcement point's stream: ingest quarantines it for
-# time_order, and judged with it the approve at 02:00 came after the action (18.119).
+# time_order (with its CND-02 gate, recorded at its time), and judged with it the approve at 02:00 came after the
+# action (18.119).
 case(
     "cnd02-approve-after-action-quarantined-time-order",
     "CND-02",
@@ -254,7 +255,7 @@ case(
         approve_at(at(2)),
     ],
     "insufficient_evidence",
-    quarantined=1,
+    quarantined=2,
 )
 
 write()

@@ -257,6 +257,7 @@ case(
         u3("approve", at(1), "a3", d="d2"),
         decide("reject", at(2), "a2", d="d2"),
         run_at(at(3)),
+        run_at(at(3), d="d2", i="t2"),
     ],
     "conformant",
 )

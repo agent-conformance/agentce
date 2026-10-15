@@ -83,6 +83,49 @@ def incident():
     )
 
 
+def gated(events, ruling="require_approval"):
+    """CND-02 judges actions, not decisions (SPEC §7.7.4; 18.187): each ToolCall here gains a high-effect class
+    (irreversible) when it gives none, and an enforcement-point PolicyDecision ruling `ruling` on it, read just before
+    its first record and at its time, so a case still judges the approval defect it was built for rather than a
+    missing gate. A line that is not a ToolCall record (an unreadable line, another type) passes as it is."""
+    out, named = [], set()
+    for e in events:
+        if isinstance(e, dict) and str(e.get("type", "")).endswith(".ToolCall.v1"):
+            e = json.loads(json.dumps(e))
+            e["data"].setdefault("effect_class", "irreversible")
+            if e["id"] not in named:
+                named.add(e["id"])
+                gate = ev(f"{e['id']}-gate", "PolicyDecision", at=e["time"], cls="enforcement_point")
+                gate["data"].update(decision=ruling, refs={"request": ref(e["id"])})
+                out.append(gate)
+        out.append(e)
+    return out
+
+
+def is_cnd02(control):
+    return "CND-02" in (control if isinstance(control, list) else [control])
+
+
+def cnd02(control, events):
+    """`events`, gated when `control` is or includes CND-02."""
+    return gated(events) if is_cnd02(control) else events
+
+
+def acting(events, failing):
+    """CND-02's focus is the action, not the decision: each failing decision id becomes the ToolCalls whose
+    refs.decision names it (its IRI or bare id, padded or not), sorted. An id that is no decision stays as it is."""
+    records = [e for e in events if isinstance(e, dict)]
+    decisions = {e["id"] for e in records if e["data"].get("@type") == "Decision"}
+    calls = [e for e in records if e["data"].get("@type") == "ToolCall"]
+    out = {f for f in failing if f not in decisions}
+    for f in decisions.intersection(failing):
+        for e in calls:
+            name = e["data"].get("refs", {}).get("decision")
+            if isinstance(name, str) and name.strip() in (f, ref(f)):
+                out.add(e["id"])
+    return sorted(out)
+
+
 C = {}
 
 
@@ -101,10 +144,10 @@ def case(
     C[name] = {
         "control": control,
         "profile": profile,
-        "events": events,
+        "events": cnd02(control, events),
         "expected": {
             "outcome": outcome,
-            "failing": list(failing),
+            "failing": acting(events, failing) if is_cnd02(control) else list(failing),
             "quarantined": quarantined,
             "exit": exit,
         },

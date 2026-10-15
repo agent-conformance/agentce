@@ -74,11 +74,15 @@ case(
     "insufficient_evidence",
     quarantined=1,
 )
-# An enforcement-point record ranks below the identity provider's independent_system login.
+# An enforcement-point record ranks below the identity provider's independent_system login. The shadowing ToolCall
+# only reads: an irreversible one, withheld, would read non-conformant with the held records (18.119), so the case
+# would judge that instead of the id's owner.
+READ_S1 = ran("d9", "s1")
+READ_S1["data"]["effect_class"] = "read"
 case(
     "cnd02-enforcement-point-shadows-login",
     "CND-02",
-    [dec(), ran("d9", "s1"), ran(), idp(), appr("approve")],
+    [dec(), READ_S1, ran(), idp(), appr("approve")],
     "conformant",
     quarantined=1,
 )
@@ -100,7 +104,8 @@ case(
 )
 
 # Quarantine state: the higher-class ToolCall is quarantined for time order, and the lower record still never takes
-# its id; with no action left, CND-02 reads as its twin without the shadow.
+# its id; with no action left, CND-02 reads as its twin without the shadow. t0's CND-02 gate, recorded at its time after
+# t9, is quarantined with it, and t9 executes no held decision (d9), so t9 is the failing action.
 def late(e, t):
     e["time"] = t
     return e
@@ -111,16 +116,16 @@ case(
     "CND-02",
     [dec(), late(ran("d9", "t9"), "2026-01-10T02:00:00Z"), late(ran(), "2026-01-10T01:00:00Z"), idp(), appr("reject")],
     NC,
-    ["d1"],
-    quarantined=1,
+    ["t9"],
+    quarantined=2,
 )
 case(
     "cnd02-self-report-shadows-time-order-toolcall",
     "CND-02",
     [shadow("t0"), dec(), late(ran("d9", "t9"), "2026-01-10T02:00:00Z"), late(ran(), "2026-01-10T01:00:00Z"), idp(), appr("reject")],
     NC,
-    ["d1"],
-    quarantined=2,
+    ["t9"],
+    quarantined=3,
 )
 # The lower record after the time-quarantined ToolCall: the owner is fixed before time order, so arrival order does
 # not hand it the id either.
@@ -129,8 +134,8 @@ case(
     "CND-02",
     [dec(), late(ran("d9", "t9"), "2026-01-10T02:00:00Z"), late(ran(), "2026-01-10T01:00:00Z"), late(shadow("t0"), "2026-01-10T03:00:00Z"), idp(), appr("reject")],
     NC,
-    ["d1"],
-    quarantined=2,
+    ["t9"],
+    quarantined=3,
 )
 
 

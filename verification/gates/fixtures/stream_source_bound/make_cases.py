@@ -139,7 +139,8 @@ case(
 )
 # One source still keeps time order within a stream it claims: the enforcement point's own later record, then its
 # ToolCall with an earlier time in the same claimed stream, quarantines the ToolCall as before; judged with the held
-# records, the withheld ToolCall still fails d1 (quarantine never gives a better outcome, 18.119).
+# records, the withheld ToolCall still fails d1 (quarantine never gives a better outcome, 18.119). Its CND-02 gate,
+# recorded at its time after t9, is quarantined with it, and t9 itself executes no decision, so it is the failing action.
 ep_late = claim(
     ev("t9", "ToolCall", at=LATER, tool={"name": "x"}), "urn:stream:gateway-1"
 )
@@ -148,8 +149,8 @@ case(
     "CND-02",
     [dec(), ep_late, claim(ran(), "urn:stream:gateway-1"), idp(), appr("reject")],
     NC,
-    ["d1"],
-    quarantined=1,
+    ["t9"],
+    quarantined=2,
 )
 # Integrity chains (18.151) are bound the same way: SPEC §6.6 verifies a hash chain per stream, and a record's claimed
 # stream names a chain of its own source. The gateway's two ToolCalls form a real export_chained chain; in the hijack
@@ -173,9 +174,12 @@ def chained(e, prev, strength="export_chained"):
 
 
 def gateway(strength="export_chained"):
-    head = chained(ran(), "0" * 64, strength)
+    """Each link carries its effect class before it is hashed (CND-02 judges the irreversible t0; t8 only reads)."""
+    action = ran()
+    action["data"]["effect_class"] = "irreversible"
+    head = chained(action, "0" * 64, strength)
     tail = chained(
-        ev("t8", "ToolCall", tool={"name": "x"}),
+        ev("t8", "ToolCall", tool={"name": "x"}, effect_class="read"),
         head["data"]["integrity"]["hash"],
         strength,
     )
@@ -187,7 +191,10 @@ def fallback(cls):
     return f"urn:src:{cls}|{SUBJECT}"
 
 
+# The unchained streams: the enforcement point's (t0's CND-02 gate claims no stream), the identity provider's, the
+# agent's.
 UNCHAINED = [
+    {"stream": fallback("enforcement_point"), "status": "failed"},
     {"stream": fallback("independent_system"), "status": "failed"},
     {"stream": fallback("self_report"), "status": "failed"},
 ]
