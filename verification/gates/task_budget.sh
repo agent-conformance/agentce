@@ -46,7 +46,7 @@ for name, case in cases.items():
         cls = record.get("class", "independent_system")
         event = {"id": record["id"], "source": sources[cls], "subject": who,
                  "type": f"org.agent-conformance.evidence.{kind}.v1", "agentcesourceclass": cls,
-                 "time": record.get("time", f"2026-01-02T00:00:{n + 1:02d}Z"), "specversion": "1.0",
+                 "time": record.get("time", f"2026-01-02T{(n + 1) // 3600:02d}:{(n + 1) // 60 % 60:02d}:{(n + 1) % 60:02d}Z"), "specversion": "1.0",
                  "datacontenttype": "application/ld+json", "data": data}
         if "agentcetask" in record:
             event["agentcetask"] = record["agentcetask"]

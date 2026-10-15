@@ -1053,6 +1053,5179 @@
         ]
       }
     },
+    "tokens-over-summed-past-2-63": {
+      "why": "513 model calls of 2 * (2^53 - 1) tokens each, a sum past what a 64-bit count holds, against a 1000-token budget: counts saturate at 2^53, so the task reads over",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n",
+      "records": [
+        {
+          "id": "tc0",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read"
+        },
+        {
+          "id": "mc000",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc001",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc002",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc003",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc004",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc005",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc006",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc007",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc008",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc009",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc010",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc011",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc012",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc013",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc014",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc015",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc016",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc017",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc018",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc019",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc020",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc021",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc022",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc023",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc024",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc025",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc026",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc027",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc028",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc029",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc030",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc031",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc032",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc033",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc034",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc035",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc036",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc037",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc038",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc039",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc040",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc041",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc042",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc043",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc044",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc045",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc046",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc047",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc048",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc049",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc050",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc051",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc052",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc053",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc054",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc055",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc056",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc057",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc058",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc059",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc060",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc061",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc062",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc063",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc064",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc065",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc066",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc067",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc068",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc069",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc070",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc071",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc072",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc073",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc074",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc075",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc076",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc077",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc078",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc079",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc080",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc081",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc082",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc083",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc084",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc085",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc086",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc087",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc088",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc089",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc090",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc091",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc092",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc093",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc094",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc095",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc096",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc097",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc098",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc099",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc100",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc101",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc102",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc103",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc104",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc105",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc106",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc107",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc108",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc109",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc110",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc111",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc112",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc113",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc114",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc115",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc116",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc117",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc118",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc119",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc120",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc121",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc122",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc123",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc124",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc125",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc126",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc127",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc128",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc129",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc130",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc131",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc132",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc133",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc134",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc135",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc136",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc137",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc138",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc139",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc140",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc141",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc142",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc143",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc144",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc145",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc146",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc147",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc148",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc149",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc150",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc151",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc152",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc153",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc154",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc155",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc156",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc157",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc158",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc159",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc160",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc161",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc162",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc163",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc164",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc165",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc166",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc167",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc168",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc169",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc170",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc171",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc172",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc173",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc174",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc175",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc176",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc177",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc178",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc179",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc180",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc181",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc182",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc183",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc184",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc185",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc186",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc187",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc188",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc189",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc190",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc191",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc192",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc193",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc194",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc195",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc196",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc197",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc198",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc199",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc200",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc201",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc202",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc203",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc204",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc205",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc206",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc207",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc208",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc209",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc210",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc211",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc212",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc213",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc214",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc215",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc216",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc217",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc218",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc219",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc220",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc221",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc222",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc223",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc224",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc225",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc226",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc227",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc228",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc229",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc230",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc231",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc232",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc233",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc234",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc235",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc236",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc237",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc238",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc239",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc240",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc241",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc242",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc243",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc244",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc245",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc246",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc247",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc248",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc249",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc250",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc251",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc252",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc253",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc254",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc255",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc256",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc257",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc258",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc259",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc260",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc261",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc262",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc263",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc264",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc265",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc266",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc267",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc268",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc269",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc270",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc271",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc272",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc273",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc274",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc275",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc276",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc277",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc278",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc279",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc280",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc281",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc282",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc283",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc284",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc285",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc286",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc287",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc288",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc289",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc290",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc291",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc292",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc293",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc294",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc295",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc296",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc297",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc298",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc299",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc300",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc301",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc302",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc303",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc304",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc305",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc306",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc307",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc308",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc309",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc310",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc311",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc312",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc313",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc314",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc315",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc316",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc317",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc318",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc319",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc320",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc321",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc322",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc323",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc324",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc325",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc326",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc327",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc328",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc329",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc330",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc331",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc332",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc333",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc334",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc335",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc336",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc337",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc338",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc339",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc340",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc341",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc342",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc343",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc344",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc345",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc346",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc347",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc348",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc349",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc350",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc351",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc352",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc353",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc354",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc355",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc356",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc357",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc358",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc359",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc360",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc361",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc362",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc363",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc364",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc365",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc366",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc367",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc368",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc369",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc370",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc371",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc372",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc373",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc374",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc375",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc376",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc377",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc378",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc379",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc380",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc381",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc382",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc383",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc384",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc385",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc386",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc387",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc388",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc389",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc390",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc391",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc392",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc393",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc394",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc395",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc396",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc397",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc398",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc399",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc400",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc401",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc402",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc403",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc404",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc405",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc406",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc407",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc408",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc409",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc410",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc411",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc412",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc413",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc414",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc415",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc416",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc417",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc418",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc419",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc420",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc421",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc422",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc423",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc424",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc425",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc426",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc427",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc428",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc429",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc430",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc431",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc432",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc433",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc434",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc435",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc436",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc437",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc438",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc439",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc440",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc441",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc442",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc443",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc444",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc445",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc446",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc447",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc448",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc449",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc450",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc451",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc452",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc453",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc454",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc455",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc456",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc457",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc458",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc459",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc460",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc461",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc462",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc463",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc464",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc465",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc466",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc467",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc468",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc469",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc470",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc471",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc472",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc473",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc474",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc475",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc476",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc477",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc478",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc479",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc480",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc481",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc482",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc483",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc484",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc485",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc486",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc487",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc488",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc489",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc490",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc491",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc492",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc493",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc494",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc495",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc496",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc497",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc498",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc499",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc500",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc501",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc502",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc503",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc504",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc505",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc506",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc507",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc508",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc509",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc510",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc511",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc512",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 9007199254740991,
+            "output_tokens": 9007199254740991
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "mc000",
+          "mc001",
+          "mc002",
+          "mc003",
+          "mc004",
+          "mc005",
+          "mc006",
+          "mc007",
+          "mc008",
+          "mc009",
+          "mc010",
+          "mc011",
+          "mc012",
+          "mc013",
+          "mc014",
+          "mc015",
+          "mc016",
+          "mc017",
+          "mc018",
+          "mc019",
+          "mc020",
+          "mc021",
+          "mc022",
+          "mc023",
+          "mc024",
+          "mc025",
+          "mc026",
+          "mc027",
+          "mc028",
+          "mc029",
+          "mc030",
+          "mc031",
+          "mc032",
+          "mc033",
+          "mc034",
+          "mc035",
+          "mc036",
+          "mc037",
+          "mc038",
+          "mc039",
+          "mc040",
+          "mc041",
+          "mc042",
+          "mc043",
+          "mc044",
+          "mc045",
+          "mc046",
+          "mc047",
+          "mc048",
+          "mc049",
+          "mc050",
+          "mc051",
+          "mc052",
+          "mc053",
+          "mc054",
+          "mc055",
+          "mc056",
+          "mc057",
+          "mc058",
+          "mc059",
+          "mc060",
+          "mc061",
+          "mc062",
+          "mc063",
+          "mc064",
+          "mc065",
+          "mc066",
+          "mc067",
+          "mc068",
+          "mc069",
+          "mc070",
+          "mc071",
+          "mc072",
+          "mc073",
+          "mc074",
+          "mc075",
+          "mc076",
+          "mc077",
+          "mc078",
+          "mc079",
+          "mc080",
+          "mc081",
+          "mc082",
+          "mc083",
+          "mc084",
+          "mc085",
+          "mc086",
+          "mc087",
+          "mc088",
+          "mc089",
+          "mc090",
+          "mc091",
+          "mc092",
+          "mc093",
+          "mc094",
+          "mc095",
+          "mc096",
+          "mc097",
+          "mc098",
+          "mc099",
+          "mc100",
+          "mc101",
+          "mc102",
+          "mc103",
+          "mc104",
+          "mc105",
+          "mc106",
+          "mc107",
+          "mc108",
+          "mc109",
+          "mc110",
+          "mc111",
+          "mc112",
+          "mc113",
+          "mc114",
+          "mc115",
+          "mc116",
+          "mc117",
+          "mc118",
+          "mc119",
+          "mc120",
+          "mc121",
+          "mc122",
+          "mc123",
+          "mc124",
+          "mc125",
+          "mc126",
+          "mc127",
+          "mc128",
+          "mc129",
+          "mc130",
+          "mc131",
+          "mc132",
+          "mc133",
+          "mc134",
+          "mc135",
+          "mc136",
+          "mc137",
+          "mc138",
+          "mc139",
+          "mc140",
+          "mc141",
+          "mc142",
+          "mc143",
+          "mc144",
+          "mc145",
+          "mc146",
+          "mc147",
+          "mc148",
+          "mc149",
+          "mc150",
+          "mc151",
+          "mc152",
+          "mc153",
+          "mc154",
+          "mc155",
+          "mc156",
+          "mc157",
+          "mc158",
+          "mc159",
+          "mc160",
+          "mc161",
+          "mc162",
+          "mc163",
+          "mc164",
+          "mc165",
+          "mc166",
+          "mc167",
+          "mc168",
+          "mc169",
+          "mc170",
+          "mc171",
+          "mc172",
+          "mc173",
+          "mc174",
+          "mc175",
+          "mc176",
+          "mc177",
+          "mc178",
+          "mc179",
+          "mc180",
+          "mc181",
+          "mc182",
+          "mc183",
+          "mc184",
+          "mc185",
+          "mc186",
+          "mc187",
+          "mc188",
+          "mc189",
+          "mc190",
+          "mc191",
+          "mc192",
+          "mc193",
+          "mc194",
+          "mc195",
+          "mc196",
+          "mc197",
+          "mc198",
+          "mc199",
+          "mc200",
+          "mc201",
+          "mc202",
+          "mc203",
+          "mc204",
+          "mc205",
+          "mc206",
+          "mc207",
+          "mc208",
+          "mc209",
+          "mc210",
+          "mc211",
+          "mc212",
+          "mc213",
+          "mc214",
+          "mc215",
+          "mc216",
+          "mc217",
+          "mc218",
+          "mc219",
+          "mc220",
+          "mc221",
+          "mc222",
+          "mc223",
+          "mc224",
+          "mc225",
+          "mc226",
+          "mc227",
+          "mc228",
+          "mc229",
+          "mc230",
+          "mc231",
+          "mc232",
+          "mc233",
+          "mc234",
+          "mc235",
+          "mc236",
+          "mc237",
+          "mc238",
+          "mc239",
+          "mc240",
+          "mc241",
+          "mc242",
+          "mc243",
+          "mc244",
+          "mc245",
+          "mc246",
+          "mc247",
+          "mc248",
+          "mc249",
+          "mc250",
+          "mc251",
+          "mc252",
+          "mc253",
+          "mc254",
+          "mc255",
+          "mc256",
+          "mc257",
+          "mc258",
+          "mc259",
+          "mc260",
+          "mc261",
+          "mc262",
+          "mc263",
+          "mc264",
+          "mc265",
+          "mc266",
+          "mc267",
+          "mc268",
+          "mc269",
+          "mc270",
+          "mc271",
+          "mc272",
+          "mc273",
+          "mc274",
+          "mc275",
+          "mc276",
+          "mc277",
+          "mc278",
+          "mc279",
+          "mc280",
+          "mc281",
+          "mc282",
+          "mc283",
+          "mc284",
+          "mc285",
+          "mc286",
+          "mc287",
+          "mc288",
+          "mc289",
+          "mc290",
+          "mc291",
+          "mc292",
+          "mc293",
+          "mc294",
+          "mc295",
+          "mc296",
+          "mc297",
+          "mc298",
+          "mc299",
+          "mc300",
+          "mc301",
+          "mc302",
+          "mc303",
+          "mc304",
+          "mc305",
+          "mc306",
+          "mc307",
+          "mc308",
+          "mc309",
+          "mc310",
+          "mc311",
+          "mc312",
+          "mc313",
+          "mc314",
+          "mc315",
+          "mc316",
+          "mc317",
+          "mc318",
+          "mc319",
+          "mc320",
+          "mc321",
+          "mc322",
+          "mc323",
+          "mc324",
+          "mc325",
+          "mc326",
+          "mc327",
+          "mc328",
+          "mc329",
+          "mc330",
+          "mc331",
+          "mc332",
+          "mc333",
+          "mc334",
+          "mc335",
+          "mc336",
+          "mc337",
+          "mc338",
+          "mc339",
+          "mc340",
+          "mc341",
+          "mc342",
+          "mc343",
+          "mc344",
+          "mc345",
+          "mc346",
+          "mc347",
+          "mc348",
+          "mc349",
+          "mc350",
+          "mc351",
+          "mc352",
+          "mc353",
+          "mc354",
+          "mc355",
+          "mc356",
+          "mc357",
+          "mc358",
+          "mc359",
+          "mc360",
+          "mc361",
+          "mc362",
+          "mc363",
+          "mc364",
+          "mc365",
+          "mc366",
+          "mc367",
+          "mc368",
+          "mc369",
+          "mc370",
+          "mc371",
+          "mc372",
+          "mc373",
+          "mc374",
+          "mc375",
+          "mc376",
+          "mc377",
+          "mc378",
+          "mc379",
+          "mc380",
+          "mc381",
+          "mc382",
+          "mc383",
+          "mc384",
+          "mc385",
+          "mc386",
+          "mc387",
+          "mc388",
+          "mc389",
+          "mc390",
+          "mc391",
+          "mc392",
+          "mc393",
+          "mc394",
+          "mc395",
+          "mc396",
+          "mc397",
+          "mc398",
+          "mc399",
+          "mc400",
+          "mc401",
+          "mc402",
+          "mc403",
+          "mc404",
+          "mc405",
+          "mc406",
+          "mc407",
+          "mc408",
+          "mc409",
+          "mc410",
+          "mc411",
+          "mc412",
+          "mc413",
+          "mc414",
+          "mc415",
+          "mc416",
+          "mc417",
+          "mc418",
+          "mc419",
+          "mc420",
+          "mc421",
+          "mc422",
+          "mc423",
+          "mc424",
+          "mc425",
+          "mc426",
+          "mc427",
+          "mc428",
+          "mc429",
+          "mc430",
+          "mc431",
+          "mc432",
+          "mc433",
+          "mc434",
+          "mc435",
+          "mc436",
+          "mc437",
+          "mc438",
+          "mc439",
+          "mc440",
+          "mc441",
+          "mc442",
+          "mc443",
+          "mc444",
+          "mc445",
+          "mc446",
+          "mc447",
+          "mc448",
+          "mc449",
+          "mc450",
+          "mc451",
+          "mc452",
+          "mc453",
+          "mc454",
+          "mc455",
+          "mc456",
+          "mc457",
+          "mc458",
+          "mc459",
+          "mc460",
+          "mc461",
+          "mc462",
+          "mc463",
+          "mc464",
+          "mc465",
+          "mc466",
+          "mc467",
+          "mc468",
+          "mc469",
+          "mc470",
+          "mc471",
+          "mc472",
+          "mc473",
+          "mc474",
+          "mc475",
+          "mc476",
+          "mc477",
+          "mc478",
+          "mc479",
+          "mc480",
+          "mc481",
+          "mc482",
+          "mc483",
+          "mc484",
+          "mc485",
+          "mc486",
+          "mc487",
+          "mc488",
+          "mc489",
+          "mc490",
+          "mc491",
+          "mc492",
+          "mc493",
+          "mc494",
+          "mc495",
+          "mc496",
+          "mc497",
+          "mc498",
+          "mc499",
+          "mc500",
+          "mc501",
+          "mc502",
+          "mc503",
+          "mc504",
+          "mc505",
+          "mc506",
+          "mc507",
+          "mc508",
+          "mc509",
+          "mc510",
+          "mc511",
+          "mc512"
+        ]
+      }
+    },
+    "tokens-limit-past-2-53": {
+      "why": "a tokens limit of 2^53 + 2 cannot be held exactly in every engine, so the task's token use cannot be told against it",
+      "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 9007199254740994}}\n",
+      "records": [
+        {
+          "id": "tc1",
+          "kind": "ToolCall",
+          "class": "enforcement_point",
+          "effect_class": "read",
+          "agentcetask": "research"
+        },
+        {
+          "id": "mc1",
+          "kind": "ModelCall",
+          "usage": {
+            "input_tokens": 5000,
+            "output_tokens": 0
+          },
+          "agentcetask": "research"
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": []
+      }
+    },
     "refusal-unheld-request": {
       "why": "a budget_exceeded Refusal naming an event the bundle does not hold changes nothing",
       "domain": "task_scopes:\n  - {task_type: research, allowed_tools: [lookup, pay], allowed_effect_classes: [read, spend], budgets: {tokens: 1000}}\n",
