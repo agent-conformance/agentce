@@ -8,6 +8,11 @@
 # tool and effect class are allowed. List every effect class the task may use in allowed_effect_classes, including
 # the ones it may use only with a human's approval, and mark those in requires_approval as well (CND-02 checks the
 # approval). A class listed only in requires_approval is out of scope.
+#
+# CND-07 checks budgets per task. tokens caps the input plus output tokens of the task's model calls, as a whole
+# number. spend: 0 means the task may not spend at all. No record carries a spend amount, so CND-07 can't check a
+# spend limit above 0 and reads "not enough evidence" once the task spends. No record carries compute time either,
+# so a compute_seconds budget also reads "not enough evidence". Leave out any budget you don't set.
 task_scopes:
   - task_type: "<task-type>"
     allowed_tools: ["<tool-name>"]                  # leave out to allow any tool
@@ -16,7 +21,7 @@ task_scopes:
     allowed_resources: ["<resource-uri-or-class>"]
     data_classes: ["<data-class>"]
     egress_destinations: ["<host-or-service>"]
-    budgets: {tokens: 0, compute_seconds: 0, spend: 0}      # your limits
+    budgets: {tokens: <max-tokens-per-task>}         # add spend: 0 if the task may not spend
     authorised_principal_roles: ["<role>"]
     # effect classes are taken from the gateway's tool registry where one exists; otherwise declared
     # and marked confirmed_by a named person (S-8).
