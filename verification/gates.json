@@ -3516,7 +3516,7 @@
         {
           "description": "Python takes a user, operator, service or agent_identified instruction as ending at an authorised principal whether or not it records one",
           "file": "engines/python/agentce/graph.py",
-          "search": "            ) or not (\n                isinstance(data.get(\"principal\"), dict)\n                and (_text(data[\"principal\"].get(\"id\")) or \"\").strip()\n            ):\n",
+          "search": "            ) or not _principal_key(data.get(\"principal\")):\n",
           "replace": "            ):\n"
         },
         {

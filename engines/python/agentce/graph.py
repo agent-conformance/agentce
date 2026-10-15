@@ -201,6 +201,13 @@ def _text(value: Any) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
+def _principal_key(principal: Any) -> str:
+    """An Instruction.principal's id, trimmed; "" when the principal is not an object or names no id."""
+    if not isinstance(principal, dict):
+        return ""
+    return (_text(principal.get("id")) or "").strip()
+
+
 def _declared_components(
     data: dict[str, Any],
 ) -> list[tuple[str | None, str, frozenset[str]]]:
@@ -867,8 +874,9 @@ class _Builder:
                     by_iri, node, event, calls, terminus
                 )
                 met, judged = met and role_met, judged and role_judged
-            delegations = [_refs(call).get("delegation") for call in calls]
-            delegations = [d for d in delegations if d is not None] if calls else []
+            delegations = [
+                d for call in calls if (d := _refs(call).get("delegation")) is not None
+            ]
             for ref in delegations:
                 held = by_iri.get(ref) if isinstance(ref, str) else None
                 if held is None or self._ptype(held) != "DelegationIssued":
@@ -910,10 +918,7 @@ class _Builder:
             data, refs = _data(event), _refs(event)
             if not _is_one_of(
                 data.get("source_class"), _AUTHORISED_INSTRUCTION
-            ) or not (
-                isinstance(data.get("principal"), dict)
-                and (_text(data["principal"].get("id")) or "").strip()
-            ):
+            ) or not _principal_key(data.get("principal")):
                 met = False
             origin = refs.get("origin")
             if origin is not None:
@@ -959,10 +964,7 @@ class _Builder:
         if not all(lists) or any(s.authorised_principal_roles is None for s in scopes):
             return True, False
         principal = _data(terminus).get("principal")
-        if (
-            not isinstance(principal, dict)
-            or not (_text(principal.get("id")) or "").strip()
-        ):
+        if not isinstance(principal, dict) or not _principal_key(principal):
             return True, True  # no principal already fails the chain (met false)
         role = principal.get("role")
         if not isinstance(role, str) or not role.strip():
@@ -989,7 +991,7 @@ class _Builder:
         principal: a PolicyDecision allow whose refs.request is the action or a call executing it, and a twin
         Instruction of the same content_ref, refs.task, source_class and principal id (SPEC §7.7.5)."""
         data, refs = _data(terminus), _refs(terminus)
-        pid = (_text(data["principal"].get("id")) or "").strip()
+        pid = _principal_key(data["principal"])
         requests = {node} | {event_iri(str(c["id"])) for c in calls}
         roles: list[str | None] = []
         for other in by_iri.values():
@@ -1000,10 +1002,7 @@ class _Builder:
                 continue
             odata, orefs = _data(other), _refs(other)
             witness = odata.get("principal")
-            if (
-                not isinstance(witness, dict)
-                or (_text(witness.get("id")) or "").strip() != pid
-            ):
+            if not isinstance(witness, dict) or _principal_key(witness) != pid:
                 continue
             ptype = self._ptype(other)
             if not (

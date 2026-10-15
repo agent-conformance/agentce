@@ -676,8 +676,8 @@ def instruction_chain(
     )
     pd_role = _pick(dims, "pd_role", "match", ("match", "other", "none"), who)
     twin_role = _pick(dims, "twin_role", "match", ("match", "other", "none"), who)
-    if principal and role_decl == "no_role":
-        principal = {k: v for k, v in principal.items() if k != "role"}
+    if role_decl == "no_role":
+        principal = _with_role(principal, "none")
     if twin_kind in MALFORMED_PRINCIPAL:
         principal = MALFORMED_PRINCIPAL[twin_kind]
     if pd_request == "other_call":
