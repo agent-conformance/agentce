@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from approval_events import (  # noqa: E402
     NC,
+    acted_last,
     appr,
     case,
     dec,
@@ -58,13 +59,8 @@ def reject_at(t, **k):
 
 
 def cnd02(name, events, outcome, failing=()):
-    """A CND-02 case whose decisions' own actions run last, after every other record: t9 executes d1 and t8 executes d2
-    at 23:00. CND-02 judges actions (SPEC §7.7.4; 18.187), so a decision needs one to be judged at all; run last, the
-    action's time never bounds the approval and the Outcome's bound is the one under test."""
-    acts = {"d1": "t9", "d2": "t8"}
-    held = [e["id"] for e in events if e["data"]["@type"] == "Decision"]
-    last = [timed(ran(d, acts[d]), "2026-01-10T23:00:00Z") for d in held]
-    case(name, "CND-02", [*events, *last], outcome, failing)
+    """A CND-02 case whose decisions' own actions run last (approval_events.acted_last)."""
+    case(name, "CND-02", acted_last(events, run_at), outcome, failing)
 
 
 # The probe: the Outcome at 01:00 shows the decision took effect; the login and the approval came hours later.

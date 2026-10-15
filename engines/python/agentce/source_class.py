@@ -277,8 +277,7 @@ class SourceClassJudge:
         else:
             contributors = [(self._own_rank(focus), _type(event) if event else "")]
             contributors += self._reached(focus, source_class_from)
-        rank = min(r for r, _ in contributors)
-        return Judged(rank, tuple(sorted({t for r, t in contributors if r == rank})))
+        return _lowest_of(contributors)
 
     def _released_class(self, focus: str, event: dict[str, Any] | None) -> Judged:
         """CND-02's reading (SPEC §7.7.3, §7.7.4): the minimum governs the approvals that release an action's gate, so
@@ -297,8 +296,13 @@ class SourceClassJudge:
             contributors += [(r, t) for r, t in released if r == best]
         if not contributors:
             return Judged(max(SOURCE_CLASS_RANK.values()), ())
-        rank = min(r for r, _ in contributors)
-        return Judged(rank, tuple(sorted({t for r, t in contributors if r == rank})))
+        return _lowest_of(contributors)
+
+
+def _lowest_of(contributors: list[tuple[int, str]]) -> Judged:
+    """The lowest rank among the contributors, and the distinct types that hold it, sorted."""
+    rank = min(r for r, _ in contributors)
+    return Judged(rank, tuple(sorted({t for r, t in contributors if r == rank})))
 
 
 def below_minimum(

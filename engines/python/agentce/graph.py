@@ -662,7 +662,7 @@ class _Builder:
             if self._ptype(e) == "PolicyDecision"
         }
         named: dict[str, list[dict[str, Any]]] = {}
-        for iri, policy in policies.items():
+        for policy in policies.values():
             request = _refs(policy).get("request")
             if isinstance(request, str):
                 named.setdefault(request, []).append(policy)
@@ -673,10 +673,9 @@ class _Builder:
                 continue
             node = event_iri(str(event["id"]))
             refs = _refs(event)
-            if ptype == "ToolCall":
-                decision = self._held_decision(refs.get("decision"))
-                if decision is not None:
-                    executed.add(decision)
+            decision = self._held_decision(refs.get("decision"))
+            if ptype == "ToolCall" and decision is not None:
+                executed.add(decision)
             effect = _data(event).get("effect_class")
             if not isinstance(effect, str):
                 if ptype == "ToolCall":
@@ -698,7 +697,6 @@ class _Builder:
                 if p.get("agentcesourceclass") in _LOGIN_CLASSES
             }
             denied = any(_data(p).get("decision") == "deny" for p in gating)
-            decision = self._held_decision(refs.get("decision"))
             approvals = (
                 sorted(self.store.objects(decision, "agentce:approvedBy"))
                 if decision is not None

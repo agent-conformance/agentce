@@ -175,9 +175,7 @@ def chained(e, prev, strength="export_chained"):
 
 def gateway(strength="export_chained"):
     """Each link carries its effect class before it is hashed (CND-02 judges the irreversible t0; t8 only reads)."""
-    action = ran()
-    action["data"]["effect_class"] = "irreversible"
-    head = chained(action, "0" * 64, strength)
+    head = chained(ran(effect_class="irreversible"), "0" * 64, strength)
     tail = chained(
         ev("t8", "ToolCall", tool={"name": "x"}, effect_class="read"),
         head["data"]["integrity"]["hash"],

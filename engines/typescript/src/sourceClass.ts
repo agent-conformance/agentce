@@ -361,9 +361,7 @@ export class SourceClassJudge {
         ...this.reached(focus, sourceClassFrom),
       ];
     }
-    const rank = Math.min(...contributors.map(([r]) => r));
-    const lowest = new Set(contributors.filter(([r]) => r === rank).map(([, t]) => t));
-    return { rank, lowest: [...lowest].sort(byteCompare) };
+    return lowestOf(contributors);
   }
 
   /** CND-02's reading (SPEC §7.7.3, §7.7.4): the action rests on the best approval that releases its gate,
@@ -383,10 +381,15 @@ export class SourceClassJudge {
     if (contributors.length === 0) {
       return { rank: Math.max(...SOURCE_CLASS_RANK.values()), lowest: [] };
     }
-    const rank = Math.min(...contributors.map(([r]) => r));
-    const lowest = new Set(contributors.filter(([r]) => r === rank).map(([, t]) => t));
-    return { rank, lowest: [...lowest].sort(byteCompare) };
+    return lowestOf(contributors);
   }
+}
+
+/** The lowest rank among the contributors, and the distinct types that hold it, sorted. */
+function lowestOf(contributors: Array<[number, string]>): Judged {
+  const rank = Math.min(...contributors.map(([r]) => r));
+  const lowest = new Set(contributors.filter(([r]) => r === rank).map(([, t]) => t));
+  return { rank, lowest: [...lowest].sort(byteCompare) };
 }
 
 /** The foci whose judged class is below `minimum`, sorted, and the record types that put them there.

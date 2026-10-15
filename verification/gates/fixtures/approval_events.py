@@ -3,6 +3,7 @@ one subject, a high-effect decision, its enforcement-point action, identity-prov
 records on it. Every approver meets the SPEC §10.4 human-actor rule unless a case says otherwise; `at` sets an event's
 time (all at AT by default)."""
 
+import copy
 import json
 from pathlib import Path
 
@@ -43,9 +44,9 @@ def dual(i="d1"):
     return dec(i, oversight_modality="dual_control")
 
 
-def ran(d="d1", i="t0"):
+def ran(d="d1", i="t0", **data):
     """The enforcement point executed the decision's action."""
-    return ev(i, "ToolCall", tool={"name": "x"}, refs={"decision": ref(d)})
+    return ev(i, "ToolCall", tool={"name": "x"}, refs={"decision": ref(d)}, **data)
 
 
 def idp(i="s1", who="u2"):
@@ -91,7 +92,7 @@ def gated(events, ruling="require_approval"):
     out, named = [], set()
     for e in events:
         if isinstance(e, dict) and str(e.get("type", "")).endswith(".ToolCall.v1"):
-            e = json.loads(json.dumps(e))
+            e = copy.deepcopy(e)
             e["data"].setdefault("effect_class", "irreversible")
             if e["id"] not in named:
                 named.add(e["id"])
@@ -124,6 +125,14 @@ def acting(events, failing):
             if isinstance(name, str) and name.strip() in (f, ref(f)):
                 out.add(e["id"])
     return sorted(out)
+
+
+def acted_last(events, run):
+    """`events`, then each decision's own action, run last at 23:00: t9 executes d1 and t8 executes d2, built by
+    run(time, decision, id). CND-02 judges actions (SPEC §7.7.4; 18.187), so a decision needs one to be judged at all;
+    run last, the action's time never bounds the approval, and the case judges what its other records bound."""
+    held = [e["id"] for e in events if e["data"]["@type"] == "Decision"]
+    return [*events, *(run("2026-01-10T23:00:00Z", d, {"d1": "t9", "d2": "t8"}[d]) for d in held)]
 
 
 C = {}

@@ -77,12 +77,10 @@ case(
 # An enforcement-point record ranks below the identity provider's independent_system login. The shadowing ToolCall
 # only reads: an irreversible one, withheld, would read non-conformant with the held records (18.119), so the case
 # would judge that instead of the id's owner.
-READ_S1 = ran("d9", "s1")
-READ_S1["data"]["effect_class"] = "read"
 case(
     "cnd02-enforcement-point-shadows-login",
     "CND-02",
-    [dec(), READ_S1, ran(), idp(), appr("approve")],
+    [dec(), ran("d9", "s1", effect_class="read"), ran(), idp(), appr("approve")],
     "conformant",
     quarantined=1,
 )
