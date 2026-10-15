@@ -9,6 +9,7 @@ from typing import Any
 
 from agentce.store import GraphStore
 from agentce.assess import (
+    _evidence,
     _reaches_human_actor_failure,
     apply_deviations,
     assess_subjects,
@@ -476,3 +477,13 @@ def test_a_late_record_that_reads_non_conformant_is_marked_for_the_exit_code(
     benign = _quarantine_rob02(make_bundle, "rob02-benign-time-order")
     assert benign.outcome == "conformant"
     assert benign.withheld_non_conformant is False
+
+
+def test_evidence_skips_a_record_with_no_canonical_form() -> None:
+    """A focus record holding an integer past 2^53 has no canonical digest; it is left out of the evidence
+    pointers rather than crashing the assessment (18.175)."""
+    events = {
+        "e:ok": {"id": "ok", "data": {"n": 1}},
+        "e:big": {"id": "big", "data": {"n": 2**62}},
+    }
+    assert [p.ref for p in _evidence(events, ["e:big", "e:ok"])] == ["e:ok"]

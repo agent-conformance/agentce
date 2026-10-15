@@ -175,9 +175,16 @@ public final class Assess {
             if (event == null) {
                 continue;
             }
+            String digest;
+            try {
+                digest = Canonical.sha256Hex(event);
+            } catch (Canonical.CanonicalizationError e) {
+                // a record with no canonical form (an integer past 2^53) has no digest to cite
+                continue;
+            }
             String sc = sourceClassOf(event);
             pointers.add(new Assertions.EvidencePointer(
-                    focus, "sha256:" + Canonical.sha256Hex(event), sc.isEmpty() ? "self_report" : sc));
+                    focus, "sha256:" + digest, sc.isEmpty() ? "self_report" : sc));
         }
         return pointers;
     }

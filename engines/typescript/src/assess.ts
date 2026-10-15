@@ -11,7 +11,7 @@
 
 import { effectiveRoles } from "./applicability";
 import { type Assertion, type EvidencePointer, makeAssertion } from "./assertions";
-import { sha256Hex } from "./canonical";
+import { CanonicalizationError, sha256Hex } from "./canonical";
 import { type Catalog, type ControlSpec, evidenceShapeFor, shapeFor } from "./catalog";
 import type { DomainBinding } from "./domain";
 import { buildGraph } from "./graph";
@@ -131,9 +131,17 @@ function evidence(eventsByIri: Map<string, Event>, focusNodes: string[]): Eviden
     if (event === undefined) {
       continue;
     }
+    let digest: string;
+    try {
+      digest = sha256Hex(event);
+    } catch (error) {
+      // a record with no canonical form (an integer past 2^53) has no digest to cite
+      if (error instanceof CanonicalizationError) continue;
+      throw error;
+    }
     pointers.push({
       ref: focus,
-      digest: `sha256:${sha256Hex(event)}`,
+      digest: `sha256:${digest}`,
       sourceClass: String(event.agentcesourceclass || "self_report"),
     });
   }

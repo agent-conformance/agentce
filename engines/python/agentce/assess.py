@@ -17,7 +17,7 @@ from typing import Any
 
 from .applicability import effective_roles
 from .assertions import Assertion, EvidencePointer
-from .canonical import sha256_hex
+from .canonical import CanonicalizationError, sha256_hex
 from .catalog import Catalog, ControlSpec
 from .domain import DomainBinding
 from .graph import build_graph
@@ -124,10 +124,15 @@ def _evidence(
         event = events_by_iri.get(focus)
         if event is None:
             continue
+        try:
+            digest = sha256_hex(event)
+        except CanonicalizationError:
+            # a record with no canonical form (an integer past 2^53) has no digest to cite
+            continue
         pointers.append(
             EvidencePointer(
                 ref=focus,
-                digest="sha256:" + sha256_hex(event),
+                digest="sha256:" + digest,
                 source_class=str(event.get("agentcesourceclass") or "self_report"),
             )
         )
