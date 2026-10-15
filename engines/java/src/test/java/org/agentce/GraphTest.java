@@ -1026,4 +1026,92 @@ class GraphTest {
         assertEquals(List.of(), released.apply(gateEvents("external_communication", "allow")));
         assertEquals(List.of("agentce:event/ap1"), released.apply(gateEvents("external_communication", "require_approval")));
     }
+
+    // --- CND-07: task budgets (SPEC §7.7.4, §7.7.6; 18.175) ---------------------------------------------------
+
+    private static JsonNode budgetCall(String id, String tool, String effect, String task) {
+        String effectJson = effect == null ? "" : ",\"effect_class\":\"" + effect + "\"";
+        String taskJson = task == null ? "" : ",\"agentcetask\":\"" + task + "\"";
+        return Json.parse("{\"id\":\"" + id + "\",\"source\":\"urn:src:gw\",\"subject\":\"spiffe://corp/agents/a\","
+                + "\"type\":\"org.agent-conformance.evidence.ToolCall.v1\",\"data\":{\"@type\":\"ToolCall\","
+                + "\"tool\":{\"name\":\"" + tool + "\"}" + effectJson + "}" + taskJson + "}");
+    }
+
+    private static JsonNode modelCall(String id, String task, String usageJson) {
+        String taskJson = task == null ? "" : ",\"agentcetask\":\"" + task + "\"";
+        return Json.parse("{\"id\":\"" + id + "\",\"source\":\"urn:src:agent\",\"subject\":\"spiffe://corp/agents/a\","
+                + "\"type\":\"org.agent-conformance.evidence.ModelCall.v1\",\"data\":{\"@type\":\"ModelCall\","
+                + "\"usage\":" + usageJson + "}" + taskJson + "}");
+    }
+
+    /** Each action's withinBudget and whether the records could tell, as "true/judged" and the like. */
+    private static Map<String, String> budgetFlags(List<JsonNode> events, String budgetsJson, String scopesJson) {
+        String scopes = scopesJson != null
+                ? scopesJson
+                : "[{\"task_type\":\"review\",\"allowed_effect_classes\":[\"read\",\"spend\"]"
+                        + (budgetsJson == null ? "" : ",\"budgets\":" + budgetsJson) + "}]";
+        GraphStore store = Graph.buildGraph(events, DomainBinding.fromDict(Json.parse("{\"task_scopes\":" + scopes + "}")));
+        Map<String, String> out = new LinkedHashMap<>();
+        for (JsonNode e : events) {
+            String iri = "agentce:event/" + e.get("id").asText();
+            out.put(e.get("id").asText(), store.literalValues(iri, "agentce:withinBudget").get(0)
+                    + (store.isA(iri, "agentce:BudgetUnjudged") ? "/untold" : "/judged"));
+        }
+        return out;
+    }
+
+    private static List<String> budgetFlagSet(List<JsonNode> events, String budgetsJson) {
+        return budgetFlags(events, budgetsJson, null).values().stream().distinct().toList();
+    }
+
+    @Test
+    void taskBudgetTokens() {
+        List<JsonNode> under = List.of(
+                modelCall("m1", "review", "{\"input_tokens\":400,\"output_tokens\":100}"),
+                budgetCall("t1", "lookup", "read", "review"));
+        assertEquals(Map.of("m1", "true/judged", "t1", "true/judged"), budgetFlags(under, "{\"tokens\":500}", null));
+        List<JsonNode> over = new ArrayList<>(under);
+        over.add(modelCall("m2", "review", "{\"input_tokens\":1,\"output_tokens\":0}"));
+        assertEquals(List.of("false/judged"), budgetFlagSet(over, "{\"tokens\":500}"));
+        // a whole number written 500.0 reads as 500, as every engine's reader may give it
+        assertEquals(List.of("false/judged"), budgetFlagSet(over, "{\"tokens\":500.0}"));
+        List<JsonNode> unread = new ArrayList<>(under);
+        unread.add(modelCall("m3", "review", "{\"input_tokens\":1}"));
+        assertEquals(List.of("true/untold"), budgetFlagSet(unread, "{\"tokens\":500}"));
+        // an overrun the readable usage already shows is told, whatever else is unreadable
+        List<JsonNode> both = new ArrayList<>(over);
+        both.add(unread.get(2));
+        assertEquals(List.of("false/judged"), budgetFlagSet(both, "{\"tokens\":500}"));
+        for (String limit : List.of("500.5", "\"500\"", "true", "-1")) {
+            assertEquals(List.of("true/untold"), budgetFlagSet(under, "{\"tokens\":" + limit + "}"));
+        }
+    }
+
+    @Test
+    void taskBudgetSpendComputeAndScope() {
+        List<JsonNode> spend = List.of(budgetCall("s1", "pay", "spend", "review"));
+        assertEquals(Map.of("s1", "false/judged"), budgetFlags(spend, "{\"spend\":0}", null));
+        assertEquals(Map.of("s1", "true/untold"), budgetFlags(spend, "{\"spend\":10}", null));
+        List<JsonNode> read = List.of(budgetCall("r1", "lookup", "read", "review"));
+        assertEquals(Map.of("r1", "true/judged"), budgetFlags(read, "{\"spend\":10}", null));
+        // a call with no effect class may have spent, and a task with no model call shows no token use
+        assertEquals(Map.of("x1", "true/untold"),
+                budgetFlags(List.of(budgetCall("x1", "pay", null, "review")), "{\"spend\":0}", null));
+        assertEquals(Map.of("r1", "true/untold"), budgetFlags(read, "{\"tokens\":5}", null));
+        // a model call may have cost an amount no record carries
+        List<JsonNode> billed = List.of(read.get(0), modelCall("m1", "review", "{\"input_tokens\":1,\"output_tokens\":1}"));
+        assertEquals(List.of("true/untold"), budgetFlagSet(billed, "{\"spend\":0}"));
+        assertEquals(Map.of("r1", "true/untold"), budgetFlags(read, "{\"compute_seconds\":60}", null));
+        assertEquals(Map.of("r1", "true/untold"), budgetFlags(read, "\"lots\"", null));
+        assertEquals(Map.of("r1", "true/judged"), budgetFlags(read, null, null));
+        List<JsonNode> other = List.of(budgetCall("o1", "lookup", "read", "elsewhere"), budgetCall("u1", "lookup", "read", null));
+        assertEquals(Map.of("o1", "true/untold", "u1", "true/judged"), budgetFlags(other, null,
+                "[{\"task_type\":\"review\",\"budgets\":{\"tokens\":5}},{\"task_type\":\"pay\"}]"));
+        GraphStore none = Graph.buildGraph(other, DomainBinding.fromDict(Json.parse("{}")));
+        assertTrue(!none.isA("agentce:event/o1", "agentce:BudgetUnjudged"));
+        GraphStore untasked = Graph.buildGraph(
+                List.of(modelCall("m0", null, "{\"input_tokens\":9,\"output_tokens\":9}")),
+                DomainBinding.fromDict(Json.parse("{\"task_scopes\":[{\"task_type\":\"review\"}]}")));
+        assertTrue(!untasked.isA("agentce:event/m0", "agentce:TaskModelCall"));
+    }
 }

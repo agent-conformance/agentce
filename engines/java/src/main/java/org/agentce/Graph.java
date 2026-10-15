@@ -29,6 +29,10 @@ public final class Graph {
     private static final String BOOL = "xsd:boolean";
     /** CND-02's population (SPEC §7.7.4), materialised by {@code conductGate}. */
     static final String GATED_ACTION = "agentce:GatedAction";
+    /** A ModelCall in a task: consumption CND-07 judges against the task's budgets. */
+    static final String TASK_MODEL_CALL = "agentce:TaskModelCall";
+    /** An action whose task budgets the records cannot tell (CND-07's evidence shape). */
+    static final String BUDGET_UNJUDGED = "agentce:BudgetUnjudged";
     private static final String DATETIME = "xsd:dateTime";
     private static final String INTEGER = "xsd:integer";
 
@@ -145,6 +149,71 @@ public final class Graph {
     /** A field the record leaves out or sets to null (Python's None). */
     private static boolean isAbsent(JsonNode node) {
         return node == null || node.isNull();
+    }
+
+    /** A non-negative whole number ({@code 5}, or {@code 5.0} as another engine's reader may give it), else null. */
+    static Long whole(JsonNode value) {
+        if (value == null || !value.isNumber()) {
+            return null;
+        }
+        double d = value.doubleValue();
+        return d >= 0 && d == Math.rint(d) && !Double.isInfinite(d) ? value.longValue() : null;
+    }
+
+    /** What each task's records show it consumed (SPEC §7.7.3 budget row); the Python engine's
+     * {@code _TaskUsage} documents the reading. */
+    static final class TaskUsage {
+        final Map<String, Long> tokens = new LinkedHashMap<>();
+        final Set<String> tokensUnread = new LinkedHashSet<>();
+        final Map<String, Integer> spendCalls = new LinkedHashMap<>();
+        final Set<String> spendUnknown = new LinkedHashSet<>();
+
+        void add(String ptype, JsonNode data, Set<String> tasks) {
+            for (String task : tasks) {
+                if ("ToolCall".equals(ptype)) {
+                    JsonNode effect = data.get("effect_class");
+                    if (effect != null && effect.isTextual() && "spend".equals(effect.asText())) {
+                        spendCalls.merge(task, 1, Integer::sum);
+                    } else if (effect == null || !effect.isTextual()) {
+                        spendUnknown.add(task);
+                    }
+                    continue;
+                }
+                spendUnknown.add(task);
+                JsonNode usage = data.get("usage");
+                Long in = usage != null && usage.isObject() ? whole(usage.get("input_tokens")) : null;
+                Long out = usage != null && usage.isObject() ? whole(usage.get("output_tokens")) : null;
+                if (in != null && out != null) {
+                    tokens.merge(task, in + out, Long::sum);
+                } else {
+                    tokensUnread.add(task);
+                }
+            }
+        }
+
+        /** TRUE within the limit, FALSE over it, null when the records cannot tell. */
+        Boolean verdict(String task, String dimension, Double limit) {
+            if ("tokens".equals(dimension)) {
+                if (limit == null || limit != Math.rint(limit) || limit.isInfinite()) {
+                    return null;
+                }
+                if (tokens.getOrDefault(task, 0L) > limit) {
+                    return false;
+                }
+                // no readable usage for the task, or a model call without one: the records cannot tell
+                return tokensUnread.contains(task) || !tokens.containsKey(task) ? null : Boolean.TRUE;
+            }
+            if ("spend".equals(dimension)) {
+                if (limit == null) {
+                    return null;
+                }
+                if (spendCalls.containsKey(task)) {
+                    return limit == 0 ? Boolean.FALSE : null;
+                }
+                return spendUnknown.contains(task) ? null : Boolean.TRUE;
+            }
+            return null;
+        }
     }
 
     static String str(JsonNode node) {
@@ -430,6 +499,8 @@ public final class Graph {
             usedClasses.add("prov:Activity");
             usedClasses.add("prov:Entity");
             usedClasses.add(GATED_ACTION);
+            usedClasses.add(TASK_MODEL_CALL);
+            usedClasses.add(BUDGET_UNJUDGED);
             for (JsonNode event : events) {
                 String node = Iri.eventIri(event.get("id").asText());
                 eventIris.add(node);
@@ -858,10 +929,13 @@ public final class Graph {
          * action is out of scope when a {@code PolicyDecision} denies its request, or when it is a
          * ToolCall in a task whose declared effect scope does not allow its tool and effect class
          * ({@code withinTaskScope}); it is over budget when a {@code Refusal} with reason class
-         * {@code budget_exceeded} names it. An action in no task and never denied reads within scope. */
+         * {@code budget_exceeded} names it, or when its task's recorded usage exceeds a budget a scope
+         * of the task declares ({@code taskBudget}). An action in no task and never denied reads within
+         * scope. */
         private void conductScopeBudget(List<JsonNode> events) {
             Set<String> denied = new LinkedHashSet<>();
             Set<String> overBudget = new LinkedHashSet<>();
+            TaskUsage usage = new TaskUsage();
             for (JsonNode event : events) {
                 String ptype = ptype(event);
                 JsonNode data = dataOf(event);
@@ -875,19 +949,58 @@ public final class Graph {
                         && request != null) {
                     overBudget.add(request);
                 }
+                if ("ModelCall".equals(ptype) || "ToolCall".equals(ptype)) {
+                    usage.add(ptype, data, actionTasks(event));
+                }
             }
             for (JsonNode event : events) {
                 String ptype = ptype(event);
-                if (!"ToolCall".equals(ptype) && !"ResourceAccess".equals(ptype)) {
+                if (!"ToolCall".equals(ptype) && !"ResourceAccess".equals(ptype) && !"ModelCall".equals(ptype)) {
                     continue;
                 }
                 String node = Iri.eventIri(event.get("id").asText());
-                boolean inScope =
-                        !denied.contains(node) && (!"ToolCall".equals(ptype) || withinTaskScope(event));
-                store.addLiteral(node, "agentce:withinScope", inScope ? "true" : "false", BOOL);
-                store.addLiteral(
-                        node, "agentce:withinBudget", overBudget.contains(node) ? "false" : "true", BOOL);
+                Set<String> tasks = actionTasks(event);
+                if ("ModelCall".equals(ptype)) {
+                    if (tasks.isEmpty()) {
+                        continue;
+                    }
+                    // A model call in a task is consumption CND-07 judges (SPEC §7.7.3 ModelCall.usage).
+                    store.addType(node, TASK_MODEL_CALL);
+                } else {
+                    boolean inScope =
+                            !denied.contains(node) && (!"ToolCall".equals(ptype) || withinTaskScope(event));
+                    literal(node, "agentce:withinScope", inScope);
+                }
+                boolean[] budget = taskBudget(tasks, usage);
+                literal(node, "agentce:withinBudget", budget[0] && !overBudget.contains(node));
+                if (!budget[1]) {
+                    store.addType(node, BUDGET_UNJUDGED);
+                    literal(node, "agentce:budgetJudged", false);
+                }
             }
+        }
+
+        /** Whether an action's tasks stayed within every budget their scopes declare (SPEC §7.7.4 CND-07,
+         * §7.7.6 budgets), and whether the records can tell, as {within, judged}; the Python engine's
+         * {@code _task_budget} documents the reading. */
+        private boolean[] taskBudget(Set<String> tasks, TaskUsage usage) {
+            boolean within = true;
+            boolean judged = true;
+            for (String task : tasks) {
+                List<DomainBinding.TaskScope> scopes = domain.scopesFor(task);
+                if (scopes.isEmpty()) {
+                    judged = judged && domain.taskScopes.isEmpty() && !domain.taskScopesMalformed;
+                    continue;
+                }
+                for (DomainBinding.TaskScope scope : scopes) {
+                    for (DomainBinding.Budget budget : scope.budgets()) {
+                        Boolean verdict = usage.verdict(task, budget.dimension(), budget.limit());
+                        within = within && !Boolean.FALSE.equals(verdict);
+                        judged = judged && verdict != null;
+                    }
+                }
+            }
+            return new boolean[] {within, judged};
         }
 
         /** Flag every ToolCall/Decision that acts on an instruction whose chain passes through an

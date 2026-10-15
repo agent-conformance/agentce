@@ -32,17 +32,32 @@ public final class DomainBinding {
     /** whether a task_scopes entry was unreadable (not a mapping, or no string task_type). */
     public boolean taskScopesMalformed;
 
+    /** The resource budgets a task scope declares (SPEC §7.7.6 {@code budgets}), in the order CND-07 reads them. */
+    public static final List<String> BUDGET_DIMENSIONS = List.of("tokens", "compute_seconds", "spend");
+
     /**
-     * One task type's declared effect scope (SPEC §7.7.6), as CND-01 reads it: the tools and the
-     * effect classes an action of the task may use. {@code requiresApproval} marks classes for CND-02
-     * and allows none by itself.
+     * A declared budget.
+     *
+     * @param dimension one of {@link #BUDGET_DIMENSIONS}
+     * @param limit a non-negative number, or null when unreadable (a limit no usage can be shown to stay within)
+     */
+    public record Budget(String dimension, Double limit) {}
+
+    /**
+     * One task type's declared effect scope (SPEC §7.7.6): the tools and the effect classes an action of
+     * the task may use, as CND-01 reads them, and the resource budgets CND-07 reads.
+     * {@code requiresApproval} marks classes for CND-02 and allows none by itself.
      *
      * @param allowedTools null when the scope lists no tools (any tool); otherwise the tools it allows
      * @param allowedEffectClasses the effect classes it allows; none when the scope lists none
      * @param requiresApproval the effect classes that need a human's approval (CND-02's marker)
+     * @param budgets the declared budgets, in {@link #BUDGET_DIMENSIONS} order
      */
     public record TaskScope(
-            Set<String> allowedTools, Set<String> allowedEffectClasses, Set<String> requiresApproval) {
+            Set<String> allowedTools,
+            Set<String> allowedEffectClasses,
+            Set<String> requiresApproval,
+            List<Budget> budgets) {
 
         public boolean allows(String tool, String effectClass) {
             if (allowedTools != null && (tool == null || !allowedTools.contains(tool))) {
@@ -100,7 +115,8 @@ public final class DomainBinding {
                         .add(new TaskScope(
                                 tools == null || tools.isNull() ? null : strings(tools),
                                 strings(entry.get("allowed_effect_classes")),
-                                strings(entry.get("requires_approval"))));
+                                strings(entry.get("requires_approval")),
+                                budgets(entry.get("budgets"))));
             }
         }
         return binding;
@@ -129,6 +145,27 @@ public final class DomainBinding {
             return empty();
         }
         return fromDict(data);
+    }
+
+    /**
+     * The budgets a scope declares; a dimension left out declares no limit. A {@code budgets} value that
+     * is not a mapping declares every dimension unreadable.
+     */
+    private static List<Budget> budgets(JsonNode value) {
+        List<Budget> out = new ArrayList<>();
+        if (value == null || value.isNull()) {
+            return out;
+        }
+        for (String dimension : BUDGET_DIMENSIONS) {
+            if (!value.isObject()) {
+                out.add(new Budget(dimension, null));
+            } else if (value.has(dimension)) {
+                JsonNode limit = value.get(dimension);
+                boolean readable = limit.isNumber() && limit.doubleValue() >= 0;
+                out.add(new Budget(dimension, readable ? limit.doubleValue() : null));
+            }
+        }
+        return out;
     }
 
     /** The string members of a declared list; anything else declares none. */

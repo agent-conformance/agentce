@@ -62,4 +62,29 @@ class DomainBindingTest {
         assertFalse(DomainBinding.fromDict(
                 Json.parse("{\"task_scopes\":[{\"task_type\":\"a\"}]}")).taskScopesMalformed);
     }
+
+    @Test
+    void taskScopeBudgets() {
+        DomainBinding binding = DomainBinding.fromDict(Json.parse("{\"task_scopes\":["
+                + "{\"task_type\":\"a\",\"budgets\":{\"spend\":0,\"tokens\":10,\"cost\":3,\"compute_seconds\":\"60\"}},"
+                + "{\"task_type\":\"b\",\"budgets\":[1]},"
+                + "{\"task_type\":\"c\",\"budgets\":{\"tokens\":true,\"spend\":-1}},"
+                + "{\"task_type\":\"d\"}]}"));
+        assertEquals(
+                List.of(
+                        new DomainBinding.Budget("tokens", 10.0),
+                        new DomainBinding.Budget("compute_seconds", null),
+                        new DomainBinding.Budget("spend", 0.0)),
+                binding.taskScopes.get("a").get(0).budgets());
+        assertEquals(
+                List.of(
+                        new DomainBinding.Budget("tokens", null),
+                        new DomainBinding.Budget("compute_seconds", null),
+                        new DomainBinding.Budget("spend", null)),
+                binding.taskScopes.get("b").get(0).budgets());
+        assertEquals(
+                List.of(new DomainBinding.Budget("tokens", null), new DomainBinding.Budget("spend", null)),
+                binding.taskScopes.get("c").get(0).budgets());
+        assertEquals(List.of(), binding.taskScopes.get("d").get(0).budgets());
+    }
 }

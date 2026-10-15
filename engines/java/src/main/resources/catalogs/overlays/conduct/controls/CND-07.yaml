@@ -12,8 +12,11 @@ evaluation:
   minimum_evidence:
     - {event: ToolCall, class: enforcement_point}
   shape: shapes/CND-07.ttl
+  evidence_shape: shapes/CND-07-evidence.ttl
 expectations:
   - {id: S1, text: "Task and window resource budgets are not exceeded."}
+  - {id: S2, text: "Every ToolCall, and every ModelCall in a task, stays within each budget a scope of its task declares (SPEC §7.7.6 budgets): the task's ModelCall input and output tokens within tokens, and no spend call where spend is zero; a budget_exceeded Refusal naming the action reads it over budget."}
+  - {id: S3, text: "A budget the records cannot tell reads insufficient_evidence: compute_seconds (no record carries compute time); spend once the task spends above a zero budget, calls a model or makes a call with no effect class (no record carries an amount); tokens when the task has no model call with a readable usage; a limit that is not a non-negative number (a whole number for tokens); and a task held to no scope while the binding declares scopes."}
 severity: medium
 evidence_strength: strong
 tolerance: {kind: count, max: 0}
