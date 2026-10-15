@@ -12,10 +12,11 @@ fails if a gate in `gates.json` is not named in this file.
   budget, fail a spend call against a spend budget of 0, and fail every action of a task once it is over. A budget the
   records cannot tell reads insufficient_evidence through a new evidence shape: compute time and spend amounts (no
   record carries them), a usage left out, a task with no model call, or a limit the binding writes as a string, a
-  negative or a fraction. A ModelCall in a task is now in CND-07's population. The gate runs 41 cases in the three
-  CLIs, among them a readable overrun beside an unreadable usage, a second subject's overrun, an untasked model call,
-  a Refusal naming an event not held and a limit written 1000.0. Three seeded faults, one per engine, make the token
-  verdict never read over.
+  negative or a fraction. A ModelCall in a task is now in CND-07's population. Every engine caps token counts at
+  2^53. A usage or a sum past 2^53 - 1 reads over every readable limit, and a limit past 2^53 - 1 is unreadable. The
+  gate runs 43 cases in the three CLIs, among them a readable overrun beside an unreadable usage, a second subject's
+  overrun, an untasked model call, a Refusal naming an event not held, a limit written 1000.0, 513 calls whose sum
+  passes 2^63 and a limit past 2^53. Three seeded faults, one per engine, make the token verdict never read over.
 - `VG-ENGINE-GOLDENS-FRESH` (18.175, changed). Its Python graph-builder fault searched for the `withinScope` line
   18.175 rewrote; it now edits the new line and still makes every ToolCall and ResourceAccess read within scope.
 - `VG-TRUST-MATRIX` (18.175, changed). `fx-CND-07-en-fail` (5000 tokens against a 1000-token budget and a spend call
