@@ -3145,6 +3145,60 @@
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "(!writeRuled.contains(record) || rewritten.contains(record))",
           "replace": "!writeRuled.contains(record)"
+        },
+        {
+          "description": "Python counts a guard read at any trust_min as a ruling again, so a decision that used a record the guard read at trust_min untrusted and no guard wrote trusted reads ROB-02 conformant (18.172)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "ruling = enforced and data.get(\"trust_min\") == \"trusted\"",
+          "replace": "ruling = enforced and data.get(\"trust_min\") is not None"
+        },
+        {
+          "description": "TypeScript counts a guard read at any trust_min as a ruling again, so a decision that used a record the guard read at trust_min untrusted and no guard wrote trusted reads ROB-02 conformant (18.172)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "const ruling = enforced && data.trust_min === \"trusted\";",
+          "replace": "const ruling = enforced && !isAbsent(data.trust_min);"
+        },
+        {
+          "description": "Java counts a guard read at any trust_min as a ruling again, so a decision that used a record the guard read at trust_min untrusted and no guard wrote trusted reads ROB-02 conformant (18.172)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "boolean ruling = enforced && \"trusted\".equals(str(data.get(\"trust_min\")));",
+          "replace": "boolean ruling = enforced && data.get(\"trust_min\") != null && !data.get(\"trust_min\").isNull();"
+        },
+        {
+          "description": "Python ignores another subject's unreadable MemoryWrite, so a decision that used the record it may have changed reads ROB-02 conformant (18.172)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "_unread_records(self.foreign_unreadable, records, stores)",
+          "replace": "_unread_records((), records, stores)"
+        },
+        {
+          "description": "TypeScript ignores another subject's unreadable MemoryWrite, so a decision that used the record it may have changed reads ROB-02 conformant (18.172)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "unreadRecords(this.foreignUnreadable, records, stores)",
+          "replace": "unreadRecords([], records, stores)"
+        },
+        {
+          "description": "Java ignores another subject's unreadable MemoryWrite, so a decision that used the record it may have changed reads ROB-02 conformant (18.172)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "unreadRecords(foreignUnreadable, records, stores)",
+          "replace": "unreadRecords(List.of(), records, stores)"
+        },
+        {
+          "description": "Python counts an unreadable MemoryWrite with no readable record_ref only against records that name its store, so a record no event names a store for reads ROB-02 conformant (18.172)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "unread |= {r for r in records if not stores.get(r) or store in stores[r]}",
+          "replace": "unread |= {r for r in records if store in stores.get(r, set())}"
+        },
+        {
+          "description": "TypeScript counts an unreadable MemoryWrite with no readable record_ref only against records that name its store, so a record no event names a store for reads ROB-02 conformant (18.172)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "if (store === null || named === undefined || named.size === 0 || named.has(store)) {",
+          "replace": "if (store === null || named?.has(store)) {"
+        },
+        {
+          "description": "Java counts an unreadable MemoryWrite with no readable record_ref only against records that name its store, so a record no event names a store for reads ROB-02 conformant (18.172)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "if (write.store() == null || named.isEmpty() || named.contains(write.store())) {",
+          "replace": "if (write.store() == null || named.contains(write.store())) {"
         }
       ],
       "fix_hint": "Run verification/gates/rob02_untrusted.sh; it names the engine, the case, the ROB-02 outcome and failing events it gave and the ones expected. The rules are each engine's two closures (tainted, and not ruled on) in robustToUntrusted in its graph builder (the CONTENT_IN, CONTENT_OUT and REFS_IN tables), and the records another subject flagged, which assess passes to each subject's graph (flagged_records)."
