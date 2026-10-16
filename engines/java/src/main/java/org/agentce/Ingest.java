@@ -62,7 +62,19 @@ public final class Ingest {
      * record may belong to any subject). An unknown_type record is not withheld: the engine reads nothing from
      * a type it does not model.
      */
-    public record Withheld(Quarantine.Record record, JsonNode event, String subject, String digest) {}
+    public record Withheld(
+            Quarantine.Record record, JsonNode event, String subject, String digest, UnreadableWrite write) {
+        Withheld(Quarantine.Record record, JsonNode event, String subject, String digest) {
+            this(record, event, subject, digest, null);
+        }
+    }
+
+    /**
+     * What ingest can still see of an unreadable record that may be a MemoryWrite (SPEC §7.4, 18.172): its raw
+     * {@code data.record_ref} and {@code data.store} when each is a string, else null. {@link Withheld#write} is set
+     * on an unreadable record whose raw type names MemoryWrite, or whose type cannot be read at all.
+     */
+    public record UnreadableWrite(String recordRef, String store) {}
 
     /** The record's canonical digest, null when it has no canonical form (a schema-invalid record may hold a
      * number the canonical form refuses). */
@@ -90,7 +102,32 @@ public final class Ingest {
 
     private static Withheld unreadable(Quarantine.Record record, JsonNode event) {
         return new Withheld(
-                record, null, event != null ? opt(event, "subject") : null, event != null ? digestOf(event) : null);
+                record,
+                null,
+                event != null ? opt(event, "subject") : null,
+                event != null ? digestOf(event) : null,
+                event != null ? unreadableWrite(event) : null);
+    }
+
+    /** The raw MemoryWrite facts of an unreadable {@code event}: a MemoryWrite unless its envelope or data names
+     * another type, so a record whose type cannot be read counts as one (fail closed, 18.172). */
+    private static UnreadableWrite unreadableWrite(JsonNode event) {
+        JsonNode type = event.get("type");
+        String name = type != null && type.isTextual() ? typeNameOf(type.asText()) : null;
+        JsonNode data = event.get("data");
+        JsonNode declared = data != null && data.isObject() ? data.get("@type") : null;
+        boolean declaredText = declared != null && declared.isTextual();
+        if (!"MemoryWrite".equals(name)
+                && !(declaredText && "MemoryWrite".equals(declared.asText()))
+                && (name != null || declaredText)) {
+            return null;
+        }
+        return new UnreadableWrite(textField(data, "record_ref"), textField(data, "store"));
+    }
+
+    private static String textField(JsonNode data, String key) {
+        JsonNode value = data != null && data.isObject() ? data.get(key) : null;
+        return value != null && value.isTextual() ? value.asText() : null;
     }
 
     private static String typeNameOf(String typeValue) {

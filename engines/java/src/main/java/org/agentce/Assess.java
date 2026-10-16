@@ -409,6 +409,15 @@ public final class Assess {
      */
     private static final Set<String> TIMING_FAMILIES = Set.of("INC");
 
+    /** What other subjects' records say of one subject's records: the records their writes marked untrusted or
+     * rewrote with no ruling (18.120), and the record_ref and store of each of their MemoryWrites ingest could not
+     * read (18.172). */
+    private record Foreign(Set<String> untrusted, List<Ingest.UnreadableWrite> unreadable) {
+        GraphStore graph(List<JsonNode> events, DomainBinding domain) {
+            return Graph.buildGraph(events, domain, untrusted, unreadable);
+        }
+    }
+
     /** One capped reading of a subject's records, its graph and judge built on first use. */
     private static final class View {
         final List<JsonNode> events;
@@ -416,10 +425,9 @@ public final class Assess {
         final Supplier<Map<String, JsonNode>> byIri;
         final Supplier<SourceClass.Judge> judge;
 
-        View(List<JsonNode> events, DomainBinding domain, Set<String> foreignUntrusted) {
+        View(List<JsonNode> events, DomainBinding domain, Foreign foreign) {
             this.events = events;
-            this.store = lazy(() ->
-                    Graph.buildGraph(events, domain, foreignUntrusted));
+            this.store = lazy(() -> foreign.graph(events, domain));
             this.byIri = lazy(() -> eventsByIriOf(events));
             this.judge = lazy(() -> new SourceClass.Judge(store.get(), byIri.get()));
         }
@@ -435,13 +443,13 @@ public final class Assess {
         final boolean any;
         private final List<JsonNode> events;
         private final DomainBinding domain;
-        private final Set<String> foreign;
+        private final Foreign foreign;
         private final Set<String> broken;
         private final Set<String> weak;
         private final Set<String> suspect;
         private final Map<String, View> views = new java.util.HashMap<>();
 
-        CappedViews(List<JsonNode> events, Integrity.Caps caps, DomainBinding domain, Set<String> foreign) {
+        CappedViews(List<JsonNode> events, Integrity.Caps caps, DomainBinding domain, Foreign foreign) {
             this.events = events;
             this.domain = domain;
             this.foreign = foreign;
@@ -527,13 +535,20 @@ public final class Assess {
         Map<String, Set<String>> flagged = Graph.flaggedRecords(flagSources);
         for (Profile.Subject subject : profile.subjects) {
             List<JsonNode> subjectEvents = eventsBySubject.getOrDefault(subject.id, java.util.List.of());
-            Set<String> foreign = new LinkedHashSet<>();
+            Set<String> foreignUntrusted = new LinkedHashSet<>();
             flagged.forEach((record, by) -> {
                 if (by.stream().anyMatch(s -> !s.equals(subject.id))) {
-                    foreign.add(record);
+                    foreignUntrusted.add(record);
                 }
             });
-            GraphStore store = Graph.buildGraph(subjectEvents, domain, foreign);
+            List<Ingest.UnreadableWrite> foreignUnreadable = new ArrayList<>();
+            for (Ingest.Withheld w : withheld) {
+                if (w.write() != null && w.subject() != null && !w.subject().equals(subject.id)) {
+                    foreignUnreadable.add(w.write());
+                }
+            }
+            Foreign foreign = new Foreign(foreignUntrusted, foreignUnreadable);
+            GraphStore store = foreign.graph(subjectEvents, domain);
             Map<String, JsonNode> eventsByIri = eventsByIriOf(subjectEvents);
             Set<String> roles = new LinkedHashSet<>(Applicability.effectiveRoles(subject.role));
             String[] win = window(profile, subjectEvents);
@@ -558,7 +573,7 @@ public final class Assess {
             List<JsonNode> cfEvents = readable.isEmpty() ? List.of() : counterfactual(subjectEvents, readable);
             GraphStore cfStore = cfEvents.isEmpty()
                     ? store
-                    : Graph.buildGraph(cfEvents, domain, foreign);
+                    : foreign.graph(cfEvents, domain);
             Map<String, JsonNode> cfByIri = eventsByIriOf(cfEvents);
             // Each graph's judge is built once, on the first control whose minimum it may fall below.
             Supplier<SourceClass.Judge> judge = lazy(() -> new SourceClass.Judge(store, eventsByIri));

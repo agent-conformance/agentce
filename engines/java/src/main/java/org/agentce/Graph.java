@@ -144,7 +144,17 @@ public final class Graph {
 
     public static GraphStore buildGraph(
             List<JsonNode> events, DomainBinding domain, GraphStore store, byte[] key, Set<String> foreignUntrusted) {
-        return new Builder(store, domain, key, foreignUntrusted).build(events);
+        return new Builder(store, domain, key, foreignUntrusted, List.of()).build(events);
+    }
+
+    /** {@code foreignUnreadable} gives the record_ref and store of each unreadable MemoryWrite another subject holds
+     * (18.172). */
+    public static GraphStore buildGraph(
+            List<JsonNode> events,
+            DomainBinding domain,
+            Set<String> foreignUntrusted,
+            List<Ingest.UnreadableWrite> foreignUnreadable) {
+        return new Builder(new GraphStore(), domain, Iri.ZERO_KEY, foreignUntrusted, foreignUnreadable).build(events);
     }
 
     /** Each record a MemoryWrite in {@code events} marks untrusted or writes with no guard ruling (anything but an
@@ -556,12 +566,20 @@ public final class Graph {
         // Records another subject's MemoryWrite marked untrusted or rewrote with no ruling: never ruled on in this
         // subject's graph (18.120).
         private final Set<String> foreignUntrusted;
+        // The record_ref and store of each MemoryWrite another subject holds that ingest could not read (18.172).
+        private final List<Ingest.UnreadableWrite> foreignUnreadable;
 
-        Builder(GraphStore store, DomainBinding domain, byte[] key, Set<String> foreignUntrusted) {
+        Builder(
+                GraphStore store,
+                DomainBinding domain,
+                byte[] key,
+                Set<String> foreignUntrusted,
+                List<Ingest.UnreadableWrite> foreignUnreadable) {
             this.store = store;
             this.domain = domain;
             this.key = key;
             this.foreignUntrusted = foreignUntrusted;
+            this.foreignUnreadable = foreignUnreadable;
         }
 
         GraphStore build(List<JsonNode> events) {
@@ -1357,10 +1375,12 @@ public final class Graph {
          * <p>Untrusted content starts at a MemoryWrite that marks its record untrusted ({@link #flagsUntrusted}); a
          * MemoryRead whose {@code trust_min} is untrusted or quarantined; and an instruction with an untrusted
          * Appendix F source class (CND-05's rule), or with none (ROB-02 only). Content the guard never ruled on
-         * starts at a MemoryRead not reported by an enforcement point; a record no enforcement-point read with a
-         * {@code trust_min} covers, unless every write of it is a ruled enforcement-point write (an unruled rewrite
-         * can change what the guard ruled on, 18.120); a record another subject's write marked untrusted or rewrote with no ruling,
-         * whatever this subject's own records say of it (18.120); and a ref the bundle does not hold. Both flow along every
+         * starts at a MemoryRead not reported by an enforcement point; a record no enforcement-point read at
+         * {@code trust_min} trusted covers, unless every write of it is a ruled enforcement-point write (an unruled
+         * rewrite can change what the guard ruled on, 18.120); a record another subject's write marked untrusted or
+         * rewrote with no ruling, whatever this subject's own records say of it (18.120); a record another subject's
+         * unreadable MemoryWrite may have changed ({@link #unreadRecords}, ROB-02 only, 18.172); and a ref the
+         * bundle does not hold. Both flow along every
          * edge that carries content into an event (CONTENT_IN, CONTENT_OUT, a read to its consumer, a
          * record to and from its writes) for as many hops as the records show. Closures over all
          * events, so order and cycles never matter. Returns both closures, which CND-05's
@@ -1376,6 +1396,8 @@ public final class Graph {
             Set<String> readRuled = new LinkedHashSet<>();
             Set<String> writeRuled = new LinkedHashSet<>();
             Set<String> rewritten = new LinkedHashSet<>();
+            // The stores this subject's memory events name each record under (none when they name no store).
+            Map<String, Set<String>> stores = new LinkedHashMap<>();
             for (JsonNode event : events) {
                 String ptype = ptype(event);
                 JsonNode data = dataOf(event);
@@ -1383,6 +1405,7 @@ public final class Graph {
                 String node = Iri.eventIri(event.get("id").asText());
                 held.add(node);
                 boolean enforced = "enforcement_point".equals(str(event.get("agentcesourceclass")));
+                String memoryStore = str(data.get("store"));
                 for (String key : CONTENT_IN) {
                     JsonNode value = data.get(key);
                     if (value != null && value.isArray()) {
@@ -1408,6 +1431,7 @@ public final class Graph {
                     flow(flows, record, node);
                     if (record != null) {
                         records.add(record);
+                        noteStore(stores, record, memoryStore);
                         (ruledWrite(event, data) ? writeRuled : rewritten).add(record);
                     }
                     if (flagsUntrusted(data)) {
@@ -1415,13 +1439,14 @@ public final class Graph {
                     }
                 } else if ("MemoryRead".equals(ptype)) {
                     JsonNode read = data.get("record_refs");
-                    // A guard's read rules on its records only when it filtered them by trust.
-                    boolean ruling = enforced && !isAbsent(data.get("trust_min"));
+                    // A guard's read rules on its records only when it let through trusted records alone (18.172).
+                    boolean ruling = enforced && "trusted".equals(str(data.get("trust_min")));
                     if (read != null && read.isArray()) {
                         for (JsonNode ref : read) {
                             String record = str(ref);
                             if (record != null) {
                                 records.add(record);
+                                noteStore(stores, record, memoryStore);
                                 if (ruling) {
                                     readRuled.add(record);
                                 }
@@ -1456,6 +1481,12 @@ public final class Graph {
             flows.values().forEach(fed::addAll);
             reach(tainted, flows);
             reach(unruled, flows);
+            // A record another subject's unreadable write may have changed is one no guard ruled on (SPEC §7.4);
+            // nobody could read that content, so it stays out of the closures CND-05 reads, as an unclassed
+            // instruction does.
+            Set<String> unread = unreadRecords(foreignUnreadable, records, stores);
+            unread.retainAll(flows.keySet());
+            reach(unread, flows);
             // An instruction that declares no source class cannot show its content came from a trusted source, so
             // ROB-02 reads it as untrusted content (18.127); CND-05's own chain rule already fails it, so it stays
             // out of the closures returned to that rule.
@@ -1466,6 +1497,7 @@ public final class Graph {
             Set<String> robustTainted = new LinkedHashSet<>(tainted);
             robustTainted.addAll(unclassed);
             Set<String> robustUnruled = new LinkedHashSet<>(unruled);
+            robustUnruled.addAll(unread);
             List<JsonNode> decisions = new ArrayList<>();
             for (JsonNode event : events) {
                 if ("Decision".equals(ptype(event))) {
@@ -1490,6 +1522,34 @@ public final class Graph {
                 store.addLiteral(
                         node, "agentce:untrustedContentRuledOn", unruled.contains(node) ? "false" : "true", BOOL);
             }
+        }
+
+        private static void noteStore(Map<String, Set<String>> stores, String record, String store) {
+            Set<String> named = stores.computeIfAbsent(record, k -> new LinkedHashSet<>());
+            if (store != null) {
+                named.add(store);
+            }
+        }
+
+        /** The records unreadable MemoryWrites may have changed (SPEC §7.4, 18.172): the one each names; with no
+         * readable record_ref, every record of its store, a record no event names a store for counting as one of
+         * them (fail closed); with no readable store either, every record. */
+        private static Set<String> unreadRecords(
+                List<Ingest.UnreadableWrite> writes, Set<String> records, Map<String, Set<String>> stores) {
+            Set<String> unread = new LinkedHashSet<>();
+            for (Ingest.UnreadableWrite write : writes) {
+                if (write.recordRef() != null) {
+                    unread.add(write.recordRef());
+                    continue;
+                }
+                for (String record : records) {
+                    Set<String> named = stores.getOrDefault(record, Set.of());
+                    if (write.store() == null || named.isEmpty() || named.contains(write.store())) {
+                        unread.add(record);
+                    }
+                }
+            }
+            return unread;
         }
 
         private static void flow(Map<String, Set<String>> flows, String source, String target) {
