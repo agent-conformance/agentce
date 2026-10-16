@@ -39,11 +39,15 @@ public final class Json {
      * Python's {@code json.loads} refuses an integer literal longer than {@link #MAX_INT_STR_DIGITS}
      * and accepts a fractional/exponent literal of any length. Jackson's default caps every number
      * token at 1000 characters, so that cap is lifted and Python's integer rule applied instead
-     * ({@link IntegerDigitLimit}).
+     * ({@link IntegerDigitLimit}). Python reads a string or an object key of any length, and Jackson
+     * caps them at 20,000,000 and 50,000 characters, so those caps are lifted too: a signed segment's
+     * envelope over the cap would otherwise read unsigned in Java alone.
      */
     private static final ObjectMapper MAPPER = new ObjectMapper(JsonFactory.builder()
                     .streamReadConstraints(StreamReadConstraints.builder()
                             .maxNumberLength(Integer.MAX_VALUE)
+                            .maxStringLength(Integer.MAX_VALUE)
+                            .maxNameLength(Integer.MAX_VALUE)
                             .build())
                     .enable(StreamReadFeature.USE_FAST_BIG_NUMBER_PARSER)
                     .build())

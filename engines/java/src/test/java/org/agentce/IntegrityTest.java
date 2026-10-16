@@ -196,6 +196,17 @@ class IntegrityTest {
         assertFalse(signed("attestations/absent.bin", bundleRoot, SOURCE_TRUST));
     }
 
+    @Test
+    void aTrustedEnvelopeOverJacksonsDefaultStringAndNameCapsStillSigns(@TempDir Path tempDir) throws IOException {
+        Path attestations = Files.createDirectories(tempDir.resolve("bundle").resolve("attestations"));
+        ObjectNode envelope = (ObjectNode) Json.parse(envelopeFor(List.of(HASH), SOURCE));
+        envelope.put("padding", "x".repeat(20_000_001));
+        envelope.put("k".repeat(50_001), "v");
+        Files.writeString(attestations.resolve("big.sig"), envelope.toString());
+
+        assertTrue(signed("attestations/big.sig", attestations.getParent(), SOURCE_TRUST));
+    }
+
     private static final String CAP_STREAM = "urn:stream:gw";
 
     private static List<JsonNode> capChain(int count, String strength, String cls) {
