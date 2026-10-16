@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 /**
@@ -116,14 +117,16 @@ public final class Conformance {
         Path proj = corpusRoot.resolve("projects").resolve(pid);
         Bundle bundle = Bundle.load(proj.resolve("evidence"));
         Ingest.Result ingested = Ingest.ingest(bundle);
-        // findings inform, never abort; hash what the source signed, not the trust-corrected copy
-        Integrity.verifyBundle(ingested.rawAccepted, bundle.manifest, bundle.root);
+        // Findings inform, never abort; hash what the source signed, not the trust-corrected copy.
+        Map<String, Integrity.Result> streams =
+                Integrity.verifyStreams(ingested.rawAccepted, bundle.manifest, bundle.root);
         DomainBinding domain = DomainBinding.load(proj.resolve("domain.linkml.yaml"));
         Profile profile = Profile.load(proj.resolve("applicability.yaml"));
         Coverage.computeCoverage(ingested.accepted, profile, bundle.root);
         Applicability.resolve(profile, ingested.accepted, List.of());
         List<Assertions.Assertion> assertions = Assess.assessSubjects(
-                ingested.accepted, profile, cat.catalogs, domain, ingested.withheld);
+                ingested.accepted, profile, cat.catalogs, domain, ingested.withheld,
+                Integrity.integrityCaps(ingested.rawAccepted, ingested.accepted, streams));
         var activity = Activity.summarizeActivity(ingested.accepted, profile);
         var blindSpots = BlindSpots.computeBlindSpots(assertions, profile, cat.catalogs, ingested.accepted);
         Report.writeReport(

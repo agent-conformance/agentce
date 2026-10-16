@@ -5,16 +5,18 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Integrity verification of evidence streams (SPEC §6.6). Each event carries {@code data.integrity}
  * {@code {hash, prev, stream, strength, sig_ref?}}. Verification recomputes each hash, checks the
  * {@code prev} chain, cross-checks source timestamps against anchor times, and reports one status per
- * stream. Broken streams are never fatal: they are findings, not assertions (SPEC §8.1). A faithful
- * port of the reference; its results inform findings and do not feed assertions.
+ * stream. Broken streams are never fatal: they are findings (SPEC §8.1), and {@link #integrityCaps} turns them
+ * into the caps the assessment applies (SPEC §6.6, §8.1). A faithful port of the reference.
  */
 public final class Integrity {
     private Integrity() {}
@@ -38,6 +40,11 @@ public final class Integrity {
         public String status = "";
         public Integer firstBadIndex;
         public List<JsonNode> anchors;
+        /**
+         * What the strength and signatures alone read (verified, verified_weak or unsigned), kept when the time check
+         * has already made the status time_suspect, so a stream's weakness still caps (SPEC §6.6). Not written out.
+         */
+        public String strengthStatus = "";
 
         Result(String stream, String strength, List<JsonNode> anchors) {
             this.stream = stream;
@@ -97,32 +104,24 @@ public final class Integrity {
         return Canonical.sha256Hex(without);
     }
 
-    private static Long parseTime(String value) {
-        if (value == null || value.isEmpty()) {
-            return null;
-        }
-        try {
-            return java.time.Instant.parse(value).toEpochMilli();
-        } catch (RuntimeException ignored) {
-            // fall through
-        }
-        try {
-            return java.time.OffsetDateTime.parse(value).toInstant().toEpochMilli();
-        } catch (RuntimeException ignored) {
-            return null;
-        }
-    }
+    /** Any aware date-time; an anchor time comparable with it is a UTC instant (compareInstants). */
+    private static final String EPOCH = "1970-01-01T00:00:00Z";
 
-    private static List<Long> anchorTimes(List<JsonNode> anchors) {
-        List<Long> times = new ArrayList<>();
+    /**
+     * The latest anchor time, compared as instants (SPEC §6.7); an anchor time with no UTC offset, or none at all,
+     * places no record and is left out.
+     */
+    private static String latestAnchor(List<JsonNode> anchors) {
+        String latest = null;
         for (JsonNode anchor : anchors) {
-            JsonNode at = anchor.get("at");
-            Long parsed = parseTime(at != null ? at.asText() : "");
-            if (parsed != null) {
-                times.add(parsed);
+            JsonNode node = anchor.get("at");
+            String at = node != null ? node.asText() : "";
+            Integer order = latest == null ? null : Structural.compareInstants(at, latest);
+            if (Structural.compareInstants(at, EPOCH) != null && (latest == null || Integer.valueOf(1).equals(order))) {
+                latest = at;
             }
         }
-        return times;
+        return latest;
     }
 
     static boolean isSigned(JsonNode block, Path bundleRoot) {
@@ -186,14 +185,23 @@ public final class Integrity {
             }
         }
 
-        // 3. Timestamp trust: an event later than the anchor that covers it is suspect.
-        List<Long> times = anchorTimes(anchors);
-        if (!times.isEmpty()) {
-            long latestAnchor = times.stream().mapToLong(Long::longValue).max().getAsLong();
+        // An anchor whose time cannot be placed (no UTC offset, absent, or not a date-time) anchors nothing (SPEC §8.1).
+        String latest = latestAnchor(anchors);
+        result.strengthStatus = strengthStatus(strength, blocks, latest != null, bundleRoot);
+
+        // 3. Timestamp trust: an event later than the anchor that covers it is suspect, and so is one whose time
+        // cannot be placed against it (no UTC offset, or not a date-time): it cannot be cross-checked (SPEC §6.6,
+        // fail closed). A stream whose anchors are all unplaceable cannot be cross-checked at all, so it is suspect as
+        // a whole.
+        if (!anchors.isEmpty() && latest == null) {
+            result.status = TIME_SUSPECT;
+            return result;
+        }
+        if (latest != null) {
             for (int index = 0; index < events.size(); index++) {
                 JsonNode t = events.get(index).get("time");
-                Long eventTime = parseTime(t != null ? t.asText() : "");
-                if (eventTime != null && eventTime > latestAnchor) {
+                Integer order = Structural.compareInstants(t != null ? t.asText() : "", latest);
+                if (order == null || order == 1) {
                     result.status = TIME_SUSPECT;
                     result.firstBadIndex = index;
                     return result;
@@ -201,22 +209,24 @@ public final class Integrity {
             }
         }
 
-        // 4. Strength and signatures.
+        result.status = result.strengthStatus;
+        return result;
+    }
+
+    /**
+     * What a stream's strength and signatures read: source_signed is verified only when every record is signed,
+     * export_anchored only with a placeable anchor, and export_chained proves only "unchanged since export".
+     */
+    private static String strengthStatus(String strength, List<JsonNode> blocks, boolean anchored, Path bundleRoot) {
         if (strength.equals(SOURCE_SIGNED)) {
-            boolean allSigned = true;
             for (JsonNode block : blocks) {
                 if (!isSigned(block, bundleRoot)) {
-                    allSigned = false;
-                    break;
+                    return UNSIGNED;
                 }
             }
-            result.status = allSigned ? VERIFIED : UNSIGNED;
-        } else if (strength.equals(EXPORT_ANCHORED)) {
-            result.status = !anchors.isEmpty() ? VERIFIED : VERIFIED_WEAK;
-        } else {
-            result.status = VERIFIED_WEAK;
+            return VERIFIED;
         }
-        return result;
+        return strength.equals(EXPORT_ANCHORED) && anchored ? VERIFIED : VERIFIED_WEAK;
     }
 
     private static Map<String, List<JsonNode>> anchorsByStream(JsonNode manifest) {
@@ -245,17 +255,31 @@ public final class Integrity {
      * chain under an id two sources claim reads verified (18.151).
      */
     public static List<Result> verifyBundle(List<JsonNode> events, JsonNode manifest, Path bundleRoot) {
+        return new ArrayList<>(verifyStreams(events, manifest, bundleRoot).values());
+    }
+
+    private static String sourceOf(JsonNode event) {
+        JsonNode source = event.get("source");
+        return source != null ? source.asText() : "";
+    }
+
+    /** The key of one chain in {@link #verifyStreams}' results: its stream id and its source. */
+    static String chainKey(String stream, String source) {
+        return stream + "\u0000" + source;
+    }
+
+    /** {@link #verifyBundle}'s results keyed by {@link #chainKey}, in its order. */
+    public static Map<String, Result> verifyStreams(List<JsonNode> events, JsonNode manifest, Path bundleRoot) {
         Map<String, List<JsonNode>> anchors = anchorsByStream(manifest);
         Map<String, Map<String, List<JsonNode>>> grouped = new LinkedHashMap<>();
         for (JsonNode event : events) {
-            JsonNode source = event.get("source");
             grouped.computeIfAbsent(streamKey(event), k -> new LinkedHashMap<>())
-                    .computeIfAbsent(source != null ? source.asText() : "", k -> new ArrayList<>())
+                    .computeIfAbsent(sourceOf(event), k -> new ArrayList<>())
                     .add(event);
         }
         List<String> streams = new ArrayList<>(grouped.keySet());
         streams.sort(Json::byteCompare);
-        List<Result> results = new ArrayList<>();
+        Map<String, Result> results = new LinkedHashMap<>();
         for (String stream : streams) {
             Map<String, List<JsonNode>> bySource = grouped.get(stream);
             List<String> sources = new ArrayList<>(bySource.keySet());
@@ -266,12 +290,64 @@ public final class Integrity {
                 // A stream id two sources claim: the manifest's anchors and a sig_ref name no source, so neither chain
                 // under that id reads verified, which fails closed rather than let one source's chain borrow another's
                 // anchors (18.151).
-                if (bySource.size() > 1 && result.status.equals(VERIFIED)) {
-                    result.status = VERIFIED_WEAK;
+                if (bySource.size() > 1) {
+                    if (result.status.equals(VERIFIED)) {
+                        result.status = VERIFIED_WEAK;
+                    }
+                    if (result.strengthStatus.equals(VERIFIED)) {
+                        result.strengthStatus = VERIFIED_WEAK;
+                    }
                 }
-                results.add(result);
+                results.put(chainKey(stream, source), result);
             }
         }
         return results;
+    }
+
+    /** A broken chain: every record on it is read at most as self_report (SPEC §8.1). */
+    private static final Set<String> BROKEN = Set.of(FAILED, GAP, REORDERED);
+    /** A chain below verified: an enforcement-point record on it caps a pass at partial (SPEC §6.6, weak_integrity). */
+    private static final Set<String> WEAK = Set.of(VERIFIED_WEAK, UNSIGNED);
+    private static final Set<String> CAPPED_CLASSES = Set.of("enforcement_point", "independent_system");
+
+    /**
+     * Which accepted records an integrity result caps, by event id (SPEC §6.6, §8.1): {@code broken} holds the
+     * enforcement-point and independent-system records on a failed, gap or reordered stream (a record with no integrity
+     * member included), {@code weak} the enforcement-point records on a verified_weak or unsigned stream, and
+     * {@code timeSuspect} every record on a time_suspect stream.
+     */
+    public record Caps(Set<String> broken, Set<String> weak, Set<String> timeSuspect) {
+        public static final Caps NONE = new Caps(Set.of(), Set.of(), Set.of());
+    }
+
+    /**
+     * The caps {@code results} (from {@link #verifyStreams} over {@code rawAccepted}) put on {@code accepted}, the same
+     * records index for index with their trust-corrected class (ingest).
+     */
+    public static Caps integrityCaps(List<JsonNode> rawAccepted, List<JsonNode> accepted, Map<String, Result> results) {
+        Set<String> broken = new HashSet<>();
+        Set<String> weak = new HashSet<>();
+        Set<String> suspect = new HashSet<>();
+        for (int index = 0; index < rawAccepted.size(); index++) {
+            JsonNode raw = rawAccepted.get(index);
+            JsonNode event = accepted.get(index);
+            Result result = results.get(chainKey(streamKey(raw), sourceOf(raw)));
+            String status = result != null ? result.status : FAILED;
+            String eventId = Readiness.pyStr(event.get("id"));
+            JsonNode clsNode = event.get("agentcesourceclass");
+            String cls = clsNode != null && clsNode.isTextual() ? clsNode.textValue() : null;
+            if (BROKEN.contains(status) && cls != null && CAPPED_CLASSES.contains(cls)) {
+                broken.add(eventId);
+            } else if (WEAK.contains(status) && "enforcement_point".equals(cls)) {
+                weak.add(eventId);
+            } else if (status.equals(TIME_SUSPECT)) {
+                suspect.add(eventId);
+                // The time check reads before the strength: a weak or unsigned stream stays weak whatever its times say.
+                if ("enforcement_point".equals(cls) && result != null && WEAK.contains(result.strengthStatus)) {
+                    weak.add(eventId);
+                }
+            }
+        }
+        return new Caps(Set.copyOf(broken), Set.copyOf(weak), Set.copyOf(suspect));
     }
 }

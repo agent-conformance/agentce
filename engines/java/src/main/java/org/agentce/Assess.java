@@ -404,6 +404,101 @@ public final class Assess {
     }
 
     /**
+     * The families whose controls judge times (SPEC §6.6: INC, and REC retention, which no catalog has yet): a
+     * time_suspect stream's records are left out of them.
+     */
+    private static final Set<String> TIMING_FAMILIES = Set.of("INC");
+
+    /** One capped reading of a subject's records, its graph and judge built on first use. */
+    private static final class View {
+        final List<JsonNode> events;
+        final Supplier<GraphStore> store;
+        final Supplier<Map<String, JsonNode>> byIri;
+        final Supplier<SourceClass.Judge> judge;
+
+        View(List<JsonNode> events, DomainBinding domain) {
+            this.events = events;
+            this.store = lazy(() -> Graph.buildGraph(events, domain));
+            this.byIri = lazy(() -> eventsByIriOf(events));
+            this.judge = lazy(() -> new SourceClass.Judge(store.get(), byIri.get()));
+        }
+    }
+
+    /**
+     * The integrity caps of SPEC §6.6 and §8.1 over one subject's records, as ceilings on an outcome read from them
+     * as declared. A pass must also hold with every record on a broken stream left out, and in a timing control every
+     * time_suspect record (else insufficient_evidence), and then with every enforcement-point record on a weak stream
+     * left out too (else partial, weak_integrity). Only a pass is capped: a violation is never changed.
+     */
+    private static final class CappedViews {
+        final boolean any;
+        private final List<JsonNode> events;
+        private final DomainBinding domain;
+        private final Set<String> broken;
+        private final Set<String> weak;
+        private final Set<String> suspect;
+        private final Map<String, View> views = new java.util.HashMap<>();
+
+        CappedViews(List<JsonNode> events, Integrity.Caps caps, DomainBinding domain) {
+            this.events = events;
+            this.domain = domain;
+            Set<String> ids = new java.util.HashSet<>();
+            for (JsonNode e : events) {
+                ids.add(Readiness.pyStr(e.get("id")));
+            }
+            this.broken = mine(caps.broken(), ids);
+            this.weak = mine(caps.weak(), ids);
+            this.suspect = mine(caps.timeSuspect(), ids);
+            this.any = !broken.isEmpty() || !weak.isEmpty() || !suspect.isEmpty();
+        }
+
+        private static Set<String> mine(Set<String> capped, Set<String> ids) {
+            Set<String> out = new java.util.HashSet<>(capped);
+            out.retainAll(ids);
+            return out;
+        }
+
+        private View view(boolean withWeak, boolean timing) {
+            return views.computeIfAbsent(withWeak + "|" + timing, key -> {
+                Set<String> dropped = new java.util.HashSet<>(broken);
+                if (withWeak) {
+                    dropped.addAll(weak);
+                }
+                if (timing) {
+                    dropped.addAll(suspect);
+                }
+                List<JsonNode> kept = new ArrayList<>();
+                for (JsonNode e : events) {
+                    if (!dropped.contains(Readiness.pyStr(e.get("id")))) {
+                        kept.add(e);
+                    }
+                }
+                return new View(kept, domain);
+            });
+        }
+
+        Assertions.Assertion ceiling(
+                Assertions.Assertion assertion, java.util.function.Function<View, Assertions.Assertion> judge) {
+            boolean timing = !suspect.isEmpty() && TIMING_FAMILIES.contains(assertion.family);
+            if ((!broken.isEmpty() || timing) && !"conformant".equals(judge.apply(view(false, timing)).outcome)) {
+                Assertions.Assertion copy = Assertions.copyOf(assertion);
+                copy.outcome = "insufficient_evidence";
+                copy.population = new int[] {assertion.population[0], 0};
+                copy.violations = new ArrayList<>();
+                copy.sourceClassSatisfied = false;
+                copy.evidenceStrength = null;
+                return copy;
+            }
+            if (!weak.isEmpty() && !"conformant".equals(judge.apply(view(true, timing)).outcome)) {
+                Assertions.Assertion copy = Assertions.copyOf(assertion);
+                copy.outcome = "partial";
+                return copy;
+            }
+            return assertion;
+        }
+    }
+
+    /**
      * Evaluate every catalog control against every subject and return the assertions. {@code withheld} is
      * required, so every caller decides what ingest withheld; it is ingest's quarantined records that may hold evidence (18.119): quarantine never gives a better outcome. A
      * control that reads conformant, or not_applicable for want of a population, reads insufficient_evidence
@@ -415,7 +510,8 @@ public final class Assess {
             Profile profile,
             List<Catalog> catalogs,
             DomainBinding domain,
-            List<Ingest.Withheld> withheld) {
+            List<Ingest.Withheld> withheld,
+            Integrity.Caps integrity) {
         List<Assertions.Assertion> assertions = new ArrayList<>();
         Map<String, List<JsonNode>> eventsBySubject = indexBySubject(accepted);
         for (Profile.Subject subject : profile.subjects) {
@@ -448,10 +544,16 @@ public final class Assess {
             // Each graph's judge is built once, on the first control whose minimum it may fall below.
             Supplier<SourceClass.Judge> judge = lazy(() -> new SourceClass.Judge(store, eventsByIri));
             Supplier<SourceClass.Judge> cfJudge = lazy(() -> new SourceClass.Judge(cfStore, cfByIri));
+            CappedViews capped = new CappedViews(subjectEvents, integrity, domain);
             for (Catalog catalog : catalogs) {
                 for (Catalog.ControlSpec control : catalog.controls) {
                     Assertions.Assertion assertion =
                             assertControl(store, catalog, control, subject, roles, subjectEvents, eventsByIri, win, judge);
+                    if (capped.any && "conformant".equals(assertion.outcome)) {
+                        assertion = capped.ceiling(assertion, view -> assertControl(
+                                view.store.get(), catalog, control, subject, roles, view.events, view.byIri.get(), win,
+                                view.judge));
+                    }
                     boolean flattered = !own.isEmpty()
                             && ("conformant".equals(assertion.outcome)
                                     || ("not_applicable".equals(assertion.outcome)

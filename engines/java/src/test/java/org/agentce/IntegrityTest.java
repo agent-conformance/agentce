@@ -119,4 +119,76 @@ class IntegrityTest {
         assertTrue(Integrity.isSigned(block("attestations/sig.bin"), bundleRoot));
         assertFalse(Integrity.isSigned(block("attestations/absent.bin"), bundleRoot));
     }
+
+    private static final String CAP_STREAM = "urn:stream:gw";
+
+    private static List<JsonNode> capChain(int count, String strength, String cls) {
+        List<JsonNode> events = new java.util.ArrayList<>();
+        String prev = Integrity.GENESIS_PREV;
+        for (int i = 0; i < count; i++) {
+            ObjectNode event = (ObjectNode) Json.parse("{\"id\":\"e" + i + "\",\"source\":\"urn:src:gw\",\"subject\":\"s\","
+                    + "\"time\":\"2026-01-01T00:0" + i + ":00Z\",\"data\":{\"@type\":\"ToolCall\",\"integrity\":{\"prev\":\""
+                    + prev + "\",\"stream\":\"" + CAP_STREAM + "\",\"strength\":\"" + strength + "\"}}}");
+            if (cls != null) {
+                event.put("agentcesourceclass", cls);
+            }
+            ObjectNode block = (ObjectNode) event.get("data").get("integrity");
+            block.put("hash", Integrity.recomputeHash(event));
+            prev = block.get("hash").asText();
+            events.add(event);
+        }
+        return events;
+    }
+
+    private static JsonNode anchoredAt(String at) {
+        return Json.parse("{\"streams\":[{\"stream\":\"" + CAP_STREAM + "\",\"anchors\":[{\"kind\":\"rfc3161\",\"ref\":\"r\",\"at\":\""
+                + at + "\"}]}]}");
+    }
+
+    private static Integrity.Caps capsOf(List<JsonNode> events, JsonNode manifest) {
+        return Integrity.integrityCaps(events, events, Integrity.verifyStreams(events, manifest, null));
+    }
+
+    @Test
+    void timeCheckAnchorWithoutOffsetAnchorsNothing() {
+        for (String at : List.of("2026-01-01T09:00:00", "")) {
+            Integrity.Result result = Integrity.verifyBundle(capChain(2, "export_anchored", null), anchoredAt(at), null).get(0);
+            assertEquals("time_suspect", result.status);
+            assertEquals(null, result.firstBadIndex);
+            assertEquals("verified_weak", result.strengthStatus);
+        }
+    }
+
+    @Test
+    void timeCheckKeepsTheStrengthReadingOfASuspectStream() {
+        Integrity.Result result =
+                Integrity.verifyBundle(capChain(2, "source_signed", null), anchoredAt("2026-01-01T00:00:30Z"), null).get(0);
+        assertEquals("time_suspect", result.status);
+        assertEquals(1, result.firstBadIndex);
+        assertEquals("unsigned", result.strengthStatus);
+    }
+
+    @Test
+    void integrityCapBrokenCapsEnforcementPointAndIndependentSystemNeverSelfReport() {
+        for (String cls : List.of("enforcement_point", "independent_system")) {
+            List<JsonNode> tampered = capChain(2, "source_signed", cls);
+            ((ObjectNode) tampered.get(0)).put("note", "changed after it was hashed");
+            assertEquals(java.util.Set.of("e0", "e1"), capsOf(tampered, Json.parse("{}")).broken());
+        }
+        List<JsonNode> own = capChain(2, "source_signed", "self_report");
+        ((ObjectNode) own.get(0)).put("note", "changed after it was hashed");
+        assertEquals(Integrity.Caps.NONE, capsOf(own, Json.parse("{}")));
+        List<JsonNode> missing = capChain(1, "source_signed", "enforcement_point");
+        ((ObjectNode) missing.get(0).get("data")).remove("integrity");
+        assertEquals(java.util.Set.of("e0"), capsOf(missing, Json.parse("{}")).broken());
+    }
+
+    @Test
+    void integrityCapWeakCapsOnlyEnforcementPointAndASuspectWeakStreamStaysWeak() {
+        assertEquals(java.util.Set.of("e0", "e1"), capsOf(capChain(2, "export_chained", "enforcement_point"), Json.parse("{}")).weak());
+        assertEquals(Integrity.Caps.NONE, capsOf(capChain(2, "export_chained", "independent_system"), Json.parse("{}")));
+        Integrity.Caps suspect = capsOf(capChain(2, "export_chained", "enforcement_point"), anchoredAt("2026-01-01T00:00:30Z"));
+        assertEquals(java.util.Set.of("e0", "e1"), suspect.timeSuspect());
+        assertEquals(java.util.Set.of("e0", "e1"), suspect.weak());
+    }
 }

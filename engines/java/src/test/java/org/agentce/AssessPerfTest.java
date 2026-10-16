@@ -85,7 +85,7 @@ class AssessPerfTest {
         subjects.append("]");
         Profile profile = Profile.fromDict(Json.parse("{\"subjects\":" + subjects + "}"));
         CountingList accepted = new CountingList(events(), counter);
-        Assess.assessSubjects(accepted, profile, List.of(), DomainBinding.empty(), List.of());
+        Assess.assessSubjects(accepted, profile, List.of(), DomainBinding.empty(), List.of(), Integrity.Caps.NONE);
         return counter.get();
     }
 

@@ -51,7 +51,7 @@ class AssessTest {
         ObjectNode result = Json.nodes().objectNode();
         for (Map.Entry<String, List<JsonNode>> e : scenarios.entrySet()) {
             ArrayNode arr = result.putArray(e.getKey());
-            for (Assertions.Assertion a : Assess.assessSubjects(e.getValue(), profile, List.of(catalog), domain, List.of())) {
+            for (Assertions.Assertion a : Assess.assessSubjects(e.getValue(), profile, List.of(catalog), domain, List.of(), Integrity.Caps.NONE)) {
                 arr.add(a.toJson());
             }
         }
@@ -160,7 +160,7 @@ class AssessTest {
                 Json.parse("{\"subjects\":[{\"id\":\"spiffe://corp/agents/rob02-fixture\",\"role\":\"both\"}]}"));
         Catalog catalog = Catalog.load(TestPaths.repoRoot().resolve("spec/catalogs/base/baseline"));
         DomainBinding domain = DomainBinding.load(fixtures.resolve("rob02_untrusted/domain.linkml.yaml"));
-        return Assess.assessSubjects(ingested.accepted, profile, List.of(catalog), domain, ingested.withheld).stream()
+        return Assess.assessSubjects(ingested.accepted, profile, List.of(catalog), domain, ingested.withheld, Integrity.Caps.NONE).stream()
                 .filter(a -> "ROB-02".equals(a.control))
                 .findFirst()
                 .orElseThrow();
@@ -195,7 +195,7 @@ class AssessTest {
         DomainBinding domain = DomainBinding.load(kase.resolve("domain.linkml.yaml"));
         Map<String, Assertions.Assertion> byControl = new LinkedHashMap<>();
         for (Assertions.Assertion a : Assess.assessSubjects(accepted, profile,
-                List.of(Catalog.load(Fixtures.BASE), Catalog.load(Fixtures.CONDUCT)), domain, List.of())) {
+                List.of(Catalog.load(Fixtures.BASE), Catalog.load(Fixtures.CONDUCT)), domain, List.of(), Integrity.Caps.NONE)) {
             byControl.put(a.control, a);
         }
         return byControl;
@@ -323,5 +323,37 @@ class AssessTest {
                 "(agentce:executes ^agentce:about)", List.of("agentce:executes", "^agentce:about", "agentce:x"),
                 "agentce:calls", List.of("agentce:calls", "agentce:reviewedBy")),
                 Structural.propertyReads(shape, shapes));
+    }
+
+    /** OVS-03's outcome over a fixture's records with one cap set of {@link Integrity.Caps} naming every record. */
+    private static String ovs03Capped(String kase, String cap) throws IOException {
+        List<JsonNode> events = eventsOf("OVS-03", kase);
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        events.forEach(e -> ids.add(e.get("id").asText()));
+        java.util.Set<String> none = java.util.Set.of();
+        Integrity.Caps caps = switch (cap) {
+            case "broken" -> new Integrity.Caps(ids, none, none);
+            case "weak" -> new Integrity.Caps(none, ids, none);
+            default -> new Integrity.Caps(none, none, ids);
+        };
+        Profile profile = Profile.fromDict(Json.parse("{\"subjects\":[{\"id\":\"" + SUBJECT + "\",\"role\":\"both\"}]}"));
+        for (Assertions.Assertion a : Assess.assessSubjects(events, profile, List.of(Catalog.load(Fixtures.BASE)),
+                DomainBinding.load(Fixtures.BASE.resolve("test/domain.yaml")), List.of(), caps)) {
+            if (a.control.equals("OVS-03")) {
+                return a.outcome;
+            }
+        }
+        throw new AssertionError("no OVS-03 assertion");
+    }
+
+    /** SPEC §6.6, §8.1: a pass on a broken stream reads insufficient_evidence, on a weak one partial; a time_suspect
+     * stream does not cap outside a timing control; a violation never moves. */
+    @Test
+    void integrityCapCeilingLowersOnlyAPass() throws IOException {
+        assertEquals("insufficient_evidence", ovs03Capped("passed", "broken"));
+        assertEquals("partial", ovs03Capped("passed", "weak"));
+        assertEquals("conformant", ovs03Capped("passed", "time_suspect"));
+        assertEquals("non-conformant", ovs03Capped("failed", "broken"));
+        assertEquals("non-conformant", ovs03Capped("failed", "weak"));
     }
 }

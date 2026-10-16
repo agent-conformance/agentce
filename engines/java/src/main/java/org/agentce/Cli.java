@@ -1127,8 +1127,9 @@ global options:
         writeQuarantineJsonl(ingested.quarantined, out.resolve("quarantine.jsonl"));
 
         // Stage 2: integrity verification, one IntegrityResult per stream.
-        List<Integrity.Result> integrityResults =
-                Integrity.verifyBundle(ingested.rawAccepted, bundle.manifest, bundle.root);
+        Map<String, Integrity.Result> integrityStreams =
+                Integrity.verifyStreams(ingested.rawAccepted, bundle.manifest, bundle.root);
+        List<Integrity.Result> integrityResults = new ArrayList<>(integrityStreams.values());
         List<ObjectNode> integrityNodes = new ArrayList<>();
         for (Integrity.Result r : integrityResults) {
             integrityNodes.add(r.toJson());
@@ -1170,7 +1171,8 @@ global options:
         // Stage 6: catalog evaluation and report artifacts.
         List<Assertions.Assertion> evaluated =
                 Assess.assessSubjects(
-                        ingested.accepted, profileObj, resolved.catalogs(), domain, ingested.withheld);
+                        ingested.accepted, profileObj, resolved.catalogs(), domain, ingested.withheld,
+                        Integrity.integrityCaps(ingested.rawAccepted, ingested.accepted, integrityStreams));
 
         // Stage 6a: incremental state (SPEC §5.4 B7, HR-10).
         String newWindowEnd = StateDir.windowEnd(profileObj.observationWindow, ingested.accepted);
