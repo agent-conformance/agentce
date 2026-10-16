@@ -3,7 +3,8 @@
 # memory reads it consumed, include a record the memory guard marked untrusted, quarantined or blocked, or that acts
 # on an untrusted instruction. Each case in fixtures/rob02_untrusted/cases.json becomes one bundle; the real Python,
 # TypeScript and Java CLIs assess it against the baseline catalog, and ROB-02's outcome and failing events must match
-# the case's expectation in every engine, with the expected exit code and nothing quarantined.
+# the case's expectation in every engine, with the expected exit code and nothing quarantined but the records the case
+# names (an unreadable write another subject holds, 18.172).
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 fixtures="$root/verification/gates/fixtures/rob02_untrusted"
@@ -47,6 +48,9 @@ for name, case in cases.items():
     failing = ",".join(sorted(expected["failing"]))
     (bundle.parent / "expected").write_text(f"{expected['outcome']} {failing}\n", encoding="utf-8")
     (bundle.parent / "exit").write_text(f"{expected['exit']}\n", encoding="utf-8")
+    # The reasons ingest must quarantine for, in file order; empty for a case that reads all its input.
+    reasons = "".join(f"{r}\n" for r in expected.get("quarantine", []))
+    (bundle.parent / "quarantine").write_text(reasons, encoding="utf-8")
 PY
 
 (cd "$root/engines/typescript" && pnpm --silent build >/dev/null)
@@ -97,8 +101,8 @@ check_cases() {
       echo "rob02-untrusted: $engine $name exited $code, expected $want_exit" >&2
       status=1
     fi
-    if [ -s "$out/quarantine.jsonl" ]; then
-      echo "rob02-untrusted: $engine quarantined events of $name, so the case did not read its input" >&2
+    if [ "$(jq -r '.reason' "$out/quarantine.jsonl" 2>/dev/null)" != "$(cat "$dir/quarantine")" ]; then
+      echo "rob02-untrusted: $engine quarantined '$(jq -r '.reason' "$out/quarantine.jsonl" 2>/dev/null | paste -sd, -)' for $name, expected '$(paste -sd, - <"$dir/quarantine")'" >&2
       status=1
     fi
     got="$(rob02 "$out/assertions.json")"

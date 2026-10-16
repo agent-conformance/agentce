@@ -1,5 +1,5 @@
 {
-  "_description": "VG-ROB02-UNTRUSTED cases (18.37b): each case is one bundle for the fixture subject; expected is ROB-02's outcome, the failing event ids and the assess exit code, with nothing quarantined, the same in Python, TypeScript and Java.",
+  "_description": "VG-ROB02-UNTRUSTED cases (18.37b): each case is one bundle for the fixture subject; expected is ROB-02's outcome, the failing event ids and the assess exit code, with nothing quarantined but the reasons a case's expected.quarantine lists (an unreadable write another subject holds, 18.172), the same in Python, TypeScript and Java.",
   "cases": {
     "clean-memory": {
       "why": "the decision used a record the guard wrote as trusted, read with trust_min trusted",
@@ -4611,6 +4611,983 @@
             "record_ref": "mem:r1",
             "trust": "trusted",
             "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "refs": {
+              "consumer": "agentce:event/d1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": []
+          }
+        }
+      ]
+    },
+    "record-trust-min-untrusted": {
+      "why": "the decision's input names a record whose only enforcement-point read let untrusted records through (trust_min untrusted): that read is no guard ruling the record trusted (18.172)",
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 0
+      },
+      "events": [
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "trust_min": "untrusted"
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": [
+              "mem:r1"
+            ]
+          }
+        }
+      ]
+    },
+    "record-trust-min-quarantined": {
+      "why": "the same with trust_min quarantined: no ruling (18.172)",
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 0
+      },
+      "events": [
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "trust_min": "quarantined"
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": [
+              "mem:r1"
+            ]
+          }
+        }
+      ]
+    },
+    "record-trust-min-trusted": {
+      "why": "twin of record-trust-min-untrusted: the read filtered at trust_min trusted, so the guard ruled the record trusted (18.172)",
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 0
+      },
+      "events": [
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "trust_min": "trusted"
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": [
+              "mem:r1"
+            ]
+          }
+        }
+      ]
+    },
+    "record-trust-min-untrusted-ruled-write": {
+      "why": "twin: the read let untrusted records through, but the record's only write is a ruled enforcement-point write (18.172)",
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 0
+      },
+      "events": [
+        {
+          "id": "w1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "trust_min": "untrusted"
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": [
+              "mem:r1"
+            ]
+          }
+        }
+      ]
+    },
+    "cross-subject-rewrite-unreadable": {
+      "why": "the subject's guard wrote the record trusted, then another subject's enforcement point rewrote it in a record ingest could not read (schema_invalid): no guard ruled on what the decision read (SPEC §7.4, 18.172)",
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2,
+        "quarantine": [
+          "schema_invalid"
+        ]
+      },
+      "events": [
+        {
+          "id": "w1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "w2",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/other",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "trusted",
+            "guard_verdict": "allow",
+            "extra": 1
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "refs": {
+              "consumer": "agentce:event/d1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": []
+          }
+        }
+      ]
+    },
+    "cross-subject-rewrite-unreadable-self-report": {
+      "why": "the same unreadable rewrite, self-reported (18.172)",
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2,
+        "quarantine": [
+          "schema_invalid"
+        ]
+      },
+      "events": [
+        {
+          "id": "w1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "w2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/other",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "extra": 1
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "refs": {
+              "consumer": "agentce:event/d1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": []
+          }
+        }
+      ]
+    },
+    "cross-subject-rewrite-unreadable-no-ref": {
+      "why": "the unreadable rewrite names no record_ref, so it counts against every record of its store kb (18.172)",
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2,
+        "quarantine": [
+          "schema_invalid"
+        ]
+      },
+      "events": [
+        {
+          "id": "w1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "w2",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/other",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "trust": "untrusted",
+            "guard_verdict": "quarantine",
+            "extra": 1
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "refs": {
+              "consumer": "agentce:event/d1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": []
+          }
+        }
+      ]
+    },
+    "cross-subject-rewrite-unreadable-no-store": {
+      "why": "the unreadable write names neither record_ref nor store, so it counts against every record (18.172)",
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2,
+        "quarantine": [
+          "schema_invalid"
+        ]
+      },
+      "events": [
+        {
+          "id": "w1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "w2",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/other",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "extra": 1
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "refs": {
+              "consumer": "agentce:event/d1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": []
+          }
+        }
+      ]
+    },
+    "cross-subject-rewrite-unreadable-storeless-read": {
+      "why": "the subject's read at trust_min trusted names no store; an unreadable write of store kb with no record_ref may have changed the record (fail closed, 18.172 critic r1 F1)",
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2,
+        "quarantine": [
+          "schema_invalid"
+        ]
+      },
+      "events": [
+        {
+          "id": "w2",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/other",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "extra": 1
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "refs": {
+              "consumer": "agentce:event/d1"
+            },
+            "trust_min": "trusted"
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": []
+          }
+        }
+      ]
+    },
+    "cross-subject-rewrite-unreadable-trust-min": {
+      "why": "an unreadable write of the record overrides the subject's own read at trust_min trusted (18.172)",
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2,
+        "quarantine": [
+          "schema_invalid"
+        ]
+      },
+      "events": [
+        {
+          "id": "w2",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/other",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "untrusted",
+            "guard_verdict": "quarantine",
+            "extra": 1
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "refs": {
+              "consumer": "agentce:event/d1"
+            },
+            "trust_min": "trusted"
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": []
+          }
+        }
+      ]
+    },
+    "cross-subject-rewrite-unreadable-type": {
+      "why": "an unreadable record whose type cannot be read (envelope type a number, no data @type) counts as a MemoryWrite (fail closed, 18.172 critic r1 F3)",
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2,
+        "quarantine": [
+          "schema_invalid"
+        ]
+      },
+      "events": [
+        {
+          "id": "w1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "w2",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/other",
+          "type": 5,
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "extra": 1
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "refs": {
+              "consumer": "agentce:event/d1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": []
+          }
+        }
+      ]
+    },
+    "cross-subject-unreadable-other-store": {
+      "why": "twin of cross-subject-rewrite-unreadable-no-ref: the unreadable write's store is another store, so the record stays ruled (18.172)",
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2,
+        "quarantine": [
+          "schema_invalid"
+        ]
+      },
+      "events": [
+        {
+          "id": "w1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "w2",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/other",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "other",
+            "extra": 1
+          }
+        },
+        {
+          "id": "m1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:03Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "refs": {
+              "consumer": "agentce:event/d1"
+            }
+          }
+        },
+        {
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-02T00:00:05Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "Decision",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "decision_type": "dom:CreditDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/rob02-fixture"
+            },
+            "inputs": []
+          }
+        }
+      ]
+    },
+    "cross-subject-unreadable-other-type": {
+      "why": "twin: the unreadable record names another type (MemoryRead) in its envelope and data, so it is no write (18.172)",
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2,
+        "quarantine": [
+          "schema_invalid"
+        ]
+      },
+      "events": [
+        {
+          "id": "w1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/rob02-fixture",
+          "type": "org.agent-conformance.evidence.MemoryWrite.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:01Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryWrite",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_ref": "mem:r1",
+            "trust": "trusted",
+            "guard_verdict": "allow"
+          }
+        },
+        {
+          "id": "w2",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/other",
+          "type": "org.agent-conformance.evidence.MemoryRead.v1",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-02T00:00:02Z",
+          "specversion": "1.0",
+          "datacontenttype": "application/ld+json",
+          "data": {
+            "@type": "MemoryRead",
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "store": "kb",
+            "record_refs": [
+              "mem:r1"
+            ],
+            "extra": 1
           }
         },
         {
