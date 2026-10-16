@@ -16,10 +16,15 @@
         "run": "38382574593",
         "attempt": 1,
         "commit": "2695b317"
+      },
+      {
+        "run": "38875282332",
+        "attempt": 1,
+        "commit": "e234f53f"
       }
     ],
     "measured": "per gate and run, the gap between its 'RED on the seeded fault' log line and the previous one in its job (the first from the start of the job's demo step); per-job setup is not included",
-    "combined": "the longest of the runs, in whole seconds, so a gate's estimate covers the slowest job it has had (the same gate took half or twice as long from one run to the next); VG-BYO-CATALOG-PARITY and VG-BYO-CATALOG-WALK are timed from run 38382574593 only, the first after the split"
+    "combined": "the longest of the runs, in whole seconds, so a gate's estimate covers the slowest job it has had (the same gate took half or twice as long from one run to the next); VG-BYO-CATALOG-PARITY and VG-BYO-CATALOG-WALK are timed from run 38382574593 only, the first after the split; VG-STREAM-SOURCE-BOUND is timed from run 38875282332 only, the first after its faults went from 9 to 18 (18.155)"
   },
   "default_seconds": 300,
   "max_chunk_seconds": 240,
@@ -100,7 +105,7 @@
     "VG-DUPLICATE-ID-CLASS": 170,
     "VG-APPROVAL-OUTCOME-BOUND": 137,
     "VG-QUARANTINE-NO-PASS": 473,
-    "VG-STREAM-SOURCE-BOUND": 325,
+    "VG-STREAM-SOURCE-BOUND": 723,
     "VG-TIME-ORDER-INSTANT": 77,
     "VG-APPROVAL-REFS-RESOLVED": 835,
     "VG-HELD-DECISION-EVERYWHERE": 296,
