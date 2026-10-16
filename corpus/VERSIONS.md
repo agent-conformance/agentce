@@ -19,7 +19,7 @@ fails the check.
 | Field | Value |
 |---|---|
 | Corpus set | v1 |
-| Manifest SHA-256 | `sha256:f18cfca6b47696d0b0f10e47329657f8d9a680b1375afc0f003c0d97179c3507` |
+| Manifest SHA-256 | `sha256:061f4a1ec8505f9c800852f0d36d9b6d8c791d1e136812c3711ac7a6a64eae50` |
 | Projects | 30 (credit domain × six implementation styles × five variants) |
 | Corpus version | 2026.09 |
 | Validated catalog | eu-ai-act@2026.09 |
@@ -49,3 +49,9 @@ fails the check.
   profile lists the same components under `third_party_components`, so the manifest is not read as
   applicability drift. `corpus/quickstart` is the credit/langgraph/known-pass project and carries the
   same event and profile entry.
+- **v1 (2026.09), pin re-extended (18.132)** — the corpus was still unpublished, so the pin was again
+  corrected in place. A verdict is now capped by its records' integrity (SPEC §6.6, §8.1), so
+  `generate.py`'s `_chain()` writes each enforcement-point source's stream as `export_anchored` with a
+  manifest anchor at its last record's time, and every other stream stays `export_chained`. The
+  tampered-record projects' ground truth now reads `insufficient_evidence` for the controls resting on
+  the broken gateway stream (OVS-03, INT-01).
