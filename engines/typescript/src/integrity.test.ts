@@ -13,7 +13,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { canonicalString } from "./canonical";
-import { GENESIS_PREV, integrityResultToJson, recomputeHash, verifyBundle } from "./integrity";
+import {
+  GENESIS_PREV,
+  integrityCaps,
+  integrityResultToJson,
+  recomputeHash,
+  verifyBundle,
+  verifyStreams,
+} from "./integrity";
 
 const TESTDATA = join(__dirname, "..", "testdata");
 
@@ -115,4 +122,86 @@ test("a sig_ref inside the bundle root is counted as signed", () => {
 test("a sig_ref that is missing from the bundle is not counted as signed", () => {
   const status = statusForSigRef("attestations/absent.sig", () => {});
   assert.equal(status, "unsigned");
+});
+
+const CAP_STREAM = "urn:stream:gw";
+
+function capChain(count: number, strength: string): Array<Record<string, unknown>> {
+  const events: Array<Record<string, unknown>> = [];
+  let prev = "0".repeat(64);
+  for (let i = 0; i < count; i += 1) {
+    const block: Record<string, unknown> = { prev, stream: CAP_STREAM, strength };
+    const event: Record<string, unknown> = {
+      id: `e${i}`,
+      source: "urn:src:gw",
+      subject: "s",
+      time: `2026-01-01T00:0${i}:00Z`,
+      data: { "@type": "ToolCall", integrity: block },
+    };
+    block.hash = recomputeHash(event);
+    prev = block.hash as string;
+    events.push(event);
+  }
+  return events;
+}
+
+function anchoredAt(at: string): Record<string, unknown> {
+  return { streams: [{ stream: CAP_STREAM, anchors: [{ kind: "rfc3161", ref: "r", at }] }] };
+}
+
+function classed(
+  events: Array<Record<string, unknown>>,
+  cls: string,
+): Array<Record<string, unknown>> {
+  return events.map((e) => ({ ...e, agentcesourceclass: cls }));
+}
+
+test("time check: an anchor time with no UTC offset, or none, anchors nothing (critic r2 N1)", () => {
+  for (const at of ["2026-01-01T09:00:00", ""]) {
+    const [result] = verifyBundle(capChain(2, "export_anchored"), anchoredAt(at));
+    assert.equal(result?.status, "time_suspect");
+    assert.equal(result?.firstBadIndex, null);
+    assert.equal(result?.strengthStatus, "verified_weak");
+  }
+});
+
+test("time check: a suspect stream keeps its strength reading (critic r1 F1)", () => {
+  const [result] = verifyBundle(capChain(2, "source_signed"), anchoredAt("2026-01-01T00:00:30Z"));
+  assert.equal(result?.status, "time_suspect");
+  assert.equal(result?.firstBadIndex, 1);
+  assert.equal(result?.strengthStatus, "unsigned");
+});
+
+test("integrity cap: broken streams cap enforcement-point and independent-system records, never self_report", () => {
+  const tampered = capChain(2, "source_signed");
+  tampered[0] = { ...tampered[0], note: "changed after it was hashed" };
+  for (const cls of ["enforcement_point", "independent_system"]) {
+    const caps = integrityCaps(tampered, classed(tampered, cls), verifyStreams(tampered, {}));
+    assert.deepEqual([...caps.broken].sort(), ["e0", "e1"]);
+  }
+  const own = integrityCaps(
+    tampered,
+    classed(tampered, "self_report"),
+    verifyStreams(tampered, {}),
+  );
+  assert.equal(own.broken.size + own.weak.size + own.timeSuspect.size, 0);
+  const missing = [{ ...capChain(1, "source_signed")[0], data: { "@type": "ToolCall" } }];
+  const caps = integrityCaps(
+    missing,
+    classed(missing, "enforcement_point"),
+    verifyStreams(missing, {}),
+  );
+  assert.deepEqual([...caps.broken], ["e0"]);
+});
+
+test("integrity cap: weak streams cap only enforcement-point records, and a suspect weak stream stays weak", () => {
+  const weak = capChain(2, "export_chained");
+  const ep = integrityCaps(weak, classed(weak, "enforcement_point"), verifyStreams(weak, {}));
+  assert.deepEqual([...ep.weak].sort(), ["e0", "e1"]);
+  const is = integrityCaps(weak, classed(weak, "independent_system"), verifyStreams(weak, {}));
+  assert.equal(is.weak.size, 0);
+  const results = verifyStreams(weak, anchoredAt("2026-01-01T00:00:30Z"));
+  const suspect = integrityCaps(weak, classed(weak, "enforcement_point"), results);
+  assert.deepEqual([...suspect.timeSuspect].sort(), ["e0", "e1"]);
+  assert.deepEqual([...suspect.weak].sort(), ["e0", "e1"]);
 });

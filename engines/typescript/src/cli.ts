@@ -41,7 +41,7 @@ import { ExitCode } from "./exitCodes";
 import { isPySpace, parseFailOn } from "./failOn";
 import { buildGraph } from "./graph";
 import { ingest } from "./ingest";
-import { integrityResultToJson, verifyBundle } from "./integrity";
+import { integrityCaps, integrityResultToJson, verifyBundle, verifyStreams } from "./integrity";
 import { DEFAULT_LANGUAGE, availableLanguages, catalogue } from "./messages";
 import { evaluateInstalledNoMl, loadVendoredDenylist } from "./noMl";
 import { type Profile, loadProfile } from "./profile";
@@ -997,7 +997,8 @@ function runAssess(options: AssessOptions): CommandResult {
   writeQuarantine(ingested.quarantined, join(out, "quarantine.jsonl"));
 
   // Stage 2: integrity verification, one IntegrityResult per stream.
-  const integrityResults = verifyBundle(ingested.rawAccepted, bundle.manifest, bundle.root);
+  const integrityStreams = verifyStreams(ingested.rawAccepted, bundle.manifest, bundle.root);
+  const integrityResults = [...integrityStreams.values()];
   writeJsonl(integrityResults.map(integrityResultToJson), join(out, "integrity.jsonl"));
 
   // Stage 3: build the provenance graph (in-memory store; ADR-0001's TypeScript variant).
@@ -1031,6 +1032,7 @@ function runAssess(options: AssessOptions): CommandResult {
     domain,
     scanned === undefined,
     ingested.withheld,
+    integrityCaps(ingested.rawAccepted, ingested.accepted, integrityStreams),
   );
   // A records run that judged nothing renders no report: its headline would read "Conformant".
   if (scanned !== undefined && evaluatedNothing(evaluated)) {

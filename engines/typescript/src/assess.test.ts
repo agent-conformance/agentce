@@ -21,6 +21,7 @@ import { loadCatalog } from "./catalog";
 import { DomainBinding } from "./domain";
 import { InputError } from "./errors";
 import { ingest } from "./ingest";
+import { NO_CAPS } from "./integrity";
 import { profileFromDict } from "./profile";
 import { parseShapesTtl } from "./psp";
 import { loadDeviationRegister } from "./readiness";
@@ -57,7 +58,7 @@ test("assess_subjects over the base catalog matches the Python reference", () =>
 
   const result: Record<string, unknown> = {};
   for (const [name, events] of Object.entries(scenarios)) {
-    result[name] = assessSubjects(events, profile, [catalog], domain, true, []).map(
+    result[name] = assessSubjects(events, profile, [catalog], domain, true, [], NO_CAPS).map(
       assertionToJson,
     );
   }
@@ -200,6 +201,7 @@ function quarantineRob02(kase: string): Assertion {
       domain,
       true,
       ingested.withheld,
+      NO_CAPS,
     );
     return assertions.find((a) => a.control === "ROB-02") as Assertion;
   } finally {
@@ -239,7 +241,7 @@ function humanActorCase(
     subjects: [{ id: "spiffe://corp/agents/cnd05-fixture", role: "both" }],
   });
   const domain = DomainBinding.load(join(kase, "domain.linkml.yaml"));
-  const assertions = assessSubjects(accepted, profile, catalogs, domain, true, []);
+  const assertions = assessSubjects(accepted, profile, catalogs, domain, true, [], NO_CAPS);
   return {
     byControl: new Map(assertions.map((a) => [a.control, a])),
     register: loadDeviationRegister(join(kase, "deviations.yaml")),

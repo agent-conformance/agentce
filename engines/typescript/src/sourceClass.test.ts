@@ -18,6 +18,7 @@ import { type Catalog, loadCatalog } from "./catalog";
 import { DomainBinding } from "./domain";
 import { InputError } from "./errors";
 import { buildGraph } from "./graph";
+import { NO_CAPS } from "./integrity";
 import { eventIri } from "./iri";
 import { profileFromDict } from "./profile";
 import {
@@ -439,7 +440,7 @@ function assess(events: Event[], control = "CND-05", domain: DomainBinding = DOM
       { id: OTHER, role: "both" },
     ],
   });
-  const assertions = assessSubjects(events, profile, [conduct()], domain, true, []);
+  const assertions = assessSubjects(events, profile, [conduct()], domain, true, [], NO_CAPS);
   const found = assertions.find((a) => a.control === control && a.subject === SUBJECT);
   assert.ok(found);
   return found;
@@ -548,7 +549,7 @@ test("a blind spot names the record below the minimum", () => {
   const profile = profileFromDict({ subjects: [{ id: SUBJECT, role: "both" }] });
   const events = [instruction({ cls: SR }), call()];
   const catalogs = [conduct()];
-  const assertions = assessSubjects(events, profile, catalogs, DOMAIN, true, []);
+  const assertions = assessSubjects(events, profile, catalogs, DOMAIN, true, [], NO_CAPS);
   const spots = computeBlindSpots(assertions, profile, catalogs, events);
   const spot = spots.blind_spots.find((s) => s.event === "Instruction");
   assert.ok(spot);
@@ -562,7 +563,7 @@ test("a blind spot names the record below the minimum", () => {
 function rob02(events: Event[]): Assertion {
   const profile = profileFromDict({ subjects: [{ id: SUBJECT, role: "both" }] });
   const catalog = loadCatalog(join(CATALOGS, "base", "baseline"));
-  const found = assessSubjects(events, profile, [catalog], DOMAIN, true, []).find(
+  const found = assessSubjects(events, profile, [catalog], DOMAIN, true, [], NO_CAPS).find(
     (a) => a.control === "ROB-02",
   );
   assert.ok(found);

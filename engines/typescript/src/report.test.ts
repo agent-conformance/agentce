@@ -38,6 +38,7 @@ import type { BlindSpots } from "./blindSpots";
 import { canonicalString } from "./canonical";
 import { loadCatalog } from "./catalog";
 import { DomainBinding } from "./domain";
+import { NO_CAPS } from "./integrity";
 import { DEFAULT_LANGUAGE, catalogue } from "./messages";
 import { profileFromDict } from "./profile";
 import {
@@ -72,7 +73,7 @@ function ovsFailedAssertions() {
     .split("\n")
     .filter((line) => line.trim())
     .map((line) => JSON.parse(line));
-  return assessSubjects(events, profile, [catalog], domain, true, []);
+  return assessSubjects(events, profile, [catalog], domain, true, [], NO_CAPS);
 }
 
 test("report canonical machine outputs match the Python reference golden", () => {

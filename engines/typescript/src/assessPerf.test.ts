@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { assessSubjects } from "./assess";
 import { DomainBinding } from "./domain";
+import { NO_CAPS } from "./integrity";
 import { profileFromDict } from "./profile";
 
 const EVENT_COUNT = 300;
@@ -40,7 +41,7 @@ function scans(numSubjects: number): number {
     subjects: Array.from({ length: numSubjects }, (_, j) => ({ id: `s${j}` })),
   });
   const accepted = countingProxy(events(), counter);
-  assessSubjects(accepted, profile, [], DomainBinding.empty(), true, []);
+  assessSubjects(accepted, profile, [], DomainBinding.empty(), true, [], NO_CAPS);
   return counter.n;
 }
 

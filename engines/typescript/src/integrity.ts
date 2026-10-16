@@ -13,6 +13,7 @@
 
 import { confineToRoot, safeIsFile } from "./bundle";
 import { sha256Hex } from "./canonical";
+import { compareInstants } from "./structural";
 import { byteCompare } from "./util";
 
 export const GENESIS_PREV = "0".repeat(64);
@@ -41,6 +42,11 @@ export interface IntegrityResult {
   status: string;
   firstBadIndex: number | null;
   anchors: Array<Record<string, unknown>>;
+  /**
+   * What the strength and signatures alone read (verified, verified_weak or unsigned), kept when the time check has
+   * already made the status time_suspect, so a stream's weakness still caps (SPEC §6.6). Not written out.
+   */
+  strengthStatus: string;
 }
 
 export function integrityResultToJson(result: IntegrityResult): Record<string, unknown> {
@@ -97,20 +103,25 @@ export function recomputeHash(event: Record<string, unknown>): string {
   return sha256Hex(without);
 }
 
-function parseTime(value: string): number | null {
-  const parsed = Date.parse(value);
-  return Number.isNaN(parsed) ? null : parsed;
-}
+/** Any aware date-time; an anchor time comparable with it is a UTC instant (compareInstants). */
+const EPOCH = "1970-01-01T00:00:00Z";
 
-function anchorTimes(anchors: Array<Record<string, unknown>>): number[] {
-  const times: number[] = [];
+/**
+ * The latest anchor time, compared as instants (SPEC §6.7); an anchor time with no UTC offset, or none at all, places
+ * no record and is left out.
+ */
+function latestAnchor(anchors: Array<Record<string, unknown>>): string | null {
+  let latest: string | null = null;
   for (const anchor of anchors) {
-    const parsed = parseTime(String(anchor.at ?? ""));
-    if (parsed !== null) {
-      times.push(parsed);
+    const at = String(anchor.at ?? "");
+    if (
+      compareInstants(at, EPOCH) !== null &&
+      (latest === null || compareInstants(at, latest) === 1)
+    ) {
+      latest = at;
     }
   }
-  return times;
+  return latest;
 }
 
 function isSigned(block: Record<string, unknown> | null, bundleRoot: string | null): boolean {
@@ -150,6 +161,7 @@ function verifyStream(
     status: "",
     firstBadIndex: null,
     anchors,
+    strengthStatus: "",
   };
 
   // 1. Tamper: a recomputed hash that does not match the stored one.
@@ -185,13 +197,24 @@ function verifyStream(
     }
   }
 
-  // 3. Timestamp trust: an event later than the anchor that covers it is suspect.
-  const times = anchorTimes(anchors);
-  if (times.length > 0) {
-    const latestAnchor = Math.max(...times);
+  // An anchor whose time cannot be placed (no UTC offset, absent, or not a date-time) anchors nothing (SPEC §8.1).
+  const latest = latestAnchor(anchors);
+  result.strengthStatus = strengthStatus(strength, blocks, latest !== null, bundleRoot);
+
+  // 3. Timestamp trust: an event later than the anchor that covers it is suspect, and so is one whose time cannot be
+  // placed against it (no UTC offset, or not a date-time): it cannot be cross-checked (SPEC §6.6, fail closed).
+  // A stream whose anchors are all unplaceable cannot be cross-checked at all, so it is suspect as a whole.
+  if (anchors.length > 0 && latest === null) {
+    result.status = IntegrityStatus.TIME_SUSPECT;
+    return result;
+  }
+  if (latest !== null) {
     for (let index = 0; index < events.length; index += 1) {
-      const eventTime = parseTime(String((events[index] as Record<string, unknown>).time ?? ""));
-      if (eventTime !== null && eventTime > latestAnchor) {
+      const order = compareInstants(
+        String((events[index] as Record<string, unknown>).time ?? ""),
+        latest,
+      );
+      if (order === 1 || order === null) {
         result.status = IntegrityStatus.TIME_SUSPECT;
         result.firstBadIndex = index;
         return result;
@@ -199,18 +222,29 @@ function verifyStream(
     }
   }
 
-  // 4. Strength and signatures.
+  result.status = result.strengthStatus;
+  return result;
+}
+
+/**
+ * What a stream's strength and signatures read: source_signed is verified only when every record is signed,
+ * export_anchored only with a placeable anchor, and export_chained proves only "unchanged since export".
+ */
+function strengthStatus(
+  strength: string,
+  blocks: Array<Record<string, unknown> | null>,
+  anchored: boolean,
+  bundleRoot: string | null,
+): string {
   if (strength === IntegrityStrength.SOURCE_SIGNED) {
-    result.status = blocks.every((block) => isSigned(block, bundleRoot))
+    return blocks.every((block) => isSigned(block, bundleRoot))
       ? IntegrityStatus.VERIFIED
       : IntegrityStatus.UNSIGNED;
-  } else if (strength === IntegrityStrength.EXPORT_ANCHORED) {
-    result.status = anchors.length > 0 ? IntegrityStatus.VERIFIED : IntegrityStatus.VERIFIED_WEAK;
-  } else {
-    // export_chained: a chain computed after export proves only "unchanged since export".
-    result.status = IntegrityStatus.VERIFIED_WEAK;
   }
-  return result;
+  if (strength === IntegrityStrength.EXPORT_ANCHORED && anchored) {
+    return IntegrityStatus.VERIFIED;
+  }
+  return IntegrityStatus.VERIFIED_WEAK;
 }
 
 function anchorsByStream(
@@ -240,6 +274,20 @@ export function verifyBundle(
   manifest: Record<string, unknown>,
   bundleRoot: string | null = null,
 ): IntegrityResult[] {
+  return [...verifyStreams(events, manifest, bundleRoot).values()];
+}
+
+/** The key of one chain in {@link verifyStreams}' results: its stream id and its source. */
+export function chainKey(stream: string, source: string): string {
+  return `${stream}\u0000${source}`;
+}
+
+/** {@link verifyBundle}'s results keyed by {@link chainKey}, in its order. */
+export function verifyStreams(
+  events: Array<Record<string, unknown>>,
+  manifest: Record<string, unknown>,
+  bundleRoot: string | null = null,
+): Map<string, IntegrityResult> {
   const anchors = anchorsByStream(manifest);
   const grouped = new Map<string, Map<string, Array<Record<string, unknown>>>>();
   for (const event of events) {
@@ -258,7 +306,7 @@ export function verifyBundle(
     }
   }
 
-  const results: IntegrityResult[] = [];
+  const results = new Map<string, IntegrityResult>();
   for (const stream of [...grouped.keys()].sort(byteCompare)) {
     const bySource = grouped.get(stream) as Map<string, Array<Record<string, unknown>>>;
     for (const source of [...bySource.keys()].sort(byteCompare)) {
@@ -270,11 +318,80 @@ export function verifyBundle(
       );
       // A stream id two sources claim: the manifest's anchors and a sig_ref name no source, so neither chain under
       // that id reads verified, which fails closed rather than let one source's chain borrow another's anchors (18.151).
-      if (bySource.size > 1 && result.status === IntegrityStatus.VERIFIED) {
-        result.status = IntegrityStatus.VERIFIED_WEAK;
+      if (bySource.size > 1) {
+        if (result.status === IntegrityStatus.VERIFIED) {
+          result.status = IntegrityStatus.VERIFIED_WEAK;
+        }
+        if (result.strengthStatus === IntegrityStatus.VERIFIED) {
+          result.strengthStatus = IntegrityStatus.VERIFIED_WEAK;
+        }
       }
-      results.push(result);
+      results.set(chainKey(stream, source), result);
     }
   }
   return results;
+}
+
+/** A broken chain: every record on it is read at most as self_report (SPEC §8.1). */
+const BROKEN: ReadonlySet<string> = new Set([
+  IntegrityStatus.FAILED,
+  IntegrityStatus.GAP,
+  IntegrityStatus.REORDERED,
+]);
+/** A chain below verified: an enforcement-point record on it caps a pass at partial (SPEC §6.6, weak_integrity). */
+const WEAK: ReadonlySet<string> = new Set([
+  IntegrityStatus.VERIFIED_WEAK,
+  IntegrityStatus.UNSIGNED,
+]);
+const CAPPED_CLASSES: ReadonlySet<unknown> = new Set(["enforcement_point", "independent_system"]);
+
+/**
+ * Which accepted records an integrity result caps, by event id (SPEC §6.6, §8.1): `broken` holds the
+ * enforcement-point and independent-system records on a failed, gap or reordered stream (a record with no integrity
+ * member included), `weak` the enforcement-point records on a verified_weak or unsigned stream, and `timeSuspect`
+ * every record on a time_suspect stream.
+ */
+export interface IntegrityCaps {
+  broken: ReadonlySet<string>;
+  weak: ReadonlySet<string>;
+  timeSuspect: ReadonlySet<string>;
+}
+
+export const NO_CAPS: IntegrityCaps = {
+  broken: new Set(),
+  weak: new Set(),
+  timeSuspect: new Set(),
+};
+
+/**
+ * The caps `results` (from {@link verifyStreams} over `rawAccepted`) put on `accepted`, the same records index for
+ * index with their trust-corrected class (ingest).
+ */
+export function integrityCaps(
+  rawAccepted: Array<Record<string, unknown>>,
+  accepted: Array<Record<string, unknown>>,
+  results: Map<string, IntegrityResult>,
+): IntegrityCaps {
+  const broken = new Set<string>();
+  const weak = new Set<string>();
+  const suspect = new Set<string>();
+  rawAccepted.forEach((raw, index) => {
+    const event = accepted[index] as Record<string, unknown>;
+    const result = results.get(chainKey(streamKey(raw), String(raw.source ?? "")));
+    const status = result !== undefined ? result.status : IntegrityStatus.FAILED;
+    const eventId = String(event.id);
+    const cls = event.agentcesourceclass;
+    if (BROKEN.has(status) && CAPPED_CLASSES.has(cls)) {
+      broken.add(eventId);
+    } else if (WEAK.has(status) && cls === "enforcement_point") {
+      weak.add(eventId);
+    } else if (status === IntegrityStatus.TIME_SUSPECT) {
+      suspect.add(eventId);
+      // The time check reads before the strength: a weak or unsigned stream stays weak whatever its times say.
+      if (cls === "enforcement_point" && result !== undefined && WEAK.has(result.strengthStatus)) {
+        weak.add(eventId);
+      }
+    }
+  });
+  return { broken, weak, timeSuspect: suspect };
 }

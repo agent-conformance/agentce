@@ -34,7 +34,7 @@ import { DomainBinding } from "./domain";
 import { InputError } from "./errors";
 import { pyStrip } from "./failOn";
 import { ingest } from "./ingest";
-import { verifyBundle } from "./integrity";
+import { integrityCaps, verifyStreams } from "./integrity";
 import { NonCanonicalNumber, parseJson } from "./json";
 import { evaluateNoMl } from "./noMl";
 import { parsePythonIntGrammar, toBigIntFromInt } from "./otelGenai";
@@ -124,7 +124,8 @@ function assessProject(
   const proj = join(corpusRoot, "projects", pid);
   const bundle = loadBundle(join(proj, "evidence"));
   const ingested = ingest(bundle);
-  verifyBundle(ingested.rawAccepted, bundle.manifest, bundle.root); // findings inform, never abort; hash what the source signed, not the trust-corrected copy
+  // Findings inform, never abort; hash what the source signed, not the trust-corrected copy.
+  const streams = verifyStreams(ingested.rawAccepted, bundle.manifest, bundle.root);
   const domain = DomainBinding.load(join(proj, "domain.linkml.yaml"));
   const profile = loadProfile(join(proj, "applicability.yaml"));
   computeCoverage(ingested.accepted, profile, bundle.root);
@@ -136,6 +137,7 @@ function assessProject(
     domain,
     true,
     ingested.withheld,
+    integrityCaps(ingested.rawAccepted, ingested.accepted, streams),
   );
   const activity = summarizeActivity(ingested.accepted, profile);
   const blindSpots = computeBlindSpots(assertions, profile, catalogs, ingested.accepted);

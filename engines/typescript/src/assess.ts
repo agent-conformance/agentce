@@ -15,6 +15,7 @@ import { type Catalog, type ControlSpec, evidenceShapeFor, shapeFor } from "./ca
 import type { DomainBinding } from "./domain";
 import { buildGraph } from "./graph";
 import { type Withheld, digestOf } from "./ingest";
+import type { IntegrityCaps } from "./integrity";
 import { eventIri } from "./iri";
 import type { Profile, Subject } from "./profile";
 import { compareDate, parseDate } from "./readiness";
@@ -322,6 +323,91 @@ function lazy<T>(make: () => T): () => T {
   };
 }
 
+/**
+ * The families whose controls judge times (SPEC §6.6: INC, and REC retention, which no catalog has yet): a time_suspect
+ * stream's records are left out of them.
+ */
+const TIMING_FAMILIES: ReadonlySet<string> = new Set(["INC"]);
+
+/** One capped reading of a subject's records, its graph and judge built on first use. */
+interface View {
+  events: Event[];
+  store: () => GraphStore;
+  byIri: () => Map<string, Event>;
+  judge: () => SourceClassJudge;
+}
+
+function makeView(events: Event[], domain: DomainBinding): View {
+  const store = lazy(() => buildGraph(events, { domain }));
+  const byIri = lazy(() => eventsByIriOf(events));
+  return { events, store, byIri, judge: lazy(() => new SourceClassJudge(store(), byIri())) };
+}
+
+/**
+ * The integrity caps of SPEC §6.6 and §8.1 over one subject's records, as ceilings on an outcome read from them as
+ * declared. A pass must also hold with every record on a broken stream left out, and in a timing control every
+ * time_suspect record (else insufficient_evidence), and then with every enforcement-point record on a weak stream left
+ * out too (else partial, weak_integrity). Only a pass is capped: a violation is never changed.
+ */
+class CappedViews {
+  readonly any: boolean;
+  private readonly broken: Set<string>;
+  private readonly weak: Set<string>;
+  private readonly suspect: Set<string>;
+  private readonly views = new Map<string, View>();
+
+  constructor(
+    private readonly events: Event[],
+    caps: IntegrityCaps,
+    private readonly domain: DomainBinding,
+  ) {
+    const ids = new Set(events.map((e) => String(e.id)));
+    const mine = (set: ReadonlySet<string>) => new Set([...set].filter((id) => ids.has(id)));
+    this.broken = mine(caps.broken);
+    this.weak = mine(caps.weak);
+    this.suspect = mine(caps.timeSuspect);
+    this.any = this.broken.size > 0 || this.weak.size > 0 || this.suspect.size > 0;
+  }
+
+  private view(weak: boolean, timing: boolean): View {
+    const key = `${weak}|${timing}`;
+    let view = this.views.get(key);
+    if (view === undefined) {
+      const dropped = new Set([
+        ...this.broken,
+        ...(weak ? this.weak : []),
+        ...(timing ? this.suspect : []),
+      ]);
+      view = makeView(
+        this.events.filter((e) => !dropped.has(String(e.id))),
+        this.domain,
+      );
+      this.views.set(key, view);
+    }
+    return view;
+  }
+
+  ceiling(assertion: Assertion, judge: (view: View) => Assertion): Assertion {
+    const timing = this.suspect.size > 0 && TIMING_FAMILIES.has(assertion.family);
+    if (this.broken.size > 0 || timing) {
+      if (judge(this.view(false, timing)).outcome !== "conformant") {
+        return {
+          ...assertion,
+          outcome: "insufficient_evidence",
+          population: [assertion.population[0], 0],
+          violations: [],
+          sourceClassSatisfied: false,
+          evidenceStrength: null,
+        };
+      }
+    }
+    if (this.weak.size > 0 && judge(this.view(true, timing)).outcome !== "conformant") {
+      return { ...assertion, outcome: "partial" };
+    }
+    return assertion;
+  }
+}
+
 /** Group `accepted` by subject id in one pass over the list. */
 export function indexBySubject(accepted: Event[]): Map<string, Event[]> {
   const index = new Map<string, Event[]>();
@@ -423,6 +509,7 @@ export function assessSubjects(
   domain: DomainBinding,
   applicabilityDeclared: boolean,
   withheld: Withheld[],
+  integrity: IntegrityCaps,
 ): Assertion[] {
   const assertions: Assertion[] = [];
   const eventsBySubject = indexBySubject(accepted);
@@ -444,6 +531,7 @@ export function assessSubjects(
     // Each graph's judge is built once, on the first control whose minimum it may fall below.
     const judge = lazy(() => new SourceClassJudge(store, eventsByIri));
     const cfJudge = lazy(() => new SourceClassJudge(cfStore, cfByIri));
+    const capped = new CappedViews(subjectEvents, integrity, domain);
     for (const catalog of catalogs) {
       for (const control of catalog.controls) {
         let assertion = assertControl(
@@ -458,6 +546,22 @@ export function assessSubjects(
           judge,
           applicabilityDeclared,
         );
+        if (capped.any && assertion.outcome === "conformant") {
+          assertion = capped.ceiling(assertion, (view) =>
+            assertControl(
+              view.store(),
+              catalog,
+              control,
+              subject,
+              roles,
+              view.events,
+              view.byIri(),
+              win,
+              view.judge,
+              applicabilityDeclared,
+            ),
+          );
+        }
         const flattered =
           own.length > 0 &&
           (assertion.outcome === "conformant" ||
