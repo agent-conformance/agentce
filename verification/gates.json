@@ -3111,19 +3111,19 @@
           "replace": "\"true\""
         },
         {
-          "description": "Python ignores the records another subject's write marked untrusted, so the subject's own trust-filtered read of a record another subject's guard quarantined reads ROB-02 conformant (18.120)",
+          "description": "Python ignores the records another subject's write marked untrusted or rewrote with no ruling, so the subject's own trust-filtered read of a record another subject's guard quarantined reads ROB-02 conformant (18.120)",
           "file": "engines/python/agentce/graph.py",
           "search": "            | (self.foreign_untrusted & set(flows))",
           "replace": "            | set()"
         },
         {
-          "description": "TypeScript ignores the records another subject's write marked untrusted, so the subject's own trust-filtered read of a record another subject's guard quarantined reads ROB-02 conformant (18.120)",
+          "description": "TypeScript ignores the records another subject's write marked untrusted or rewrote with no ruling, so the subject's own trust-filtered read of a record another subject's guard quarantined reads ROB-02 conformant (18.120)",
           "file": "engines/typescript/src/graph.ts",
           "search": "(!held.has(ref) && !records.has(ref)) || this.foreignUntrusted.has(ref)",
           "replace": "!held.has(ref) && !records.has(ref)"
         },
         {
-          "description": "Java ignores the records another subject's write marked untrusted, so the subject's own trust-filtered read of a record another subject's guard quarantined reads ROB-02 conformant (18.120)",
+          "description": "Java ignores the records another subject's write marked untrusted or rewrote with no ruling, so the subject's own trust-filtered read of a record another subject's guard quarantined reads ROB-02 conformant (18.120)",
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "(!held.contains(ref) && !records.contains(ref)) || foreignUntrusted.contains(ref)",
           "replace": "!held.contains(ref) && !records.contains(ref)"
