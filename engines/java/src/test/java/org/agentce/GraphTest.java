@@ -13,6 +13,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -217,6 +218,63 @@ class GraphTest {
         JsonNode filtered =
                 event("m1", "MemoryRead", "\"record_refs\": [\"mem:r1\"], \"trust_min\": \"trusted\"");
         assertEquals(List.of("true"), ruled(List.of(unguarded, filtered, used)));
+    }
+
+    @Test
+    void rob02AnUnruledRewriteOfAGuardedRecordIsNotRuledOn() {
+        JsonNode guarded = event("w1", "MemoryWrite", "\"record_ref\": \"mem:r1\", \"trust\": \"trusted\"");
+        JsonNode used = decisionWith("d1", "\"inputs\": [\"mem:r1\"]");
+        JsonNode filtered =
+                event("m1", "MemoryRead", "\"record_refs\": [\"mem:r1\"], \"trust_min\": \"trusted\"");
+        for (JsonNode rewrite : List.of(
+                selfReport(event("w2", "MemoryWrite", "\"record_ref\": \"mem:r1\"")),
+                selfReport(event("w2", "MemoryWrite", "\"record_ref\": \"mem:r1\", \"trust\": \"trusted\"")),
+                event("w2", "MemoryWrite", "\"record_ref\": \"mem:r1\""))) {
+            assertEquals(List.of("false"), ruled(List.of(guarded, rewrite, used)));
+            assertEquals(List.of("false"), ruled(List.of(rewrite, used, guarded)));
+            assertEquals(List.of("true"), ruled(List.of(guarded, rewrite, filtered, used)));
+        }
+        JsonNode again = event("w2", "MemoryWrite", "\"record_ref\": \"mem:r1\", \"guard_verdict\": \"allow\"");
+        assertEquals(List.of("true"), ruled(List.of(guarded, again, used)));
+    }
+
+    @Test
+    void rob02ARecordAnotherSubjectFlaggedIsNeverRuledOn() {
+        JsonNode write = event("w1", "MemoryWrite", "\"record_ref\": \"mem:r1\", \"trust\": \"trusted\"");
+        JsonNode filtered = event("m1", "MemoryRead", "\"record_refs\": [\"mem:r1\"], \"trust_min\": \"trusted\", "
+                + "\"refs\": {\"consumer\": \"agentce:event/d1\"}");
+        List<JsonNode> events = List.of(write, filtered, decisionEvent("d1"));
+        assertEquals(List.of("true"), ruled(events));
+        for (String[] pair : new String[][] {{"mem:r1", "false"}, {"mem:r2", "true"}}) {
+            GraphStore store = Graph.buildGraph(
+                    events, DomainBinding.fromDict(CREDIT_DOMAIN), new GraphStore(), Iri.ZERO_KEY, Set.of(pair[0]));
+            assertEquals(List.of(pair[1]), store.literalValues("agentce:event/d1", "agentce:untrustedContentRuledOn"));
+            assertEquals(List.of("true"), store.literalValues("agentce:event/d1", "agentce:robustToUntrustedContent"));
+        }
+    }
+
+    @Test
+    void rob02FlaggedRecordsNamesEverySubjectThatFlaggedARecord() {
+        String[][] writes = {
+            {"w1", "a", "\"trust\": \"untrusted\""},
+            {"w2", "b", "\"guard_verdict\": \"block\""},
+            {"w3", "c", "\"trust\": \"trusted\""},
+            {"w4", "d", "\"provenance_origin_class\": \"tool_output\""},
+            {"w5", "e", "\"provenance_origin_class\": \"tool_output\", \"trust\": \"trusted\""},
+        };
+        List<JsonNode> events = new ArrayList<>();
+        for (String[] w : writes) {
+            JsonNode e = event(w[0], "MemoryWrite", "\"record_ref\": \"mem:r1\", " + w[2]);
+            ((ObjectNode) e).put("subject", w[1]);
+            events.add(e);
+        }
+        events.add(event("m1", "MemoryRead", "\"record_refs\": [\"mem:r1\"], \"trust_min\": \"untrusted\""));
+        JsonNode claimed = selfReport(event("w6", "MemoryWrite", "\"record_ref\": \"mem:r1\", \"trust\": \"trusted\""));
+        ((ObjectNode) claimed).put("subject", "f");
+        events.add(claimed);
+        assertEquals(Map.of("mem:r1", Set.of("a", "b", "d", "f")), Graph.flaggedRecords(events));
+        Collections.reverse(events);
+        assertEquals(Map.of("mem:r1", Set.of("a", "b", "d", "f")), Graph.flaggedRecords(events));
     }
 
     @Test

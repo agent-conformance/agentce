@@ -416,9 +416,10 @@ public final class Assess {
         final Supplier<Map<String, JsonNode>> byIri;
         final Supplier<SourceClass.Judge> judge;
 
-        View(List<JsonNode> events, DomainBinding domain) {
+        View(List<JsonNode> events, DomainBinding domain, Set<String> foreignUntrusted) {
             this.events = events;
-            this.store = lazy(() -> Graph.buildGraph(events, domain));
+            this.store = lazy(() ->
+                    Graph.buildGraph(events, domain, new GraphStore(), Iri.ZERO_KEY, foreignUntrusted));
             this.byIri = lazy(() -> eventsByIriOf(events));
             this.judge = lazy(() -> new SourceClass.Judge(store.get(), byIri.get()));
         }
@@ -434,14 +435,16 @@ public final class Assess {
         final boolean any;
         private final List<JsonNode> events;
         private final DomainBinding domain;
+        private final Set<String> foreign;
         private final Set<String> broken;
         private final Set<String> weak;
         private final Set<String> suspect;
         private final Map<String, View> views = new java.util.HashMap<>();
 
-        CappedViews(List<JsonNode> events, Integrity.Caps caps, DomainBinding domain) {
+        CappedViews(List<JsonNode> events, Integrity.Caps caps, DomainBinding domain, Set<String> foreign) {
             this.events = events;
             this.domain = domain;
+            this.foreign = foreign;
             Set<String> ids = new java.util.HashSet<>();
             for (JsonNode e : events) {
                 ids.add(Readiness.pyStr(e.get("id")));
@@ -473,7 +476,7 @@ public final class Assess {
                         kept.add(e);
                     }
                 }
-                return new View(kept, domain);
+                return new View(kept, domain, foreign);
             });
         }
 
@@ -514,9 +517,23 @@ public final class Assess {
             Integrity.Caps integrity) {
         List<Assertions.Assertion> assertions = new ArrayList<>();
         Map<String, List<JsonNode>> eventsBySubject = indexBySubject(accepted);
+        // A record another subject's write marked untrusted, held or withheld, is never ruled on for this one (18.120).
+        List<JsonNode> flagSources = new ArrayList<>(accepted);
+        for (Ingest.Withheld w : withheld) {
+            if (w.event() != null) {
+                flagSources.add(w.event());
+            }
+        }
+        Map<String, Set<String>> flagged = Graph.flaggedRecords(flagSources);
         for (Profile.Subject subject : profile.subjects) {
             List<JsonNode> subjectEvents = eventsBySubject.getOrDefault(subject.id, java.util.List.of());
-            GraphStore store = Graph.buildGraph(subjectEvents, domain);
+            Set<String> foreign = new LinkedHashSet<>();
+            flagged.forEach((record, by) -> {
+                if (by.stream().anyMatch(s -> !s.equals(subject.id))) {
+                    foreign.add(record);
+                }
+            });
+            GraphStore store = Graph.buildGraph(subjectEvents, domain, new GraphStore(), Iri.ZERO_KEY, foreign);
             Map<String, JsonNode> eventsByIri = eventsByIriOf(subjectEvents);
             Set<String> roles = new LinkedHashSet<>(Applicability.effectiveRoles(subject.role));
             String[] win = window(profile, subjectEvents);
@@ -539,12 +556,14 @@ public final class Assess {
             // unreadable record already decides the outcome, but the exit code still needs what the readable ones
             // show (18.149).
             List<JsonNode> cfEvents = readable.isEmpty() ? List.of() : counterfactual(subjectEvents, readable);
-            GraphStore cfStore = cfEvents.isEmpty() ? store : Graph.buildGraph(cfEvents, domain);
+            GraphStore cfStore = cfEvents.isEmpty()
+                    ? store
+                    : Graph.buildGraph(cfEvents, domain, new GraphStore(), Iri.ZERO_KEY, foreign);
             Map<String, JsonNode> cfByIri = eventsByIriOf(cfEvents);
             // Each graph's judge is built once, on the first control whose minimum it may fall below.
             Supplier<SourceClass.Judge> judge = lazy(() -> new SourceClass.Judge(store, eventsByIri));
             Supplier<SourceClass.Judge> cfJudge = lazy(() -> new SourceClass.Judge(cfStore, cfByIri));
-            CappedViews capped = new CappedViews(subjectEvents, integrity, domain);
+            CappedViews capped = new CappedViews(subjectEvents, integrity, domain, foreign);
             for (Catalog catalog : catalogs) {
                 for (Catalog.ControlSpec control : catalog.controls) {
                     Assertions.Assertion assertion =

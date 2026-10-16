@@ -133,7 +133,32 @@ public final class Graph {
 
     public static GraphStore buildGraph(
             List<JsonNode> events, DomainBinding domain, GraphStore store, byte[] key) {
-        return new Builder(store, domain, key).build(events);
+        return buildGraph(events, domain, store, key, Set.of());
+    }
+
+    /** {@code foreignUntrusted} names the records another subject's write marked untrusted ({@link #flaggedRecords}). */
+    public static GraphStore buildGraph(
+            List<JsonNode> events, DomainBinding domain, GraphStore store, byte[] key, Set<String> foreignUntrusted) {
+        return new Builder(store, domain, key, foreignUntrusted).build(events);
+    }
+
+    /** Each record a MemoryWrite in {@code events} marks untrusted or writes with no guard ruling (anything but an
+     * enforcement-point write with a trust or a verdict), with the subjects whose records hold such a write. A
+     * subject's graph reads a record another subject flagged or rewrote unruled as one its guard never ruled on
+     * (18.120). */
+    public static Map<String, Set<String>> flaggedRecords(Iterable<JsonNode> events) {
+        Map<String, Set<String>> flagged = new LinkedHashMap<>();
+        for (JsonNode event : events) {
+            JsonNode data = dataOf(event);
+            String record = str(data.get("record_ref"));
+            boolean ruled = "enforcement_point".equals(str(event.get("agentcesourceclass")))
+                    && (!isAbsent(data.get("trust")) || !isAbsent(data.get("guard_verdict")));
+            if ("MemoryWrite".equals(str(data.get("@type"))) && record != null && (flagsUntrusted(data) || !ruled)) {
+                flagged.computeIfAbsent(record, r -> new LinkedHashSet<>())
+                        .add(Objects.toString(str(event.get("subject")), ""));
+            }
+        }
+        return flagged;
     }
 
     // --- helpers ---
@@ -151,6 +176,16 @@ public final class Graph {
     /** An Appendix F source class outside the trusted set (CND-05's rule, also ROB-02's). */
     private static boolean untrustedSourceClass(String sourceClass) {
         return sourceClass != null && !TRUSTED_INSTRUCTION.contains(sourceClass);
+    }
+
+    /** A MemoryWrite that marks its record untrusted: trust untrusted or quarantined, a quarantine or block verdict, or
+     * no trust and no verdict but an untrusted Appendix F {@code provenance_origin_class} (SPEC §7.4, ROB-02). */
+    private static boolean flagsUntrusted(JsonNode data) {
+        return isOneOf(data.get("trust"), UNTRUSTED_TRUST)
+                || isOneOf(data.get("guard_verdict"), UNTRUSTED_VERDICTS)
+                || (isAbsent(data.get("trust"))
+                        && isAbsent(data.get("guard_verdict"))
+                        && untrustedSourceClass(str(data.get("provenance_origin_class"))));
     }
 
     private static boolean isOneOf(JsonNode node, Set<String> values) {
@@ -508,10 +543,14 @@ public final class Graph {
         // INC-03: event IRI -> the decision its refs.decision names, whatever the event type.
         private final Map<String, String> refDecision = new LinkedHashMap<>();
 
-        Builder(GraphStore store, DomainBinding domain, byte[] key) {
+        // Records another subject's MemoryWrite marked untrusted: never ruled on in this subject's graph (18.120).
+        private final Set<String> foreignUntrusted;
+
+        Builder(GraphStore store, DomainBinding domain, byte[] key, Set<String> foreignUntrusted) {
             this.store = store;
             this.domain = domain;
             this.key = key;
+            this.foreignUntrusted = foreignUntrusted;
         }
 
         GraphStore build(List<JsonNode> events) {
@@ -1304,13 +1343,13 @@ public final class Graph {
         /** Flag whether each Decision kept untrusted content out, and whether the memory guard
          * ruled on all it used (SPEC §7.4, ROB-02).
          *
-         * <p>Untrusted content starts at a MemoryWrite whose trust is untrusted or quarantined, whose
-         * guard verdict is quarantine or block, or which carries no trust and no verdict but an
-         * untrusted Appendix F {@code provenance_origin_class}; a MemoryRead whose {@code trust_min}
-         * is untrusted or quarantined; and an instruction with an untrusted Appendix F source class
-         * (CND-05's rule), or with none (ROB-02 only). Content the guard never ruled on starts at a MemoryRead not reported by an
-         * enforcement point, a record no ruled enforcement-point write and no enforcement-point read
-         * with a {@code trust_min} covers, and a ref the bundle does not hold. Both flow along every
+         * <p>Untrusted content starts at a MemoryWrite that marks its record untrusted ({@link #flagsUntrusted}); a
+         * MemoryRead whose {@code trust_min} is untrusted or quarantined; and an instruction with an untrusted
+         * Appendix F source class (CND-05's rule), or with none (ROB-02 only). Content the guard never ruled on
+         * starts at a MemoryRead not reported by an enforcement point; a record no enforcement-point read with a
+         * {@code trust_min} covers, unless every write of it is a ruled enforcement-point write (an unruled rewrite
+         * can change what the guard ruled on, 18.120); a record another subject's write marked untrusted or rewrote with no ruling,
+         * whatever this subject's own records say of it (18.120); and a ref the bundle does not hold. Both flow along every
          * edge that carries content into an event (CONTENT_IN, CONTENT_OUT, a read to its consumer, a
          * record to and from its writes) for as many hops as the records show. Closures over all
          * events, so order and cycles never matter. Returns both closures, which CND-05's
@@ -1321,7 +1360,11 @@ public final class Graph {
             Set<String> unruled = new LinkedHashSet<>();
             Set<String> held = new LinkedHashSet<>();
             Set<String> records = new LinkedHashSet<>();
-            Set<String> guarded = new LinkedHashSet<>();
+            // Records an enforcement-point read with a trust_min covers; records with a ruled enforcement-point
+            // write; records with any other write.
+            Set<String> readRuled = new LinkedHashSet<>();
+            Set<String> writeRuled = new LinkedHashSet<>();
+            Set<String> rewritten = new LinkedHashSet<>();
             for (JsonNode event : events) {
                 String ptype = ptype(event);
                 JsonNode data = dataOf(event);
@@ -1352,17 +1395,12 @@ public final class Graph {
                     String record = str(data.get("record_ref"));
                     // A record and each write of it stand for the same content.
                     flow(flows, record, node);
-                    boolean unmarked = isAbsent(data.get("trust")) && isAbsent(data.get("guard_verdict"));
+                    boolean marked = !isAbsent(data.get("trust")) || !isAbsent(data.get("guard_verdict"));
                     if (record != null) {
                         records.add(record);
-                        if (enforced && !unmarked) {
-                            guarded.add(record);
-                        }
+                        (enforced && marked ? writeRuled : rewritten).add(record);
                     }
-                    String origin = str(data.get("provenance_origin_class"));
-                    if (isOneOf(data.get("trust"), UNTRUSTED_TRUST)
-                            || isOneOf(data.get("guard_verdict"), UNTRUSTED_VERDICTS)
-                            || (unmarked && untrustedSourceClass(origin))) {
+                    if (flagsUntrusted(data)) {
                         tainted.add(node);
                     }
                 } else if ("MemoryRead".equals(ptype)) {
@@ -1375,7 +1413,7 @@ public final class Graph {
                             if (record != null) {
                                 records.add(record);
                                 if (ruling) {
-                                    guarded.add(record);
+                                    readRuled.add(record);
                                 }
                             }
                         }
@@ -1394,13 +1432,13 @@ public final class Graph {
                 }
             });
             for (String record : records) {
-                if (!guarded.contains(record)) {
+                if (!readRuled.contains(record) && (!writeRuled.contains(record) || rewritten.contains(record))) {
                     unruled.add(record);
                 }
             }
             // Every source of a flow is a ref some event names.
             for (String ref : flows.keySet()) {
-                if (!held.contains(ref) && !records.contains(ref)) {
+                if ((!held.contains(ref) && !records.contains(ref)) || foreignUntrusted.contains(ref)) {
                     unruled.add(ref);
                 }
             }
