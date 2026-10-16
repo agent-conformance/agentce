@@ -31,7 +31,7 @@ Agent SDK, Google ADK, CrewAI, a custom loop) × five variants:
 | `known-pass` | full enforcement-point evidence | conformant across REC/OVS/INT/INC |
 | `known-fail` | missing actor, unverified delegation not reaching a human, mismatched oversight, self-reported consequential tool call, incident without actor | non-conformant with precise violations |
 | `insufficient-evidence` | only self-reported streams for the consequential tool call | insufficient_evidence on the oversight control |
-| `tampered` | one integrity stream edited after hashing | integrity failure detected; structural verdicts unchanged |
+| `tampered` | the gateway's integrity stream edited after hashing | integrity failure detected; the controls resting on gateway records read insufficient evidence |
 | `coverage-gap` | an independent system of record (reference ledger) saw more tool calls than were captured | coverage below threshold |
 
 The style changes a bundle's surface — source systems, convention versions, agent identity — but never

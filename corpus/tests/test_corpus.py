@@ -113,6 +113,8 @@ def test_known_pass_integrity_is_clean(corpus_dir: Path, tmp_path: Path) -> None
     ]
     clean = {"verified", "verified_weak"}
     assert integrity and all(r["status"] in clean for r in integrity)
+    # The gateway's stream is anchored, so its records satisfy enforcement_point uncapped (SPEC §6.6).
+    assert any(r["status"] == "verified" for r in integrity)
 
 
 def test_coverage_gap_is_below_threshold(corpus_dir: Path, tmp_path: Path) -> None:

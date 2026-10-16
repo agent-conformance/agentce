@@ -197,25 +197,52 @@ def _event(
     return event
 
 
-def _chain(events: list[dict[str, Any]], strength: str) -> None:
+def _chain(
+    events: list[dict[str, Any]], anchored: frozenset[str] = frozenset()
+) -> list[dict[str, Any]]:
     """Add a valid ``data.integrity`` hash chain to ``events``, grouped by integrity stream.
 
     The hash is the RFC 8785 canonical form of the event with ``data.integrity`` absent (SPEC §6.6),
     so the engine recomputes it identically. Streams are ``source|subject``; within a stream the
-    events must already be in non-decreasing time order.
+    events must already be in non-decreasing time order. A stream of a source in ``anchored`` is
+    ``export_anchored`` and its head is anchored at its last event's time, as an enforcement-point
+    stream must be to read ``verified`` (SPEC §6.6); every other stream is ``export_chained``. Returns
+    the manifest's stream entries, one per anchored stream.
     """
     prev_by_stream: dict[str, str] = {}
+    last_time: dict[str, str] = {}
     for event in events:
         stream = f"{event['source']}|{event['subject']}"
         prev = prev_by_stream.get(stream, GENESIS_PREV)
         digest = canonical.sha256_hex(event)  # event still has no integrity block
         event["data"]["integrity"] = {
             "stream": stream,
-            "strength": strength,
+            "strength": "export_anchored"
+            if event["source"] in anchored
+            else "export_chained",
             "prev": prev,
             "hash": digest,
         }
         prev_by_stream[stream] = digest
+        if event["source"] in anchored:
+            last_time[stream] = str(event["time"])
+    return [
+        {
+            "stream": stream,
+            "head": prev_by_stream[stream],
+            "anchors": [{"kind": "rfc3161", "at": last_time[stream]}],
+        }
+        for stream in sorted(last_time)
+    ]
+
+
+def _enforcement_sources(events: list[dict[str, Any]]) -> frozenset[str]:
+    """The sources whose events carry the ``enforcement_point`` class."""
+    return frozenset(
+        str(e["source"])
+        for e in events
+        if e.get("agentcesourceclass") == "enforcement_point"
+    )
 
 
 def _manifest_sources(
@@ -605,12 +632,12 @@ def _scenario(
             }
         ]
     elif variant == "tampered":
-        # Assertions match known-pass; a post-hash edit breaks one integrity stream (INT-family
-        # downgrade of dependent controls lands with the integrity→assertion feedback in a later phase).
+        # A post-hash edit breaks the gateway's integrity stream, so every control resting on a gateway
+        # record reads insufficient_evidence (SPEC §8.1); the rest match known-pass.
         expected = {
             "REC-04": "conformant",
-            "OVS-03": "conformant",
-            "INT-01": "conformant",
+            "OVS-03": "insufficient_evidence",
+            "INT-01": "insufficient_evidence",
             "INC-02": "conformant",
         }
         extras["tamper"] = True
@@ -681,9 +708,7 @@ def _benign_quarantine(subject: str, source: str) -> list[dict[str, Any]]:
         sclass="self_report",
         data={"session_id": "sess-dup"},
     )
-    _chain(
-        [dup], "export_chained"
-    )  # the accepted delivery verifies cleanly on its own stream
+    _chain([dup])  # the accepted delivery verifies cleanly on its own stream
     dup2 = json.loads(json.dumps(dup))  # a second, identical delivery -> duplicate_id
     unknown = {
         "specversion": "1.0",
@@ -772,7 +797,8 @@ def _apply_tamper(events: list[dict[str, Any]]) -> None:
 
     The edit changes a content-hash reference (still schema-valid, so the event is accepted and
     reaches integrity verification) to a different digest — the recomputed hash no longer matches the
-    stored one, and the stream verifies as ``failed``. Structural verdicts are unaffected."""
+    stored one, and the stream verifies as ``failed``: every control resting on it reads
+    insufficient_evidence (SPEC §8.1)."""
     for event in events:
         if event["data"].get("@type") == "ToolCall" and "integrity" in event["data"]:
             event["data"]["result_ref"] = (
@@ -927,8 +953,9 @@ def _write_project(
     events += _component_manifests(
         events, sources["agent"], clock, f"{style_id}-{variant}"
     )
-    # Integrity chains over the curated streams (export_chained -> verified_weak, a clean status).
-    _chain(events, "export_chained")
+    # Integrity chains over the curated streams: enforcement-point streams anchored (verified), the
+    # rest export_chained (verified_weak, a clean status for a self-report or independent stream).
+    streams = _chain(events, _enforcement_sources(events))
     if extras.get("tamper"):
         _apply_tamper(events)
 
@@ -987,6 +1014,7 @@ def _write_project(
         "domain": domain.name,
         "sources": _manifest_sources(events, sources),
         "files": sorted(files, key=lambda f: f["path"]),
+        **({"streams": streams} if streams else {}),
     }
     (evidence / "manifest.json").write_text(
         json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8"
@@ -1170,7 +1198,7 @@ def _write_multi_agent(
         events.extend(role_events)
         expected_by_subject[subj] = role_expected
     events += _component_manifests(events, sources["agent"], clock, kind)
-    _chain(events, "export_chained")
+    streams = _chain(events, _enforcement_sources(events))
 
     proj_dir = root.joinpath("projects", "multi-agent", domain.name, kind)
     evidence = proj_dir / "evidence"
@@ -1191,6 +1219,7 @@ def _write_multi_agent(
         "domain": domain.name,
         "sources": _manifest_sources(events, sources),
         "files": sorted(files, key=lambda f: f["path"]),
+        **({"streams": streams} if streams else {}),
     }
     (evidence / "manifest.json").write_text(
         json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8"
@@ -1494,7 +1523,7 @@ def _variant_blurb(variant: str) -> str:
         "known-pass": "full enforcement-point evidence, every declared measure observed.",
         "known-fail": "missing acting agent, a delegation chain that does not reach a human, a mismatched oversight modality, a self-reported consequential tool call, and an incident without an actor.",
         "insufficient-evidence": "only self-reported streams for the consequential tool call, so the oversight control cannot be evaluated.",
-        "tampered": "one integrity stream carries an event edited after it was hashed; the tamper is detected while the structural verdicts are unchanged.",
+        "tampered": "the gateway's integrity stream carries an event edited after it was hashed; the tamper is detected, and the controls that rest on gateway records read insufficient evidence.",
         "coverage-gap": "the reference ledger declares more tool calls than were captured, so coverage falls below threshold.",
         "minor-only": "a single non-consequential decision, so the consequential controls do not apply; the incident control is satisfied.",
         "dual-clean": "two clean consequential decisions in one session, a conformant population larger than one.",

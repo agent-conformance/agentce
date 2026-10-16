@@ -12,7 +12,7 @@
     },
     {
       "path": "events/urn-agentce-source-langgraph-gateway-eu-1.jsonl",
-      "sha256": "e7cbc309e6fed8d0f72d612dfcbcee066ebb2b55dec168e595ec64289601e2d4"
+      "sha256": "b17b3c27bd6f1a5836737e2180ca9328dd7b3bb2a929a81e9a4f6a04a00d710d"
     },
     {
       "path": "events/urn-agentce-source-langgraph-runtime-eu-1.jsonl",
@@ -20,17 +20,17 @@
     },
     {
       "path": "events/urn-agentce-source-workload-idp-eu-1.jsonl",
-      "sha256": "958b4b3cec0721ab2ebffd62ce50460febea06bf6ed1a5d42eec6fa1a128f4ca"
+      "sha256": "5c4c2b1447855a9c84a47724c7cb0cf00f968926d26f9b2501ed0ab44b7f4d85"
     }
   ],
   "sources": [
     {
-      "id": "urn:agentce:source:incident-register:corp",
-      "class": "independent_system"
+      "class": "independent_system",
+      "id": "urn:agentce:source:incident-register:corp"
     },
     {
-      "id": "urn:agentce:source:langgraph-gateway:eu-1",
-      "class": "enforcement_point"
+      "class": "enforcement_point",
+      "id": "urn:agentce:source:langgraph-gateway:eu-1"
     },
     {
       "id": "urn:agentce:source:langgraph-runtime-bulk:eu-1"
@@ -42,8 +42,30 @@
       "id": "urn:agentce:source:langgraph-session:eu-1"
     },
     {
-      "id": "urn:agentce:source:workload-idp:eu-1",
-      "class": "enforcement_point"
+      "class": "enforcement_point",
+      "id": "urn:agentce:source:workload-idp:eu-1"
+    }
+  ],
+  "streams": [
+    {
+      "anchors": [
+        {
+          "at": "2026-05-01T09:00:02.000Z",
+          "kind": "rfc3161"
+        }
+      ],
+      "head": "b8cc99485873bc60cb972fb364e9871716cd2a4ce6c1daf6236a879dc018d338",
+      "stream": "urn:agentce:source:langgraph-gateway:eu-1|spiffe://corp/agents/credit-langgraph"
+    },
+    {
+      "anchors": [
+        {
+          "at": "2026-05-01T09:00:01.000Z",
+          "kind": "rfc3161"
+        }
+      ],
+      "head": "0b39c63b6e759540df6ed132b1320560d94577a6a4606f907c83bb1f06472786",
+      "stream": "urn:agentce:source:workload-idp:eu-1|spiffe://corp/agents/credit-langgraph"
     }
   ]
 }
