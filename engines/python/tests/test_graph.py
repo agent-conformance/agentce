@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from agentce.domain import DomainBinding
-from agentce.graph import build_graph
+from agentce.graph import build_graph, flagged_records
 from agentce.iri import event_iri, principal_iri
 
 CREDIT = "agentce:CreditDecision"
@@ -649,6 +649,77 @@ def test_ruled_on_is_independent_of_event_order() -> None:
     write = _self_report(_event("w1", "MemoryWrite", {"record_ref": "mem:r1"}))
     events = [write, _with_inputs(decision("d1", "t"), ["mem:r1"])]
     assert _ruled(events) == _ruled(list(reversed(events))) == ["false"]
+
+
+def test_an_unruled_rewrite_of_a_guarded_record_is_not_ruled_on() -> None:
+    ruled = _event("w1", "MemoryWrite", {"record_ref": "mem:r1", "trust": "trusted"})
+    used = _with_inputs(decision("d1", "t"), ["mem:r1"])
+    rewrites = (
+        _self_report(_event("w2", "MemoryWrite", {"record_ref": "mem:r1"})),
+        _self_report(
+            _event("w2", "MemoryWrite", {"record_ref": "mem:r1", "trust": "trusted"})
+        ),
+        _event("w2", "MemoryWrite", {"record_ref": "mem:r1"}),
+    )
+    for rewrite in rewrites:
+        assert _ruled([ruled, rewrite, used]) == ["false"], rewrite
+        assert _ruled([rewrite, used, ruled]) == ["false"], rewrite
+        # The guard's read filtered by trust rules on what the decision used.
+        filtered = _event(
+            "m1", "MemoryRead", {"record_refs": ["mem:r1"], "trust_min": "trusted"}
+        )
+        assert _ruled([ruled, rewrite, filtered, used]) == ["true"], rewrite
+    # Two ruled enforcement-point writes stay ruled on.
+    again = _event(
+        "w2", "MemoryWrite", {"record_ref": "mem:r1", "guard_verdict": "allow"}
+    )
+    assert _ruled([ruled, again, used]) == ["true"]
+
+
+def test_a_record_another_subject_flagged_is_never_ruled_on() -> None:
+    write = _event("w1", "MemoryWrite", {"record_ref": "mem:r1", "trust": "trusted"})
+    filtered = _event(
+        "m1",
+        "MemoryRead",
+        {
+            "record_refs": ["mem:r1"],
+            "trust_min": "trusted",
+            "refs": {"consumer": "agentce:event/d1"},
+        },
+    )
+    events = [write, filtered, decision("d1", "t")]
+    assert _ruled(events) == ["true"]
+    for foreign, expected in (
+        (frozenset({"mem:r1"}), "false"),
+        (frozenset({"mem:r2"}), "true"),
+    ):
+        store = build_graph(events, domain=DOMAIN, foreign_untrusted=foreign)
+        got = store.literal_values(event_iri("d1"), "agentce:untrustedContentRuledOn")
+        assert got == [expected], foreign
+        assert store.literal_values(
+            event_iri("d1"), "agentce:robustToUntrustedContent"
+        ) == ["true"]
+
+
+def test_flagged_records_names_every_subject_that_flagged_a_record() -> None:
+    def write(event_id: str, subject: str, **data: Any) -> dict[str, Any]:
+        event = _event(event_id, "MemoryWrite", {"record_ref": "mem:r1", **data})
+        event["subject"] = subject
+        return event
+
+    events = [
+        write("w1", "a", trust="untrusted"),
+        write("w2", "b", guard_verdict="block"),
+        write("w3", "c", trust="trusted"),
+        write("w4", "d", provenance_origin_class="tool_output"),
+        write("w5", "e", provenance_origin_class="tool_output", trust="trusted"),
+        _event(
+            "m1", "MemoryRead", {"record_refs": ["mem:r1"], "trust_min": "untrusted"}
+        ),
+    ]
+    events.append(_self_report(write("w6", "f", trust="trusted")))
+    assert flagged_records(events) == {"mem:r1": {"a", "b", "d", "f"}}
+    assert flagged_records(reversed(events)) == flagged_records(events)
 
 
 def test_an_untrusted_origin_class_with_no_ruling_taints() -> None:

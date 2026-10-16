@@ -148,6 +148,41 @@ def _is_one_of(value: Any, values: frozenset[str]) -> bool:
     return isinstance(value, str) and value in values
 
 
+def _flags_untrusted(data: dict[str, Any]) -> bool:
+    """A MemoryWrite that marks its record untrusted: trust untrusted or quarantined, a quarantine or block verdict, or
+    no trust and no verdict but an untrusted Appendix F ``provenance_origin_class`` (SPEC §7.4, ROB-02)."""
+    trust, verdict = data.get("trust"), data.get("guard_verdict")
+    return (
+        _is_one_of(trust, _UNTRUSTED_TRUST)
+        or _is_one_of(verdict, _UNTRUSTED_VERDICTS)
+        or (
+            trust is None
+            and verdict is None
+            and _untrusted_source_class(data.get("provenance_origin_class"))
+        )
+    )
+
+
+def flagged_records(events: Iterable[dict[str, Any]]) -> dict[str, set[str]]:
+    """Each record a MemoryWrite in ``events`` marks untrusted or writes with no guard ruling (anything but an
+    enforcement-point write with a trust or a verdict), with the subjects whose records hold such a write. A subject's
+    graph reads a record another subject flagged or rewrote unruled as one its guard never ruled on (18.120)."""
+    flagged: dict[str, set[str]] = {}
+    for event in events:
+        data = _data(event)
+        record = data.get("record_ref")
+        ruled = event.get("agentcesourceclass") == "enforcement_point" and (
+            data.get("trust") is not None or data.get("guard_verdict") is not None
+        )
+        if (
+            data.get("@type") == "MemoryWrite"
+            and isinstance(record, str)
+            and (_flags_untrusted(data) or not ruled)
+        ):
+            flagged.setdefault(record, set()).add(str(event.get("subject", "")))
+    return flagged
+
+
 def _flow(edges: dict[str, set[str]], source: Any, target: Any) -> None:
     if isinstance(source, str) and isinstance(target, str):
         edges.setdefault(source, set()).add(target)
@@ -358,10 +393,18 @@ class _TaskUsage:
 
 
 class _Builder:
-    def __init__(self, store: GraphStore, domain: DomainBinding, key: bytes) -> None:
+    def __init__(
+        self,
+        store: GraphStore,
+        domain: DomainBinding,
+        key: bytes,
+        foreign_untrusted: frozenset[str] = frozenset(),
+    ) -> None:
         self.store = store
         self.domain = domain
         self.key = key
+        # Records another subject's MemoryWrite marked untrusted: never ruled on in this subject's graph (18.120).
+        self.foreign_untrusted = foreign_untrusted
         self.event_iris: set[str] = set()
         self.decision_type: dict[str, str] = {}  # decision event IRI -> decision_type
         self.decision_time: dict[str, str] = {}
@@ -1088,13 +1131,13 @@ class _Builder:
         """Flag whether each Decision kept untrusted content out, and whether the memory guard
         ruled on all it used (SPEC §7.4, ROB-02).
 
-        Untrusted content starts at a MemoryWrite whose trust is untrusted or quarantined, whose
-        guard verdict is quarantine or block, or which carries no trust and no verdict but an
-        untrusted Appendix F ``provenance_origin_class``; a MemoryRead whose ``trust_min`` is
-        untrusted or quarantined; and an instruction with an untrusted Appendix F source class
-        (CND-05's rule), or with none (ROB-02 only). Content the guard never ruled on starts at a MemoryRead not reported by
-        an enforcement point, a record no ruled enforcement-point write and no enforcement-point
-        read with a ``trust_min`` covers, and a ref the bundle does not hold. Both flow along
+        Untrusted content starts at a MemoryWrite that marks its record untrusted (:func:`_flags_untrusted`); a
+        MemoryRead whose ``trust_min`` is untrusted or quarantined; and an instruction with an untrusted Appendix F
+        source class (CND-05's rule), or with none (ROB-02 only). Content the guard never ruled on starts at a
+        MemoryRead not reported by an enforcement point; a record no enforcement-point read with a ``trust_min``
+        covers, unless every write of it is a ruled enforcement-point write (an unruled rewrite can change what the
+        guard ruled on, 18.120); a record another subject's write marked untrusted or rewrote with no ruling, whatever
+        this subject's own records say of it (18.120); and a ref the bundle does not hold. Both flow along
         every edge that carries content into an event (``_CONTENT_IN``, ``_CONTENT_OUT``, a read
         to its consumer, a record to and from its writes) for as many hops as the records show,
         so a decision is reached through another decision, a tool call or a model call. Closures
@@ -1105,7 +1148,11 @@ class _Builder:
         unruled: set[str] = set()
         held: set[str] = set()
         records: set[str] = set()
-        guarded: set[str] = set()
+        # Records an enforcement-point read with a trust_min covers; records with a ruled enforcement-point write;
+        # records with any other write.
+        read_ruled: set[str] = set()
+        write_ruled: set[str] = set()
+        rewritten: set[str] = set()
         for event in events:
             ptype = self._ptype(event)
             data = _data(event)
@@ -1128,20 +1175,14 @@ class _Builder:
                 record = data.get("record_ref")
                 # A record and each write of it stand for the same content.
                 _flow(flows, record, node)
-                trust, verdict = data.get("trust"), data.get("guard_verdict")
-                unmarked = trust is None and verdict is None
+                marked = (
+                    data.get("trust") is not None
+                    or data.get("guard_verdict") is not None
+                )
                 if isinstance(record, str):
                     records.add(record)
-                    if enforced and not unmarked:
-                        guarded.add(record)
-                if (
-                    _is_one_of(trust, _UNTRUSTED_TRUST)
-                    or _is_one_of(verdict, _UNTRUSTED_VERDICTS)
-                    or (
-                        unmarked
-                        and _untrusted_source_class(data.get("provenance_origin_class"))
-                    )
-                ):
+                    (write_ruled if enforced and marked else rewritten).add(record)
+                if _flags_untrusted(data):
                     tainted.add(node)
             elif ptype == "MemoryRead":
                 read = data.get("record_refs")
@@ -1151,7 +1192,7 @@ class _Builder:
                     if isinstance(record, str):
                         records.add(record)
                         if ruling:
-                            guarded.add(record)
+                            read_ruled.add(record)
                 if not enforced:
                     unruled.add(node)
                 if _is_one_of(data.get("trust_min"), _UNTRUSTED_TRUST):
@@ -1159,7 +1200,12 @@ class _Builder:
         tainted |= {
             iri for iri, untrusted in self.instruction_untrusted.items() if untrusted
         }
-        unruled |= (records - guarded) | (set(flows) - held - records)
+        guarded = read_ruled | (write_ruled - rewritten)
+        unruled |= (
+            (records - guarded)
+            | (set(flows) - held - records)
+            | (self.foreign_untrusted & set(flows))
+        )
         fed = {target for targets in flows.values() for target in targets}
         _reach(tainted, flows)
         _reach(unruled, flows)
@@ -1588,9 +1634,14 @@ def build_graph(
     domain: DomainBinding | None = None,
     store: GraphStore | None = None,
     pseudonym_key: bytes = ZERO_KEY,
+    foreign_untrusted: frozenset[str] = frozenset(),
 ) -> GraphStore:
-    """Materialise ``events`` into a graph store; create an in-memory store if none is given."""
+    """Materialise ``events`` into a graph store; create an in-memory store if none is given.
+    ``foreign_untrusted`` names the records another subject's write marked untrusted (:func:`flagged_records`)."""
     builder = _Builder(
-        store or GraphStore(), domain or DomainBinding.empty(), pseudonym_key
+        store or GraphStore(),
+        domain or DomainBinding.empty(),
+        pseudonym_key,
+        foreign_untrusted,
     )
     return builder.build(events)

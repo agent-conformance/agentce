@@ -19,7 +19,7 @@ from .applicability import effective_roles
 from .assertions import Assertion, EvidencePointer
 from .catalog import Catalog, ControlSpec
 from .domain import DomainBinding
-from .graph import build_graph
+from .graph import build_graph, flagged_records
 from .ingest import Withheld, record_digest
 from .integrity import IntegrityCaps
 from .iri import event_iri
@@ -314,10 +314,13 @@ class _View:
 
     events: list[dict[str, Any]]
     domain: DomainBinding
+    foreign_untrusted: frozenset[str]
 
     @functools.cached_property
     def store(self) -> GraphStore:
-        return build_graph(self.events, domain=self.domain)
+        return build_graph(
+            self.events, domain=self.domain, foreign_untrusted=self.foreign_untrusted
+        )
 
     @functools.cached_property
     def by_iri(self) -> dict[str, dict[str, Any]]:
@@ -338,10 +341,15 @@ class _CappedViews:
     stream left out too (else partial, weak_integrity). Only a pass is capped: a violation is never changed."""
 
     def __init__(
-        self, events: list[dict[str, Any]], caps: IntegrityCaps, domain: DomainBinding
+        self,
+        events: list[dict[str, Any]],
+        caps: IntegrityCaps,
+        domain: DomainBinding,
+        foreign_untrusted: frozenset[str],
     ) -> None:
         ids = {str(e.get("id")) for e in events}
         self._events, self._domain = events, domain
+        self._foreign = foreign_untrusted
         self._broken = caps.broken & ids
         self._weak = caps.weak & ids
         self._suspect = caps.time_suspect & ids
@@ -359,6 +367,7 @@ class _CappedViews:
             self._views[key] = _View(
                 [e for e in self._events if str(e.get("id")) not in dropped],
                 self._domain,
+                self._foreign,
             )
         return self._views[key]
 
@@ -485,9 +494,14 @@ def assess_subjects(
     records read insufficient_evidence names the readable withheld records when judging them too changes it (18.149)."""
     assertions: list[Assertion] = []
     events_by_subject = index_by_subject(accepted)
+    # A record another subject's write marked untrusted, held or withheld, is never ruled on for this one (18.120).
+    flagged = flagged_records(
+        [*accepted, *(w.event for w in withheld if w.event is not None)]
+    )
     for subject in profile.subjects:
         subject_events = events_by_subject.get(subject.id, [])
-        store = build_graph(subject_events, domain=domain)
+        foreign = frozenset(r for r, by in flagged.items() if by - {subject.id})
+        store = build_graph(subject_events, domain=domain, foreign_untrusted=foreign)
         events_by_iri = _events_by_iri(subject_events)
         roles = set(effective_roles(subject.role))
         window = _window(profile, subject_events)
@@ -498,12 +512,16 @@ def assess_subjects(
         # The comparison runs whenever a readable record is withheld, even beside an unreadable one: the unreadable
         # record already decides the outcome, but the exit code still needs what the readable ones show (18.149).
         cf_events = _counterfactual(subject_events, readable) if readable else []
-        cf_store = build_graph(cf_events, domain=domain) if cf_events else store
+        cf_store = (
+            build_graph(cf_events, domain=domain, foreign_untrusted=foreign)
+            if cf_events
+            else store
+        )
         cf_by_iri = _events_by_iri(cf_events)
         # Each graph's judge is built once, on the first control whose minimum it may fall below.
         judge = functools.cache(lambda: SourceClassJudge(store, events_by_iri))
         cf_judge = functools.cache(lambda: SourceClassJudge(cf_store, cf_by_iri))
-        capped = _CappedViews(subject_events, integrity, domain)
+        capped = _CappedViews(subject_events, integrity, domain, foreign)
         for catalog in catalogs:
             for control in catalog.controls:
                 assertion = _assert_control(
