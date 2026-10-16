@@ -15,6 +15,7 @@
 
 import { DomainBinding, TOKEN_CAP, tokenCount } from "./domain";
 import { pyStrip } from "./failOn";
+import type { UnreadableWrite } from "./ingest";
 import { ZERO_KEY, eventIri, isEventRef, principalIri } from "./iri";
 import { GraphStore } from "./store";
 import { compareLiterals } from "./structural";
@@ -193,6 +194,41 @@ function ruledWrite(event: Event, data: Record<string, unknown>): boolean {
     event.agentcesourceclass === "enforcement_point" &&
     (!isAbsent(data.trust) || !isAbsent(data.guard_verdict))
   );
+}
+
+function noteStore(stores: Map<string, Set<string>>, record: string, store: unknown): void {
+  let named = stores.get(record);
+  if (named === undefined) {
+    named = new Set();
+    stores.set(record, named);
+  }
+  if (typeof store === "string") {
+    named.add(store);
+  }
+}
+
+/** The records unreadable MemoryWrites may have changed (SPEC §7.4, 18.172): the one each names; with no readable
+ * record_ref, every record of its store, a record no event names a store for counting as one of them (fail closed);
+ * with no readable store either, every record. */
+function unreadRecords(
+  writes: readonly UnreadableWrite[],
+  records: ReadonlySet<string>,
+  stores: ReadonlyMap<string, ReadonlySet<string>>,
+): Set<string> {
+  const unread = new Set<string>();
+  for (const { recordRef, store } of writes) {
+    if (recordRef !== null) {
+      unread.add(recordRef);
+    } else {
+      for (const record of records) {
+        const named = stores.get(record);
+        if (store === null || named === undefined || named.size === 0 || named.has(store)) {
+          unread.add(record);
+        }
+      }
+    }
+  }
+  return unread;
 }
 
 /** Each record a MemoryWrite in `events` marks untrusted or writes with no guard ruling (anything but an
@@ -497,6 +533,8 @@ class Builder {
     // Records another subject's MemoryWrite marked untrusted or rewrote with no ruling: never ruled on in this
     // subject's graph (18.120).
     private readonly foreignUntrusted: ReadonlySet<string>,
+    // The record_ref and store of each MemoryWrite another subject holds that ingest could not read (18.172).
+    private readonly foreignUnreadable: readonly UnreadableWrite[],
   ) {}
 
   build(events: Event[]): GraphStore {
@@ -1294,10 +1332,11 @@ class Builder {
    * Untrusted content starts at a MemoryWrite that marks its record untrusted (`flagsUntrusted`); a MemoryRead
    * whose `trust_min` is untrusted or quarantined; and an instruction with an untrusted Appendix F source class
    * (CND-05's rule). Content the guard never ruled on starts at a MemoryRead not reported by an enforcement point;
-   * a record no enforcement-point read with a `trust_min` covers, unless every write of it is a ruled
+   * a record no enforcement-point read at `trust_min` trusted covers, unless every write of it is a ruled
    * enforcement-point write (an unruled rewrite can change what the guard ruled on, 18.120); a record another
-   * subject's write marked untrusted or rewrote with no ruling, whatever this subject's own records say of it (18.120); and a ref the bundle
-   * does not hold.
+   * subject's write marked untrusted or rewrote with no ruling, whatever this subject's own records say of it (18.120);
+   * a record another subject's unreadable MemoryWrite may have changed (`unreadRecords`, ROB-02 only, 18.172); and a
+   * ref the bundle does not hold.
    * Both flow along every edge that carries content into an event (CONTENT_IN, CONTENT_OUT, a read to
    * its consumer, a record to and from its writes) for as many hops as the records show. Closures over
    * all events, so order and cycles never matter. Returns both closures, which CND-05's instruction
@@ -1313,6 +1352,8 @@ class Builder {
     const readRuled = new Set<string>();
     const writeRuled = new Set<string>();
     const rewritten = new Set<string>();
+    // The stores this subject's memory events name each record under (none when they name no store).
+    const stores = new Map<string, Set<string>>();
     for (const event of events) {
       const ptype = this.ptype(event);
       const data = dataOf(event);
@@ -1320,6 +1361,7 @@ class Builder {
       const node = eventIri(String(event.id));
       held.add(node);
       const enforced = event.agentcesourceclass === "enforcement_point";
+      const store = data.store;
       for (const key of CONTENT_IN) {
         const value = data[key];
         for (const ref of Array.isArray(value) ? value : [value]) {
@@ -1342,6 +1384,7 @@ class Builder {
         flow(flows, record, node);
         if (typeof record === "string") {
           records.add(record);
+          noteStore(stores, record, store);
           (ruledWrite(event, data) ? writeRuled : rewritten).add(record);
         }
         if (flagsUntrusted(data)) {
@@ -1349,11 +1392,12 @@ class Builder {
         }
       } else if (ptype === "MemoryRead") {
         const read = data.record_refs;
-        // A guard's read rules on its records only when it filtered them by trust.
-        const ruling = enforced && !isAbsent(data.trust_min);
+        // A guard's read rules on its records only when it let through trusted records alone (18.172).
+        const ruling = enforced && data.trust_min === "trusted";
         for (const record of Array.isArray(read) ? read : []) {
           if (typeof record === "string") {
             records.add(record);
+            noteStore(stores, record, store);
             if (ruling) {
               readRuled.add(record);
             }
@@ -1390,6 +1434,12 @@ class Builder {
     }
     reach(tainted, flows);
     reach(unruled, flows);
+    // A record another subject's unreadable write may have changed is one no guard ruled on (SPEC §7.4); nobody
+    // could read that content, so it stays out of the closures CND-05 reads, as an unclassed instruction does.
+    const unread = new Set(
+      [...unreadRecords(this.foreignUnreadable, records, stores)].filter((r) => flows.has(r)),
+    );
+    reach(unread, flows);
     // An instruction that declares no source class cannot show its content came from a trusted source, so
     // ROB-02 reads it as untrusted content (18.127); CND-05's own chain rule already fails it, so it stays out
     // of the closures returned to that rule.
@@ -1404,7 +1454,7 @@ class Builder {
     this.robustLiterals(
       decisions,
       new Set([...tainted, ...unclassed]),
-      new Set([...unruled, ...unfed]),
+      new Set([...unruled, ...unread, ...unfed]),
     );
     for (const node of unruled) {
       tainted.add(node);
@@ -1882,6 +1932,8 @@ export function buildGraph(
     pseudonymKey?: Buffer;
     /** The records another subject's write marked untrusted or rewrote with no ruling (`flaggedRecords`). */
     foreignUntrusted?: ReadonlySet<string>;
+    /** The record_ref and store of each unreadable MemoryWrite another subject holds (18.172). */
+    foreignUnreadable?: readonly UnreadableWrite[];
   } = {},
 ): GraphStore {
   const builder = new Builder(
@@ -1889,6 +1941,7 @@ export function buildGraph(
     options.domain ?? DomainBinding.empty(),
     options.pseudonymKey ?? ZERO_KEY,
     options.foreignUntrusted ?? new Set(),
+    options.foreignUnreadable ?? [],
   );
   return builder.build(events);
 }

@@ -132,6 +132,15 @@ export interface Withheld {
   event: Record<string, unknown> | null;
   subject: string | null;
   digest: string | null;
+  /** Set on an unreadable record whose raw type names MemoryWrite, or whose type cannot be read at all (18.172). */
+  write?: UnreadableWrite;
+}
+
+/** What ingest can still see of an unreadable record that may be a MemoryWrite (SPEC §7.4, 18.172): its raw
+ * `data.record_ref` and `data.store` when each is a string, else null. */
+export interface UnreadableWrite {
+  recordRef: string | null;
+  store: string | null;
 }
 
 export interface IngestResult {
@@ -176,6 +185,30 @@ function unreadable(record: QuarantineRecord, event?: Record<string, unknown>): 
     event: null,
     subject: event !== undefined ? (optStr(event, "subject") ?? null) : null,
     digest: event !== undefined ? digestOf(event) : null,
+    ...(event !== undefined ? unreadableWrite(event) : {}),
+  };
+}
+
+/** The raw MemoryWrite facts of an unreadable `event`: a MemoryWrite unless its envelope or data names another
+ * type, so a record whose type cannot be read counts as one (fail closed, 18.172). */
+function unreadableWrite(event: Record<string, unknown>): { write?: UnreadableWrite } {
+  const name = typeof event.type === "string" ? eventTypeName(event.type) : null;
+  const data = isRecord(event.data) ? event.data : {};
+  const declared = data["@type"];
+  if (
+    name !== "MemoryWrite" &&
+    declared !== "MemoryWrite" &&
+    (name !== null || typeof declared === "string")
+  ) {
+    return {};
+  }
+  const record = data.record_ref;
+  const store = data.store;
+  return {
+    write: {
+      recordRef: typeof record === "string" ? record : null,
+      store: typeof store === "string" ? store : null,
+    },
   };
 }
 

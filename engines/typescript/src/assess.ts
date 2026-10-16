@@ -14,7 +14,7 @@ import { type Assertion, type EvidencePointer, makeAssertion } from "./assertion
 import { type Catalog, type ControlSpec, evidenceShapeFor, shapeFor } from "./catalog";
 import type { DomainBinding } from "./domain";
 import { buildGraph, flaggedRecords } from "./graph";
-import { type Withheld, digestOf } from "./ingest";
+import { type UnreadableWrite, type Withheld, digestOf } from "./ingest";
 import type { IntegrityCaps } from "./integrity";
 import { eventIri } from "./iri";
 import type { Profile, Subject } from "./profile";
@@ -337,12 +337,23 @@ interface View {
   judge: () => SourceClassJudge;
 }
 
-function makeView(
-  events: Event[],
-  domain: DomainBinding,
-  foreignUntrusted: ReadonlySet<string>,
-): View {
-  const store = lazy(() => buildGraph(events, { domain, foreignUntrusted }));
+/** What other subjects' records say of one subject's records: the records their writes marked untrusted or rewrote
+ * with no ruling (18.120), and the record_ref and store of each of their MemoryWrites ingest could not read (18.172). */
+interface Foreign {
+  untrusted: ReadonlySet<string>;
+  unreadable: readonly UnreadableWrite[];
+}
+
+function foreignGraph(events: Event[], domain: DomainBinding, foreign: Foreign): GraphStore {
+  return buildGraph(events, {
+    domain,
+    foreignUntrusted: foreign.untrusted,
+    foreignUnreadable: foreign.unreadable,
+  });
+}
+
+function makeView(events: Event[], domain: DomainBinding, foreign: Foreign): View {
+  const store = lazy(() => foreignGraph(events, domain, foreign));
   const byIri = lazy(() => eventsByIriOf(events));
   return { events, store, byIri, judge: lazy(() => new SourceClassJudge(store(), byIri())) };
 }
@@ -364,7 +375,7 @@ class CappedViews {
     private readonly events: Event[],
     caps: IntegrityCaps,
     private readonly domain: DomainBinding,
-    private readonly foreign: ReadonlySet<string>,
+    private readonly foreign: Foreign,
   ) {
     const ids = new Set(events.map((e) => String(e.id)));
     const mine = (set: ReadonlySet<string>) => new Set([...set].filter((id) => ids.has(id)));
@@ -526,10 +537,15 @@ export function assessSubjects(
   ]);
   for (const subject of profile.subjects) {
     const subjectEvents = eventsBySubject.get(subject.id) ?? [];
-    const foreign = new Set(
-      [...flagged].filter(([, by]) => [...by].some((s) => s !== subject.id)).map(([r]) => r),
-    );
-    const store = buildGraph(subjectEvents, { domain, foreignUntrusted: foreign });
+    const foreign: Foreign = {
+      untrusted: new Set(
+        [...flagged].filter(([, by]) => [...by].some((s) => s !== subject.id)).map(([r]) => r),
+      ),
+      unreadable: withheld
+        .filter((w) => w.subject !== null && w.subject !== subject.id)
+        .flatMap((w) => (w.write !== undefined ? [w.write] : [])),
+    };
+    const store = foreignGraph(subjectEvents, domain, foreign);
     const eventsByIri = eventsByIriOf(subjectEvents);
     const roles = new Set(effectiveRoles(subject.role));
     const win = window(profile, subjectEvents);
@@ -540,8 +556,7 @@ export function assessSubjects(
     // The comparison runs whenever a readable record is withheld, even beside an unreadable one: the unreadable record
     // already decides the outcome, but the exit code still needs what the readable ones show (18.149).
     const cfEvents = readable.length > 0 ? counterfactual(subjectEvents, readable) : [];
-    const cfStore =
-      cfEvents.length > 0 ? buildGraph(cfEvents, { domain, foreignUntrusted: foreign }) : store;
+    const cfStore = cfEvents.length > 0 ? foreignGraph(cfEvents, domain, foreign) : store;
     const cfByIri = eventsByIriOf(cfEvents);
     // Each graph's judge is built once, on the first control whose minimum it may fall below.
     const judge = lazy(() => new SourceClassJudge(store, eventsByIri));
