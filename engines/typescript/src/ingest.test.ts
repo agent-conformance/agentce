@@ -354,3 +354,43 @@ test("an oversize record is withheld with no event (18.119)", () => {
     [["oversize", null, null]],
   );
 });
+
+test("withheld keeps the raw facts of an unreadable write (18.172)", () => {
+  // An unreadable record is a MemoryWrite unless it names another type the engine knows; its record_ref and store
+  // are kept when each is a string.
+  const evidence = (name: string) => `org.agent-conformance.evidence.${name}.v1`;
+  const write = (id: string, type: unknown, data: Record<string, unknown>) => ({
+    id,
+    source: "urn:src:guard",
+    subject: "spiffe://corp/agents/other",
+    type,
+    time: "2026-01-02T00:00:01Z",
+    specversion: "1.0",
+    data: { store: "kb", record_ref: "mem:r1", extra: 1, ...data },
+  });
+  const result = ingest(
+    loadBundle(
+      writeBundle(
+        [
+          write("w1", evidence("MemoryWrite"), { "@type": "MemoryWrite" }),
+          write("w2", 5, {}),
+          write("w3", evidence("MemoryWrit"), { "@type": "MemoryWrit" }),
+          write("w4", evidence("MemoryRead"), { "@type": "MemoryRead" }),
+          write("w5", 5, { "@type": "MemoryRead" }),
+          write("w6", 5, { record_ref: 7, store: null }),
+          write("w7", evidence("MemoryRead"), { "@type": "MemoryWrite" }),
+        ],
+        ["urn:src:guard"],
+      ),
+    ),
+  );
+  const kept = { recordRef: "mem:r1", store: "kb" };
+  assert.deepEqual(
+    result.withheld.map((w) => w.write ?? null),
+    [kept, kept, kept, null, null, { recordRef: null, store: null }, kept],
+  );
+  assert.deepEqual(
+    new Set(result.withheld.map((w) => w.subject)),
+    new Set(["spiffe://corp/agents/other"]),
+  );
+});

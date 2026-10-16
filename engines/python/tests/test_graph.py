@@ -701,6 +701,65 @@ def test_a_record_another_subject_flagged_is_never_ruled_on() -> None:
         ) == ["true"]
 
 
+def test_a_guard_read_rules_on_its_records_only_at_trust_min_trusted() -> None:
+    # 18.172: a read that let untrusted or quarantined records through, or filtered by nothing, rules on nothing.
+    unguarded = _self_report(
+        _event("w1", "MemoryWrite", {"record_ref": "mem:r1", "trust": "trusted"})
+    )
+    used = _with_inputs(decision("d1", "t"), ["mem:r1"])
+    for trust_min, expected in (
+        ("trusted", "true"),
+        ("untrusted", "false"),
+        ("quarantined", "false"),
+        (None, "false"),
+    ):
+        read = _event(
+            "m1", "MemoryRead", {"record_refs": ["mem:r1"], "trust_min": trust_min}
+        )
+        assert _ruled([unguarded, read, used]) == [expected], trust_min
+        assert _ruled([used, read, unguarded]) == [expected], trust_min
+    # A ruled enforcement-point write still rules on its record whatever the read let through.
+    ruled = _event("w1", "MemoryWrite", {"record_ref": "mem:r1", "trust": "trusted"})
+    read = _event(
+        "m1", "MemoryRead", {"record_refs": ["mem:r1"], "trust_min": "untrusted"}
+    )
+    assert _ruled([ruled, read, used]) == ["true"]
+
+
+def test_a_record_another_subjects_unreadable_write_may_have_changed_is_not_ruled_on() -> (
+    None
+):
+    # 18.172 (SPEC §7.4): the record it names; with no readable record_ref, every record of its store, a record no
+    # event names a store for counting as one of them; with no readable store either, every record.
+    def build(events: list[dict[str, Any]], unreadable: Any) -> Any:
+        return build_graph(events, domain=DOMAIN, foreign_unreadable=unreadable)
+
+    used = _with_inputs(decision("d1", "t"), ["mem:r1"])
+    for store in ("kb", None):
+        data = {"record_ref": "mem:r1", "trust": "trusted", "store": store}
+        events = [_event("w1", "MemoryWrite", data), used]
+        for unreadable, expected in (
+            ((), "true"),
+            ((("mem:r1", None),), "false"),
+            ((("mem:r1", "other"),), "false"),
+            ((("mem:r2", None),), "true"),
+            (((None, "kb"),), "false"),
+            (((None, "other"),), "false" if store is None else "true"),
+            (((None, None),), "false"),
+            ((("mem:r2", None), (None, None)), "false"),
+        ):
+            for order in (events, list(reversed(events))):
+                graph = build(order, unreadable)
+                got = graph.literal_values(
+                    event_iri("d1"), "agentce:untrustedContentRuledOn"
+                )
+                assert got == [expected], (store, unreadable)
+                # Nobody could read that content, so it is unruled, never untrusted.
+                assert graph.literal_values(
+                    event_iri("d1"), "agentce:robustToUntrustedContent"
+                ) == ["true"]
+
+
 def test_flagged_records_names_every_subject_that_flagged_a_record() -> None:
     def write(event_id: str, subject: str, **data: Any) -> dict[str, Any]:
         event = _event(event_id, "MemoryWrite", {"record_ref": "mem:r1", **data})

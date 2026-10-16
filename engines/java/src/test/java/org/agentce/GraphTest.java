@@ -254,6 +254,66 @@ class GraphTest {
     }
 
     @Test
+    void rob02AGuardReadRulesOnItsRecordsOnlyAtTrustMinTrusted() {
+        // 18.172: a read that let untrusted or quarantined records through, or filtered by nothing, rules on nothing.
+        JsonNode unguarded = selfReport(
+                event("w1", "MemoryWrite", "\"record_ref\": \"mem:r1\", \"trust\": \"trusted\""));
+        JsonNode used = decisionWith("d1", "\"inputs\": [\"mem:r1\"]");
+        for (String[] pair : new String[][] {
+            {"\"trusted\"", "true"}, {"\"untrusted\"", "false"}, {"\"quarantined\"", "false"}, {"null", "false"}
+        }) {
+            JsonNode read = event("m1", "MemoryRead", "\"record_refs\": [\"mem:r1\"], \"trust_min\": " + pair[0]);
+            assertEquals(List.of(pair[1]), ruled(List.of(unguarded, read, used)), pair[0]);
+            assertEquals(List.of(pair[1]), ruled(List.of(used, read, unguarded)), pair[0]);
+        }
+        // A ruled enforcement-point write still rules on its record whatever the read let through.
+        JsonNode ruledWrite = event("w1", "MemoryWrite", "\"record_ref\": \"mem:r1\", \"trust\": \"trusted\"");
+        JsonNode read = event("m1", "MemoryRead", "\"record_refs\": [\"mem:r1\"], \"trust_min\": \"untrusted\"");
+        assertEquals(List.of("true"), ruled(List.of(ruledWrite, read, used)));
+    }
+
+    @Test
+    void rob02ARecordAnotherSubjectsUnreadableWriteMayHaveChangedIsNotRuledOn() {
+        // SPEC §7.4: the record it names; with no readable record_ref, every record of its store, a record no event
+        // names a store for counting as one of them; with no readable store either, every record.
+        JsonNode used = decisionWith("d1", "\"inputs\": [\"mem:r1\"]");
+        Ingest.UnreadableWrite ref = new Ingest.UnreadableWrite("mem:r1", null);
+        Ingest.UnreadableWrite refOther = new Ingest.UnreadableWrite("mem:r1", "other");
+        Ingest.UnreadableWrite otherRef = new Ingest.UnreadableWrite("mem:r2", null);
+        Ingest.UnreadableWrite kb = new Ingest.UnreadableWrite(null, "kb");
+        Ingest.UnreadableWrite otherStore = new Ingest.UnreadableWrite(null, "other");
+        Ingest.UnreadableWrite none = new Ingest.UnreadableWrite(null, null);
+        for (String store : java.util.Arrays.asList("\"kb\"", "null")) {
+            JsonNode write = event("w1", "MemoryWrite",
+                    "\"record_ref\": \"mem:r1\", \"trust\": \"trusted\", \"store\": " + store);
+            List<JsonNode> events = List.of(write, used);
+            Map<List<Ingest.UnreadableWrite>, String> cases = new LinkedHashMap<>();
+            cases.put(List.of(), "true");
+            cases.put(List.of(ref), "false");
+            cases.put(List.of(refOther), "false");
+            cases.put(List.of(otherRef), "true");
+            cases.put(List.of(kb), "false");
+            cases.put(List.of(otherStore), store.equals("null") ? "false" : "true");
+            cases.put(List.of(none), "false");
+            cases.put(List.of(otherRef, none), "false");
+            for (Map.Entry<List<Ingest.UnreadableWrite>, String> c : cases.entrySet()) {
+                List<JsonNode> reversed = new ArrayList<>(events);
+                Collections.reverse(reversed);
+                for (List<JsonNode> order : List.of(events, reversed)) {
+                    GraphStore graph = Graph.buildGraph(
+                            order, DomainBinding.fromDict(CREDIT_DOMAIN), Set.of(), c.getKey());
+                    String label = store + " " + c.getKey();
+                    assertEquals(List.of(c.getValue()),
+                            graph.literalValues("agentce:event/d1", "agentce:untrustedContentRuledOn"), label);
+                    // Nobody could read that content, so it is unruled, never untrusted.
+                    assertEquals(List.of("true"),
+                            graph.literalValues("agentce:event/d1", "agentce:robustToUntrustedContent"), label);
+                }
+            }
+        }
+    }
+
+    @Test
     void rob02FlaggedRecordsNamesEverySubjectThatFlaggedARecord() {
         String[][] writes = {
             {"w1", "a", "\"trust\": \"untrusted\""},

@@ -432,3 +432,44 @@ def test_withheld_oversize_has_no_event(
     assert [(w.record.reason, w.event, w.subject) for w in result.withheld] == [
         (QuarantineReason.OVERSIZE, None, None)
     ]
+
+
+def test_withheld_keeps_the_raw_facts_of_an_unreadable_write(
+    make_bundle: Callable[..., Any],
+) -> None:
+    # 18.172: an unreadable record is a MemoryWrite unless it names another type the engine knows; its record_ref and
+    # store are kept when each is a string.
+    from agentce.ingest import UnreadableWrite
+
+    def write(event_id: str, type_: Any, data: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "id": event_id,
+            "source": "urn:src:guard",
+            "subject": "spiffe://corp/agents/other",
+            "type": type_,
+            "time": "2026-01-02T00:00:01Z",
+            "specversion": "1.0",
+            "data": {"store": "kb", "record_ref": "mem:r1", "extra": 1, **data},
+        }
+
+    evidence = "org.agent-conformance.evidence.{}.v1".format
+    items = [
+        write("w1", evidence("MemoryWrite"), {"@type": "MemoryWrite"}),
+        write("w2", 5, {}),
+        write("w3", evidence("MemoryWrit"), {"@type": "MemoryWrit"}),
+        write("w4", evidence("MemoryRead"), {"@type": "MemoryRead"}),
+        write("w5", 5, {"@type": "MemoryRead"}),
+        write("w6", 5, {"record_ref": 7, "store": None}),
+        write("w7", evidence("MemoryRead"), {"@type": "MemoryWrite"}),
+    ]
+    result = _ingest(make_bundle, items)
+    assert [w.write for w in result.withheld] == [
+        UnreadableWrite("mem:r1", "kb"),
+        UnreadableWrite("mem:r1", "kb"),
+        UnreadableWrite("mem:r1", "kb"),
+        None,
+        None,
+        UnreadableWrite(None, None),
+        UnreadableWrite("mem:r1", "kb"),
+    ]
+    assert {w.subject for w in result.withheld} == {"spiffe://corp/agents/other"}

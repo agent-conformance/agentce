@@ -310,6 +310,69 @@ test("ROB-02: a record another subject flagged is never ruled on (18.120)", () =
   }
 });
 
+test("ROB-02: a guard read rules on its records only at trust_min trusted (18.172)", () => {
+  // A read that let untrusted or quarantined records through, or filtered by nothing, rules on nothing.
+  const unguarded = selfReport(
+    memoryEvent("w1", "MemoryWrite", { record_ref: "mem:r1", trust: "trusted" }),
+  );
+  const used = withInputs(decisionEvent("d1"), ["mem:r1"]);
+  for (const [trustMin, expected] of [
+    ["trusted", "true"],
+    ["untrusted", "false"],
+    ["quarantined", "false"],
+    [null, "false"],
+  ]) {
+    const read = memoryEvent("m1", "MemoryRead", { record_refs: ["mem:r1"], trust_min: trustMin });
+    assert.deepEqual(ruled([unguarded, read, used]), [expected], String(trustMin));
+    assert.deepEqual(ruled([used, read, unguarded]), [expected], String(trustMin));
+  }
+  // A ruled enforcement-point write still rules on its record whatever the read let through.
+  const ruledWrite = memoryEvent("w1", "MemoryWrite", { record_ref: "mem:r1", trust: "trusted" });
+  const read = memoryEvent("m1", "MemoryRead", { record_refs: ["mem:r1"], trust_min: "untrusted" });
+  assert.deepEqual(ruled([ruledWrite, read, used]), ["true"]);
+});
+
+test("ROB-02: a record another subject's unreadable write may have changed is not ruled on (18.172)", () => {
+  // SPEC §7.4: the record it names; with no readable record_ref, every record of its store, a record no event names
+  // a store for counting as one of them; with no readable store either, every record.
+  const w = (recordRef: string | null, store: string | null) => ({ recordRef, store });
+  const used = withInputs(decisionEvent("d1"), ["mem:r1"]);
+  for (const store of ["kb", null]) {
+    const write = memoryEvent("w1", "MemoryWrite", {
+      record_ref: "mem:r1",
+      trust: "trusted",
+      store,
+    });
+    const events = [write, used];
+    for (const [unreadable, expected] of [
+      [[], "true"],
+      [[w("mem:r1", null)], "false"],
+      [[w("mem:r1", "other")], "false"],
+      [[w("mem:r2", null)], "true"],
+      [[w(null, "kb")], "false"],
+      [[w(null, "other")], store === null ? "false" : "true"],
+      [[w(null, null)], "false"],
+      [[w("mem:r2", null), w(null, null)], "false"],
+    ] as const) {
+      for (const order of [events, [...events].reverse()]) {
+        const graph = buildGraph(order, { domain: MINOR_DOMAIN, foreignUnreadable: unreadable });
+        const label = JSON.stringify([store, unreadable]);
+        assert.deepEqual(
+          graph.literalValues("agentce:event/d1", "agentce:untrustedContentRuledOn"),
+          [expected],
+          label,
+        );
+        // Nobody could read that content, so it is unruled, never untrusted.
+        assert.deepEqual(
+          graph.literalValues("agentce:event/d1", "agentce:robustToUntrustedContent"),
+          ["true"],
+          label,
+        );
+      }
+    }
+  }
+});
+
 test("ROB-02: flaggedRecords names every subject that flagged a record (18.120)", () => {
   const write = (id: string, subject: string, data: Record<string, unknown>) => ({
     ...memoryEvent(id, "MemoryWrite", { record_ref: "mem:r1", ...data }),

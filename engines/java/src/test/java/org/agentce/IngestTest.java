@@ -249,4 +249,39 @@ class IngestTest {
         assertEquals(null, result.withheld.get(0).event());
         assertEquals(null, result.withheld.get(0).subject());
     }
+
+    private static JsonNode unreadableWrite(String id, String typeJson, String dataJson) {
+        return Json.parse("{\"id\": \"" + id + "\", \"source\": \"" + SOURCE + "\", "
+                + "\"subject\": \"spiffe://corp/agents/other\", \"type\": " + typeJson + ", "
+                + "\"time\": \"2026-01-02T00:00:01Z\", \"specversion\": \"1.0\", "
+                + "\"data\": {\"store\": \"kb\", \"record_ref\": \"mem:r1\", \"extra\": 1" + dataJson + "}}");
+    }
+
+    @Test
+    void withheldKeepsTheRawFactsOfAnUnreadableWrite(@TempDir Path tempDir) throws IOException {
+        // 18.172: an unreadable record is a MemoryWrite unless it names another type the engine knows; its record_ref
+        // and store are kept when each is a string.
+        String write = "\"org.agent-conformance.evidence.MemoryWrite.v1\"";
+        String misspelt = "\"org.agent-conformance.evidence.MemoryWrit.v1\"";
+        String read = "\"org.agent-conformance.evidence.MemoryRead.v1\"";
+        List<JsonNode> events = List.of(
+                unreadableWrite("w1", write, ", \"@type\": \"MemoryWrite\""),
+                unreadableWrite("w2", "5", ""),
+                unreadableWrite("w3", misspelt, ", \"@type\": \"MemoryWrit\""),
+                unreadableWrite("w4", read, ", \"@type\": \"MemoryRead\""),
+                unreadableWrite("w5", "5", ", \"@type\": \"MemoryRead\""),
+                unreadableWrite("w6", "5", ", \"record_ref\": 7, \"store\": null"),
+                unreadableWrite("w7", read, ", \"@type\": \"MemoryWrite\""));
+        ArrayNode sources = Json.nodes().arrayNode();
+        sources.addObject().put("id", SOURCE).put("class", "enforcement_point");
+        Ingest.Result result = Ingest.ingest(Fixtures.writeIngestBundle(tempDir.resolve("b"), events, sources));
+        Ingest.UnreadableWrite kept = new Ingest.UnreadableWrite("mem:r1", "kb");
+        List<Ingest.UnreadableWrite> writes = new ArrayList<>();
+        result.withheld.forEach(w -> writes.add(w.write()));
+        assertEquals(
+                java.util.Arrays.asList(
+                        kept, kept, kept, null, null, new Ingest.UnreadableWrite(null, null), kept),
+                writes);
+        result.withheld.forEach(w -> assertEquals("spiffe://corp/agents/other", w.subject()));
+    }
 }
