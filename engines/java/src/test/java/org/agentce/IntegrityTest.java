@@ -160,6 +160,17 @@ class IntegrityTest {
     }
 
     @Test
+    void timeCheckAnchorOfTheWrongTypeAnchorsNothing() {
+        String placeable = "\"2026-01-01T09:00:00Z\"";
+        for (String anchor : List.of("1.5", "true", "null", "[" + placeable + "]", "{\"at\":1.5}", "{\"at\":[" + placeable + "]}")) {
+            JsonNode manifest = Json.parse("{\"streams\":[{\"stream\":\"" + CAP_STREAM + "\",\"anchors\":[" + anchor + "]}]}");
+            Integrity.Result result = Integrity.verifyBundle(capChain(2, "export_anchored", null), manifest, null).get(0);
+            assertEquals("time_suspect", result.status);
+            assertEquals("verified_weak", result.strengthStatus);
+        }
+    }
+
+    @Test
     void timeCheckKeepsTheStrengthReadingOfASuspectStream() {
         Integrity.Result result =
                 Integrity.verifyBundle(capChain(2, "source_signed", null), anchoredAt("2026-01-01T00:00:30Z"), null).get(0);

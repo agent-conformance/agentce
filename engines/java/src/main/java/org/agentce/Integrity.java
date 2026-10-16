@@ -108,14 +108,17 @@ public final class Integrity {
     private static final String EPOCH = "1970-01-01T00:00:00Z";
 
     /**
-     * The latest anchor time, compared as instants (SPEC §6.7); an anchor time with no UTC offset, or none at all,
-     * places no record and is left out.
+     * The latest anchor time, compared as instants (SPEC §6.7); an anchor that is not an object, or whose time is not
+     * a string with a UTC offset, places no record and is left out.
      */
     private static String latestAnchor(List<JsonNode> anchors) {
         String latest = null;
         for (JsonNode anchor : anchors) {
-            JsonNode node = anchor.get("at");
-            String at = node != null ? node.asText() : "";
+            JsonNode node = anchor.isObject() ? anchor.get("at") : null;
+            if (node == null || !node.isTextual()) {
+                continue;
+            }
+            String at = node.textValue();
             Integer order = latest == null ? null : Structural.compareInstants(at, latest);
             if (Structural.compareInstants(at, EPOCH) != null && (latest == null || Integer.valueOf(1).equals(order))) {
                 latest = at;

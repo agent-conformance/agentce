@@ -100,13 +100,15 @@ def recompute_hash(event: dict[str, Any]) -> str:
 
 
 def _latest_anchor(anchors: list[dict[str, Any]]) -> str | None:
-    """The latest anchor time, compared as instants (SPEC §6.7); an anchor time with no UTC offset, or none at all,
-    places no record and is left out."""
+    """The latest anchor time, compared as instants (SPEC §6.7); an anchor that is not an object, or whose time is not
+    a string with a UTC offset, places no record and is left out."""
     latest: str | None = None
     for anchor in anchors:
-        at = str(anchor.get("at", ""))
-        if compare_instants(at, _EPOCH) is not None and (
-            latest is None or compare_instants(at, latest) == 1
+        at = anchor.get("at") if isinstance(anchor, dict) else None
+        if (
+            isinstance(at, str)
+            and compare_instants(at, _EPOCH) is not None
+            and (latest is None or compare_instants(at, latest) == 1)
         ):
             latest = at
     return latest

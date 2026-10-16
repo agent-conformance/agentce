@@ -243,6 +243,27 @@ def test_time_check_anchor_without_offset_anchors_nothing() -> None:
         assert result.strength_status == IntegrityStatus.VERIFIED_WEAK.value
 
 
+def test_time_check_anchor_of_the_wrong_type_anchors_nothing() -> None:
+    """An anchor that is not an object, or whose time is not a string, anchors nothing, even when it holds a placeable
+    time, and never crashes verify (the verify census)."""
+    placeable = "2026-01-01T09:00:00Z"
+    for anchor in (
+        1.5,
+        True,
+        None,
+        [placeable],
+        {"at": 1.5},
+        {"at": [placeable]},
+        {"at": {"t": placeable}},
+    ):
+        manifest = {"streams": [{"stream": STREAM, "anchors": [anchor]}]}
+        (result,) = verify_bundle(
+            chain(2, strength="export_anchored", sig_ref=None), manifest
+        )
+        assert result.status == IntegrityStatus.TIME_SUSPECT.value
+        assert result.strength_status == IntegrityStatus.VERIFIED_WEAK.value
+
+
 def test_time_check_keeps_the_strength_reading_of_a_suspect_stream() -> None:
     """time_suspect never hides an unsigned source_signed stream (critic r1 F1)."""
     (result,) = verify_bundle(chain(2, sig_ref=None), _anchored("2026-01-01T00:00:30Z"))

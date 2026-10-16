@@ -13,6 +13,7 @@
 
 import { confineToRoot, safeIsFile } from "./bundle";
 import { sha256Hex } from "./canonical";
+import { NonCanonicalNumber } from "./json";
 import { compareInstants } from "./structural";
 import { byteCompare } from "./util";
 
@@ -59,9 +60,23 @@ export function integrityResultToJson(result: IntegrityResult): Record<string, u
     record.first_bad_index = result.firstBadIndex;
   }
   if (result.anchors.length > 0) {
-    record.anchors = result.anchors;
+    record.anchors = result.anchors.map(plainJson);
   }
   return record;
+}
+
+/** The manifest's anchors as they were written: a number token the reader kept for the canonical form is a number. */
+function plainJson(value: unknown): unknown {
+  if (value instanceof NonCanonicalNumber) {
+    return value.toNumber();
+  }
+  if (Array.isArray(value)) {
+    return value.map(plainJson);
+  }
+  if (isRecord(value)) {
+    return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, plainJson(child)]));
+  }
+  return value;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -107,14 +122,15 @@ export function recomputeHash(event: Record<string, unknown>): string {
 const EPOCH = "1970-01-01T00:00:00Z";
 
 /**
- * The latest anchor time, compared as instants (SPEC §6.7); an anchor time with no UTC offset, or none at all, places
- * no record and is left out.
+ * The latest anchor time, compared as instants (SPEC §6.7); an anchor that is not an object, or whose time is not a
+ * string with a UTC offset, places no record and is left out.
  */
 function latestAnchor(anchors: Array<Record<string, unknown>>): string | null {
   let latest: string | null = null;
   for (const anchor of anchors) {
-    const at = String(anchor.at ?? "");
+    const at: unknown = isRecord(anchor) ? anchor.at : undefined;
     if (
+      typeof at === "string" &&
       compareInstants(at, EPOCH) !== null &&
       (latest === null || compareInstants(at, latest) === 1)
     ) {

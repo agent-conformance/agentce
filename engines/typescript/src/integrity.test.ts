@@ -21,6 +21,7 @@ import {
   verifyBundle,
   verifyStreams,
 } from "./integrity";
+import { parseJson } from "./json";
 
 const TESTDATA = join(__dirname, "..", "testdata");
 
@@ -162,6 +163,27 @@ test("time check: an anchor time with no UTC offset, or none, anchors nothing (c
     assert.equal(result?.status, "time_suspect");
     assert.equal(result?.firstBadIndex, null);
     assert.equal(result?.strengthStatus, "verified_weak");
+  }
+});
+
+test("time check: an anchor of the wrong type anchors nothing, and is written out as read", () => {
+  const placeable = "2026-01-01T09:00:00Z";
+  for (const anchor of [
+    "1.5",
+    "true",
+    "null",
+    `["${placeable}"]`,
+    '{"at":1.5}',
+    `{"at":["${placeable}"]}`,
+  ]) {
+    const manifest = parseJson(
+      `{"streams":[{"stream":"${CAP_STREAM}","anchors":[${anchor}]}]}`,
+    ) as Record<string, unknown>;
+    const [result] = verifyBundle(capChain(2, "export_anchored"), manifest);
+    assert.ok(result);
+    assert.equal(result.status, "time_suspect");
+    assert.equal(result.strengthStatus, "verified_weak");
+    assert.deepEqual(integrityResultToJson(result).anchors, [JSON.parse(anchor)]);
   }
 });
 
