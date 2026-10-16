@@ -71,8 +71,8 @@ chunks go to the shards longest first, each to the shard with the least work so 
 estimate for a lane count, or the pairs one shard runs:
 
 ```
-python3 verification/shard.py --balance-check 28
-python3 verification/shard.py --dry-run 0 28      # one "<gate> <fault>" line per pair
+python3 verification/shard.py --balance-check 34
+python3 verification/shard.py --dry-run 0 34      # one "<gate> <fault>" line per pair
 ```
 
 The balance check prints each shard's estimated minutes. It exits 1 when a gate has no recorded seconds and no
