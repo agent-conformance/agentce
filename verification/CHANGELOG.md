@@ -3,6 +3,24 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.110.0
+
+- `VG-INTEGRITY-CAP` (18.132, added). The engines wrote integrity results to integrity.jsonl and counted them, but no verdict
+  used them. A control could pass on an enforcement-point record whose stream failed its hash check, had a gap,
+  carried no integrity at all or was chained only after export. All three engines now cap the verdict (SPEC §6.6,
+  §8.1): a pass that rests on an enforcement-point or independent-system record on a failed, gap, reordered or missing
+  chain reads insufficient_evidence; a pass that rests on an enforcement-point record on an export_chained, unsigned or
+  unanchored stream reads partial; a timing control (INC) leaves a time_suspect stream's records out. An anchor whose
+  time has no UTC offset, or none at all, anchors nothing, and a record time that cannot be placed against an anchor
+  reads time_suspect in every engine. A violation never changes. The gate runs 21 cases through the three real CLIs,
+  with six seeded faults, two in each engine: the ceiling and the anchor rule.
+- `VG-SOURCE-CLASS`, the `approval_outcome.sh` gates, `VG-CND04-PROVENANCE`, `VG-CND05-CHAIN`, `VG-EUAIACT-CLUSTER1`,
+  `VG-HUMAN-ACTOR`, `VG-QUARANTINE-NO-PASS` and `VG-ROB02-UNTRUSTED` (18.132, changed). Their fixtures now chain and
+  anchor each source's records (`verification/gates/fixture_integrity.py`), so the cases judge what they judged before
+  rather than the cap. A case that pins its own integrity keeps it.
+- `VG-STREAM-SOURCE-BOUND` (18.132, changed). Its integrity faults point at the code's new place; they seed the same
+  defects.
+
 ## 0.109.0
 
 - `VG-CND04-PROVENANCE` (18.122, added). CND-04's shape asked only that a consequential action name an instruction,

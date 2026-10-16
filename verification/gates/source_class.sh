@@ -13,7 +13,7 @@ fixtures="$root/verification/gates/fixtures/source_class"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen python - "$fixtures/cases.json" "$work" \
+(cd "$root/engines/python" && PYTHONPATH="$root/verification/gates" env -u VIRTUAL_ENV uv run --frozen python - "$fixtures/cases.json" "$work" \
   "$root/spec/catalogs/overlays/conduct") <<'PY'
 import hashlib
 import json
@@ -21,6 +21,8 @@ import re
 import shutil
 import sys
 from pathlib import Path
+
+from fixture_integrity import chain_streams
 
 cases = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))["cases"]
 work, overlay = Path(sys.argv[2]), Path(sys.argv[3])
@@ -45,22 +47,25 @@ for name, case in cases.items():
         continue
     bundle = work / name / "bundle"
     (bundle / "events").mkdir(parents=True)
-    text = "".join(json.dumps(e, sort_keys=True) + "\n" for e in case["events"])
+    # Declared classes, so each record keeps the class its source has (SPEC §6.4).
+    sources = [
+        {"id": f"urn:src:{cls}", "class": cls}
+        for cls in ("enforcement_point", "independent_system", "self_report")
+    ]
+    events, streams = chain_streams(case["events"], {"agentce_bundle_version": 1, "sources": sources})
+    text = "".join(json.dumps(e, sort_keys=True) + "\n" for e in events)
     (bundle / "events" / "subject.jsonl").write_text(text, encoding="utf-8")
     manifest = {
         "agentce_bundle_version": 1,
         "domain": "source-class-fixture",
+        "streams": streams,
         "files": [
             {
                 "path": "events/subject.jsonl",
                 "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
             }
         ],
-        # Declared classes, so each record keeps the class its source has (SPEC §6.4).
-        "sources": [
-            {"id": f"urn:src:{cls}", "class": cls}
-            for cls in ("enforcement_point", "independent_system", "self_report")
-        ],
+        "sources": sources,
     }
     (bundle / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     failing = ",".join(sorted(expected["failing"]))

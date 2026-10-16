@@ -22,18 +22,39 @@ cases="$root/verification/gates/fixtures/$name/cases.json"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen python - "$cases" "$work") <<'PY'
+(cd "$root/engines/python" && PYTHONPATH="$root/verification/gates" env -u VIRTUAL_ENV uv run --frozen python - "$cases" "$work") <<'PY'
 import hashlib
 import json
 import sys
 from pathlib import Path
 
+from fixture_integrity import chain_streams
+
 cases = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))["cases"]
 for name, case in cases.items():
     bundle = Path(sys.argv[2]) / name / "bundle"
     (bundle / "events").mkdir(parents=True)
-    text = "".join(json.dumps(e, sort_keys=True) + "\n" for e in case["events"])
+    # Declared classes, so the login records keep the class their stream has (SPEC §6.4); a source named
+    # urn:src:unclassed... is declared with no class, so ingest trusts its records as self_report.
+    sources = [
+        {"id": f"urn:src:{cls}", "class": cls}
+        for cls in ("enforcement_point", "independent_system", "self_report")
+    ] + [
+        {"id": source}
+        for source in sorted({e["source"] for e in case["events"]})
+        if source.startswith("urn:src:unclassed")
+    ]
+    # A case that pins integrity.jsonl writes its own chains; every other stream is chained over its accepted records.
+    events, streams = (
+        (case["events"], [])
+        if "integrity" in case["expected"]
+        else chain_streams(case["events"], {"agentce_bundle_version": 1, "sources": sources})
+    )
+    text = "".join(json.dumps(e, sort_keys=True) + "\n" for e in events)
     (bundle / "events" / "subject.jsonl").write_text(text, encoding="utf-8")
+    for path, body in case.get("files", {}).items():  # a case's other bundle files (signature envelopes)
+        (bundle / path).parent.mkdir(parents=True, exist_ok=True)
+        (bundle / path).write_text(body, encoding="utf-8")
     manifest = {
         "agentce_bundle_version": 1,
         "domain": "approval-outcome-fixture",
@@ -43,20 +64,12 @@ for name, case in cases.items():
                 "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
             }
         ],
-        # Declared classes, so the login records keep the class their stream has (SPEC §6.4); a source named
-        # urn:src:unclassed... is declared with no class, so ingest trusts its records as self_report.
-        "sources": [
-            {"id": f"urn:src:{cls}", "class": cls}
-            for cls in ("enforcement_point", "independent_system", "self_report")
-        ]
-        + [
-            {"id": source}
-            for source in sorted({e["source"] for e in case["events"]})
-            if source.startswith("urn:src:unclassed")
-        ],
+        "sources": sources,
     }
     if "streams" in case:  # a case's integrity streams and their anchors (SPEC §6.6), as the manifest lists them
-        manifest["streams"] = case["streams"]
+        streams = case["streams"] + streams
+    if streams:
+        manifest["streams"] = streams
     (bundle / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     expected = case["expected"]
     failing = ",".join(sorted(expected["failing"]))
