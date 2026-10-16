@@ -77,7 +77,7 @@ from ..exit_codes import ExitCode
 from ..fail_on import parse_fail_on
 from ..graph import build_graph
 from ..ingest import ingest
-from ..integrity import IntegrityStatus, verify_bundle
+from ..integrity import IntegrityStatus, integrity_caps, verify_bundle, verify_streams
 from ..logsetup import get_logger
 from ..profile import Profile
 from ..quarantine import counts_by_reason, write_quarantine
@@ -1396,9 +1396,10 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
                 cat, bundle_out / "catalog" / str(i)
             )
     # Stage 2: integrity verification, one IntegrityResult per stream.
-    integrity_results = verify_bundle(
+    integrity_streams = verify_streams(
         ingested.raw_accepted, loaded.manifest, loaded.root
     )
+    integrity_results = list(integrity_streams.values())
     _write_jsonl((r.to_json() for r in integrity_results), out_dir / "integrity.jsonl")
     # Stage 3: build the provenance graph into the on-disk store (ADR-0001).
     domain_path = _opt_str(ns, "domain")
@@ -1433,6 +1434,9 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         domain,
         applicability_declared=scanned is None,
         withheld=ingested.withheld,
+        integrity=integrity_caps(
+            ingested.raw_accepted, ingested.accepted, integrity_streams
+        ),
     )
     # A records run that judged nothing renders no report: its headline would read "Conformant".
     if scanned is not None and evaluated_nothing(evaluated):

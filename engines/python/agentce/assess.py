@@ -21,6 +21,7 @@ from .catalog import Catalog, ControlSpec
 from .domain import DomainBinding
 from .graph import build_graph
 from .ingest import Withheld, record_digest
+from .integrity import IntegrityCaps
 from .iri import event_iri
 from .profile import Profile, Subject
 from .readiness import parse_date
@@ -302,6 +303,87 @@ def _events_by_iri(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return {event_iri(str(e["id"])): e for e in events if "id" in e}
 
 
+#: The families whose controls judge times (SPEC §6.6: INC, and REC retention, which no catalog has yet): a
+#: time_suspect stream's records are left out of them.
+TIMING_FAMILIES = frozenset({"INC"})
+
+
+@dataclasses.dataclass
+class _View:
+    """One capped reading of a subject's records, its graph and judge built on first use."""
+
+    events: list[dict[str, Any]]
+    domain: DomainBinding
+
+    @functools.cached_property
+    def store(self) -> GraphStore:
+        return build_graph(self.events, domain=self.domain)
+
+    @functools.cached_property
+    def by_iri(self) -> dict[str, dict[str, Any]]:
+        return _events_by_iri(self.events)
+
+    def judge(self) -> SourceClassJudge:
+        return self._judge
+
+    @functools.cached_property
+    def _judge(self) -> SourceClassJudge:
+        return SourceClassJudge(self.store, self.by_iri)
+
+
+class _CappedViews:
+    """The integrity caps of SPEC §6.6 and §8.1 over one subject's records, as ceilings on an outcome read from
+    them as declared. A pass must also hold with every record on a broken stream left out, and in a timing control
+    every time_suspect record (else insufficient_evidence), and then with every enforcement-point record on a weak
+    stream left out too (else partial, weak_integrity). Only a pass is capped: a violation is never changed."""
+
+    def __init__(
+        self, events: list[dict[str, Any]], caps: IntegrityCaps, domain: DomainBinding
+    ) -> None:
+        ids = {str(e.get("id")) for e in events}
+        self._events, self._domain = events, domain
+        self._broken = caps.broken & ids
+        self._weak = caps.weak & ids
+        self._suspect = caps.time_suspect & ids
+        self.any = bool(self._broken or self._weak or self._suspect)
+        self._views: dict[tuple[bool, bool], _View] = {}
+
+    def _view(self, *, weak: bool, timing: bool) -> _View:
+        key = (weak, timing)
+        if key not in self._views:
+            dropped = (
+                self._broken
+                | (self._weak if weak else frozenset())
+                | (self._suspect if timing else frozenset())
+            )
+            self._views[key] = _View(
+                [e for e in self._events if str(e.get("id")) not in dropped],
+                self._domain,
+            )
+        return self._views[key]
+
+    def ceiling(
+        self, assertion: Assertion, judge: Callable[[_View], Assertion]
+    ) -> Assertion:
+        timing = bool(self._suspect) and assertion.family in TIMING_FAMILIES
+        if self._broken or timing:
+            if judge(self._view(weak=False, timing=timing)).outcome != "conformant":
+                return dataclasses.replace(
+                    assertion,
+                    outcome="insufficient_evidence",
+                    population=(assertion.population[0], 0),
+                    violations=[],
+                    source_class_satisfied=False,
+                    evidence_strength=None,
+                )
+        if (
+            self._weak
+            and judge(self._view(weak=True, timing=timing)).outcome != "conformant"
+        ):
+            return dataclasses.replace(assertion, outcome="partial")
+        return assertion
+
+
 def _counterfactual(
     subject_events: list[dict[str, Any]], readable: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
@@ -388,6 +470,7 @@ def assess_subjects(
     *,
     applicability_declared: bool = True,
     withheld: Sequence[Withheld],
+    integrity: IntegrityCaps,
 ) -> list[Assertion]:
     """Evaluate every catalog control against every subject and return the assertions.
 
@@ -420,6 +503,7 @@ def assess_subjects(
         # Each graph's judge is built once, on the first control whose minimum it may fall below.
         judge = functools.cache(lambda: SourceClassJudge(store, events_by_iri))
         cf_judge = functools.cache(lambda: SourceClassJudge(cf_store, cf_by_iri))
+        capped = _CappedViews(subject_events, integrity, domain)
         for catalog in catalogs:
             for control in catalog.controls:
                 assertion = _assert_control(
@@ -434,6 +518,22 @@ def assess_subjects(
                     judge,
                     applicability_declared=applicability_declared,
                 )
+                if capped.any and assertion.outcome == "conformant":
+                    assertion = capped.ceiling(
+                        assertion,
+                        lambda view: _assert_control(
+                            view.store,
+                            catalog,
+                            control,
+                            subject,
+                            roles,
+                            view.events,
+                            view.by_iri,
+                            window,
+                            view.judge,
+                            applicability_declared=applicability_declared,
+                        ),
+                    )
                 flattered = bool(own) and (
                     assertion.outcome == "conformant"
                     or (

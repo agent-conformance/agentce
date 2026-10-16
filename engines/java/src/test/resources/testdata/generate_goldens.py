@@ -41,6 +41,7 @@ sys.path.insert(0, str(REPO / "engines" / "python" / "tests"))
 from agentce.assertions import Assertion, aggregate  # noqa: E402
 from agentce.assess import assess_subjects  # noqa: E402
 from agentce.catalog import Catalog, load_catalog  # noqa: E402
+from agentce.integrity import NO_CAPS  # noqa: E402
 from agentce.domain import DomainBinding  # noqa: E402
 from agentce.graph import build_graph  # noqa: E402
 from agentce.profile import Profile  # noqa: E402
@@ -109,7 +110,9 @@ def build_assess_golden(catalog: Catalog, domain: DomainBinding) -> dict[str, ob
     }
     result: dict[str, object] = {}
     for name, events in scenarios.items():
-        assertions = assess_subjects(events, profile, [catalog], domain, withheld=())
+        assertions = assess_subjects(
+            events, profile, [catalog], domain, withheld=(), integrity=NO_CAPS
+        )
         result[name] = [a.to_json() for a in assertions]
     return result
 
@@ -206,7 +209,7 @@ def build_report_golden(catalog: Catalog, domain: DomainBinding) -> dict[str, ob
     profile = Profile.from_dict({"subjects": [{"id": SUBJECT, "role": "both"}]})
     events = events_of("OVS-03", "failed")
     assertions: list[Assertion] = assess_subjects(
-        events, profile, [catalog], domain, withheld=()
+        events, profile, [catalog], domain, withheld=(), integrity=NO_CAPS
     )
     counts = aggregate(assertions)
 

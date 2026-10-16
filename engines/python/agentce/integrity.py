@@ -18,15 +18,17 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
 from . import canonical
 from .bundle import confine_to_root, safe_is_file
+from .structural import compare_instants
 
 GENESIS_PREV = "0" * 64
+#: Any aware date-time; an anchor time comparable with it is a UTC instant (compare_instants).
+_EPOCH = "1970-01-01T00:00:00Z"
 DEFAULT_CLOCK_SKEW_SECONDS = 300  # 5 minutes (SPEC §6.6 timestamp trust)
 
 
@@ -55,6 +57,9 @@ class IntegrityResult:
     status: str
     first_bad_index: int | None = None
     anchors: list[dict[str, Any]] = field(default_factory=list)
+    #: What the strength and signatures alone read (verified, verified_weak or unsigned), kept when the time check has
+    #: already made the status time_suspect, so a stream's weakness still caps (SPEC §6.6). Not written out.
+    strength_status: str = ""
 
     def to_json(self) -> dict[str, Any]:
         record: dict[str, Any] = {
@@ -94,20 +99,17 @@ def recompute_hash(event: dict[str, Any]) -> str:
     return canonical.sha256_hex(without)
 
 
-def _parse_time(value: str) -> datetime | None:
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except (ValueError, AttributeError):
-        return None
-
-
-def _anchor_times(anchors: list[dict[str, Any]]) -> list[datetime]:
-    times = []
+def _latest_anchor(anchors: list[dict[str, Any]]) -> str | None:
+    """The latest anchor time, compared as instants (SPEC §6.7); an anchor time with no UTC offset, or none at all,
+    places no record and is left out."""
+    latest: str | None = None
     for anchor in anchors:
-        parsed = _parse_time(str(anchor.get("at", "")))
-        if parsed is not None:
-            times.append(parsed)
-    return times
+        at = str(anchor.get("at", ""))
+        if compare_instants(at, _EPOCH) is not None and (
+            latest is None or compare_instants(at, latest) == 1
+        ):
+            latest = at
+    return latest
 
 
 def _verify_stream(
@@ -154,32 +156,45 @@ def _verify_stream(
             result.first_bad_index = index
             return result
 
-    # 3. Timestamp trust: an event later than the anchor that covers it is suspect.
-    anchor_times = _anchor_times(anchors)
-    if anchor_times:
-        latest_anchor = max(anchor_times)
+    # An anchor whose time cannot be placed (no UTC offset, absent, or not a date-time) anchors nothing (SPEC §8.1).
+    latest_anchor = _latest_anchor(anchors)
+    result.strength_status = _strength_status(
+        strength, blocks, latest_anchor is not None, bundle_root
+    )
+
+    # 3. Timestamp trust: an event later than the anchor that covers it is suspect, and so is one whose time cannot
+    # be placed against it (no UTC offset, or not a date-time): it cannot be cross-checked (SPEC §6.6, fail closed).
+    # A stream whose anchors are all unplaceable cannot be cross-checked at all, so it is suspect as a whole.
+    if anchors and latest_anchor is None:
+        result.status = IntegrityStatus.TIME_SUSPECT.value
+        return result
+    if latest_anchor is not None:
         for index, event in enumerate(events):
-            event_time = _parse_time(str(event.get("time", "")))
-            if event_time is not None and event_time > latest_anchor:
+            if compare_instants(str(event.get("time", "")), latest_anchor) in (1, None):
                 result.status = IntegrityStatus.TIME_SUSPECT.value
                 result.first_bad_index = index
                 return result
 
-    # 4. Strength and signatures.
-    if strength == IntegrityStrength.SOURCE_SIGNED.value:
-        if all(_is_signed(block, bundle_root) for block in blocks):
-            result.status = IntegrityStatus.VERIFIED.value
-        else:
-            result.status = IntegrityStatus.UNSIGNED.value
-    elif strength == IntegrityStrength.EXPORT_ANCHORED.value:
-        result.status = (
-            IntegrityStatus.VERIFIED.value
-            if anchors
-            else IntegrityStatus.VERIFIED_WEAK.value
-        )
-    else:  # export_chained: a chain computed after export proves only "unchanged since export".
-        result.status = IntegrityStatus.VERIFIED_WEAK.value
+    result.status = result.strength_status
     return result
+
+
+def _strength_status(
+    strength: str,
+    blocks: list[dict[str, Any] | None],
+    anchored: bool,
+    bundle_root: Path | None,
+) -> str:
+    """What a stream's strength and signatures read: source_signed is verified only when every record is signed,
+    export_anchored only with a placeable anchor, and export_chained proves only "unchanged since export"."""
+    if strength == IntegrityStrength.SOURCE_SIGNED.value:
+        signed = all(_is_signed(block, bundle_root) for block in blocks)
+        return (
+            IntegrityStatus.VERIFIED.value if signed else IntegrityStatus.UNSIGNED.value
+        )
+    if strength == IntegrityStrength.EXPORT_ANCHORED.value and anchored:
+        return IntegrityStatus.VERIFIED.value
+    return IntegrityStatus.VERIFIED_WEAK.value
 
 
 def _is_signed(block: dict[str, Any] | None, bundle_root: Path | None) -> bool:
@@ -206,6 +221,21 @@ def verify_bundle(
     A chain is keyed on (the record's source, the stream it claims): a claimed stream id names a stream of the record's
     own source (SPEC §6.6), so a record never joins, or breaks, another source's chain by naming it, and no chain under
     an id two sources claim reads verified (18.151)."""
+    return list(
+        verify_streams(
+            events, manifest, bundle_root, clock_skew_seconds=clock_skew_seconds
+        ).values()
+    )
+
+
+def verify_streams(
+    events: list[dict[str, Any]],
+    manifest: dict[str, Any],
+    bundle_root: Path | None = None,
+    *,
+    clock_skew_seconds: int = DEFAULT_CLOCK_SKEW_SECONDS,
+) -> dict[tuple[str, str], IntegrityResult]:
+    """:func:`verify_bundle`'s results keyed by (stream id, source), in its order."""
     anchors_by_stream = _anchors_by_stream(manifest)
     grouped: dict[str, dict[str, list[dict[str, Any]]]] = {}
     for event in events:
@@ -213,7 +243,7 @@ def verify_bundle(
             str(event.get("source", "")), []
         ).append(event)
 
-    results = []
+    results: dict[tuple[str, str], IntegrityResult] = {}
     for stream in sorted(grouped):
         by_source = grouped[stream]
         for source in sorted(by_source):
@@ -227,10 +257,72 @@ def verify_bundle(
             # A stream id two sources claim: the manifest's anchors and a sig_ref name no source, so neither chain
             # under that id reads verified, which fails closed rather than let one source's chain borrow another's
             # anchors (18.151).
-            if len(by_source) > 1 and result.status == IntegrityStatus.VERIFIED.value:
-                result.status = IntegrityStatus.VERIFIED_WEAK.value
-            results.append(result)
+            if len(by_source) > 1:
+                if result.status == IntegrityStatus.VERIFIED.value:
+                    result.status = IntegrityStatus.VERIFIED_WEAK.value
+                if result.strength_status == IntegrityStatus.VERIFIED.value:
+                    result.strength_status = IntegrityStatus.VERIFIED_WEAK.value
+            results[(stream, source)] = result
     return results
+
+
+#: A broken chain: every record on it is read at most as self_report (SPEC §8.1).
+_BROKEN = frozenset(
+    {
+        IntegrityStatus.FAILED.value,
+        IntegrityStatus.GAP.value,
+        IntegrityStatus.REORDERED.value,
+    }
+)
+#: A chain below verified: an enforcement-point record on it caps a pass at partial (SPEC §6.6, weak_integrity).
+_WEAK = frozenset({IntegrityStatus.VERIFIED_WEAK.value, IntegrityStatus.UNSIGNED.value})
+_CAPPED_CLASSES = frozenset({"enforcement_point", "independent_system"})
+
+
+@dataclass(frozen=True)
+class IntegrityCaps:
+    """Which accepted records an integrity result caps, by event id (SPEC §6.6, §8.1): ``broken`` holds the
+    enforcement-point and independent-system records on a failed, gap or reordered stream (a record with no
+    integrity member included), ``weak`` the enforcement-point records on a verified_weak or unsigned stream, and
+    ``time_suspect`` every record on a time_suspect stream."""
+
+    broken: frozenset[str] = frozenset()
+    weak: frozenset[str] = frozenset()
+    time_suspect: frozenset[str] = frozenset()
+
+
+NO_CAPS = IntegrityCaps()
+
+
+def integrity_caps(
+    raw_accepted: list[dict[str, Any]],
+    accepted: list[dict[str, Any]],
+    results: dict[tuple[str, str], IntegrityResult],
+) -> IntegrityCaps:
+    """The caps ``results`` (from :func:`verify_streams` over ``raw_accepted``) put on ``accepted``, the same
+    records index for index with their trust-corrected class (ingest)."""
+    broken: set[str] = set()
+    weak: set[str] = set()
+    suspect: set[str] = set()
+    for raw, event in zip(raw_accepted, accepted, strict=True):
+        result = results.get((_stream_key(raw), str(raw.get("source", ""))))
+        status = result.status if result is not None else IntegrityStatus.FAILED.value
+        event_id = str(event.get("id"))
+        cls = event.get("agentcesourceclass")
+        if status in _BROKEN and cls in _CAPPED_CLASSES:
+            broken.add(event_id)
+        elif status in _WEAK and cls == "enforcement_point":
+            weak.add(event_id)
+        elif status == IntegrityStatus.TIME_SUSPECT.value:
+            suspect.add(event_id)
+            # The time check reads before the strength: a weak or unsigned stream stays weak whatever its times say.
+            if (
+                cls == "enforcement_point"
+                and result is not None
+                and result.strength_status in _WEAK
+            ):
+                weak.add(event_id)
+    return IntegrityCaps(frozenset(broken), frozenset(weak), frozenset(suspect))
 
 
 def _anchors_by_stream(manifest: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from agentce.integrity import NO_CAPS
 from agentce.assess import assess_subjects
 from agentce.domain import DomainBinding
 from agentce.profile import Profile
@@ -48,7 +49,9 @@ def _scans(num_subjects: int) -> int:
         {"subjects": [{"id": f"s{j}"} for j in range(num_subjects)]}
     )
     accepted = _CountingList(_events(), counter=counter)
-    assess_subjects(accepted, profile, [], DomainBinding.empty(), withheld=())
+    assess_subjects(
+        accepted, profile, [], DomainBinding.empty(), withheld=(), integrity=NO_CAPS
+    )
     return counter["n"]
 
 

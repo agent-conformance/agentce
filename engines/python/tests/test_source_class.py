@@ -15,6 +15,7 @@ from typing import Any
 
 import pytest
 
+from agentce.integrity import NO_CAPS
 from agentce.assess import assess_subjects, missing_evidence
 from agentce.blind_spots import compute_blind_spots
 from agentce.catalog import Catalog, lint_catalog, load_catalog
@@ -427,7 +428,9 @@ def _assess(
     profile = Profile.from_dict(
         {"subjects": [{"id": SUBJECT, "role": "both"}, {"id": OTHER, "role": "both"}]}
     )
-    assertions = assess_subjects(events, profile, [_conduct()], domain, withheld=())
+    assertions = assess_subjects(
+        events, profile, [_conduct()], domain, withheld=(), integrity=NO_CAPS
+    )
     return next(a for a in assertions if a.control == control and a.subject == SUBJECT)
 
 
@@ -546,7 +549,9 @@ def test_a_blind_spot_names_the_record_below_the_minimum() -> None:
     profile = Profile.from_dict({"subjects": [{"id": SUBJECT, "role": "both"}]})
     events = [_instruction(cls=SR), _call()]
     catalogs = [_conduct()]
-    assertions = assess_subjects(events, profile, catalogs, DOMAIN, withheld=())
+    assertions = assess_subjects(
+        events, profile, catalogs, DOMAIN, withheld=(), integrity=NO_CAPS
+    )
     spots = compute_blind_spots(assertions, profile, catalogs, events)
     spot = next(s for s in spots["blind_spots"] if s["event"] == "Instruction")
     assert spot["class"] == "enforcement_point"
@@ -559,7 +564,9 @@ def test_a_blind_spot_names_the_record_below_the_minimum() -> None:
 def _rob02(events: list[dict[str, Any]]) -> Any:
     profile = Profile.from_dict({"subjects": [{"id": SUBJECT, "role": "both"}]})
     catalog = load_catalog(_CATALOGS / "base" / "baseline")
-    assertions = assess_subjects(events, profile, [catalog], DOMAIN, withheld=())
+    assertions = assess_subjects(
+        events, profile, [catalog], DOMAIN, withheld=(), integrity=NO_CAPS
+    )
     return next(a for a in assertions if a.control == "ROB-02")
 
 

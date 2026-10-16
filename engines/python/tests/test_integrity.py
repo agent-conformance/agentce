@@ -9,7 +9,13 @@ from typing import Any
 import jsonschema
 
 from agentce import integrity
-from agentce.integrity import GENESIS_PREV, IntegrityStatus, verify_bundle
+from agentce.integrity import (
+    GENESIS_PREV,
+    IntegrityStatus,
+    integrity_caps,
+    verify_bundle,
+    verify_streams,
+)
 
 _SCHEMA = json.loads(
     (
@@ -205,3 +211,82 @@ def test_no_chain_reads_verified_under_a_stream_id_two_sources_claim() -> None:
         IntegrityStatus.VERIFIED_WEAK.value,
         IntegrityStatus.VERIFIED_WEAK.value,
     ]
+
+
+def _anchored(at: str) -> dict[str, Any]:
+    return {
+        "streams": [
+            {"stream": STREAM, "anchors": [{"kind": "rfc3161", "ref": "r", "at": at}]}
+        ]
+    }
+
+
+def test_time_check_record_time_without_offset_is_time_suspect() -> None:
+    """A record time with no UTC offset cannot be placed against the anchor, so it cannot be cross-checked (SPEC §6.6)."""
+    events = chain(2, strength="export_anchored", sig_ref=None)
+    events[1]["time"] = "2026-01-01T00:01:00"
+    _ig(events[1])["hash"] = integrity.recompute_hash(events[1])
+    events[1]["data"]["integrity"]["prev"] = _ig(events[0])["hash"]
+    (result,) = verify_bundle(events, _anchored("2026-01-01T09:00:00Z"))
+    assert result.status == IntegrityStatus.TIME_SUSPECT.value
+    assert result.first_bad_index == 1
+
+
+def test_time_check_anchor_without_offset_anchors_nothing() -> None:
+    """An anchor time with no UTC offset, or none at all, anchors nothing: the stream is time_suspect as a whole and
+    its strength reads as an unanchored stream's (critic r2 N1)."""
+    for at in ("2026-01-01T09:00:00", ""):
+        events = chain(2, strength="export_anchored", sig_ref=None)
+        (result,) = verify_bundle(events, _anchored(at))
+        assert result.status == IntegrityStatus.TIME_SUSPECT.value
+        assert result.first_bad_index is None
+        assert result.strength_status == IntegrityStatus.VERIFIED_WEAK.value
+
+
+def test_time_check_keeps_the_strength_reading_of_a_suspect_stream() -> None:
+    """time_suspect never hides an unsigned source_signed stream (critic r1 F1)."""
+    (result,) = verify_bundle(chain(2, sig_ref=None), _anchored("2026-01-01T00:00:30Z"))
+    assert result.status == IntegrityStatus.TIME_SUSPECT.value
+    assert result.strength_status == IntegrityStatus.UNSIGNED.value
+
+
+def _classed(events: list[dict[str, Any]], cls: str) -> list[dict[str, Any]]:
+    return [{**e, "agentcesourceclass": cls} for e in events]
+
+
+def test_integrity_cap_classification() -> None:
+    """Broken streams cap enforcement-point and independent-system records, weak ones only enforcement-point records,
+    a time_suspect stream every record (and its enforcement-point records stay weak when its strength is weak); a
+    self_report record is never capped, and a record no chain verified (no integrity member) counts as broken."""
+    tampered = chain(2)
+    tampered[0]["note"] = "changed after it was hashed"
+    for cls in ("enforcement_point", "independent_system"):
+        raw = tampered
+        caps = integrity_caps(raw, _classed(raw, cls), verify_streams(raw, {}))
+        assert caps.broken == {"e0", "e1"}
+    raw = tampered
+    caps = integrity_caps(raw, _classed(raw, "self_report"), verify_streams(raw, {}))
+    assert not (caps.broken or caps.weak or caps.time_suspect)
+
+    weak = chain(2, strength="export_chained", sig_ref=None)
+    assert integrity_caps(
+        weak, _classed(weak, "enforcement_point"), verify_streams(weak, {})
+    ).weak == {"e0", "e1"}
+    assert (
+        integrity_caps(
+            weak, _classed(weak, "independent_system"), verify_streams(weak, {})
+        )
+        == integrity.NO_CAPS
+    )
+
+    suspect = chain(2, strength="export_chained", sig_ref=None)
+    results = verify_streams(suspect, _anchored("2026-01-01T00:00:30Z"))
+    caps = integrity_caps(suspect, _classed(suspect, "enforcement_point"), results)
+    assert caps.time_suspect == {"e0", "e1"}
+    assert caps.weak == {"e0", "e1"}
+
+    missing = [{**chain(1)[0], "data": {"@type": "ToolCall"}}]
+    caps = integrity_caps(
+        missing, _classed(missing, "enforcement_point"), verify_streams(missing, {})
+    )
+    assert caps.broken == {"e0"}

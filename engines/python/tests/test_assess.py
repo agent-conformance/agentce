@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from agentce.store import GraphStore
+from agentce.integrity import NO_CAPS, IntegrityCaps
 from agentce.assess import (
     _evidence,
     _reaches_human_actor_failure,
@@ -53,6 +54,7 @@ def test_conformant_assessment_with_evidence() -> None:
         [catalog],
         domain,
         withheld=(),
+        integrity=NO_CAPS,
     )
     outcomes = _outcomes(assertions)
     assert outcomes["OVS-03"] == "conformant"
@@ -72,11 +74,38 @@ def test_non_conformant_assessment() -> None:
         [catalog],
         domain,
         withheld=(),
+        integrity=NO_CAPS,
     )
     ovs = next(a for a in assertions if a.control == "OVS-03")
     assert ovs.outcome == "non-conformant"
     assert ovs.population == (1, 1)
     assert ovs.violations
+
+
+def _ovs03_capped(fixture: str, cap: str) -> str:
+    """OVS-03's outcome over the fixture's records with the ``cap`` set of IntegrityCaps naming every one of them."""
+    events = _events(fixture)
+    ids = frozenset(str(e["id"]) for e in events)
+    capped = IntegrityCaps(**{cap: ids})
+    assertions = assess_subjects(
+        events,
+        _profile(),
+        [load_catalog(_BASE)],
+        DomainBinding.load(_BASE / "test" / "domain.yaml"),
+        withheld=(),
+        integrity=capped,
+    )
+    return next(a for a in assertions if a.control == "OVS-03").outcome
+
+
+def test_integrity_cap_ceiling_lowers_only_a_pass() -> None:
+    """SPEC §6.6, §8.1: a pass resting on records of a broken stream reads insufficient_evidence, on a weak stream
+    partial; a time_suspect stream does not cap outside a timing control; a violation never moves."""
+    assert _ovs03_capped("OVS-03/passed.jsonl", "broken") == "insufficient_evidence"
+    assert _ovs03_capped("OVS-03/passed.jsonl", "weak") == "partial"
+    assert _ovs03_capped("OVS-03/passed.jsonl", "time_suspect") == "conformant"
+    assert _ovs03_capped("OVS-03/failed.jsonl", "broken") == "non-conformant"
+    assert _ovs03_capped("OVS-03/failed.jsonl", "weak") == "non-conformant"
 
 
 def test_assessment_report_is_dc5_valid(tmp_path: Path) -> None:
@@ -88,6 +117,7 @@ def test_assessment_report_is_dc5_valid(tmp_path: Path) -> None:
         [catalog],
         domain,
         withheld=(),
+        integrity=NO_CAPS,
     )
     # write_report enforces DC-5; a supporting verdict without evidence would raise here.
     write_report(
@@ -112,6 +142,7 @@ def test_crosswalk_is_carried_from_the_control_and_never_verified() -> None:
         [catalog],
         domain,
         withheld=(),
+        integrity=NO_CAPS,
     )
     doc01 = next(a for a in assertions if a.control == "DOC-01")
     source = yaml.safe_load(
@@ -138,6 +169,7 @@ def test_role_mismatch_is_not_applicable() -> None:
         [catalog],
         domain,
         withheld=(),
+        integrity=NO_CAPS,
     )
     assert _outcomes(assertions)["OVS-03"] == "conformant"
 
@@ -168,6 +200,7 @@ def _non_conformant_ovs03() -> Any:
         [catalog],
         domain,
         withheld=(),
+        integrity=NO_CAPS,
     )
     return next(a for a in assertions if a.control == "OVS-03")
 
@@ -196,6 +229,7 @@ def test_apply_deviations_leaves_conformant_and_insufficient_evidence_untouched(
         [catalog],
         domain,
         withheld=(),
+        integrity=NO_CAPS,
     )
     conformant = next(a for a in assertions if a.control == "OVS-03")
     assert conformant.outcome == "conformant"
@@ -266,7 +300,9 @@ def _human_actor_case(
         {"subjects": [{"id": "spiffe://corp/agents/cnd05-fixture", "role": "both"}]}
     )
     domain = DomainBinding.load(case / "domain.linkml.yaml")
-    assertions = assess_subjects(accepted, profile, catalogs, domain, withheld=())
+    assertions = assess_subjects(
+        accepted, profile, catalogs, domain, withheld=(), integrity=NO_CAPS
+    )
     return {a.control: a for a in assertions}, _load_deviation_register(
         case / "deviations.yaml"
     )
@@ -425,7 +461,9 @@ def _assess_rob02(events: list[Any], withheld: Any = ()) -> Any:
     )
     catalog = load_catalog(_REPO_ROOT / "spec" / "catalogs" / "base" / "baseline")
     domain = DomainBinding.load(_ROB02 / "domain.linkml.yaml")
-    assertions = assess_subjects(events, profile, [catalog], domain, withheld=withheld)
+    assertions = assess_subjects(
+        events, profile, [catalog], domain, withheld=withheld, integrity=NO_CAPS
+    )
     return next(a for a in assertions if a.control == "ROB-02")
 
 

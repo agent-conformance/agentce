@@ -37,7 +37,7 @@ from .coverage import compute_coverage
 from .domain import DomainBinding
 from .errors import InputError
 from .ingest import ingest
-from .integrity import verify_bundle
+from .integrity import integrity_caps, verify_streams
 from .profile import Profile
 from .report import write_report
 from .safe_json import JSONError, load_json
@@ -107,15 +107,19 @@ def _assess_project(
     proj = corpus_root / "projects" / pid
     bundle = load_bundle(proj / "evidence")
     ingested = ingest(bundle)
-    verify_bundle(
-        ingested.raw_accepted, bundle.manifest, bundle.root
-    )  # findings inform, never abort; hash what the source signed, not the trust-corrected copy
+    # Findings inform, never abort; hash what the source signed, not the trust-corrected copy.
+    streams = verify_streams(ingested.raw_accepted, bundle.manifest, bundle.root)
     domain = DomainBinding.load(proj / "domain.linkml.yaml")
     profile = Profile.load(proj / "applicability.yaml")
     compute_coverage(ingested.accepted, profile, bundle.root)
     resolve_applicability(profile, ingested.accepted)
     assertions = assess_subjects(
-        ingested.accepted, profile, catalogs, domain, withheld=ingested.withheld
+        ingested.accepted,
+        profile,
+        catalogs,
+        domain,
+        withheld=ingested.withheld,
+        integrity=integrity_caps(ingested.raw_accepted, ingested.accepted, streams),
     )
     write_report(
         out_dir,
