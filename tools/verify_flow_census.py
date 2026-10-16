@@ -1991,6 +1991,11 @@ _HASHED_ONLY = (
     "never a parse"
 )
 _PACKAGED = "disposition: reads a file shipped inside the installed engine, not the verified input"
+_SOURCE_SIG = (
+    "disposition: a source_signed record's sig_ref envelope, read only under an operator trust root "
+    "(AGENTCE_TRUST_ROOT); every failure to read, parse or verify it reads the stream unsigned, never "
+    "a refusal or verified (VG-STREAM-SOURCE-BOUND pins the content cases in all three engines)"
+)
 _IMPLICIT_HELP = (
     "disposition: argparse's implicit help; prints usage and reads no input (its argv spellings "
     "across engines are 18.52's)"
@@ -2064,6 +2069,8 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     ),
     "agentce.commands.cmd_verify: os.path.exists(release)": ("target-argument",),
     "agentce.ingest.ingest: path.read_bytes()": ("bundle-streams",),
+    "agentce.integrity._signed_digests: signing.parse_verify_input(verified.payload)": _SOURCE_SIG,
+    "agentce.integrity._signed_digests: signing.read_verify_input(path)": _SOURCE_SIG,
     "agentce.safe_json.load_json: json.loads(text)": ("bundle-streams",),
     "agentce.schema.evidence_schema: json.loads(text)": _PACKAGED,
     "agentce.schema.evidence_schema: resources.files('agentce.data')"
