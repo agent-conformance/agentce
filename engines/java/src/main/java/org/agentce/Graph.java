@@ -136,18 +136,13 @@ public final class Graph {
         return buildGraph(events, domain, store, key, Set.of());
     }
 
-    /** {@code foreignUntrusted} names the records another subject's write marked untrusted or rewrote with no ruling
-     * ({@link #flaggedRecords}). */
-    public static GraphStore buildGraph(List<JsonNode> events, DomainBinding domain, Set<String> foreignUntrusted) {
-        return buildGraph(events, domain, new GraphStore(), Iri.ZERO_KEY, foreignUntrusted);
-    }
-
     public static GraphStore buildGraph(
             List<JsonNode> events, DomainBinding domain, GraphStore store, byte[] key, Set<String> foreignUntrusted) {
         return new Builder(store, domain, key, foreignUntrusted, List.of()).build(events);
     }
 
-    /** {@code foreignUnreadable} gives the record_ref and store of each unreadable MemoryWrite another subject holds
+    /** {@code foreignUntrusted} names the records another subject's write marked untrusted or rewrote with no ruling
+     * ({@link #flaggedRecords}); {@code foreignUnreadable} gives the record_ref and store of each unreadable MemoryWrite another subject holds
      * (18.172). */
     public static GraphStore buildGraph(
             List<JsonNode> events,

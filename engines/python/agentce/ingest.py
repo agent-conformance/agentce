@@ -384,11 +384,7 @@ def _unreadable_write(event: dict[str, Any]) -> UnreadableWrite | None:
         name in event_types() or declared in event_types()
     ):
         return None
-    record, store = data.get("record_ref"), data.get("store")
-    return UnreadableWrite(
-        record if isinstance(record, str) else None,
-        store if isinstance(store, str) else None,
-    )
+    return UnreadableWrite(_opt(data, "record_ref"), _opt(data, "store"))
 
 
 def _too_deep() -> InputError:

@@ -1436,9 +1436,12 @@ class Builder {
     reach(unruled, flows);
     // A record another subject's unreadable write may have changed is one no guard ruled on (SPEC §7.4); nobody
     // could read that content, so it stays out of the closures CND-05 reads, as an unclassed instruction does.
-    const unread = new Set(
-      [...unreadRecords(this.foreignUnreadable, records, stores)].filter((r) => flows.has(r)),
-    );
+    const unread = unreadRecords(this.foreignUnreadable, records, stores);
+    for (const record of unread) {
+      if (!flows.has(record)) {
+        unread.delete(record);
+      }
+    }
     reach(unread, flows);
     // An instruction that declares no source class cannot show its content came from a trusted source, so
     // ROB-02 reads it as untrusted content (18.127); CND-05's own chain rule already fails it, so it stays out

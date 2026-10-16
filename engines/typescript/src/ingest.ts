@@ -204,13 +204,8 @@ function unreadableWrite(event: Record<string, unknown>): { write?: UnreadableWr
   ) {
     return {};
   }
-  const record = data.record_ref;
-  const store = data.store;
   return {
-    write: {
-      recordRef: typeof record === "string" ? record : null,
-      store: typeof store === "string" ? store : null,
-    },
+    write: { recordRef: optStr(data, "record_ref") ?? null, store: optStr(data, "store") ?? null },
   };
 }
 

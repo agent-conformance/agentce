@@ -113,23 +113,17 @@ public final class Ingest {
      * another known type, so a record whose type cannot be read, or names a type the engine does not know, counts as
      * one (fail closed, 18.172). */
     private static UnreadableWrite unreadableWrite(JsonNode event) {
-        JsonNode type = event.get("type");
-        String name = type != null && type.isTextual() ? typeNameOf(type.asText()) : null;
-        JsonNode data = event.get("data");
-        JsonNode declared = data != null && data.isObject() ? data.get("@type") : null;
-        boolean declaredText = declared != null && declared.isTextual();
+        String type = opt(event, "type");
+        String name = type != null ? typeNameOf(type) : null;
+        JsonNode raw = event.get("data");
+        JsonNode data = raw != null && raw.isObject() ? raw : Json.nodes().objectNode();
+        String declared = opt(data, "@type");
         if (!"MemoryWrite".equals(name)
-                && !(declaredText && "MemoryWrite".equals(declared.asText()))
-                && ((name != null && Schema.eventTypes().contains(name))
-                        || (declaredText && Schema.eventTypes().contains(declared.asText())))) {
+                && !"MemoryWrite".equals(declared)
+                && (Schema.eventTypes().contains(name) || Schema.eventTypes().contains(declared))) {
             return null;
         }
-        return new UnreadableWrite(textField(data, "record_ref"), textField(data, "store"));
-    }
-
-    private static String textField(JsonNode data, String key) {
-        JsonNode value = data != null && data.isObject() ? data.get(key) : null;
-        return value != null && value.isTextual() ? value.asText() : null;
+        return new UnreadableWrite(opt(data, "record_ref"), opt(data, "store"));
     }
 
     private static String typeNameOf(String typeValue) {

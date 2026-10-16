@@ -17,12 +17,15 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Collection, Iterable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .domain import TOKEN_CAP, DomainBinding, token_count
 from .iri import ZERO_KEY, event_iri, is_event_ref, principal_iri
 from .store import GraphStore
 from .structural import compare_literals
+
+if TYPE_CHECKING:
+    from .ingest import UnreadableWrite
 
 BOOL = "xsd:boolean"
 #: CND-02's population (SPEC §7.7.4), materialised by :meth:`_Builder._conduct_gate`.
@@ -194,7 +197,7 @@ def _note_store(stores: dict[str, set[str]], record: str, store: Any) -> None:
 
 
 def _unread_records(
-    writes: Iterable[tuple[str | None, str | None]],
+    writes: Iterable[UnreadableWrite],
     records: set[str],
     stores: dict[str, set[str]],
 ) -> set[str]:
@@ -428,7 +431,7 @@ class _Builder:
         domain: DomainBinding,
         key: bytes,
         foreign_untrusted: frozenset[str],
-        foreign_unreadable: Collection[tuple[str | None, str | None]],
+        foreign_unreadable: Collection[UnreadableWrite],
     ) -> None:
         self.store = store
         self.domain = domain
@@ -1248,7 +1251,9 @@ class _Builder:
         _reach(unruled, flows)
         # A record another subject's unreadable write may have changed is one no guard ruled on (SPEC §7.4); nobody
         # could read that content, so it stays out of the closures CND-05 reads, as an unclassed instruction does.
-        unread = _unread_records(self.foreign_unreadable, records, stores) & set(flows)
+        unread = (
+            _unread_records(self.foreign_unreadable, records, stores) & flows.keys()
+        )
         _reach(unread, flows)
         # An instruction that declares no source class cannot show its content came from a trusted source, so
         # ROB-02 reads it as untrusted content (18.127); CND-05's own chain rule already fails it, so it stays out
@@ -1676,7 +1681,7 @@ def build_graph(
     store: GraphStore | None = None,
     pseudonym_key: bytes = ZERO_KEY,
     foreign_untrusted: frozenset[str] = frozenset(),
-    foreign_unreadable: Collection[tuple[str | None, str | None]] = (),
+    foreign_unreadable: Collection[UnreadableWrite] = (),
 ) -> GraphStore:
     """Materialise ``events`` into a graph store; create an in-memory store if none is given.
     ``foreign_untrusted`` names the records another subject's write marked untrusted or rewrote with no ruling
