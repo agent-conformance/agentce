@@ -68,11 +68,12 @@ splits them evenly over the gate's fault runs and its one restore run. A gate wh
 chunks go to the shards longest first, each to the shard with the least work so far, and a shard runs
 `./verification/run --demo-fault <ID> --fault=<n> ...` once per chunk. A gate with no recorded seconds counts as
 `default_seconds` (300, about twice the mean demo), so a new gate is treated as heavy until it is timed. To see the
-estimate for a lane count, or the pairs one shard runs:
+estimate for a lane count, or the pairs one shard runs, use the commands below. `<lanes>` is the number of entries
+in the `demo-fault` job's `lane` list in `.github/workflows/verification.yml`.
 
 ```
-python3 verification/shard.py --balance-check 34
-python3 verification/shard.py --dry-run 0 34      # one "<gate> <fault>" line per pair
+python3 verification/shard.py --balance-check <lanes>
+python3 verification/shard.py --dry-run 0 <lanes>      # one "<gate> <fault>" line per pair
 ```
 
 The balance check prints each shard's estimated minutes. It exits 1 when a gate has no recorded seconds and no

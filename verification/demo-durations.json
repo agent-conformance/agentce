@@ -39,7 +39,7 @@
       }
     ],
     "measured": "per gate and run, the gap between its 'RED on the seeded fault' log line and the previous one in its job (the first from the start of the job's demo step); per-job setup is not included",
-    "combined": "the longest of the runs, in whole seconds, so a gate's estimate covers the slowest job it has had (the same gate took half or twice as long from one run to the next); VG-BYO-CATALOG-PARITY and VG-BYO-CATALOG-WALK are timed from run 38382574593 only, the first after the split; VG-STREAM-SOURCE-BOUND is timed from run 38875282332 only, the first after its faults went from 9 to 18 (18.155); every gate was re-timed from runs 38870560963, 38875282332, 38950489932 and 38959429891 and kept at no less than its longest measured seconds there (18.200)"
+    "combined": "the longest measured over the runs listed, in whole seconds, so a gate's estimate covers the slowest job it has had (the same gate took half or twice as long from one run to the next); 18.200 re-timed every gate from runs 38870560963, 38875282332, 38950489932 and 38959429891 and kept none below its earlier recorded seconds"
   },
   "default_seconds": 300,
   "max_chunk_seconds": 240,
