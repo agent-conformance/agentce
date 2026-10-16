@@ -676,6 +676,24 @@ class TrustRoot:
         :meth:`from_dict`'s own load-time invariant."""
         return {"keys": {keyid: {"public_key": public_key_b64, "identity": identity}}}
 
+    def without(self, other: "TrustRoot") -> "TrustRoot":
+        """This trust root less every key and certificate authority whose public key ``other`` also holds."""
+        held = {
+            public_ed25519_b64(key)
+            for key in (*other.keys.values(), *other.authorities.values())
+        }
+        keys = {i: k for i, k in self.keys.items() if public_ed25519_b64(k) not in held}
+        return TrustRoot(
+            keys=keys,
+            key_identities={i: self.key_identities.get(i, i) for i in keys},
+            authorities={
+                i: a
+                for i, a in self.authorities.items()
+                if public_ed25519_b64(a) not in held
+            },
+            description=self.description,
+        )
+
     def resolve(self, signature: dict[str, Any]) -> tuple[Ed25519PublicKey, str]:
         """Resolve a DSSE signature entry to the ``(public_key, identity)`` that must verify it."""
         cert = signature.get("cert")

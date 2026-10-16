@@ -20,6 +20,7 @@ import java.security.SignatureException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -321,6 +322,27 @@ public final class Verify {
             return new TrustRoot(keys, authorities);
         }
 
+        /** This trust root less every key and certificate authority whose public key {@code other} also
+         * holds (mirrors {@code TrustRoot.without}). */
+        public TrustRoot without(TrustRoot other) {
+            Set<String> held = new HashSet<>();
+            other.keys.values().forEach(e -> held.add(Base64.getEncoder().encodeToString(e.publicKeyRaw())));
+            other.authorities.values().forEach(e -> held.add(Base64.getEncoder().encodeToString(e.publicKeyRaw())));
+            Map<String, KeyEntry> keptKeys = new LinkedHashMap<>();
+            keys.forEach((id, e) -> {
+                if (!held.contains(Base64.getEncoder().encodeToString(e.publicKeyRaw()))) {
+                    keptKeys.put(id, e);
+                }
+            });
+            Map<String, AuthorityEntry> keptAuthorities = new LinkedHashMap<>();
+            authorities.forEach((id, e) -> {
+                if (!held.contains(Base64.getEncoder().encodeToString(e.publicKeyRaw()))) {
+                    keptAuthorities.put(id, e);
+                }
+            });
+            return new TrustRoot(keptKeys, keptAuthorities);
+        }
+
         /** Resolves a DSSE signature entry to the key/identity that must verify it ({@code cert}
          * checked before {@code keyid}, matching {@code signing.py:324-329}'s own order). */
         KeyEntry resolve(JsonNode signature) {
@@ -539,7 +561,7 @@ public final class Verify {
     /** {@link #parseUntrustedJson} for one input verify reads, refused with that input's own key:
      * {@code verify.json_too_deep} naming {@code what} past the depth limit, else {@code
      * unreadableKey}. Mirrors {@code signing.parse_verify_input}. */
-    private static JsonNode parseVerifyInput(byte[] raw, String unreadableKey, String what) {
+    static JsonNode parseVerifyInput(byte[] raw, String unreadableKey, String what) {
         try {
             return parseUntrustedJson(raw);
         } catch (JsonTooDeep e) {

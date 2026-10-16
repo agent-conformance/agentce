@@ -11,6 +11,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.GeneralSecurityException;
+import java.security.KeyPairGenerator;
+import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -53,16 +57,71 @@ class IntegrityTest {
         return event;
     }
 
-    @Test
-    void sourceSignedStreamIsVerifiedWithSigRefAndUnsignedWithout() {
-        List<Integrity.Result> withSig = Integrity.verifyBundle(List.of(signedEvent("attestations/sg1.sig")), Json.nodes().objectNode(), null);
-        assertEquals("verified", withSig.get(0).status);
-        List<Integrity.Result> withoutSig = Integrity.verifyBundle(List.of(signedEvent(null)), Json.nodes().objectNode(), null);
-        assertEquals("unsigned", withoutSig.get(0).status);
+    /** A fresh Ed25519 signer (KmsSigner loads only from a PEM file). */
+    private static Sign.KmsSigner testSigner() {
+        try {
+            byte[] pkcs8 = KeyPairGenerator.getInstance("Ed25519").generateKeyPair().getPrivate().getEncoded();
+            String pem = "-----BEGIN PRIVATE KEY-----\n"
+                    + Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.US_ASCII)).encodeToString(pkcs8)
+                    + "\n-----END PRIVATE KEY-----\n";
+            Path file = Files.createTempFile("agentce-signer-", ".pem");
+            try {
+                Files.writeString(file, pem, StandardCharsets.US_ASCII);
+                return Sign.KmsSigner.load(file);
+            } finally {
+                Files.delete(file);
+            }
+        } catch (GeneralSecurityException | IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static Verify.TrustRoot trustOf(Sign.KmsSigner signer) {
+        ObjectNode doc = Json.nodes().objectNode();
+        ObjectNode key = doc.putObject("keys").putObject(signer.keyid());
+        key.put("public_key", signer.publicKeyB64());
+        key.put("identity", "test source");
+        return Verify.TrustRoot.fromDict(doc);
+    }
+
+    /** A DSSE envelope over an in-toto Statement naming {@code hashes} as subjects. */
+    private static String envelopeFor(List<String> hashes, Sign.KmsSigner signer) {
+        ObjectNode statement = Json.nodes().objectNode();
+        statement.put("_type", "https://in-toto.io/Statement/v1");
+        ArrayNode subjects = statement.putArray("subject");
+        for (String hash : hashes) {
+            ObjectNode subject = subjects.addObject();
+            subject.put("name", "stream");
+            subject.putObject("digest").put("sha256", hash);
+        }
+        statement.put("predicateType", "https://agent-conformance.org/test");
+        statement.putObject("predicate");
+        return Sign.signStatement(statement, signer).toString();
+    }
+
+    private static final Sign.KmsSigner SOURCE = testSigner();
+    private static final Verify.TrustRoot SOURCE_TRUST = trustOf(SOURCE);
+
+    private static String hashOf(JsonNode event) {
+        return event.get("data").get("integrity").get("hash").textValue();
     }
 
     @Test
-    void aRecordNeverBreaksAnotherSourcesChainByClaimingItsStream() {
+    void sourceSignedStreamIsUnsignedWithoutSigRefBundleOrTrustRoot(@TempDir Path tempDir) throws IOException {
+        JsonNode event = signedEvent("attestations/sg1.sig");
+        Files.createDirectories(tempDir.resolve("attestations"));
+        Files.writeString(tempDir.resolve("attestations/sg1.sig"), envelopeFor(List.of(hashOf(event)), SOURCE));
+        ObjectNode manifest = Json.nodes().objectNode();
+        assertEquals("verified", Integrity.verifyBundle(List.of(event), manifest, tempDir, SOURCE_TRUST).get(0).status);
+        assertEquals("unsigned", Integrity.verifyBundle(List.of(event), manifest, tempDir, null).get(0).status);
+        assertEquals("unsigned", Integrity.verifyBundle(List.of(event), manifest, null, SOURCE_TRUST).get(0).status);
+        assertEquals(
+                "unsigned",
+                Integrity.verifyBundle(List.of(signedEvent(null)), manifest, tempDir, SOURCE_TRUST).get(0).status);
+    }
+
+    @Test
+    void aRecordNeverBreaksAnotherSourcesChainByClaimingItsStream(@TempDir Path tempDir) throws IOException {
         // 18.151: chains are keyed on (source, claimed stream), so the agent's bad-hash record naming the gateway's
         // stream gets its own result and leaves the gateway's chain unbroken; with two sources on one id, neither reads
         // verified.
@@ -78,12 +137,18 @@ class IntegrityTest {
         ObjectNode hijackBlock = (ObjectNode) hijack.get("data").get("integrity");
         hijackBlock.put("hash", "f".repeat(64));
         hijackBlock.put("prev", "e".repeat(64));
-        assertEquals(List.of("s-signed failed", "s-signed verified_weak"), statuses(List.of(head, hijack, tail)));
-        assertEquals(List.of("s-signed verified"), statuses(List.of(head, tail)));
+        Files.createDirectories(tempDir.resolve("attestations"));
+        for (String name : List.of("sg1.sig", "sg2.sig")) {
+            Files.writeString(
+                    tempDir.resolve("attestations").resolve(name), envelopeFor(List.of(hashOf(head), hashOf(tail)), SOURCE));
+        }
+        assertEquals(
+                List.of("s-signed failed", "s-signed verified_weak"), statuses(List.of(head, hijack, tail), tempDir));
+        assertEquals(List.of("s-signed verified"), statuses(List.of(head, tail), tempDir));
     }
 
-    private static List<String> statuses(List<JsonNode> events) {
-        return Integrity.verifyBundle(events, Json.nodes().objectNode(), null).stream()
+    private static List<String> statuses(List<JsonNode> events, Path root) {
+        return Integrity.verifyBundle(events, Json.nodes().objectNode(), root, SOURCE_TRUST).stream()
                 .map(r -> r.stream + " " + r.status)
                 .toList();
     }
@@ -91,7 +156,14 @@ class IntegrityTest {
     private static JsonNode block(String sigRef) {
         ObjectNode integrity = Json.nodes().objectNode();
         integrity.put("sig_ref", sigRef);
+        integrity.put("hash", HASH);
         return integrity;
+    }
+
+    private static final String HASH = "a".repeat(64);
+
+    private static boolean signed(String sigRef, Path bundleRoot, Verify.TrustRoot trust) {
+        return Integrity.isSigned(block(sigRef), bundleRoot, trust, new HashMap<>());
     }
 
     @Test
@@ -99,25 +171,29 @@ class IntegrityTest {
         Path bundleRoot = tempDir.resolve("bundle");
         Files.createDirectories(bundleRoot.resolve("attestations"));
         Path outside = tempDir.resolve("sig.bin");
-        Files.writeString(outside, "signature bytes\n", StandardCharsets.UTF_8);
+        Files.writeString(outside, envelopeFor(List.of(HASH), SOURCE), StandardCharsets.UTF_8);
         Files.createSymbolicLink(bundleRoot.resolve("attestations").resolve("alias.sig"), outside);
 
         // sig_ref is evidence content: neither a literal '..' nor a symlink out may pass as a signature.
-        assertFalse(Integrity.isSigned(block("../sig.bin"), bundleRoot));
-        assertFalse(Integrity.isSigned(block("attestations/alias.sig"), bundleRoot));
+        assertFalse(signed("../sig.bin", bundleRoot, SOURCE_TRUST));
+        assertFalse(signed("attestations/alias.sig", bundleRoot, SOURCE_TRUST));
     }
 
     @Test
-    void sigRefInsideTheBundleRootIsTreatedAsSigned(@TempDir Path tempDir) throws IOException {
-        Path bundleRoot = tempDir.resolve("bundle");
-        Files.createDirectories(bundleRoot.resolve("attestations"));
-        Files.writeString(
-                bundleRoot.resolve("attestations").resolve("sig.bin"),
-                "signature bytes\n",
-                StandardCharsets.UTF_8);
+    void sigRefInsideTheBundleRootSignsOnlyWithATrustedEnvelopeOverTheHash(@TempDir Path tempDir) throws IOException {
+        Path attestations = Files.createDirectories(tempDir.resolve("bundle").resolve("attestations"));
+        Path bundleRoot = attestations.getParent();
+        Files.writeString(attestations.resolve("good.sig"), envelopeFor(List.of(HASH), SOURCE));
+        Files.writeString(attestations.resolve("other.sig"), envelopeFor(List.of(HASH), testSigner()));
+        Files.writeString(attestations.resolve("elsewhere.sig"), envelopeFor(List.of("b".repeat(64)), SOURCE));
+        Files.writeString(attestations.resolve("sig.bin"), "signature bytes\n", StandardCharsets.UTF_8);
 
-        assertTrue(Integrity.isSigned(block("attestations/sig.bin"), bundleRoot));
-        assertFalse(Integrity.isSigned(block("attestations/absent.bin"), bundleRoot));
+        assertTrue(signed("attestations/good.sig", bundleRoot, SOURCE_TRUST));
+        assertFalse(signed("attestations/good.sig", bundleRoot, null));
+        assertFalse(signed("attestations/other.sig", bundleRoot, SOURCE_TRUST));
+        assertFalse(signed("attestations/elsewhere.sig", bundleRoot, SOURCE_TRUST));
+        assertFalse(signed("attestations/sig.bin", bundleRoot, SOURCE_TRUST));
+        assertFalse(signed("attestations/absent.bin", bundleRoot, SOURCE_TRUST));
     }
 
     private static final String CAP_STREAM = "urn:stream:gw";

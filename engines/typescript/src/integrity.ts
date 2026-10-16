@@ -9,13 +9,22 @@
  * and reports the stream `strength` and one `status` per stream. Broken streams are never fatal: they
  * are findings the evaluator uses to downgrade dependent assertions (SPEC §8.1). This is a faithful
  * port of the Python reference; its results inform findings and do not feed assertions (SPEC §8.1).
+ *
+ * A `source_signed` stream reads verified only when every event's `sig_ref` names a DSSE envelope in the bundle
+ * that verifies against a key the run trusts and whose in-toto Statement names that event's hash, or the hash of a
+ * later event of the same chain (the head of the signed segment; SPEC §6.6). The trusted keys are the operator's own
+ * trust root (`--trust-root` or `AGENTCE_TRUST_ROOT`), never the development root vendored in the engine, whose
+ * private seed is published: with no trust root no source signature counts, and the stream reads unsigned.
  */
 
+import { readFileSync } from "node:fs";
 import { confineToRoot, safeIsFile } from "./bundle";
 import { sha256Hex } from "./canonical";
 import { asParsed } from "./json";
+import { INTOTO_PAYLOAD_TYPE } from "./sign";
 import { compareInstants } from "./structural";
 import { byteCompare } from "./util";
+import { type TrustRoot, VerifyRefusal, parseVerifyInput, verifyEnvelope } from "./verify";
 
 export const GENESIS_PREV = "0".repeat(64);
 export const DEFAULT_CLOCK_SKEW_SECONDS = 300; // 5 minutes (SPEC §6.6 timestamp trust)
@@ -126,21 +135,82 @@ function latestAnchor(anchors: Array<Record<string, unknown>>): string | null {
   return latest;
 }
 
-function isSigned(block: Record<string, unknown> | null, bundleRoot: string | null): boolean {
-  if (block === null) {
+/**
+ * Whether a record's `sig_ref` envelope verifies against a trusted key and names the record's own hash. A later
+ * record's hash does not do: a hash leaves out `data.integrity`, so it commits to no earlier record. Anything else,
+ * including no trust root or no bundle to read the envelope from, is unsigned (fail closed).
+ */
+function isSigned(
+  block: Record<string, unknown> | null,
+  bundleRoot: string | null,
+  trust: TrustRoot | null,
+  envelopes: Map<string, ReadonlySet<string>>,
+): boolean {
+  if (block === null || trust === null || bundleRoot === null) {
     return false;
   }
   const sigRef = block.sig_ref;
   if (typeof sigRef !== "string" || !sigRef) {
     return false;
   }
-  if (bundleRoot === null) {
-    return true;
+  let digests = envelopes.get(sigRef);
+  if (digests === undefined) {
+    digests = signedDigests(bundleRoot, sigRef, trust);
+    envelopes.set(sigRef, digests);
   }
-  // A sig_ref is evidence content: confine it to the bundle root so a signature file outside it
-  // (reached literally or through a symlink) never counts as a verified signature.
-  const confined = confineToRoot(bundleRoot, sigRef);
-  return confined !== null && safeIsFile(confined);
+  return typeof block.hash === "string" && digests.has(block.hash);
+}
+
+/**
+ * The SHA-256 digests the in-toto Statement of a verified `sig_ref` envelope names as subjects; none when the file is
+ * outside the bundle or unreadable, is not a DSSE envelope over an in-toto Statement, or verifies against no key in
+ * `trust`. A sig_ref is evidence content: it is confined to the bundle root, so a file outside it (reached literally
+ * or through a symlink) never counts.
+ */
+function signedDigests(bundleRoot: string, sigRef: string, trust: TrustRoot): ReadonlySet<string> {
+  const none: ReadonlySet<string> = new Set();
+  const path = confineToRoot(bundleRoot, sigRef);
+  if (path === null || !safeIsFile(path)) {
+    return none;
+  }
+  let statement: unknown;
+  try {
+    const envelope = parseVerifyInput(
+      readFileSync(path),
+      "verify.envelope_malformed",
+      "the signature envelope",
+    );
+    const verified = verifyEnvelope(envelope, trust);
+    if ((envelope as Record<string, unknown>).payloadType !== INTOTO_PAYLOAD_TYPE) {
+      return none;
+    }
+    statement = parseVerifyInput(
+      verified.payload,
+      "verify.statement_unreadable",
+      "the signed statement",
+    );
+  } catch (exc) {
+    if (exc instanceof VerifyRefusal || isErrnoError(exc)) {
+      return none;
+    }
+    throw exc;
+  }
+  const subjects = isRecord(statement) ? statement.subject : undefined;
+  if (!Array.isArray(subjects)) {
+    return none;
+  }
+  const out = new Set<string>();
+  for (const subject of subjects) {
+    const digest = isRecord(subject) ? subject.digest : undefined;
+    if (isRecord(digest) && typeof digest.sha256 === "string") {
+      out.add(digest.sha256);
+    }
+  }
+  return out;
+}
+
+function isErrnoError(exc: unknown): boolean {
+  return exc instanceof Error && typeof (exc as NodeJS.ErrnoException).code === "string";
 }
 
 function verifyStream(
@@ -148,6 +218,7 @@ function verifyStream(
   events: Array<Record<string, unknown>>,
   anchors: Array<Record<string, unknown>>,
   bundleRoot: string | null,
+  sourceTrust: TrustRoot | null,
 ): IntegrityResult {
   const blocks = events.map(integrityBlock);
   let strength: string = IntegrityStrength.EXPORT_CHAINED;
@@ -201,7 +272,13 @@ function verifyStream(
 
   // An anchor whose time cannot be placed (no UTC offset, absent, or not a date-time) anchors nothing (SPEC §8.1).
   const latest = latestAnchor(anchors);
-  result.strengthStatus = strengthStatus(strength, blocks, latest !== null, bundleRoot);
+  result.strengthStatus = strengthStatus(
+    strength,
+    blocks,
+    latest !== null,
+    bundleRoot,
+    sourceTrust,
+  );
 
   // 3. Timestamp trust: an event later than the anchor that covers it is suspect, and so is one whose time cannot be
   // placed against it (no UTC offset, or not a date-time): it cannot be cross-checked (SPEC §6.6, fail closed).
@@ -237,9 +314,11 @@ function strengthStatus(
   blocks: Array<Record<string, unknown> | null>,
   anchored: boolean,
   bundleRoot: string | null,
+  trust: TrustRoot | null,
 ): string {
   if (strength === IntegrityStrength.SOURCE_SIGNED) {
-    return blocks.every((block) => isSigned(block, bundleRoot))
+    const envelopes = new Map<string, ReadonlySet<string>>();
+    return blocks.every((block) => isSigned(block, bundleRoot, trust, envelopes))
       ? IntegrityStatus.VERIFIED
       : IntegrityStatus.UNSIGNED;
   }
@@ -275,8 +354,9 @@ export function verifyBundle(
   events: Array<Record<string, unknown>>,
   manifest: Record<string, unknown>,
   bundleRoot: string | null = null,
+  sourceTrust: TrustRoot | null = null,
 ): IntegrityResult[] {
-  return [...verifyStreams(events, manifest, bundleRoot).values()];
+  return [...verifyStreams(events, manifest, bundleRoot, sourceTrust).values()];
 }
 
 /** The key of one chain in {@link verifyStreams}' results: its stream id and its source. */
@@ -289,6 +369,7 @@ export function verifyStreams(
   events: Array<Record<string, unknown>>,
   manifest: Record<string, unknown>,
   bundleRoot: string | null = null,
+  sourceTrust: TrustRoot | null = null,
 ): Map<string, IntegrityResult> {
   const anchors = anchorsByStream(manifest);
   const grouped = new Map<string, Map<string, Array<Record<string, unknown>>>>();
@@ -317,6 +398,7 @@ export function verifyStreams(
         bySource.get(source) as Array<Record<string, unknown>>,
         anchors.get(stream) ?? [],
         bundleRoot,
+        sourceTrust,
       );
       // A stream id two sources claim: the manifest's anchors and a sig_ref name no source, so neither chain under
       // that id reads verified, which fails closed rather than let one source's chain borrow another's anchors (18.151).

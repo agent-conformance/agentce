@@ -77,7 +77,13 @@ from ..exit_codes import ExitCode
 from ..fail_on import parse_fail_on
 from ..graph import build_graph
 from ..ingest import ingest
-from ..integrity import IntegrityStatus, integrity_caps, verify_bundle, verify_streams
+from ..integrity import (
+    IntegrityStatus,
+    IntegrityStrength,
+    integrity_caps,
+    verify_bundle,
+    verify_streams,
+)
 from ..logsetup import get_logger
 from ..profile import Profile
 from ..quarantine import counts_by_reason, write_quarantine
@@ -354,7 +360,12 @@ def cmd_verify(ns: argparse.Namespace) -> CommandResult:
         bundle_dir = _require_dir(bundle, key="bundle", what="the evidence bundle")
         loaded = load_bundle(bundle_dir)
         ingested = ingest(loaded)
-        results = verify_bundle(ingested.raw_accepted, loaded.manifest, loaded.root)
+        results = verify_bundle(
+            ingested.raw_accepted,
+            loaded.manifest,
+            loaded.root,
+            source_trust=_source_trust(ns, ingested.raw_accepted),
+        )
         clean = {IntegrityStatus.VERIFIED.value, IntegrityStatus.VERIFIED_WEAK.value}
         broken = [r for r in results if r.status not in clean]
         result.data.update(
@@ -1366,6 +1377,8 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     # Stage 1: ingest and validate. A missing/mismatching manifest aborts with exit 3.
     loaded = load_bundle(bundle)
     ingested = ingest(loaded)
+    # Resolved before anything is written: a trust root that cannot be loaded refuses the run (SPEC §6.6).
+    source_trust = _source_trust(ns, ingested.raw_accepted)
     write_quarantine(ingested.quarantined, out_dir / "quarantine.jsonl")
     # Packaging for sharing (18.8, Hill 3), right after Stage 1 so the copy reflects exactly what was
     # ingested: --out becomes self-contained, ready for `agentce verify --report` to re-run offline.
@@ -1397,7 +1410,10 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             )
     # Stage 2: integrity verification, one IntegrityResult per stream.
     integrity_streams = verify_streams(
-        ingested.raw_accepted, loaded.manifest, loaded.root
+        ingested.raw_accepted,
+        loaded.manifest,
+        loaded.root,
+        source_trust=source_trust,
     )
     integrity_results = list(integrity_streams.values())
     _write_jsonl((r.to_json() for r in integrity_results), out_dir / "integrity.jsonl")
@@ -1834,9 +1850,15 @@ def _effective_trust_root(ns: argparse.Namespace) -> signing.TrustRoot:
     The vendored development root is the default so the engine's own signed catalogs verify offline
     out of the box; a deployment that signs its catalogs with its own keys points either surface at
     its own root, and that root — never the vendored one — is what verification then uses."""
+    explicit = _explicit_trust_root(ns)
+    return signing.vendored_trust() if explicit is None else explicit
+
+
+def _explicit_trust_root(ns: argparse.Namespace) -> signing.TrustRoot | None:
+    """The trust root the operator named (``--trust-root``, else ``AGENTCE_TRUST_ROOT``), or ``None``."""
     raw = _opt_str(ns, "trust_root") or os.environ.get("AGENTCE_TRUST_ROOT")
     if raw is None or not raw.strip():
-        return signing.vendored_trust()
+        return None
     path = _require_file(raw, key="trust_root", what="the trust root")
     try:
         return signing.load_trust_root(path)
@@ -1847,6 +1869,28 @@ def _effective_trust_root(ns: argparse.Namespace) -> signing.TrustRoot:
             "pass --trust-root <file> (or set AGENTCE_TRUST_ROOT) to a trust root in the form of "
             "the engine's vendored data/trust/dev-root.json.",
         ) from exc
+
+
+def _source_trust(
+    ns: argparse.Namespace, records: list[dict[str, Any]]
+) -> signing.TrustRoot | None:
+    """The keys a ``source_signed`` record's signature must verify against (SPEC §6.6): the operator's own trust
+    root only, less the vendored development keys, whose private seed is published, even when the operator names
+    that root. Read only when a record declares ``source_signed``, so a run with no signed stream never depends on
+    the trust root."""
+    if not any(_declares_source_signed(record) for record in records):
+        return None
+    explicit = _explicit_trust_root(ns)
+    return None if explicit is None else explicit.without(signing.vendored_trust())
+
+
+def _declares_source_signed(record: dict[str, Any]) -> bool:
+    data = record.get("data")
+    block = data.get("integrity") if isinstance(data, dict) else None
+    return (
+        isinstance(block, dict)
+        and block.get("strength") == IntegrityStrength.SOURCE_SIGNED.value
+    )
 
 
 def _verify_catalog_dirs(

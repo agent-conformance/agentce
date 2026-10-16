@@ -8,7 +8,9 @@ from typing import Any
 
 import jsonschema
 
-from agentce import integrity
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from agentce import integrity, signing
 from agentce.integrity import (
     GENESIS_PREV,
     IntegrityStatus,
@@ -75,11 +77,73 @@ def chain(
     return events
 
 
-def test_verified_source_signed() -> None:
-    (result,) = verify_bundle(chain(3), {})
+def _signer(label: bytes) -> signing.KmsSigner:
+    return signing.KmsSigner(
+        Ed25519PrivateKey.from_private_bytes(label.ljust(32, b"\0"))
+    )
+
+
+def _trust(signer: signing.KmsSigner) -> signing.TrustRoot:
+    return signing.TrustRoot.from_dict(
+        signing.TrustRoot.document(signer.keyid, signer.public_key_b64, "test source")
+    )
+
+
+def _write_envelope(root: Path, digests: list[str], signer: signing.KmsSigner) -> None:
+    statement = {
+        "_type": signing.INTOTO_STATEMENT_TYPE,
+        "subject": [{"name": "stream", "digest": {"sha256": d}} for d in digests],
+        "predicateType": "https://agent-conformance.org/test",
+        "predicate": {},
+    }
+    path = root / "attestations" / "a.dsse.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(signing.sign_statement(statement, signer)), encoding="utf-8"
+    )
+
+
+SOURCE_KEY = _signer(b"source")
+
+
+def test_verified_source_signed(tmp_path: Path) -> None:
+    events = chain(3)
+    # One envelope signs the segment by naming each record's own hash.
+    _write_envelope(tmp_path, [_ig(e)["hash"] for e in events], SOURCE_KEY)
+    (result,) = verify_bundle(events, {}, tmp_path, source_trust=_trust(SOURCE_KEY))
     assert result.status == IntegrityStatus.VERIFIED.value
     assert result.first_bad_index is None
     jsonschema.validate(result.to_json(), _SCHEMA)
+
+
+def test_source_signed_needs_a_trusted_key_and_a_covering_statement(
+    tmp_path: Path,
+) -> None:
+    events = chain(3)
+    head = _ig(events[-1])["hash"]
+    _write_envelope(tmp_path, [head], SOURCE_KEY)
+    for root, trust in (
+        (tmp_path, None),
+        (None, _trust(SOURCE_KEY)),
+        (tmp_path, _trust(_signer(b"other"))),
+    ):
+        (result,) = verify_bundle(events, {}, root, source_trust=trust)
+        assert result.status == IntegrityStatus.UNSIGNED.value
+    # A statement naming only the head does not cover the earlier records: a record's hash leaves out its prev, so
+    # the head commits to nothing before it.
+    _write_envelope(tmp_path, [head], SOURCE_KEY)
+    (result,) = verify_bundle(events, {}, tmp_path, source_trust=_trust(SOURCE_KEY))
+    assert result.status == IntegrityStatus.UNSIGNED.value
+    # A statement naming only the first record does not cover the later ones.
+    _write_envelope(tmp_path, [_ig(events[0])["hash"]], SOURCE_KEY)
+    (result,) = verify_bundle(events, {}, tmp_path, source_trust=_trust(SOURCE_KEY))
+    assert result.status == IntegrityStatus.UNSIGNED.value
+    # A file that is not a DSSE envelope signs nothing.
+    (tmp_path / "attestations" / "a.dsse.json").write_text(
+        "not an envelope", encoding="utf-8"
+    )
+    (result,) = verify_bundle(events, {}, tmp_path, source_trust=_trust(SOURCE_KEY))
+    assert result.status == IntegrityStatus.UNSIGNED.value
 
 
 def test_verified_weak_export_chained() -> None:

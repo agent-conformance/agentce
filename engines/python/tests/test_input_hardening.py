@@ -27,6 +27,7 @@ from agentce.ingest import ingest
 from agentce.integrity import _is_signed
 from agentce.profile import CoverageDenominator, Profile
 from agentce.quarantine import QuarantineReason
+from agentce.signing import TrustRoot
 
 
 def _sha256_hex(path: Path) -> str:
@@ -416,16 +417,31 @@ def test_integrity_sig_ref_escaping_root_is_not_verified(tmp_path: Path) -> None
     outside = tmp_path / "sig.bin"
     outside.write_text("signature bytes\n", encoding="utf-8")
 
-    assert _is_signed({"sig_ref": "../sig.bin"}, bundle_root) is False
+    assert (
+        _is_signed(
+            {"sig_ref": "../sig.bin", "hash": "0" * 64}, bundle_root, TrustRoot(), {}
+        )
+        is False
+    )
 
 
-def test_integrity_sig_ref_inside_root_is_verified(tmp_path: Path) -> None:
+def test_integrity_sig_ref_inside_root_that_is_no_envelope_is_not_verified(
+    tmp_path: Path,
+) -> None:
     bundle_root = tmp_path / "bundle"
     (bundle_root / "attestations").mkdir(parents=True)
     inside = bundle_root / "attestations" / "sig.bin"
     inside.write_text("signature bytes\n", encoding="utf-8")
 
-    assert _is_signed({"sig_ref": "attestations/sig.bin"}, bundle_root) is True
+    assert (
+        _is_signed(
+            {"sig_ref": "attestations/sig.bin", "hash": "0" * 64},
+            bundle_root,
+            TrustRoot(),
+            {},
+        )
+        is False
+    )
 
 
 def test_confine_to_root_handles_symlink_loop_without_raising(tmp_path: Path) -> None:

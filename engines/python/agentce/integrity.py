@@ -8,10 +8,11 @@ checks the ``prev`` chain (gap or reordered), cross-checks source timestamps aga
 (time_suspect), and reports the stream ``strength`` and one ``status`` per stream. Broken streams are
 never fatal: they are findings the evaluator uses to downgrade dependent assertions (SPEC §8.1).
 
-Cryptographic DSSE/Sigstore signature verification against a vendored trust root is a release-time
-concern (SPEC §8.7, Phase 5); here a ``source_signed`` stream is treated as signed when every event
-carries a ``sig_ref`` whose attestation file is present in the bundle, and the hash chain itself is
-verified cryptographically with SHA-256.
+A ``source_signed`` stream reads verified only when every event's ``sig_ref`` names a DSSE envelope in the bundle
+that verifies against a key the run trusts and whose in-toto Statement names that event's own hash (SPEC §6.6); one
+envelope signs a segment by naming each of its events' hashes. The trusted keys are the operator's own
+trust root (``--trust-root`` or ``AGENTCE_TRUST_ROOT``), never the development root vendored in the engine, whose
+private seed is published: with no trust root no source signature counts, and the stream reads unsigned.
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from . import canonical
+from . import canonical, signing
 from .bundle import confine_to_root, safe_is_file
 from .structural import compare_instants
 
@@ -120,6 +121,7 @@ def _verify_stream(
     anchors: list[dict[str, Any]],
     *,
     bundle_root: Path | None,
+    source_trust: signing.TrustRoot | None,
     clock_skew_seconds: int,
 ) -> IntegrityResult:
     blocks = [_integrity(e) for e in events]
@@ -161,7 +163,7 @@ def _verify_stream(
     # An anchor whose time cannot be placed (no UTC offset, absent, or not a date-time) anchors nothing (SPEC §8.1).
     latest_anchor = _latest_anchor(anchors)
     result.strength_status = _strength_status(
-        strength, blocks, latest_anchor is not None, bundle_root
+        strength, blocks, latest_anchor is not None, bundle_root, source_trust
     )
 
     # 3. Timestamp trust: an event later than the anchor that covers it is suspect, and so is one whose time cannot
@@ -186,11 +188,15 @@ def _strength_status(
     blocks: list[dict[str, Any] | None],
     anchored: bool,
     bundle_root: Path | None,
+    trust: signing.TrustRoot | None,
 ) -> str:
     """What a stream's strength and signatures read: source_signed is verified only when every record is signed,
     export_anchored only with a placeable anchor, and export_chained proves only "unchanged since export"."""
     if strength == IntegrityStrength.SOURCE_SIGNED.value:
-        signed = all(_is_signed(block, bundle_root) for block in blocks)
+        envelopes: dict[str, frozenset[str]] = {}
+        signed = all(
+            _is_signed(block, bundle_root, trust, envelopes) for block in blocks
+        )
         return (
             IntegrityStatus.VERIFIED.value if signed else IntegrityStatus.UNSIGNED.value
         )
@@ -199,16 +205,55 @@ def _strength_status(
     return IntegrityStatus.VERIFIED_WEAK.value
 
 
-def _is_signed(block: dict[str, Any] | None, bundle_root: Path | None) -> bool:
-    if block is None:
+def _is_signed(
+    block: dict[str, Any] | None,
+    bundle_root: Path | None,
+    trust: signing.TrustRoot | None,
+    envelopes: dict[str, frozenset[str]],
+) -> bool:
+    """Whether a record's ``sig_ref`` envelope verifies against a trusted key and names the record's own hash. A later
+    record's hash does not do: a hash leaves out ``data.integrity``, so it commits to no earlier record. Anything else,
+    including no trust root or no bundle to read the envelope from, is unsigned (fail closed)."""
+    if block is None or trust is None or bundle_root is None:
         return False
     sig_ref = block.get("sig_ref")
     if not isinstance(sig_ref, str) or not sig_ref:
         return False
-    if bundle_root is None:
-        return True
+    if sig_ref not in envelopes:
+        envelopes[sig_ref] = _signed_digests(bundle_root, sig_ref, trust)
+    return block.get("hash") in envelopes[sig_ref]
+
+
+def _signed_digests(
+    bundle_root: Path, sig_ref: str, trust: signing.TrustRoot
+) -> frozenset[str]:
+    """The SHA-256 digests the in-toto Statement of a verified ``sig_ref`` envelope names as subjects; none when the
+    file is outside the bundle or unreadable, is not a DSSE envelope over an in-toto Statement, or verifies against
+    no key in ``trust``."""
     path = confine_to_root(bundle_root, sig_ref)
-    return path is not None and safe_is_file(path)
+    if path is None or not safe_is_file(path):
+        return frozenset()
+    try:
+        envelope = signing.read_verify_input(
+            path, "verify.envelope_malformed", "the signature envelope"
+        )
+        verified = signing.verify_envelope(envelope, trust)
+        if envelope.get("payloadType") != signing.INTOTO_PAYLOAD_TYPE:
+            return frozenset()
+        statement = signing.parse_verify_input(
+            verified.payload, "verify.statement_unreadable", "the signed statement"
+        )
+    except (signing.VerificationError, OSError):
+        return frozenset()
+    subjects = statement.get("subject") if isinstance(statement, dict) else None
+    if not isinstance(subjects, list):
+        return frozenset()
+    digests = (s.get("digest") for s in subjects if isinstance(s, dict))
+    return frozenset(
+        d["sha256"]
+        for d in digests
+        if isinstance(d, dict) and isinstance(d.get("sha256"), str)
+    )
 
 
 def verify_bundle(
@@ -216,6 +261,7 @@ def verify_bundle(
     manifest: dict[str, Any],
     bundle_root: Path | None = None,
     *,
+    source_trust: signing.TrustRoot | None = None,
     clock_skew_seconds: int = DEFAULT_CLOCK_SKEW_SECONDS,
 ) -> list[IntegrityResult]:
     """Verify every integrity stream in ``events``; return one result per stream, ordered by stream id, then source.
@@ -225,7 +271,11 @@ def verify_bundle(
     an id two sources claim reads verified (18.151)."""
     return list(
         verify_streams(
-            events, manifest, bundle_root, clock_skew_seconds=clock_skew_seconds
+            events,
+            manifest,
+            bundle_root,
+            source_trust=source_trust,
+            clock_skew_seconds=clock_skew_seconds,
         ).values()
     )
 
@@ -235,6 +285,7 @@ def verify_streams(
     manifest: dict[str, Any],
     bundle_root: Path | None = None,
     *,
+    source_trust: signing.TrustRoot | None = None,
     clock_skew_seconds: int = DEFAULT_CLOCK_SKEW_SECONDS,
 ) -> dict[tuple[str, str], IntegrityResult]:
     """:func:`verify_bundle`'s results keyed by (stream id, source), in its order."""
@@ -254,6 +305,7 @@ def verify_streams(
                 by_source[source],
                 anchors_by_stream.get(stream, []),
                 bundle_root=bundle_root,
+                source_trust=source_trust,
                 clock_skew_seconds=clock_skew_seconds,
             )
             # A stream id two sources claim: the manifest's anchors and a sig_ref name no source, so neither chain

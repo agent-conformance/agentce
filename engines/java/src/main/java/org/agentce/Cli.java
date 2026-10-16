@@ -544,9 +544,16 @@ global options:
      * --trust-root} flag) still honours the environment variable. The fix text is Python's runtime
      * string, not the vendored catalogue's. */
     private static Verify.TrustRoot effectiveTrustRoot(String flagValue) {
+        Verify.TrustRoot explicit = explicitTrustRoot(flagValue);
+        return explicit == null ? Verify.vendoredTrust() : explicit;
+    }
+
+    /** The trust root the operator named ({@code --trust-root}, else {@code AGENTCE_TRUST_ROOT}), or null. Mirrors
+     * {@code _explicit_trust_root}. */
+    private static Verify.TrustRoot explicitTrustRoot(String flagValue) {
         String raw = flagValue != null && !flagValue.isEmpty() ? flagValue : System.getenv("AGENTCE_TRUST_ROOT");
         if (raw == null || raw.isBlank()) {
-            return Verify.vendoredTrust();
+            return null;
         }
         String path = requireFile(raw, "trust_root", "the trust root", "pass --trust-root <file>.");
         try {
@@ -559,6 +566,24 @@ global options:
                     "pass --trust-root <file> (or set AGENTCE_TRUST_ROOT) to a trust root in the form of the "
                             + "engine's vendored data/trust/dev-root.json.");
         }
+    }
+
+    /** The keys a {@code source_signed} record's signature must verify against (SPEC §6.6): the operator's own trust
+     * root only, less the vendored development keys, whose private seed is published, even when the operator names
+     * that root. Read only when a record declares {@code source_signed}, so a run with no signed stream never depends
+     * on the trust root. Mirrors {@code _source_trust}. */
+    private static Verify.TrustRoot sourceTrust(String flagValue, List<JsonNode> records) {
+        for (JsonNode record : records) {
+            JsonNode data = record.get("data");
+            JsonNode block = data != null && data.isObject() ? data.get("integrity") : null;
+            if (block != null && block.isObject() && block.has("strength")
+                    && block.get("strength").isTextual()
+                    && block.get("strength").textValue().equals(Integrity.SOURCE_SIGNED)) {
+                Verify.TrustRoot explicit = explicitTrustRoot(flagValue);
+                return explicit == null ? null : explicit.without(Verify.vendoredTrust());
+            }
+        }
+        return null;
     }
 
     /** Refuses every {@code --catalog-dir} catalog whose signature does not verify against {@code
@@ -1124,11 +1149,13 @@ global options:
         // Stage 1: ingest and validate. A missing/mismatching manifest aborts with exit 3.
         Bundle bundle = Bundle.load(Paths.get(bundleDir));
         Ingest.Result ingested = Ingest.ingest(bundle);
+        // Resolved before anything is written: a trust root that cannot be loaded refuses the run (SPEC §6.6).
+        Verify.TrustRoot signedTrust = sourceTrust(options.trustRootFlag(), ingested.rawAccepted);
         writeQuarantineJsonl(ingested.quarantined, out.resolve("quarantine.jsonl"));
 
         // Stage 2: integrity verification, one IntegrityResult per stream.
         Map<String, Integrity.Result> integrityStreams =
-                Integrity.verifyStreams(ingested.rawAccepted, bundle.manifest, bundle.root);
+                Integrity.verifyStreams(ingested.rawAccepted, bundle.manifest, bundle.root, signedTrust);
         List<Integrity.Result> integrityResults = new ArrayList<>(integrityStreams.values());
         List<ObjectNode> integrityNodes = new ArrayList<>();
         for (Integrity.Result r : integrityResults) {
@@ -2461,7 +2488,8 @@ global options:
             Bundle loaded = Bundle.load(Paths.get(bundleDir));
             Ingest.Result ingested = Ingest.ingest(loaded);
             List<Integrity.Result> results =
-                    Integrity.verifyBundle(ingested.rawAccepted, loaded.manifest, loaded.root);
+                    Integrity.verifyBundle(
+                            ingested.rawAccepted, loaded.manifest, loaded.root, sourceTrust(null, ingested.rawAccepted));
             Set<String> clean = Set.of("verified", "verified_weak");
             int broken = 0;
             ArrayNode streams = Json.nodes().arrayNode();

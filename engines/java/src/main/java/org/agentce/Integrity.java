@@ -3,8 +3,11 @@ package org.agentce;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,13 +20,20 @@ import java.util.Set;
  * {@code prev} chain, cross-checks source timestamps against anchor times, and reports one status per
  * stream. Broken streams are never fatal: they are findings (SPEC §8.1), and {@link #integrityCaps} turns them
  * into the caps the assessment applies (SPEC §6.6, §8.1). A faithful port of the reference.
+ *
+ * <p>A {@code source_signed} stream reads verified only when every event's {@code sig_ref} names a DSSE envelope in
+ * the bundle that verifies against a key the run trusts and whose in-toto Statement names that event's hash, or the
+ * hash of a later event of the same chain (the head of the signed segment; SPEC §6.6). The trusted keys are the
+ * operator's own trust root ({@code --trust-root} or {@code AGENTCE_TRUST_ROOT}), never the development root vendored
+ * in the engine, whose private seed is published: with no trust root no source signature counts, and the stream reads
+ * unsigned.
  */
 public final class Integrity {
     private Integrity() {}
 
     public static final String GENESIS_PREV = "0".repeat(64);
 
-    private static final String SOURCE_SIGNED = "source_signed";
+    static final String SOURCE_SIGNED = "source_signed";
     private static final String EXPORT_ANCHORED = "export_anchored";
     private static final String EXPORT_CHAINED = "export_chained";
     private static final String VERIFIED = "verified";
@@ -127,24 +137,75 @@ public final class Integrity {
         return latest;
     }
 
-    static boolean isSigned(JsonNode block, Path bundleRoot) {
-        if (block == null) {
+    /**
+     * Whether a record's {@code sig_ref} envelope verifies against a trusted key and names the record's own hash. A
+     * later record's hash does not do: a hash leaves out {@code data.integrity}, so it commits to no earlier record.
+     * Anything else, including no trust root or no bundle to read the envelope from, is unsigned (fail closed).
+     */
+    static boolean isSigned(
+            JsonNode block,
+            Path bundleRoot,
+            Verify.TrustRoot trust,
+            Map<String, Set<String>> envelopes) {
+        if (block == null || trust == null || bundleRoot == null) {
             return false;
         }
         JsonNode sigRef = block.get("sig_ref");
         if (sigRef == null || !sigRef.isTextual() || sigRef.textValue().isEmpty()) {
             return false;
         }
-        if (bundleRoot == null) {
-            return true;
-        }
-        // A sig_ref is evidence content: confine it to the bundle root so a hostile event cannot have
-        // an attacker-chosen file outside the bundle stand in as this stream's signature.
-        Path confined = Bundle.confineToRoot(bundleRoot, sigRef.textValue());
-        return confined != null && Bundle.safeIsFile(confined);
+        Set<String> digests = envelopes.computeIfAbsent(
+                sigRef.textValue(), ref -> signedDigests(bundleRoot, ref, trust));
+        JsonNode hash = block.get("hash");
+        return hash != null && hash.isTextual() && digests.contains(hash.textValue());
     }
 
-    private static Result verifyStream(String stream, List<JsonNode> events, List<JsonNode> anchors, Path bundleRoot) {
+    /**
+     * The SHA-256 digests the in-toto Statement of a verified {@code sig_ref} envelope names as subjects; none when the
+     * file is outside the bundle or unreadable, is not a DSSE envelope over an in-toto Statement, or verifies against
+     * no key in {@code trust}. A sig_ref is evidence content: it is confined to the bundle root, so a file outside it
+     * (reached literally or through a symlink) never counts.
+     */
+    private static Set<String> signedDigests(Path bundleRoot, String sigRef, Verify.TrustRoot trust) {
+        Path path = Bundle.confineToRoot(bundleRoot, sigRef);
+        if (path == null || !Bundle.safeIsFile(path)) {
+            return Set.of();
+        }
+        JsonNode statement;
+        try {
+            JsonNode envelope = Verify.parseVerifyInput(
+                    Files.readAllBytes(path), "verify.envelope_malformed", "the signature envelope");
+            Verify.VerifiedEnvelope verified = Verify.verifyEnvelope(envelope, trust);
+            JsonNode payloadType = envelope.get("payloadType");
+            if (!payloadType.textValue().equals(Sign.INTOTO_PAYLOAD_TYPE)) {
+                return Set.of();
+            }
+            statement = Verify.parseVerifyInput(
+                    verified.payload(), "verify.statement_unreadable", "the signed statement");
+        } catch (IllegalArgumentException | IOException e) {
+            return Set.of();
+        }
+        JsonNode subjects = statement.isObject() ? statement.get("subject") : null;
+        if (subjects == null || !subjects.isArray()) {
+            return Set.of();
+        }
+        Set<String> out = new HashSet<>();
+        for (JsonNode subject : subjects) {
+            JsonNode digest = subject.isObject() ? subject.get("digest") : null;
+            JsonNode sha256 = digest != null && digest.isObject() ? digest.get("sha256") : null;
+            if (sha256 != null && sha256.isTextual()) {
+                out.add(sha256.textValue());
+            }
+        }
+        return out;
+    }
+
+    private static Result verifyStream(
+            String stream,
+            List<JsonNode> events,
+            List<JsonNode> anchors,
+            Path bundleRoot,
+            Verify.TrustRoot sourceTrust) {
         List<JsonNode> blocks = new ArrayList<>();
         for (JsonNode event : events) {
             blocks.add(integrityBlock(event));
@@ -190,7 +251,7 @@ public final class Integrity {
 
         // An anchor whose time cannot be placed (no UTC offset, absent, or not a date-time) anchors nothing (SPEC §8.1).
         String latest = latestAnchor(anchors);
-        result.strengthStatus = strengthStatus(strength, blocks, latest != null, bundleRoot);
+        result.strengthStatus = strengthStatus(strength, blocks, latest != null, bundleRoot, sourceTrust);
 
         // 3. Timestamp trust: an event later than the anchor that covers it is suspect, and so is one whose time
         // cannot be placed against it (no UTC offset, or not a date-time): it cannot be cross-checked (SPEC §6.6,
@@ -220,10 +281,12 @@ public final class Integrity {
      * What a stream's strength and signatures read: source_signed is verified only when every record is signed,
      * export_anchored only with a placeable anchor, and export_chained proves only "unchanged since export".
      */
-    private static String strengthStatus(String strength, List<JsonNode> blocks, boolean anchored, Path bundleRoot) {
+    private static String strengthStatus(
+            String strength, List<JsonNode> blocks, boolean anchored, Path bundleRoot, Verify.TrustRoot trust) {
         if (strength.equals(SOURCE_SIGNED)) {
+            Map<String, Set<String>> envelopes = new HashMap<>();
             for (JsonNode block : blocks) {
-                if (!isSigned(block, bundleRoot)) {
+                if (!isSigned(block, bundleRoot, trust, envelopes)) {
                     return UNSIGNED;
                 }
             }
@@ -258,7 +321,13 @@ public final class Integrity {
      * chain under an id two sources claim reads verified (18.151).
      */
     public static List<Result> verifyBundle(List<JsonNode> events, JsonNode manifest, Path bundleRoot) {
-        return new ArrayList<>(verifyStreams(events, manifest, bundleRoot).values());
+        return verifyBundle(events, manifest, bundleRoot, null);
+    }
+
+    /** {@link #verifyBundle}, with the keys a {@code source_signed} record's signature must verify against. */
+    public static List<Result> verifyBundle(
+            List<JsonNode> events, JsonNode manifest, Path bundleRoot, Verify.TrustRoot sourceTrust) {
+        return new ArrayList<>(verifyStreams(events, manifest, bundleRoot, sourceTrust).values());
     }
 
     private static String sourceOf(JsonNode event) {
@@ -273,6 +342,12 @@ public final class Integrity {
 
     /** {@link #verifyBundle}'s results keyed by {@link #chainKey}, in its order. */
     public static Map<String, Result> verifyStreams(List<JsonNode> events, JsonNode manifest, Path bundleRoot) {
+        return verifyStreams(events, manifest, bundleRoot, null);
+    }
+
+    /** {@link #verifyStreams}, with the keys a {@code source_signed} record's signature must verify against. */
+    public static Map<String, Result> verifyStreams(
+            List<JsonNode> events, JsonNode manifest, Path bundleRoot, Verify.TrustRoot sourceTrust) {
         Map<String, List<JsonNode>> anchors = anchorsByStream(manifest);
         Map<String, Map<String, List<JsonNode>>> grouped = new LinkedHashMap<>();
         for (JsonNode event : events) {
@@ -289,7 +364,7 @@ public final class Integrity {
             sources.sort(Json::byteCompare);
             for (String source : sources) {
                 Result result = verifyStream(
-                        stream, bySource.get(source), anchors.getOrDefault(stream, List.of()), bundleRoot);
+                        stream, bySource.get(source), anchors.getOrDefault(stream, List.of()), bundleRoot, sourceTrust);
                 // A stream id two sources claim: the manifest's anchors and a sig_ref name no source, so neither chain
                 // under that id reads verified, which fails closed rather than let one source's chain borrow another's
                 // anchors (18.151).

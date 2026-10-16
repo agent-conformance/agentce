@@ -202,7 +202,7 @@ export function parseUntrustedJson(raw: Buffer, keepNumberTokens = false): unkno
 /** {@link parseUntrustedJson} for one input verify reads, refused with that input's own key:
  * `verify.json_too_deep` naming `what` past the depth limit, else `unreadableKey`. Mirrors
  * `signing.parse_verify_input`. */
-function parseVerifyInput(
+export function parseVerifyInput(
   raw: Buffer,
   unreadableKey: string,
   what: string,
@@ -382,6 +382,19 @@ export class TrustRoot {
       authorities.set(issuer, { publicKeyRaw: b64dStrict(String(entry.public_key)) });
     }
     return new TrustRoot(keys, authorities);
+  }
+
+  /** This trust root less every key and certificate authority whose public key `other` also holds
+   * (mirrors `TrustRoot.without`). */
+  without(other: TrustRoot): TrustRoot {
+    const held = new Set(
+      [...other.keys.values(), ...other.authorities.values()].map((e) =>
+        e.publicKeyRaw.toString("base64"),
+      ),
+    );
+    const kept = <E extends AuthorityEntry>(entries: ReadonlyMap<string, E>): Map<string, E> =>
+      new Map([...entries].filter(([, e]) => !held.has(e.publicKeyRaw.toString("base64"))));
+    return new TrustRoot(kept(this.keys), kept(this.authorities));
   }
 
   /** Resolves a DSSE signature entry to the key/identity that must verify it (`cert` checked before

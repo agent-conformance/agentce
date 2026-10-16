@@ -8,6 +8,7 @@
  */
 
 import assert from "node:assert/strict";
+import { generateKeyPairSync } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -22,6 +23,8 @@ import {
   verifyStreams,
 } from "./integrity";
 import { parseJson } from "./json";
+import { INTOTO_STATEMENT_TYPE, KmsSigner, signStatement } from "./sign";
+import { TrustRoot } from "./verify";
 
 const TESTDATA = join(__dirname, "..", "testdata");
 
@@ -53,11 +56,51 @@ function signedEvent(sigRef: string | null): Record<string, unknown> {
   return event;
 }
 
-test("a source_signed stream is verified with a sig_ref and unsigned without one", () => {
-  const withSig = verifyBundle([signedEvent("attestations/sg1.sig")], {}, null);
-  assert.equal(withSig[0]?.status, "verified");
-  const withoutSig = verifyBundle([signedEvent(null)], {}, null);
-  assert.equal(withoutSig[0]?.status, "unsigned");
+/** A fresh Ed25519 signer (KmsSigner loads only from a PEM file). */
+function testSigner(): KmsSigner {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-signer-"));
+  try {
+    const pem = generateKeyPairSync("ed25519").privateKey.export({ type: "pkcs8", format: "pem" });
+    writeFileSync(join(dir, "key.pem"), pem);
+    return KmsSigner.load(join(dir, "key.pem"));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function trustOf(signer: KmsSigner): TrustRoot {
+  return TrustRoot.fromDict({
+    keys: { [signer.keyid]: { public_key: signer.publicKeyB64, identity: "test source" } },
+  });
+}
+
+/** A DSSE envelope over an in-toto Statement naming `hashes` as subjects. */
+function envelopeFor(hashes: string[], signer: KmsSigner): string {
+  const statement = {
+    _type: INTOTO_STATEMENT_TYPE,
+    subject: hashes.map((sha256) => ({ name: "stream", digest: { sha256 } })),
+    predicateType: "https://agent-conformance.org/test",
+    predicate: {},
+  };
+  return JSON.stringify(signStatement(statement, signer));
+}
+
+const SOURCE = testSigner();
+const SOURCE_TRUST = trustOf(SOURCE);
+
+function hashOf(event: Record<string, unknown>): string {
+  return String(
+    ((event.data as Record<string, unknown>).integrity as Record<string, unknown>).hash,
+  );
+}
+
+test("a source_signed stream is unsigned without a sig_ref, a bundle to read it from, or a trust root", () => {
+  assert.equal(verifyBundle([signedEvent(null)], {}, null, SOURCE_TRUST)[0]?.status, "unsigned");
+  assert.equal(
+    verifyBundle([signedEvent("attestations/sg1.sig")], {}, null, SOURCE_TRUST)[0]?.status,
+    "unsigned",
+  );
+  assert.equal(statusForSigRef("attestations/sg1.sig", envelopeInBundle(SOURCE), null), "unsigned");
 });
 
 test("a record never breaks another source's chain by claiming its stream", () => {
@@ -72,34 +115,55 @@ test("a record never breaks another source's chain by claiming its stream", () =
   const hijack = { ...signedEvent(null), id: "x9", source: "agent-1" };
   block(hijack).hash = "f".repeat(64);
   block(hijack).prev = "e".repeat(64);
+  const root = mkdtempSync(join(tmpdir(), "agentce-integrity-"));
+  mkdirSync(join(root, "attestations"));
+  for (const name of ["sg1.sig", "sg2.sig"]) {
+    writeFileSync(
+      join(root, "attestations", name),
+      envelopeFor([hashOf(head), hashOf(tail)], SOURCE),
+    );
+  }
   const statuses = (events: Array<Record<string, unknown>>) =>
-    verifyBundle(events, {}, null).map((r) => [r.stream, r.status]);
+    verifyBundle(events, {}, root, SOURCE_TRUST).map((r) => [r.stream, r.status]);
   assert.deepEqual(statuses([head, hijack, tail]), [
     ["s-signed", "failed"],
     ["s-signed", "verified_weak"],
   ]);
   assert.deepEqual(statuses([head, tail]), [["s-signed", "verified"]]);
+  rmSync(root, { recursive: true, force: true });
 });
 
 // --- A sig_ref is evidence content: a signature file outside the bundle root never counts,
 // --- whether it is reached literally or through a symlink (SPEC §6.6, §8.1).
 
-/** The stream status for a `sig_ref` resolved against a real temporary bundle root. */
-function statusForSigRef(sigRef: string, prepare: (dir: string, root: string) => void): string {
+/** The stream status for a `sig_ref` resolved against a real temporary bundle root and `trust`. */
+function statusForSigRef(
+  sigRef: string,
+  prepare: (dir: string, root: string) => void,
+  trust: TrustRoot | null = SOURCE_TRUST,
+): string {
   const dir = mkdtempSync(join(tmpdir(), "agentce-integrity-"));
   try {
     const root = join(dir, "bundle");
     mkdirSync(join(root, "attestations"), { recursive: true });
     prepare(dir, root);
-    return verifyBundle([signedEvent(sigRef)], {}, root)[0]?.status ?? "";
+    return verifyBundle([signedEvent(sigRef)], {}, root, trust)[0]?.status ?? "";
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 }
 
+/** Writes, at `attestations/sg1.sig`, an envelope `signer` signed over the one record's hash. */
+function envelopeInBundle(signer: KmsSigner): (dir: string, root: string) => void {
+  return (_dir, root) => {
+    const body = envelopeFor([hashOf(signedEvent("attestations/sg1.sig"))], signer);
+    writeFileSync(join(root, "attestations", "sg1.sig"), body, "utf-8");
+  };
+}
+
 test("a sig_ref escaping the bundle root with '..' is not counted as signed", () => {
   const status = statusForSigRef("../sig.bin", (dir) => {
-    writeFileSync(join(dir, "sig.bin"), "signature bytes\n", "utf-8");
+    writeFileSync(join(dir, "sig.bin"), envelopeFor([hashOf(signedEvent("../sig.bin"))], SOURCE));
   });
   assert.equal(status, "unsigned");
 });
@@ -107,17 +171,32 @@ test("a sig_ref escaping the bundle root with '..' is not counted as signed", ()
 test("a sig_ref whose symlink escapes the bundle root is not counted as signed", () => {
   const status = statusForSigRef("attestations/sg1.sig", (dir, root) => {
     const outside = join(dir, "sig.bin");
-    writeFileSync(outside, "signature bytes\n", "utf-8");
+    writeFileSync(outside, envelopeFor([hashOf(signedEvent("attestations/sg1.sig"))], SOURCE));
     symlinkSync(outside, join(root, "attestations", "sg1.sig"));
   });
   assert.equal(status, "unsigned");
 });
 
-test("a sig_ref inside the bundle root is counted as signed", () => {
+test("a sig_ref naming a trusted envelope over the record's hash is counted as signed", () => {
+  assert.equal(statusForSigRef("attestations/sg1.sig", envelopeInBundle(SOURCE)), "verified");
+});
+
+test("a sig_ref whose envelope a key the run does not trust signed is not counted as signed", () => {
+  assert.equal(statusForSigRef("attestations/sg1.sig", envelopeInBundle(testSigner())), "unsigned");
+});
+
+test("a sig_ref inside the bundle root that is no DSSE envelope is not counted as signed", () => {
   const status = statusForSigRef("attestations/sg1.sig", (_dir, root) => {
     writeFileSync(join(root, "attestations", "sg1.sig"), "signature bytes\n", "utf-8");
   });
-  assert.equal(status, "verified");
+  assert.equal(status, "unsigned");
+});
+
+test("a statement naming another record's hash does not sign this one", () => {
+  const status = statusForSigRef("attestations/sg1.sig", (_dir, root) => {
+    writeFileSync(join(root, "attestations", "sg1.sig"), envelopeFor(["a".repeat(64)], SOURCE));
+  });
+  assert.equal(status, "unsigned");
 });
 
 test("a sig_ref that is missing from the bundle is not counted as signed", () => {

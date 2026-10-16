@@ -41,7 +41,13 @@ import { ExitCode } from "./exitCodes";
 import { isPySpace, parseFailOn } from "./failOn";
 import { buildGraph } from "./graph";
 import { ingest } from "./ingest";
-import { integrityCaps, integrityResultToJson, verifyBundle, verifyStreams } from "./integrity";
+import {
+  IntegrityStrength,
+  integrityCaps,
+  integrityResultToJson,
+  verifyBundle,
+  verifyStreams,
+} from "./integrity";
 import { DEFAULT_LANGUAGE, availableLanguages, catalogue } from "./messages";
 import { evaluateInstalledNoMl, loadVendoredDenylist } from "./noMl";
 import { type Profile, loadProfile } from "./profile";
@@ -350,9 +356,15 @@ function vendoredCatalogs(): Map<string, string> {
  * zero `--catalog-dir`s, and `quickstart` (no `--trust-root` flag) still honours the variable. The
  * fix text is Python's literal, not the vendored catalogue's. */
 function effectiveTrustRoot(flagValue: string | undefined): TrustRoot {
+  return explicitTrustRoot(flagValue) ?? vendoredTrust();
+}
+
+/** The trust root the operator named (`--trust-root`, else `AGENTCE_TRUST_ROOT`), or null. Mirrors
+ * `_explicit_trust_root`. */
+function explicitTrustRoot(flagValue: string | undefined): TrustRoot | null {
   const raw = flagValue || process.env.AGENTCE_TRUST_ROOT;
   if (raw === undefined || raw.trim() === "") {
-    return vendoredTrust();
+    return null;
   }
   const path = requireFile(raw, "trust_root", "the trust root", "pass --trust-root <file>.");
   try {
@@ -366,6 +378,34 @@ function effectiveTrustRoot(flagValue: string | undefined): TrustRoot {
         "engine's vendored data/trust/dev-root.json.",
     );
   }
+}
+
+/** The keys a `source_signed` record's signature must verify against (SPEC §6.6): the operator's own trust root
+ * only, less the vendored development keys, whose private seed is published, even when the operator names that
+ * root. Read only when a record declares `source_signed`, so a run with no signed stream never depends on the trust
+ * root. Mirrors `_source_trust`. */
+function sourceTrust(
+  flagValue: string | undefined,
+  records: ReadonlyArray<Record<string, unknown>>,
+): TrustRoot | null {
+  if (!records.some(declaresSourceSigned)) {
+    return null;
+  }
+  return explicitTrustRoot(flagValue)?.without(vendoredTrust()) ?? null;
+}
+
+function declaresSourceSigned(record: Record<string, unknown>): boolean {
+  const data = record.data;
+  const block =
+    typeof data === "object" && data !== null && !Array.isArray(data)
+      ? (data as Record<string, unknown>).integrity
+      : undefined;
+  return (
+    typeof block === "object" &&
+    block !== null &&
+    !Array.isArray(block) &&
+    (block as Record<string, unknown>).strength === IntegrityStrength.SOURCE_SIGNED
+  );
 }
 
 /** Refuses every `--catalog-dir` catalog whose signature does not verify against `trust` (SPEC
@@ -994,10 +1034,17 @@ function runAssess(options: AssessOptions): CommandResult {
   // Stage 1: ingest and validate. A missing/mismatching manifest aborts with exit 3.
   const bundle = loadBundle(bundleDir);
   const ingested = ingest(bundle);
+  // Resolved before anything is written: a trust root that cannot be loaded refuses the run (SPEC §6.6).
+  const signedTrust = sourceTrust(options.trustRootFlag, ingested.rawAccepted);
   writeQuarantine(ingested.quarantined, join(out, "quarantine.jsonl"));
 
   // Stage 2: integrity verification, one IntegrityResult per stream.
-  const integrityStreams = verifyStreams(ingested.rawAccepted, bundle.manifest, bundle.root);
+  const integrityStreams = verifyStreams(
+    ingested.rawAccepted,
+    bundle.manifest,
+    bundle.root,
+    signedTrust,
+  );
   const integrityResults = [...integrityStreams.values()];
   writeJsonl(integrityResults.map(integrityResultToJson), join(out, "integrity.jsonl"));
 
@@ -2286,7 +2333,12 @@ function cmdVerify(argv: string[]): CommandResult {
     const bundleDir = requireDir(bundle, "bundle", "the evidence bundle");
     const loaded = loadBundle(bundleDir);
     const ingested = ingest(loaded);
-    const results = verifyBundle(ingested.rawAccepted, loaded.manifest, loaded.root);
+    const results = verifyBundle(
+      ingested.rawAccepted,
+      loaded.manifest,
+      loaded.root,
+      sourceTrust(undefined, ingested.rawAccepted),
+    );
     const clean = new Set(["verified", "verified_weak"]);
     const broken = results.filter((r) => !clean.has(r.status));
     result.data.bundle = bundleDir;
