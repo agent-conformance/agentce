@@ -136,7 +136,12 @@ public final class Graph {
         return buildGraph(events, domain, store, key, Set.of());
     }
 
-    /** {@code foreignUntrusted} names the records another subject's write marked untrusted ({@link #flaggedRecords}). */
+    /** {@code foreignUntrusted} names the records another subject's write marked untrusted or rewrote with no ruling
+     * ({@link #flaggedRecords}). */
+    public static GraphStore buildGraph(List<JsonNode> events, DomainBinding domain, Set<String> foreignUntrusted) {
+        return buildGraph(events, domain, new GraphStore(), Iri.ZERO_KEY, foreignUntrusted);
+    }
+
     public static GraphStore buildGraph(
             List<JsonNode> events, DomainBinding domain, GraphStore store, byte[] key, Set<String> foreignUntrusted) {
         return new Builder(store, domain, key, foreignUntrusted).build(events);
@@ -151,9 +156,8 @@ public final class Graph {
         for (JsonNode event : events) {
             JsonNode data = dataOf(event);
             String record = str(data.get("record_ref"));
-            boolean ruled = "enforcement_point".equals(str(event.get("agentcesourceclass")))
-                    && (!isAbsent(data.get("trust")) || !isAbsent(data.get("guard_verdict")));
-            if ("MemoryWrite".equals(str(data.get("@type"))) && record != null && (flagsUntrusted(data) || !ruled)) {
+            if ("MemoryWrite".equals(str(data.get("@type"))) && record != null
+                    && (flagsUntrusted(data) || !ruledWrite(event, data))) {
                 flagged.computeIfAbsent(record, r -> new LinkedHashSet<>())
                         .add(Objects.toString(str(event.get("subject")), ""));
             }
@@ -162,6 +166,12 @@ public final class Graph {
     }
 
     // --- helpers ---
+
+    /** A write a guard ruled on: an enforcement-point MemoryWrite with a trust or a verdict (18.120). */
+    private static boolean ruledWrite(JsonNode event, JsonNode data) {
+        return "enforcement_point".equals(str(event.get("agentcesourceclass")))
+                && (!isAbsent(data.get("trust")) || !isAbsent(data.get("guard_verdict")));
+    }
 
     static JsonNode dataOf(JsonNode event) {
         JsonNode data = event.get("data");
@@ -543,7 +553,8 @@ public final class Graph {
         // INC-03: event IRI -> the decision its refs.decision names, whatever the event type.
         private final Map<String, String> refDecision = new LinkedHashMap<>();
 
-        // Records another subject's MemoryWrite marked untrusted: never ruled on in this subject's graph (18.120).
+        // Records another subject's MemoryWrite marked untrusted or rewrote with no ruling: never ruled on in this
+        // subject's graph (18.120).
         private final Set<String> foreignUntrusted;
 
         Builder(GraphStore store, DomainBinding domain, byte[] key, Set<String> foreignUntrusted) {
@@ -1395,10 +1406,9 @@ public final class Graph {
                     String record = str(data.get("record_ref"));
                     // A record and each write of it stand for the same content.
                     flow(flows, record, node);
-                    boolean marked = !isAbsent(data.get("trust")) || !isAbsent(data.get("guard_verdict"));
                     if (record != null) {
                         records.add(record);
-                        (enforced && marked ? writeRuled : rewritten).add(record);
+                        (ruledWrite(event, data) ? writeRuled : rewritten).add(record);
                     }
                     if (flagsUntrusted(data)) {
                         tainted.add(node);

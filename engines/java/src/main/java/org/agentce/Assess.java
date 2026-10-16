@@ -419,7 +419,7 @@ public final class Assess {
         View(List<JsonNode> events, DomainBinding domain, Set<String> foreignUntrusted) {
             this.events = events;
             this.store = lazy(() ->
-                    Graph.buildGraph(events, domain, new GraphStore(), Iri.ZERO_KEY, foreignUntrusted));
+                    Graph.buildGraph(events, domain, foreignUntrusted));
             this.byIri = lazy(() -> eventsByIriOf(events));
             this.judge = lazy(() -> new SourceClass.Judge(store.get(), byIri.get()));
         }
@@ -533,7 +533,7 @@ public final class Assess {
                     foreign.add(record);
                 }
             });
-            GraphStore store = Graph.buildGraph(subjectEvents, domain, new GraphStore(), Iri.ZERO_KEY, foreign);
+            GraphStore store = Graph.buildGraph(subjectEvents, domain, foreign);
             Map<String, JsonNode> eventsByIri = eventsByIriOf(subjectEvents);
             Set<String> roles = new LinkedHashSet<>(Applicability.effectiveRoles(subject.role));
             String[] win = window(profile, subjectEvents);
@@ -558,7 +558,7 @@ public final class Assess {
             List<JsonNode> cfEvents = readable.isEmpty() ? List.of() : counterfactual(subjectEvents, readable);
             GraphStore cfStore = cfEvents.isEmpty()
                     ? store
-                    : Graph.buildGraph(cfEvents, domain, new GraphStore(), Iri.ZERO_KEY, foreign);
+                    : Graph.buildGraph(cfEvents, domain, foreign);
             Map<String, JsonNode> cfByIri = eventsByIriOf(cfEvents);
             // Each graph's judge is built once, on the first control whose minimum it may fall below.
             Supplier<SourceClass.Judge> judge = lazy(() -> new SourceClass.Judge(store, eventsByIri));

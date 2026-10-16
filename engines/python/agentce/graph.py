@@ -163,6 +163,13 @@ def _flags_untrusted(data: dict[str, Any]) -> bool:
     )
 
 
+def _ruled_write(event: dict[str, Any], data: dict[str, Any]) -> bool:
+    """A write a guard ruled on: an enforcement-point MemoryWrite with a trust or a verdict (18.120)."""
+    return event.get("agentcesourceclass") == "enforcement_point" and (
+        data.get("trust") is not None or data.get("guard_verdict") is not None
+    )
+
+
 def flagged_records(events: Iterable[dict[str, Any]]) -> dict[str, set[str]]:
     """Each record a MemoryWrite in ``events`` marks untrusted or writes with no guard ruling (anything but an
     enforcement-point write with a trust or a verdict), with the subjects whose records hold such a write. A subject's
@@ -171,13 +178,10 @@ def flagged_records(events: Iterable[dict[str, Any]]) -> dict[str, set[str]]:
     for event in events:
         data = _data(event)
         record = data.get("record_ref")
-        ruled = event.get("agentcesourceclass") == "enforcement_point" and (
-            data.get("trust") is not None or data.get("guard_verdict") is not None
-        )
         if (
             data.get("@type") == "MemoryWrite"
             and isinstance(record, str)
-            and (_flags_untrusted(data) or not ruled)
+            and (_flags_untrusted(data) or not _ruled_write(event, data))
         ):
             flagged.setdefault(record, set()).add(str(event.get("subject", "")))
     return flagged
@@ -398,12 +402,13 @@ class _Builder:
         store: GraphStore,
         domain: DomainBinding,
         key: bytes,
-        foreign_untrusted: frozenset[str] = frozenset(),
+        foreign_untrusted: frozenset[str],
     ) -> None:
         self.store = store
         self.domain = domain
         self.key = key
-        # Records another subject's MemoryWrite marked untrusted: never ruled on in this subject's graph (18.120).
+        # Records another subject's MemoryWrite marked untrusted or rewrote with no ruling: never ruled on in this
+        # subject's graph (18.120).
         self.foreign_untrusted = foreign_untrusted
         self.event_iris: set[str] = set()
         self.decision_type: dict[str, str] = {}  # decision event IRI -> decision_type
@@ -1175,13 +1180,11 @@ class _Builder:
                 record = data.get("record_ref")
                 # A record and each write of it stand for the same content.
                 _flow(flows, record, node)
-                marked = (
-                    data.get("trust") is not None
-                    or data.get("guard_verdict") is not None
-                )
                 if isinstance(record, str):
                     records.add(record)
-                    (write_ruled if enforced and marked else rewritten).add(record)
+                    (write_ruled if _ruled_write(event, data) else rewritten).add(
+                        record
+                    )
                 if _flags_untrusted(data):
                     tainted.add(node)
             elif ptype == "MemoryRead":
@@ -1637,7 +1640,8 @@ def build_graph(
     foreign_untrusted: frozenset[str] = frozenset(),
 ) -> GraphStore:
     """Materialise ``events`` into a graph store; create an in-memory store if none is given.
-    ``foreign_untrusted`` names the records another subject's write marked untrusted (:func:`flagged_records`)."""
+    ``foreign_untrusted`` names the records another subject's write marked untrusted or rewrote with no ruling
+    (:func:`flagged_records`)."""
     builder = _Builder(
         store or GraphStore(),
         domain or DomainBinding.empty(),

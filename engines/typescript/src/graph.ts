@@ -187,6 +187,14 @@ function flagsUntrusted(data: Record<string, unknown>): boolean {
   );
 }
 
+/** A write a guard ruled on: an enforcement-point MemoryWrite with a trust or a verdict (18.120). */
+function ruledWrite(event: Event, data: Record<string, unknown>): boolean {
+  return (
+    event.agentcesourceclass === "enforcement_point" &&
+    (!isAbsent(data.trust) || !isAbsent(data.guard_verdict))
+  );
+}
+
 /** Each record a MemoryWrite in `events` marks untrusted or writes with no guard ruling (anything but an
  * enforcement-point write with a trust or a verdict), with the subjects whose records hold such a write. A subject's
  * graph reads a record another subject flagged or rewrote unruled as one its guard never ruled on (18.120). */
@@ -195,13 +203,10 @@ export function flaggedRecords(events: Iterable<Event>): Map<string, Set<string>
   for (const event of events) {
     const data = dataOf(event);
     const record = data.record_ref;
-    const ruled =
-      event.agentcesourceclass === "enforcement_point" &&
-      (!isAbsent(data.trust) || !isAbsent(data.guard_verdict));
     if (
       data["@type"] === "MemoryWrite" &&
       typeof record === "string" &&
-      (flagsUntrusted(data) || !ruled)
+      (flagsUntrusted(data) || !ruledWrite(event, data))
     ) {
       let subjects = flagged.get(record);
       if (subjects === undefined) {
@@ -489,8 +494,9 @@ class Builder {
     private readonly store: GraphStore,
     private readonly domain: DomainBinding,
     private readonly key: Buffer,
-    // Records another subject's MemoryWrite marked untrusted: never ruled on in this subject's graph (18.120).
-    private readonly foreignUntrusted: ReadonlySet<string> = new Set(),
+    // Records another subject's MemoryWrite marked untrusted or rewrote with no ruling: never ruled on in this
+    // subject's graph (18.120).
+    private readonly foreignUntrusted: ReadonlySet<string>,
   ) {}
 
   build(events: Event[]): GraphStore {
@@ -1334,10 +1340,9 @@ class Builder {
         const record = data.record_ref;
         // A record and each write of it stand for the same content.
         flow(flows, record, node);
-        const marked = !isAbsent(data.trust) || !isAbsent(data.guard_verdict);
         if (typeof record === "string") {
           records.add(record);
-          (enforced && marked ? writeRuled : rewritten).add(record);
+          (ruledWrite(event, data) ? writeRuled : rewritten).add(record);
         }
         if (flagsUntrusted(data)) {
           tainted.add(node);
@@ -1875,7 +1880,7 @@ export function buildGraph(
     domain?: DomainBinding;
     store?: GraphStore;
     pseudonymKey?: Buffer;
-    /** The records another subject's write marked untrusted (`flaggedRecords`). */
+    /** The records another subject's write marked untrusted or rewrote with no ruling (`flaggedRecords`). */
     foreignUntrusted?: ReadonlySet<string>;
   } = {},
 ): GraphStore {
@@ -1883,7 +1888,7 @@ export function buildGraph(
     options.store ?? new GraphStore(),
     options.domain ?? DomainBinding.empty(),
     options.pseudonymKey ?? ZERO_KEY,
-    options.foreignUntrusted,
+    options.foreignUntrusted ?? new Set(),
   );
   return builder.build(events);
 }
