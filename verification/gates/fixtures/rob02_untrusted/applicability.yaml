@@ -1,6 +1,7 @@
 # Applicability profile for the VG-ROB02-UNTRUSTED gate fixture (verification/gates/rob02_untrusted.sh).
 # Two subjects, the baseline catalog; each case in cases.json is one bundle. The fixture subject makes every decision;
-# the other subject only writes memory in the cross-subject cases, whose rulings do not count for the fixture subject.
+# the other subject only writes memory in the cross-subject cases, whose rulings do not count for the fixture subject,
+# while a write it marks untrusted leaves the record unruled for the fixture subject too (18.120).
 profile_version: 1
 observation_window:
   start: "2026-01-01T00:00:00Z"
