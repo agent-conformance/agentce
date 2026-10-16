@@ -1,89 +1,4 @@
 {
-  "anchor-cnd05-direct-user": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "anchor-rob02-clean-memory": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c04-integ-failed-gateway": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c04-integ-failed-ingress": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c04-integ-missing-gateway": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c04-integ-missing-ingress": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c04-integ-weak_chained-gateway": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c04-integ-weak_chained-ingress": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c05-integ-failed-gateway-user": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c05-integ-failed-ingress-user": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c05-integ-failed-policy-SR-user-corr": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c05-integ-gap-gateway-user": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c05-integ-gap-ingress-user": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c05-integ-missing-gateway-user": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c05-integ-missing-ingress-user": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c05-integ-unsigned-gateway-user": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c05-integ-unsigned-ingress-user": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
   "c05-integ-verified_signed-gateway-user": {
     "owner": "18.155",
     "reason": "GAP at 78bdb0da; closed by 18.155's matrix check",
@@ -92,31 +7,6 @@
   "c05-integ-verified_signed-ingress-user": {
     "owner": "18.155",
     "reason": "GAP at 78bdb0da; closed by 18.155's matrix check",
-    "status": "GAP"
-  },
-  "c05-integ-weak_chained-gateway-user": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c05-integ-weak_chained-ingress-user": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c05-integ-weak_chained-policy-SR-user-corr": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c05-integ-weak_unanchored-gateway-user": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "c05-integ-weak_unanchored-ingress-user": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
     "status": "GAP"
   },
   "c06-acted-EP-missing": {
@@ -139,11 +29,6 @@
     "reason": "MISMATCH at 78bdb0da; closed by 18.173's matrix check",
     "status": "MISMATCH"
   },
-  "fx-CND-01-EP-integ-weak": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
   "fx-DOC-03-en-pass-uea": {
     "owner": "18.37e",
     "reason": "GAP at 78bdb0da; closed by 18.37e's matrix check",
@@ -154,134 +39,14 @@
     "reason": "GAP at 78bdb0da; closed by 18.37e's matrix check",
     "status": "GAP"
   },
-  "fx-INC-02-IS-integ-failed": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-INC-02-IS-integ-missing": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-INT-01-EP-integ-failed": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-INT-01-EP-integ-gap": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-INT-01-EP-integ-missing": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-INT-01-EP-integ-unsigned": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-INT-01-EP-integ-weak_chained": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
   "fx-INT-01-en-coverage-unknown": {
     "owner": "18.134",
     "reason": "GAP at 78bdb0da; closed by 18.134's matrix check",
     "status": "GAP"
   },
-  "fx-INT-04-EP-integ-failed": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-INT-04-EP-integ-gap": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-INT-04-EP-integ-missing": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-INT-04-EP-integ-unsigned": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-INT-04-EP-integ-weak_chained": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
   "fx-INT-04-en-coverage-unknown": {
     "owner": "18.134",
     "reason": "GAP at 78bdb0da; closed by 18.134's matrix check",
-    "status": "GAP"
-  },
-  "fx-OVS-03-EP-integ-failed": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-OVS-03-EP-integ-weak_chained": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-OVS-06-EP-integ-failed": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-OVS-06-EP-integ-gap": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-OVS-06-EP-integ-missing": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-OVS-06-EP-integ-unsigned": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-OVS-06-EP-integ-weak_chained": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-ROB-01-EP-integ-failed": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-ROB-01-EP-integ-gap": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-ROB-01-EP-integ-missing": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-ROB-01-EP-integ-unsigned": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "fx-ROB-01-EP-integ-weak_chained": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
     "status": "GAP"
   },
   "fx-ROB-05-en-pass-uea": {
@@ -319,39 +84,9 @@
     "reason": "GAP at 78bdb0da; closed by 18.172's matrix check",
     "status": "GAP"
   },
-  "r02-integ-failed-ep_trusted": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "r02-integ-gap-ep_trusted": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "r02-integ-missing-ep_trusted": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "r02-integ-unsigned-ep_trusted": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
   "r02-integ-verified_signed-ep_trusted": {
     "owner": "18.155",
     "reason": "GAP at 78bdb0da; closed by 18.155's matrix check",
-    "status": "GAP"
-  },
-  "r02-integ-weak_chained-ep_trusted": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
-    "status": "GAP"
-  },
-  "r02-integ-weak_unanchored-ep_trusted": {
-    "owner": "18.132",
-    "reason": "GAP at 78bdb0da; closed by 18.132's matrix check",
     "status": "GAP"
   },
   "r02-other-subject-ep_quarantined-ep_trusted": {

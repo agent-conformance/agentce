@@ -14,11 +14,13 @@ subject="spiffe://corp/agents/task-scope-fixture"
 other="spiffe://corp/agents/task-scope-other"
 template="$root/skills/agentce-get-evidence/assets/task-scope.template.yaml"
 
-(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen python - "$fixtures/cases.json" "$work" "$subject" "$other" "$template") <<'PY'
+(cd "$root/engines/python" && PYTHONPATH="$root/verification/gates" env -u VIRTUAL_ENV uv run --frozen python - "$fixtures/cases.json" "$work" "$subject" "$other" "$template") <<'PY'
 import hashlib
 import json
 import sys
 from pathlib import Path
+
+from fixture_integrity import chain_streams
 
 cases = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))["cases"]
 work, subject, other = Path(sys.argv[2]), sys.argv[3], sys.argv[4]
@@ -60,14 +62,19 @@ for name, case in cases.items():
                                     "decision": "deny", "refs": {"request": request}}})
     bundle = work / name / "bundle"
     (bundle / "events").mkdir(parents=True)
+    sources = [{"id": "urn:src:gateway", "class": "enforcement_point"}]
     # a stream is written in time order (a record out of order is quarantined)
-    text = "".join(json.dumps(e, sort_keys=True) + "\n" for e in sorted(events, key=lambda e: e["time"]))
+    events, streams = chain_streams(
+        sorted(events, key=lambda e: e["time"]), {"agentce_bundle_version": 1, "sources": sources}
+    )
+    text = "".join(json.dumps(e, sort_keys=True) + "\n" for e in events)
     (bundle / "events" / "subject.jsonl").write_text(text, encoding="utf-8")
     manifest = {
         "agentce_bundle_version": 1,
         "domain": "task-scope-fixture",
+        "streams": streams,
         "files": [{"path": "events/subject.jsonl", "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}],
-        "sources": [{"id": "urn:src:gateway", "class": "enforcement_point"}],
+        "sources": sources,
     }
     (bundle / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     domain = template if case["domain"] == "@template" else case["domain"]
