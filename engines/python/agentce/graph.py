@@ -187,6 +187,31 @@ def flagged_records(events: Iterable[dict[str, Any]]) -> dict[str, set[str]]:
     return flagged
 
 
+def _note_store(stores: dict[str, set[str]], record: str, store: Any) -> None:
+    named = stores.setdefault(record, set())
+    if isinstance(store, str):
+        named.add(store)
+
+
+def _unread_records(
+    writes: Iterable[tuple[str | None, str | None]],
+    records: set[str],
+    stores: dict[str, set[str]],
+) -> set[str]:
+    """The records unreadable MemoryWrites may have changed (SPEC §7.4, 18.172): the one each names; with no readable
+    record_ref, every record of its store, a record no event names a store for counting as one of them (fail closed);
+    with no readable store either, every record."""
+    unread: set[str] = set()
+    for record, store in writes:
+        if record is not None:
+            unread.add(record)
+        elif store is not None:
+            unread |= {r for r in records if not stores.get(r) or store in stores[r]}
+        else:
+            unread |= records
+    return unread
+
+
 def _flow(edges: dict[str, set[str]], source: Any, target: Any) -> None:
     if isinstance(source, str) and isinstance(target, str):
         edges.setdefault(source, set()).add(target)
@@ -403,6 +428,7 @@ class _Builder:
         domain: DomainBinding,
         key: bytes,
         foreign_untrusted: frozenset[str],
+        foreign_unreadable: Collection[tuple[str | None, str | None]],
     ) -> None:
         self.store = store
         self.domain = domain
@@ -410,6 +436,8 @@ class _Builder:
         # Records another subject's MemoryWrite marked untrusted or rewrote with no ruling: never ruled on in this
         # subject's graph (18.120).
         self.foreign_untrusted = foreign_untrusted
+        # The (record_ref, store) of each MemoryWrite another subject holds that ingest could not read (18.172).
+        self.foreign_unreadable = foreign_unreadable
         self.event_iris: set[str] = set()
         self.decision_type: dict[str, str] = {}  # decision event IRI -> decision_type
         self.decision_time: dict[str, str] = {}
@@ -1139,10 +1167,11 @@ class _Builder:
         Untrusted content starts at a MemoryWrite that marks its record untrusted (:func:`_flags_untrusted`); a
         MemoryRead whose ``trust_min`` is untrusted or quarantined; and an instruction with an untrusted Appendix F
         source class (CND-05's rule), or with none (ROB-02 only). Content the guard never ruled on starts at a
-        MemoryRead not reported by an enforcement point; a record no enforcement-point read with a ``trust_min``
+        MemoryRead not reported by an enforcement point; a record no enforcement-point read at ``trust_min`` trusted
         covers, unless every write of it is a ruled enforcement-point write (an unruled rewrite can change what the
         guard ruled on, 18.120); a record another subject's write marked untrusted or rewrote with no ruling, whatever
-        this subject's own records say of it (18.120); and a ref the bundle does not hold. Both flow along
+        this subject's own records say of it (18.120); a record another subject's unreadable MemoryWrite may have
+        changed (:func:`_unread_records`, ROB-02 only, 18.172); and a ref the bundle does not hold. Both flow along
         every edge that carries content into an event (``_CONTENT_IN``, ``_CONTENT_OUT``, a read
         to its consumer, a record to and from its writes) for as many hops as the records show,
         so a decision is reached through another decision, a tool call or a model call. Closures
@@ -1158,12 +1187,15 @@ class _Builder:
         read_ruled: set[str] = set()
         write_ruled: set[str] = set()
         rewritten: set[str] = set()
+        # The stores this subject's memory events name each record under (none when they name no store).
+        stores: dict[str, set[str]] = {}
         for event in events:
             ptype = self._ptype(event)
             data = _data(event)
             refs = _refs(event)
             node = event_iri(str(event["id"]))
             held.add(node)
+            store = data.get("store")
             enforced = event.get("agentcesourceclass") == "enforcement_point"
             for key in _CONTENT_IN:
                 value = data.get(key)
@@ -1182,6 +1214,7 @@ class _Builder:
                 _flow(flows, record, node)
                 if isinstance(record, str):
                     records.add(record)
+                    _note_store(stores, record, store)
                     (write_ruled if _ruled_write(event, data) else rewritten).add(
                         record
                     )
@@ -1189,11 +1222,12 @@ class _Builder:
                     tainted.add(node)
             elif ptype == "MemoryRead":
                 read = data.get("record_refs")
-                # A guard's read rules on its records only when it filtered them by trust.
-                ruling = enforced and data.get("trust_min") is not None
+                # A guard's read rules on its records only when it let through trusted records alone (18.172).
+                ruling = enforced and data.get("trust_min") == "trusted"
                 for record in read if isinstance(read, list) else []:
                     if isinstance(record, str):
                         records.add(record)
+                        _note_store(stores, record, store)
                         if ruling:
                             read_ruled.add(record)
                 if not enforced:
@@ -1212,6 +1246,10 @@ class _Builder:
         fed = {target for targets in flows.values() for target in targets}
         _reach(tainted, flows)
         _reach(unruled, flows)
+        # A record another subject's unreadable write may have changed is one no guard ruled on (SPEC §7.4); nobody
+        # could read that content, so it stays out of the closures CND-05 reads, as an unclassed instruction does.
+        unread = _unread_records(self.foreign_unreadable, records, stores) & set(flows)
+        _reach(unread, flows)
         # An instruction that declares no source class cannot show its content came from a trusted source, so
         # ROB-02 reads it as untrusted content (18.127); CND-05's own chain rule already fails it, so it stays out
         # of the closures returned to that rule.
@@ -1221,7 +1259,7 @@ class _Builder:
         # A decision nothing recorded flows into used nothing the guard could have ruled on, so ROB-02 cannot
         # judge it (ruling 15): it reads untrustedContentRuledOn false itself, and taints nothing downstream.
         unfed = {event_iri(str(e["id"])) for e in decisions} - fed
-        self._robust_literals(decisions, tainted | unclassed, unruled | unfed)
+        self._robust_literals(decisions, tainted | unclassed, unruled | unread | unfed)
         tainted |= unruled
         return tainted
 
@@ -1638,14 +1676,17 @@ def build_graph(
     store: GraphStore | None = None,
     pseudonym_key: bytes = ZERO_KEY,
     foreign_untrusted: frozenset[str] = frozenset(),
+    foreign_unreadable: Collection[tuple[str | None, str | None]] = (),
 ) -> GraphStore:
     """Materialise ``events`` into a graph store; create an in-memory store if none is given.
     ``foreign_untrusted`` names the records another subject's write marked untrusted or rewrote with no ruling
-    (:func:`flagged_records`)."""
+    (:func:`flagged_records`); ``foreign_unreadable`` gives the (record_ref, store) of each unreadable MemoryWrite
+    another subject holds (18.172)."""
     builder = _Builder(
         store or GraphStore(),
         domain or DomainBinding.empty(),
         pseudonym_key,
         foreign_untrusted,
+        foreign_unreadable,
     )
     return builder.build(events)

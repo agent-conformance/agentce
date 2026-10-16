@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, NamedTuple
 
 from .bundle import Bundle
 from .canonical import CanonicalizationError, sha256_hex
@@ -42,6 +42,14 @@ _JSON_WHITESPACE = " \t\r\n"
 _TYPE_RE = re.compile(r"^org\.agent-conformance\.evidence\.(?P<name>[A-Za-z0-9]+)\.v1$")
 
 
+class UnreadableWrite(NamedTuple):
+    """What ingest can still see of an unreadable record that may be a MemoryWrite (SPEC §7.4, 18.172): its raw
+    ``data.record_ref`` and ``data.store`` when each is a string, else ``None``."""
+
+    record_ref: str | None
+    store: str | None
+
+
 @dataclass(frozen=True)
 class Withheld:
     """A quarantined record that may hold evidence a control needs (18.119): quarantine never gives a better
@@ -56,6 +64,8 @@ class Withheld:
     event: dict[str, Any] | None
     subject: str | None
     digest: str | None
+    #: Set on an unreadable record whose raw type names MemoryWrite, or whose type cannot be read at all (18.172).
+    write: UnreadableWrite | None = None
 
 
 @dataclass
@@ -357,6 +367,26 @@ def _unreadable(
         None,
         _opt(event, "subject") if event is not None else None,
         record_digest(event) if event is not None else None,
+        _unreadable_write(event) if event is not None else None,
+    )
+
+
+def _unreadable_write(event: dict[str, Any]) -> UnreadableWrite | None:
+    """The raw MemoryWrite facts of an unreadable ``event``: a MemoryWrite unless its envelope or data names another
+    type, so a record whose type cannot be read counts as one (fail closed, 18.172)."""
+    type_value = event.get("type")
+    name = _event_type_name(type_value) if isinstance(type_value, str) else None
+    data = event.get("data")
+    data = data if isinstance(data, dict) else {}
+    declared = data.get("@type")
+    if "MemoryWrite" not in (name, declared) and (
+        name is not None or isinstance(declared, str)
+    ):
+        return None
+    record, store = data.get("record_ref"), data.get("store")
+    return UnreadableWrite(
+        record if isinstance(record, str) else None,
+        store if isinstance(store, str) else None,
     )
 
 

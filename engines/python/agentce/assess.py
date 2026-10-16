@@ -20,7 +20,7 @@ from .assertions import Assertion, EvidencePointer
 from .catalog import Catalog, ControlSpec
 from .domain import DomainBinding
 from .graph import build_graph, flagged_records
-from .ingest import Withheld, record_digest
+from .ingest import UnreadableWrite, Withheld, record_digest
 from .integrity import IntegrityCaps
 from .iri import event_iri
 from .profile import Profile, Subject
@@ -308,19 +308,35 @@ def _events_by_iri(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
 TIMING_FAMILIES = frozenset({"INC"})
 
 
+@dataclasses.dataclass(frozen=True)
+class _Foreign:
+    """What other subjects' records say of one subject's records: the records their writes marked untrusted or
+    rewrote with no ruling (18.120), and the record_ref and store of each of their MemoryWrites ingest could not
+    read (18.172)."""
+
+    untrusted: frozenset[str]
+    unreadable: tuple[UnreadableWrite, ...]
+
+    def graph(self, events: list[dict[str, Any]], domain: DomainBinding) -> GraphStore:
+        return build_graph(
+            events,
+            domain=domain,
+            foreign_untrusted=self.untrusted,
+            foreign_unreadable=self.unreadable,
+        )
+
+
 @dataclasses.dataclass
 class _View:
     """One capped reading of a subject's records, its graph and judge built on first use."""
 
     events: list[dict[str, Any]]
     domain: DomainBinding
-    foreign_untrusted: frozenset[str]
+    foreign: _Foreign
 
     @functools.cached_property
     def store(self) -> GraphStore:
-        return build_graph(
-            self.events, domain=self.domain, foreign_untrusted=self.foreign_untrusted
-        )
+        return self.foreign.graph(self.events, self.domain)
 
     @functools.cached_property
     def by_iri(self) -> dict[str, dict[str, Any]]:
@@ -345,11 +361,11 @@ class _CappedViews:
         events: list[dict[str, Any]],
         caps: IntegrityCaps,
         domain: DomainBinding,
-        foreign_untrusted: frozenset[str],
+        foreign: _Foreign,
     ) -> None:
         ids = {str(e.get("id")) for e in events}
         self._events, self._domain = events, domain
-        self._foreign = foreign_untrusted
+        self._foreign = foreign
         self._broken = caps.broken & ids
         self._weak = caps.weak & ids
         self._suspect = caps.time_suspect & ids
@@ -500,8 +516,15 @@ def assess_subjects(
     )
     for subject in profile.subjects:
         subject_events = events_by_subject.get(subject.id, [])
-        foreign = frozenset(r for r, by in flagged.items() if by - {subject.id})
-        store = build_graph(subject_events, domain=domain, foreign_untrusted=foreign)
+        foreign = _Foreign(
+            frozenset(r for r, by in flagged.items() if by - {subject.id}),
+            tuple(
+                w.write
+                for w in withheld
+                if w.write is not None and w.subject not in (subject.id, None)
+            ),
+        )
+        store = foreign.graph(subject_events, domain)
         events_by_iri = _events_by_iri(subject_events)
         roles = set(effective_roles(subject.role))
         window = _window(profile, subject_events)
@@ -512,11 +535,7 @@ def assess_subjects(
         # The comparison runs whenever a readable record is withheld, even beside an unreadable one: the unreadable
         # record already decides the outcome, but the exit code still needs what the readable ones show (18.149).
         cf_events = _counterfactual(subject_events, readable) if readable else []
-        cf_store = (
-            build_graph(cf_events, domain=domain, foreign_untrusted=foreign)
-            if cf_events
-            else store
-        )
+        cf_store = foreign.graph(cf_events, domain) if cf_events else store
         cf_by_iri = _events_by_iri(cf_events)
         # Each graph's judge is built once, on the first control whose minimum it may fall below.
         judge = functools.cache(lambda: SourceClassJudge(store, events_by_iri))
