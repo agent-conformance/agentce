@@ -13,7 +13,7 @@
 
 import { confineToRoot, safeIsFile } from "./bundle";
 import { sha256Hex } from "./canonical";
-import { NonCanonicalNumber } from "./json";
+import { asParsed } from "./json";
 import { compareInstants } from "./structural";
 import { byteCompare } from "./util";
 
@@ -60,23 +60,9 @@ export function integrityResultToJson(result: IntegrityResult): Record<string, u
     record.first_bad_index = result.firstBadIndex;
   }
   if (result.anchors.length > 0) {
-    record.anchors = result.anchors.map(plainJson);
+    record.anchors = result.anchors.map(asParsed);
   }
   return record;
-}
-
-/** The manifest's anchors as they were written: a number token the reader kept for the canonical form is a number. */
-function plainJson(value: unknown): unknown {
-  if (value instanceof NonCanonicalNumber) {
-    return value.toNumber();
-  }
-  if (Array.isArray(value)) {
-    return value.map(plainJson);
-  }
-  if (isRecord(value)) {
-    return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, plainJson(child)]));
-  }
-  return value;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

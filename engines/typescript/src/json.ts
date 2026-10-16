@@ -31,6 +31,21 @@ export class NonCanonicalNumber {
   }
 }
 
+/** `value` as `JSON.parse` reads it: a number token {@link parseJson} kept exact becomes the double
+ * `JSON.parse` would give, in nested arrays and objects too. */
+export function asParsed(value: unknown): unknown {
+  if (value instanceof NonCanonicalNumber) {
+    return value.toNumber();
+  }
+  if (Array.isArray(value)) {
+    return value.map(asParsed);
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, asParsed(item)]));
+  }
+  return value;
+}
+
 // A number token only needs the slow path when it has a fraction or exponent, or enough digits to
 // leave the safe-integer range; every other document parses identically with the native parser.
 const NEEDS_TOKEN_SCAN = /[0-9][.eE]|[0-9]{16}/;

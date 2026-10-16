@@ -35,7 +35,7 @@ import { InputError } from "./errors";
 import { pyStrip } from "./failOn";
 import { ingest } from "./ingest";
 import { integrityCaps, verifyStreams } from "./integrity";
-import { NonCanonicalNumber, parseJson } from "./json";
+import { NonCanonicalNumber, asParsed, parseJson } from "./json";
 import { evaluateNoMl } from "./noMl";
 import { parsePythonIntGrammar, toBigIntFromInt } from "./otelGenai";
 import { loadProfile } from "./profile";
@@ -214,21 +214,6 @@ export function adapterConformance(
     throw new Error(`'${kind}' object has no attribute 'get'`);
   }
   return parsed as AdapterDetail;
-}
-
-/** `value` as `JSON.parse` reads it: a number token {@link parseJson} kept exact becomes the double
- * `JSON.parse` would give, in nested arrays and objects too. */
-function asParsed(value: unknown): unknown {
-  if (value instanceof NonCanonicalNumber) {
-    return value.toNumber();
-  }
-  if (Array.isArray(value)) {
-    return value.map(asParsed);
-  }
-  if (value !== null && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, asParsed(item)]));
-  }
-  return value;
 }
 
 /** Python's `int()` of a report count (a number, a boolean or an integer string), exact at any
