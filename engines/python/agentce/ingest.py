@@ -373,14 +373,15 @@ def _unreadable(
 
 def _unreadable_write(event: dict[str, Any]) -> UnreadableWrite | None:
     """The raw MemoryWrite facts of an unreadable ``event``: a MemoryWrite unless its envelope or data names another
-    type, so a record whose type cannot be read counts as one (fail closed, 18.172)."""
+    known type, so a record whose type cannot be read, or names a type the engine does not know, counts as one (fail
+    closed, 18.172)."""
     type_value = event.get("type")
     name = _event_type_name(type_value) if isinstance(type_value, str) else None
     data = event.get("data")
     data = data if isinstance(data, dict) else {}
     declared = data.get("@type")
     if "MemoryWrite" not in (name, declared) and (
-        name is not None or isinstance(declared, str)
+        name in event_types() or declared in event_types()
     ):
         return None
     record, store = data.get("record_ref"), data.get("store")

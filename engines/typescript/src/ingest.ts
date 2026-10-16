@@ -190,7 +190,8 @@ function unreadable(record: QuarantineRecord, event?: Record<string, unknown>): 
 }
 
 /** The raw MemoryWrite facts of an unreadable `event`: a MemoryWrite unless its envelope or data names another
- * type, so a record whose type cannot be read counts as one (fail closed, 18.172). */
+ * known type, so a record whose type cannot be read, or names a type the engine does not know, counts as one (fail
+ * closed, 18.172). */
 function unreadableWrite(event: Record<string, unknown>): { write?: UnreadableWrite } {
   const name = typeof event.type === "string" ? eventTypeName(event.type) : null;
   const data = isRecord(event.data) ? event.data : {};
@@ -198,7 +199,8 @@ function unreadableWrite(event: Record<string, unknown>): { write?: UnreadableWr
   if (
     name !== "MemoryWrite" &&
     declared !== "MemoryWrite" &&
-    (name !== null || typeof declared === "string")
+    ((name !== null && eventTypes().has(name)) ||
+      (typeof declared === "string" && eventTypes().has(declared)))
   ) {
     return {};
   }

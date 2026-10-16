@@ -110,7 +110,8 @@ public final class Ingest {
     }
 
     /** The raw MemoryWrite facts of an unreadable {@code event}: a MemoryWrite unless its envelope or data names
-     * another type, so a record whose type cannot be read counts as one (fail closed, 18.172). */
+     * another known type, so a record whose type cannot be read, or names a type the engine does not know, counts as
+     * one (fail closed, 18.172). */
     private static UnreadableWrite unreadableWrite(JsonNode event) {
         JsonNode type = event.get("type");
         String name = type != null && type.isTextual() ? typeNameOf(type.asText()) : null;
@@ -119,7 +120,8 @@ public final class Ingest {
         boolean declaredText = declared != null && declared.isTextual();
         if (!"MemoryWrite".equals(name)
                 && !(declaredText && "MemoryWrite".equals(declared.asText()))
-                && (name != null || declaredText)) {
+                && ((name != null && Schema.eventTypes().contains(name))
+                        || (declaredText && Schema.eventTypes().contains(declared.asText())))) {
             return null;
         }
         return new UnreadableWrite(textField(data, "record_ref"), textField(data, "store"));
