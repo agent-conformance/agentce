@@ -98,9 +98,25 @@ def _write_jsonl(path: Path, events: list[dict[str, Any]]) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _chain(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The events as their exporter writes them: one export_chained stream, each record carrying its hash and the
+    one before it (SPEC §6.6), so an independent-system record keeps its class rather than reading as a failed
+    stream (§8.1). The hash is SHA-256 over the event without ``data.integrity`` in canonical form, which for these
+    ASCII, number-free records is sorted-key compact JSON."""
+    prev = "0" * 64
+    chained = []
+    for event in events:
+        body = json.dumps(event, sort_keys=True, separators=(",", ":"))
+        digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
+        integrity = {"stream": SOURCE, "strength": "export_chained", "prev": prev, "hash": digest}
+        chained.append({**event, "data": {**event["data"], "integrity": integrity}})
+        prev = digest
+    return chained
+
+
 def _write_bundle(bundle: Path, events: list[dict[str, Any]]) -> None:
     rel = "events/incidents.jsonl"
-    digest = _write_jsonl(bundle / rel, events)
+    digest = _write_jsonl(bundle / rel, _chain(events))
     manifest = {
         "agentce_bundle_version": 1,
         "domain": "runtime-conformance",

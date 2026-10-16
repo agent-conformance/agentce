@@ -12,7 +12,10 @@ or a CI job supplies the cadence; the engine supplies the state, the drift detec
 is how the engine discharges a requirement that assessment be continuous rather than a one-time snapshot
 (the EU AI Act's Art. 72 post-market-monitoring duty is one example).
 
-Each example below is self-contained and runs from a fresh directory.
+Each example below is self-contained and runs from a fresh directory. Each record carries the `integrity`
+member its exporter writes, which holds the record's own hash and the hash of the record before it in the
+same stream. The engine counts an independent-system record at its class only on a stream whose chain
+verifies. Without the member, `INC-02` reads insufficient evidence rather than conformant (SPEC §8.1).
 
 ## Re-running over an unchanged bundle is a no-op
 
@@ -22,7 +25,7 @@ outcome. Re-running the identical evidence bundle changes nothing, so it reports
 ```bash
 mkdir -p rc/events rc/state
 cat > rc/events/incidents.jsonl <<'EOF'
-{"specversion":"1.0","id":"inc1","source":"urn:example:incidents","type":"org.agent-conformance.evidence.Incident.v1","time":"2026-05-02T09:00:00Z","subject":"spiffe://example/agents/a","datacontenttype":"application/ld+json","agentcesourceclass":"independent_system","data":{"@context":"https://agent-conformance.org/contexts/evidence/v1","@type":"Incident","detected_at":"2026-05-02T09:00:00Z","reported_at":"2026-05-02T09:00:00Z","agent":{"id":"spiffe://example/agents/a"}}}
+{"specversion":"1.0","id":"inc1","source":"urn:example:incidents","type":"org.agent-conformance.evidence.Incident.v1","time":"2026-05-02T09:00:00Z","subject":"spiffe://example/agents/a","datacontenttype":"application/ld+json","agentcesourceclass":"independent_system","data":{"@context":"https://agent-conformance.org/contexts/evidence/v1","@type":"Incident","detected_at":"2026-05-02T09:00:00Z","reported_at":"2026-05-02T09:00:00Z","agent":{"id":"spiffe://example/agents/a"},"integrity":{"stream":"urn:example:incidents","strength":"export_chained","prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"49c190a47f041498ea688dd5d586694eddc28a5947ba9fd77daa6bf128dd69eb"}}}
 EOF
 DIGEST=$(shasum -a 256 rc/events/incidents.jsonl | cut -d' ' -f1)
 cat > rc/manifest.json <<EOF
@@ -55,7 +58,7 @@ normal result, not an error:
 ```bash
 mkdir -p rc0/events rc0/state
 cat > rc0/events/incidents.jsonl <<'EOF'
-{"specversion":"1.0","id":"inc1","source":"urn:example:incidents","type":"org.agent-conformance.evidence.Incident.v1","time":"2026-05-02T09:00:00Z","subject":"spiffe://example/agents/a","datacontenttype":"application/ld+json","agentcesourceclass":"independent_system","data":{"@context":"https://agent-conformance.org/contexts/evidence/v1","@type":"Incident","detected_at":"2026-05-02T09:00:00Z","reported_at":"2026-05-02T09:00:00Z","agent":{"id":"spiffe://example/agents/a"}}}
+{"specversion":"1.0","id":"inc1","source":"urn:example:incidents","type":"org.agent-conformance.evidence.Incident.v1","time":"2026-05-02T09:00:00Z","subject":"spiffe://example/agents/a","datacontenttype":"application/ld+json","agentcesourceclass":"independent_system","data":{"@context":"https://agent-conformance.org/contexts/evidence/v1","@type":"Incident","detected_at":"2026-05-02T09:00:00Z","reported_at":"2026-05-02T09:00:00Z","agent":{"id":"spiffe://example/agents/a"},"integrity":{"stream":"urn:example:incidents","strength":"export_chained","prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"49c190a47f041498ea688dd5d586694eddc28a5947ba9fd77daa6bf128dd69eb"}}}
 EOF
 DIGEST=$(shasum -a 256 rc0/events/incidents.jsonl | cut -d' ' -f1)
 cat > rc0/manifest.json <<EOF
@@ -93,7 +96,7 @@ artifact `assess` writes, so `agentce report --validate` would catch a copy of i
 ```bash
 mkdir -p rc2/events rc2/state
 cat > rc2/events/incidents.jsonl <<'EOF'
-{"specversion":"1.0","id":"inc1","source":"urn:example:incidents","type":"org.agent-conformance.evidence.Incident.v1","time":"2026-05-02T09:00:00Z","subject":"spiffe://example/agents/a","datacontenttype":"application/ld+json","agentcesourceclass":"independent_system","data":{"@context":"https://agent-conformance.org/contexts/evidence/v1","@type":"Incident","detected_at":"2026-05-02T09:00:00Z","reported_at":"2026-05-02T09:00:00Z","agent":{"id":"spiffe://example/agents/a"}}}
+{"specversion":"1.0","id":"inc1","source":"urn:example:incidents","type":"org.agent-conformance.evidence.Incident.v1","time":"2026-05-02T09:00:00Z","subject":"spiffe://example/agents/a","datacontenttype":"application/ld+json","agentcesourceclass":"independent_system","data":{"@context":"https://agent-conformance.org/contexts/evidence/v1","@type":"Incident","detected_at":"2026-05-02T09:00:00Z","reported_at":"2026-05-02T09:00:00Z","agent":{"id":"spiffe://example/agents/a"},"integrity":{"stream":"urn:example:incidents","strength":"export_chained","prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"49c190a47f041498ea688dd5d586694eddc28a5947ba9fd77daa6bf128dd69eb"}}}
 EOF
 DIGEST=$(shasum -a 256 rc2/events/incidents.jsonl | cut -d' ' -f1)
 cat > rc2/manifest.json <<EOF
@@ -117,7 +120,7 @@ EOF
 uv run --project engines/python agentce assess --bundle rc2 --profile rc2/profile.yaml --catalog "eu-ai-act@2026.09" --catalog-dir spec/catalogs/base/eu-ai-act --out rc2/out-1 --state rc2/state --json > /dev/null
 
 cat >> rc2/events/incidents.jsonl <<'EOF'
-{"specversion":"1.0","id":"inc2","source":"urn:example:incidents","type":"org.agent-conformance.evidence.Incident.v1","time":"2026-05-02T09:05:00Z","subject":"spiffe://example/agents/a","datacontenttype":"application/ld+json","agentcesourceclass":"independent_system","data":{"@context":"https://agent-conformance.org/contexts/evidence/v1","@type":"Incident","detected_at":"2026-05-02T09:05:00Z","reported_at":"2026-05-02T09:05:00Z"}}
+{"specversion":"1.0","id":"inc2","source":"urn:example:incidents","type":"org.agent-conformance.evidence.Incident.v1","time":"2026-05-02T09:05:00Z","subject":"spiffe://example/agents/a","datacontenttype":"application/ld+json","agentcesourceclass":"independent_system","data":{"@context":"https://agent-conformance.org/contexts/evidence/v1","@type":"Incident","detected_at":"2026-05-02T09:05:00Z","reported_at":"2026-05-02T09:05:00Z","integrity":{"stream":"urn:example:incidents","strength":"export_chained","prev":"49c190a47f041498ea688dd5d586694eddc28a5947ba9fd77daa6bf128dd69eb","hash":"3ec4bcaa02a13b0d58331409625469618f886cb5f95ad94798129caa502ebc58"}}}
 EOF
 DIGEST2=$(shasum -a 256 rc2/events/incidents.jsonl | cut -d' ' -f1)
 cat > rc2/manifest.json <<EOF
@@ -139,8 +142,8 @@ changed:
 ```bash
 mkdir -p rc3/events rc3/state
 cat > rc3/events/incidents.jsonl <<'EOF'
-{"specversion":"1.0","id":"inc-a1","source":"urn:example:incidents","type":"org.agent-conformance.evidence.Incident.v1","time":"2026-05-02T09:00:00Z","subject":"spiffe://example/agents/a","datacontenttype":"application/ld+json","agentcesourceclass":"independent_system","data":{"@context":"https://agent-conformance.org/contexts/evidence/v1","@type":"Incident","detected_at":"2026-05-02T09:00:00Z","reported_at":"2026-05-02T09:00:00Z","agent":{"id":"spiffe://example/agents/a"}}}
-{"specversion":"1.0","id":"inc-b1","source":"urn:example:incidents","type":"org.agent-conformance.evidence.Incident.v1","time":"2026-05-02T09:00:00Z","subject":"spiffe://example/agents/b","datacontenttype":"application/ld+json","agentcesourceclass":"independent_system","data":{"@context":"https://agent-conformance.org/contexts/evidence/v1","@type":"Incident","detected_at":"2026-05-02T09:00:00Z","reported_at":"2026-05-02T09:00:00Z","agent":{"id":"spiffe://example/agents/b"}}}
+{"specversion":"1.0","id":"inc-a1","source":"urn:example:incidents","type":"org.agent-conformance.evidence.Incident.v1","time":"2026-05-02T09:00:00Z","subject":"spiffe://example/agents/a","datacontenttype":"application/ld+json","agentcesourceclass":"independent_system","data":{"@context":"https://agent-conformance.org/contexts/evidence/v1","@type":"Incident","detected_at":"2026-05-02T09:00:00Z","reported_at":"2026-05-02T09:00:00Z","agent":{"id":"spiffe://example/agents/a"},"integrity":{"stream":"urn:example:incidents","strength":"export_chained","prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"094e8492ce169969a1fc1ddf27fcd1664eb06ee336302cd665fefde0129dc2c1"}}}
+{"specversion":"1.0","id":"inc-b1","source":"urn:example:incidents","type":"org.agent-conformance.evidence.Incident.v1","time":"2026-05-02T09:00:00Z","subject":"spiffe://example/agents/b","datacontenttype":"application/ld+json","agentcesourceclass":"independent_system","data":{"@context":"https://agent-conformance.org/contexts/evidence/v1","@type":"Incident","detected_at":"2026-05-02T09:00:00Z","reported_at":"2026-05-02T09:00:00Z","agent":{"id":"spiffe://example/agents/b"},"integrity":{"stream":"urn:example:incidents","strength":"export_chained","prev":"094e8492ce169969a1fc1ddf27fcd1664eb06ee336302cd665fefde0129dc2c1","hash":"6bdf0fdc375a6d59023eef282859560fcd606fc4e2353358565a91f4b17197a5"}}}
 EOF
 DIGEST=$(shasum -a 256 rc3/events/incidents.jsonl | cut -d' ' -f1)
 cat > rc3/manifest.json <<EOF
@@ -170,7 +173,7 @@ EOF
 uv run --project engines/python agentce assess --bundle rc3 --profile rc3/profile.yaml --catalog "eu-ai-act@2026.09" --catalog-dir spec/catalogs/base/eu-ai-act --out rc3/out-1 --state rc3/state --json > /dev/null
 
 cat >> rc3/events/incidents.jsonl <<'EOF'
-{"specversion":"1.0","id":"inc-a2","source":"urn:example:incidents","type":"org.agent-conformance.evidence.Incident.v1","time":"2026-05-02T09:05:00Z","subject":"spiffe://example/agents/a","datacontenttype":"application/ld+json","agentcesourceclass":"independent_system","data":{"@context":"https://agent-conformance.org/contexts/evidence/v1","@type":"Incident","detected_at":"2026-05-02T09:05:00Z","reported_at":"2026-05-02T09:05:00Z"}}
+{"specversion":"1.0","id":"inc-a2","source":"urn:example:incidents","type":"org.agent-conformance.evidence.Incident.v1","time":"2026-05-02T09:05:00Z","subject":"spiffe://example/agents/a","datacontenttype":"application/ld+json","agentcesourceclass":"independent_system","data":{"@context":"https://agent-conformance.org/contexts/evidence/v1","@type":"Incident","detected_at":"2026-05-02T09:05:00Z","reported_at":"2026-05-02T09:05:00Z","integrity":{"stream":"urn:example:incidents","strength":"export_chained","prev":"6bdf0fdc375a6d59023eef282859560fcd606fc4e2353358565a91f4b17197a5","hash":"7afaad868f69f6e9e9deb253d70695eee9a716dccbb0ccfc01177bcd1befe6c4"}}}
 EOF
 DIGEST2=$(shasum -a 256 rc3/events/incidents.jsonl | cut -d' ' -f1)
 cat > rc3/manifest.json <<EOF

@@ -93,6 +93,11 @@ allow:
     class: legitimate
     justification: "Synthetic all-zero policy_digest on the corroborating PolicyDecision of three VG-CND04-PROVENANCE cases; CND-04 reads no digest."
 
+  - path: website/src/content/docs/docs/runtime-conformance.md
+    pattern: zero-digest
+    count: 4
+    class: legitimate
+    justification: "The all-zero prev of the first incident record in each example stream is the SPEC §6.6 genesis link (GENESIS_PREV), not a placeholder digest."
   - path: verification/gates/fixtures/integrity_cap/cases.json
     pattern: zero-digest
     count: 57
