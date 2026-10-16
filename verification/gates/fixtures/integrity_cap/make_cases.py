@@ -1,4 +1,5 @@
-"""Write cases.json for VG-INTEGRITY-CAP (18.132). Run from this folder: python make_cases.py.
+"""Write cases.json for VG-INTEGRITY-CAP (18.132). Run from this folder, in the Python engine's environment (the signed
+stream signs with its signing module): uv run --project ../../../../engines/python python make_cases.py.
 
 SPEC §6.6 and §8.1: an enforcement-point record counts at its class only on a verified stream. A control that reads
 conformant only because of a record on a failed, gap or missing chain reads insufficient_evidence; one resting on an
@@ -17,9 +18,24 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from approval_events import C, NC, SUBJECT, appr, case, dec, ev, idp, ran, write  # noqa: E402
+from approval_events import (  # noqa: E402
+    C,
+    NC,
+    SUBJECT,
+    appr,
+    case,
+    dec,
+    envelope,
+    ev,
+    idp,
+    ran,
+    source_signer,
+    trust_root,
+    write,
+)
 
 GENESIS = "0" * 64
+SOURCE = source_signer()
 #: After every record's time, so an anchored head covers them all.
 ANCHOR_AT = "2026-01-10T02:00:00Z"
 #: Before every record's time, so an anchored stream reads time_suspect.
@@ -37,8 +53,8 @@ def stream_of(cls):
 
 def chain(name, modes, claimer=None):
     """Chain C[name]'s records per source class. `modes` maps a class to how its stream is written (a class it does not
-    name is anchored): anchored, early (anchored before its records: time_suspect), signed (source_signed with a
-    sig_ref file), unsigned (source_signed, no sig_ref), chained (export_chained), gap (a link names a hash the stream
+    name is anchored): anchored, early (anchored before its records: time_suspect), signed (source_signed, each
+    record's sig_ref a trusted envelope over its hash), unsigned (source_signed, no sig_ref), chained (export_chained), gap (a link names a hash the stream
     does not hold), failed (a stored hash that is not its record's), missing (no integrity member), naive-anchor
     (anchored, the anchor's time with no UTC offset), early-chained (export_chained, anchored before its records). `claimer`, if given,
     is a record of another source that claims the enforcement point's stream id with a well-formed link of its own.
@@ -69,9 +85,9 @@ def chain(name, modes, claimer=None):
             block = {"hash": digest(e), "prev": prev, "stream": stream_of(cls), "strength": strength}
             if mode == "gap" and index == len(records) - 1:
                 block["prev"] = hashlib.sha256(b"a link the stream does not hold").hexdigest()
-            if mode == "signed":
+            if mode == "signed":  # a DSSE envelope the run's trust root verifies, naming the record's own hash
                 block["sig_ref"] = f"signatures/{cls}-{e['id']}.dsse.json"
-                files[block["sig_ref"]] = json.dumps({"payloadType": "application/vnd.in-toto+json"}) + "\n"
+                files[block["sig_ref"]] = envelope([block["hash"]], SOURCE)
             e["data"]["integrity"] = block
             prev = block["hash"]
         if mode == "failed":  # the stored hash is not the record's: the record changed after it was hashed
@@ -106,6 +122,7 @@ def chain(name, modes, claimer=None):
         entry["streams"] = streams
     if files:
         entry["files"] = files
+        entry["trust_root"] = trust_root(SOURCE)
 
 
 def gated_pass():

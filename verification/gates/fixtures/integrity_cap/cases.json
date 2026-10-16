@@ -196,8 +196,16 @@
         }
       ],
       "files": {
-        "signatures/enforcement_point-t0-gate.dsse.json": "{\"payloadType\": \"application/vnd.in-toto+json\"}\n",
-        "signatures/enforcement_point-t0.dsse.json": "{\"payloadType\": \"application/vnd.in-toto+json\"}\n"
+        "signatures/enforcement_point-t0-gate.dsse.json": "{\n  \"payloadType\": \"application/vnd.in-toto+json\",\n  \"payload\": \"eyJfdHlwZSI6Imh0dHBzOi8vaW4tdG90by5pby9TdGF0ZW1lbnQvdjEiLCJwcmVkaWNhdGUiOnt9LCJwcmVkaWNhdGVUeXBlIjoiaHR0cHM6Ly9hZ2VudC1jb25mb3JtYW5jZS5vcmcvYXR0ZXN0YXRpb25zL3N0cmVhbS1zZWdtZW50L3YxIiwic3ViamVjdCI6W3siZGlnZXN0Ijp7InNoYTI1NiI6Ijk3YTNlOTFmNTliNjBlNTBkZDBkYjM4YTgwMmYxNDdkMjM0NWVjM2VhYTRjZjJhZjUxZGZlZjgxMGFkZmY1NDUifSwibmFtZSI6InN0cmVhbS1zZWdtZW50In1dfQ==\",\n  \"signatures\": [\n    {\n      \"keyid\": \"sha256:78cb40da63ad55318d38518cee0b2aea18120dc45f520661201de65888b5fc7f\",\n      \"sig\": \"UV+h5uVu2sksPFvPC0aKFE0LTLhwci/dr9bXV5K4CDyktw4j0sbcg+E9w6zCKLLOmC3QJZF89I3+XCg6ku60Cg==\"\n    }\n  ]\n}\n",
+        "signatures/enforcement_point-t0.dsse.json": "{\n  \"payloadType\": \"application/vnd.in-toto+json\",\n  \"payload\": \"eyJfdHlwZSI6Imh0dHBzOi8vaW4tdG90by5pby9TdGF0ZW1lbnQvdjEiLCJwcmVkaWNhdGUiOnt9LCJwcmVkaWNhdGVUeXBlIjoiaHR0cHM6Ly9hZ2VudC1jb25mb3JtYW5jZS5vcmcvYXR0ZXN0YXRpb25zL3N0cmVhbS1zZWdtZW50L3YxIiwic3ViamVjdCI6W3siZGlnZXN0Ijp7InNoYTI1NiI6IjQwZjc4ZGIzYTFhMzcyNjQ1NWJkYjk3NTAzMzRiMTc4OTNjNjU4MDE3NzNkNzliOGY4NWQxZTIyZDc0NGJiZGUifSwibmFtZSI6InN0cmVhbS1zZWdtZW50In1dfQ==\",\n  \"signatures\": [\n    {\n      \"keyid\": \"sha256:78cb40da63ad55318d38518cee0b2aea18120dc45f520661201de65888b5fc7f\",\n      \"sig\": \"87mNRCA349clrf/7M7f40GfFJrpIdQB2sxq5na6NjzllG9UZjCRih/lxHy14QuCD0buHX6hNfOUIBI0h3pYhCQ==\"\n    }\n  ]\n}\n"
+      },
+      "trust_root": {
+        "keys": {
+          "sha256:78cb40da63ad55318d38518cee0b2aea18120dc45f520661201de65888b5fc7f": {
+            "public_key": "DPH0OjYVUy+o4wcbxY5+Mkj0vB1VwXyX2HEWRbl9zV4=",
+            "identity": "urn:src:enforcement_point"
+          }
+        }
       }
     },
     "anchored-stream-enforcement-point": {

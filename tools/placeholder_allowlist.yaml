@@ -822,6 +822,6 @@ allow:
 
   - path: verification/gates/fixtures/stream_source_bound/cases.json
     pattern: zero-digest
-    count: 8
+    count: 20
     class: legitimate
     justification: "Genesis all-zero prev pointer at the head of each VG-STREAM-SOURCE-BOUND integrity chain case (no predecessor block)."

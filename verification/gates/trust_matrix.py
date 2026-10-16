@@ -71,8 +71,6 @@ DIGEST = "320f5f5427995641ea964c6cdc9b2a8ec36b3d19b4ec99ce0872e8b1bcd2e620"
 #: The cell ids open.json may hold. Closing a cell removes it here and from open.json in one commit; nothing is added.
 OPEN_PINNED: frozenset[str] = frozenset(
     {
-        "c05-integ-verified_signed-gateway-user",
-        "c05-integ-verified_signed-ingress-user",
         "c06-acted-EP-missing",
         "c06-acted-EP-user",
         "c06-ep-deny-no-refusal",
@@ -88,7 +86,6 @@ OPEN_PINNED: frozenset[str] = frozenset(
         "r02-grid-none-ep_untrusted",
         "r02-grid-sr_trusted-ep_untrusted",
         "r02-grid-unmarked_trusted_origin-ep_untrusted",
-        "r02-integ-verified_signed-ep_trusted",
         "r02-other-subject-ep_quarantined-ep_trusted",
         "r02-other-subject-ep_untrusted-ep_trusted",
         "r02-other-subject-sr_untrusted-ep_trusted",

@@ -4,6 +4,7 @@ records on it. Every approver meets the SPEC §10.4 human-actor rule unless a ca
 time (all at AT by default)."""
 
 import copy
+import hashlib
 import json
 from pathlib import Path
 
@@ -149,6 +150,8 @@ def case(
     exit=2,
     integrity=None,
     streams=None,
+    files=None,
+    trust=None,
 ):
     C[name] = {
         "control": control,
@@ -165,9 +168,47 @@ def case(
         C[name]["expected"]["integrity"] = integrity
     if streams is not None:
         C[name]["streams"] = streams
+    if files is not None:  # a case's other bundle files (signature envelopes)
+        C[name]["files"] = files
+    if trust is not None:  # the trust root the run is given (--trust-root)
+        C[name]["trust_root"] = trust
 
 
 TWO = [idp("s1"), idp("s2", who="u3")]
+
+
+# Source signatures (SPEC §6.6, 18.155): a source_signed record counts only when its sig_ref envelope verifies against
+# the run's own trust root (--trust-root) and its in-toto Statement names the record's hash or a later hash of its
+# chain. The keys are fixed Ed25519 keys derived from a label, so cases.json is reproducible (Ed25519 is
+# deterministic); signing needs the engine's own module, so a make_cases.py that signs runs in the Python engine's
+# environment (uv run --project engines/python).
+def source_signer(label="source"):
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    from agentce import signing
+
+    seed = hashlib.sha256(f"agentce gate fixture {label} key".encode()).digest()
+    return signing.KmsSigner(Ed25519PrivateKey.from_private_bytes(seed))
+
+
+def envelope(hashes, signer):
+    """A DSSE envelope `signer` signs over an in-toto Statement naming `hashes` as its subjects, as file text."""
+    from agentce import signing
+
+    statement = {
+        "_type": signing.INTOTO_STATEMENT_TYPE,
+        "subject": [{"name": "stream-segment", "digest": {"sha256": h}} for h in hashes],
+        "predicateType": "https://agent-conformance.org/attestations/stream-segment/v1",
+        "predicate": {},
+    }
+    return json.dumps(signing.sign_statement(statement, signer), indent=2) + "\n"
+
+
+def trust_root(signer):
+    """The trust root document that trusts `signer`'s key alone (signing.TrustRoot.document's shape)."""
+    from agentce import signing
+
+    return signing.TrustRoot.document(signer.keyid, signer.public_key_b64, "urn:src:enforcement_point")
 
 
 def write():

@@ -79,6 +79,8 @@ for name, case in cases.items():
     (bundle.parent / "expected").write_text(
         f"{expected['outcome']} {failing} {expected['quarantined']} {expected['exit']}\n", encoding="utf-8"
     )
+    if "trust_root" in case:  # the run's own trust root (--trust-root): the keys a source signature verifies against
+        (bundle.parent / "trust-root.json").write_text(json.dumps(case["trust_root"]) + "\n", encoding="utf-8")
     if "integrity" in expected:
         lines = "".join(f"{e['stream']} {e['status']}\n" for e in expected["integrity"])
         (bundle.parent / "integrity").write_text(lines, encoding="utf-8")
@@ -117,8 +119,10 @@ check_cases() {
     want="$(cat "$dir/expected")"
     out="$dir/out-$engine"
     code=0
+    trust=()
+    [ -f "$dir/trust-root.json" ] && trust=(--trust-root "$dir/trust-root.json")
     run "$engine" assess --bundle "$dir/bundle" --profile "$fixtures/$(cat "$dir/profile")" \
-      --domain "$fixtures/domain.linkml.yaml" --out "$out" \
+      --domain "$fixtures/domain.linkml.yaml" --out "$out" ${trust[@]+"${trust[@]}"} \
       >/dev/null 2>"$dir/err-$engine" || code=$?
     if [ ! -f "$out/assertions.json" ]; then
       echo "$label: $engine wrote no assertions.json for $name (exit $code)" >&2

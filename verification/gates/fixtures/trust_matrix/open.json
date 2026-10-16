@@ -1,14 +1,4 @@
 {
-  "c05-integ-verified_signed-gateway-user": {
-    "owner": "18.155",
-    "reason": "GAP at 78bdb0da; closed by 18.155's matrix check",
-    "status": "GAP"
-  },
-  "c05-integ-verified_signed-ingress-user": {
-    "owner": "18.155",
-    "reason": "GAP at 78bdb0da; closed by 18.155's matrix check",
-    "status": "GAP"
-  },
   "c06-acted-EP-missing": {
     "owner": "18.173",
     "reason": "GAP at 78bdb0da; closed by 18.173's matrix check",
@@ -82,11 +72,6 @@
   "r02-grid-unmarked_trusted_origin-ep_untrusted": {
     "owner": "18.172",
     "reason": "GAP at 78bdb0da; closed by 18.172's matrix check",
-    "status": "GAP"
-  },
-  "r02-integ-verified_signed-ep_trusted": {
-    "owner": "18.155",
-    "reason": "GAP at 78bdb0da; closed by 18.155's matrix check",
     "status": "GAP"
   },
   "r02-other-subject-ep_quarantined-ep_trusted": {

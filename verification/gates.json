@@ -4196,7 +4196,7 @@
     },
     {
       "id": "VG-STREAM-SOURCE-BOUND",
-      "title": "A record's claimed integrity stream never joins it to another source's time-order group or hash chain, in all three engines: time order and integrity chains are keyed on (source, claimed stream), so an agent's own record that names the enforcement point's stream can neither get the enforcement point's genuine ToolCall quarantined time_order (18.147) nor break its chain (18.151)",
+      "title": "A record's claimed integrity stream never joins it to another source's time-order group or hash chain, in all three engines: time order and integrity chains are keyed on (source, claimed stream), so an agent's own record that names the enforcement point's stream can neither get the enforcement point's genuine ToolCall quarantined time_order (18.147) nor break its chain (18.151); and a source_signed chain reads verified only when its sig_ref is a DSSE envelope that verifies against the run's own trust root and names that record's own hash (18.155)",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -4214,7 +4214,7 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/stream_source_bound/cases.json (18: CND-02 with the agent's own routine Decision x9, recorded later than the enforcement point's ToolCall, claiming the enforcement point's stream from a self_report source, an undeclared source and an independent_system source, claiming the gateway's own claimed stream id, arriving after the ToolCall with an earlier time, and naming another subject, against the twin where x9 claims nothing; x9 claiming the identity provider's stream before an approve through the login and before a reject, against their twins; and one source's own later record quarantining its earlier ToolCall in the stream both claim; and the agent's bad-hash record read between the gateway's two chained ToolCalls claiming their stream, against the twin where it claims nothing; and the gateway's export_anchored chain with the manifest's anchor, later or earlier than the records, against the agent's own well-formed export_anchored link claiming the same id; every integrity stream and status pinned) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs, so each hijack case reads exactly like its twin (non-conformant, failing d1, nothing quarantined) one source still keeps time order within its own stream, and the gateway's chain reads verified_weak with or without the hijacker, which gets its own failed entry under the same stream id; with two sources on one anchored id neither chain reads verified, and an early anchor still marks every chain time_suspect",
+        "pass": "every case in verification/gates/fixtures/stream_source_bound/cases.json (30: CND-02 with the agent's own routine Decision x9, recorded later than the enforcement point's ToolCall, claiming the enforcement point's stream from a self_report source, an undeclared source and an independent_system source, claiming the gateway's own claimed stream id, arriving after the ToolCall with an earlier time, and naming another subject, against the twin where x9 claims nothing; x9 claiming the identity provider's stream before an approve through the login and before a reject, against their twins; and one source's own later record quarantining its earlier ToolCall in the stream both claim; and the agent's bad-hash record read between the gateway's two chained ToolCalls claiming their stream, against the twin where it claims nothing; and the gateway's export_anchored chain with the manifest's anchor, later or earlier than the records, against the agent's own well-formed export_anchored link claiming the same id; and the gateway's source_signed chain whose one envelope is signed by the run's trusted key over both records' hashes, names only the head's hash, names only the head's while the export host has swapped in its own first record, is a file that is no DSSE envelope, is signed by a key the run does not trust, names a hash the chain does not hold, names only the first record's hash, has a payload swapped after signing, signs a payload that is no in-toto Statement, is read with no trust root, or is signed by the engine's vendored development key, with no trust root or with the run naming that key as its trust root; every integrity stream and status pinned) gives the expected control outcome, failing events, quarantined record count and assess exit code from the real Python, TypeScript and Java CLIs, so each hijack case reads exactly like its twin (non-conformant, failing d1, nothing quarantined) one source still keeps time order within its own stream, and the gateway's chain reads verified_weak with or without the hijacker, which gets its own failed entry under the same stream id; with two sources on one anchored id neither chain reads verified, and an early anchor still marks every chain time_suspect; the source_signed chain reads verified only when the trusted key's statement names every record's own hash, and unsigned in every other signed case",
         "fail": "any case gives another outcome, another set of failing events, another quarantined count, another exit code or other integrity streams and statuses in any engine"
       },
       "fix_hint": "Run bash verification/gates/approval_outcome.sh stream_source_bound; it names the engine, the case and what it gave against what was expected. Ingest (ingest.py / ingest.ts / Ingest.java) keeps the last time per ordering key, order_key / orderKey = (the record's source, the stream it claims or its source); the quarantine record's stream field keeps the claimed stream. Integrity (integrity.py / integrity.ts / Integrity.java) groups chains on (claimed stream, source) orders results by stream, then source, and caps verified at verified_weak for a stream id two sources claim.",
@@ -4272,6 +4272,60 @@
           "file": "engines/java/src/main/java/org/agentce/Integrity.java",
           "search": "if (result.status.equals(VERIFIED)) {",
           "replace": "if (result.status.equals(UNSIGNED)) {"
+        },
+        {
+          "description": "Python counts a sig_ref as signed without verifying its DSSE envelope's signature against the trust root or the hashes its statement names, so a file that is no envelope reads verified",
+          "file": "engines/python/agentce/integrity.py",
+          "search": "    return block.get(\"hash\") in envelopes[sig_ref]",
+          "replace": "    return True"
+        },
+        {
+          "description": "TypeScript counts a sig_ref as signed without verifying its DSSE envelope's signature",
+          "file": "engines/typescript/src/integrity.ts",
+          "search": "  return typeof block.hash === \"string\" && digests.has(block.hash);",
+          "replace": "  return true;"
+        },
+        {
+          "description": "Java counts a sig_ref as signed without verifying its DSSE envelope's signature",
+          "file": "engines/java/src/main/java/org/agentce/Integrity.java",
+          "search": "        return hash != null && hash.isTextual() && digests.contains(hash.textValue());",
+          "replace": "        return true;"
+        },
+        {
+          "description": "Python counts a record as signed by any trusted envelope at its sig_ref, whatever hashes the signature names, so a later record's signature covers a forged earlier one",
+          "file": "engines/python/agentce/integrity.py",
+          "search": "    return block.get(\"hash\") in envelopes[sig_ref]",
+          "replace": "    return bool(envelopes[sig_ref])"
+        },
+        {
+          "description": "TypeScript counts a record as signed by any trusted envelope at its sig_ref, whatever hashes the signature names",
+          "file": "engines/typescript/src/integrity.ts",
+          "search": "  return typeof block.hash === \"string\" && digests.has(block.hash);",
+          "replace": "  return digests.size > 0;"
+        },
+        {
+          "description": "Java counts a record as signed by any trusted envelope at its sig_ref, whatever hashes the signature names",
+          "file": "engines/java/src/main/java/org/agentce/Integrity.java",
+          "search": "        return hash != null && hash.isTextual() && digests.contains(hash.textValue());",
+          "replace": "        return !digests.isEmpty();"
+        },
+        {
+          "description": "Python counts a source signature by the vendored development key (its seed is published) when the run names that key's trust root",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    return None if explicit is None else explicit.without(signing.vendored_trust())",
+          "replace": "    return explicit"
+        },
+        {
+          "description": "TypeScript counts a source signature by the vendored development key when the run names that key's trust root",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "  return explicitTrustRoot(flagValue)?.without(vendoredTrust()) ?? null;",
+          "replace": "  return explicitTrustRoot(flagValue);"
+        },
+        {
+          "description": "Java counts a source signature by the vendored development key when the run names that key's trust root",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "                return explicit == null ? null : explicit.without(Verify.vendoredTrust());",
+          "replace": "                return explicit;"
         }
       ]
     },
@@ -4295,7 +4349,7 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/integrity_cap/cases.json (21, written by make_cases.py: CND-02's gated pass with the enforcement point's records on a signed, anchored, unsigned, export_chained, gap, failed and integrity-less stream; a source_signed stream with no signatures read against an early anchor or with record times carrying no UTC offset; an anchored stream whose only anchor time has no offset; an export_chained stream anchored before its records; the independent system's export_chained and failed streams; the agent's own failed stream; a violation on a failed stream; INC-02's incident record on a time_suspect, an unplaceable-anchor and a verified stream, and CND-02 outside a timing control on a time_suspect stream; and a source claiming the genuine stream id beside a violation, against its twin) gives the expected control outcome, failing events, quarantined count, exit code and every integrity stream and status from the real Python, TypeScript and Java CLIs. \"Signed\" here means the sig_ref names a file in the bundle; 18.155 verifies its content",
+        "pass": "every case in verification/gates/fixtures/integrity_cap/cases.json (21, written by make_cases.py: CND-02's gated pass with the enforcement point's records on a signed, anchored, unsigned, export_chained, gap, failed and integrity-less stream; a source_signed stream with no signatures read against an early anchor or with record times carrying no UTC offset; an anchored stream whose only anchor time has no offset; an export_chained stream anchored before its records; the independent system's export_chained and failed streams; the agent's own failed stream; a violation on a failed stream; INC-02's incident record on a time_suspect, an unplaceable-anchor and a verified stream, and CND-02 outside a timing control on a time_suspect stream; and a source claiming the genuine stream id beside a violation, against its twin) gives the expected control outcome, failing events, quarantined count, exit code and every integrity stream and status from the real Python, TypeScript and Java CLIs. \"Signed\" here means each record's sig_ref is a DSSE envelope over its hash that verifies against the trust root the case gives the run (--trust-root, 18.155)",
         "fail": "any case gives another outcome, another set of failing events, another quarantined count, another exit code or other integrity streams and statuses in any engine"
       },
       "fix_hint": "Run bash verification/gates/approval_outcome.sh integrity_cap; it names the engine, the case and what it gave against what was expected. The caps come from integrity_caps / integrityCaps (integrity.py / integrity.ts / Integrity.java) over verify_streams' results, and assess_subjects / assessSubjects applies them as a ceiling on a conformant outcome (_CappedViews / CappedViews in assess.py / assess.ts / Assess.java).",
@@ -4327,14 +4381,14 @@
         {
           "description": "TypeScript counts an anchor whose time cannot be placed",
           "file": "engines/typescript/src/integrity.ts",
-          "search": "strengthStatus(strength, blocks, latest !== null, bundleRoot)",
-          "replace": "strengthStatus(strength, blocks, anchors.length > 0, bundleRoot)"
+          "search": "    latest !== null,\n    bundleRoot,\n    sourceTrust,",
+          "replace": "    anchors.length > 0,\n    bundleRoot,\n    sourceTrust,"
         },
         {
           "description": "Java counts an anchor whose time cannot be placed",
           "file": "engines/java/src/main/java/org/agentce/Integrity.java",
-          "search": "strengthStatus(strength, blocks, latest != null, bundleRoot)",
-          "replace": "strengthStatus(strength, blocks, !anchors.isEmpty(), bundleRoot)"
+          "search": "strengthStatus(strength, blocks, latest != null, bundleRoot, sourceTrust)",
+          "replace": "strengthStatus(strength, blocks, !anchors.isEmpty(), bundleRoot, sourceTrust)"
         }
       ]
     },
