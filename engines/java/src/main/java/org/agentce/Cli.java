@@ -574,11 +574,7 @@ global options:
      * on the trust root. Mirrors {@code _source_trust}. */
     private static Verify.TrustRoot sourceTrust(String flagValue, List<JsonNode> records) {
         for (JsonNode record : records) {
-            JsonNode data = record.get("data");
-            JsonNode block = data != null && data.isObject() ? data.get("integrity") : null;
-            if (block != null && block.isObject() && block.has("strength")
-                    && block.get("strength").isTextual()
-                    && block.get("strength").textValue().equals(Integrity.SOURCE_SIGNED)) {
+            if (Integrity.SOURCE_SIGNED.equals(record.path("data").path("integrity").path("strength").textValue())) {
                 Verify.TrustRoot explicit = explicitTrustRoot(flagValue);
                 return explicit == null ? null : explicit.without(Verify.vendoredTrust());
             }

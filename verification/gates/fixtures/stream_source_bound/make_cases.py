@@ -380,12 +380,12 @@ signed(
     lambda h, first: envelope([hashlib.sha256(b"a record this stream does not hold").hexdigest()], SOURCE),
     "unsigned",
 )
-# A statement naming only the chain's first record covers that record, not the later one: the stream is unsigned.
 # A statement naming only the chain's head covers that record, not the earlier one: a record's hash leaves out its
 # prev, so the head commits to nothing before it.
 signed("integrity-source-signed-head-only", lambda h, first: envelope([h], SOURCE), "unsigned")
 # The source signed the head alone; the export host swapped in its own first record and re-pointed the head's prev.
 signed("integrity-source-signed-forged-prefix", lambda h, first: envelope([h], SOURCE), "unsigned", forge=True)
+# A statement naming only the chain's first record covers that record, not the later one: the stream is unsigned.
 signed("integrity-source-signed-first-link-only", lambda h, first: envelope([first], SOURCE), "unsigned")
 signed("integrity-source-signed-tampered-payload", tampered, "unsigned")
 signed("integrity-source-signed-not-intoto", not_intoto, "unsigned")

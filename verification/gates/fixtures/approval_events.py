@@ -178,8 +178,7 @@ TWO = [idp("s1"), idp("s2", who="u3")]
 
 
 # Source signatures (SPEC §6.6, 18.155): a source_signed record counts only when its sig_ref envelope verifies against
-# the run's own trust root (--trust-root) and its in-toto Statement names the record's hash or a later hash of its
-# chain. The keys are fixed Ed25519 keys derived from a label, so cases.json is reproducible (Ed25519 is
+# the run's own trust root (--trust-root) and its in-toto Statement names the record's own hash. The keys are fixed Ed25519 keys derived from a label, so cases.json is reproducible (Ed25519 is
 # deterministic); signing needs the engine's own module, so a make_cases.py that signs runs in the Python engine's
 # environment (uv run --project engines/python).
 def source_signer(label="source"):

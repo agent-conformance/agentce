@@ -11,8 +11,8 @@
  * port of the Python reference; its results inform findings and do not feed assertions (SPEC §8.1).
  *
  * A `source_signed` stream reads verified only when every event's `sig_ref` names a DSSE envelope in the bundle
- * that verifies against a key the run trusts and whose in-toto Statement names that event's hash, or the hash of a
- * later event of the same chain (the head of the signed segment; SPEC §6.6). The trusted keys are the operator's own
+ * that verifies against a key the run trusts and whose in-toto Statement names that event's own hash (SPEC §6.6); one
+ * envelope signs a segment by naming each of its events' hashes. The trusted keys are the operator's own
  * trust root (`--trust-root` or `AGENTCE_TRUST_ROOT`), never the development root vendored in the engine, whose
  * private seed is published: with no trust root no source signature counts, and the stream reads unsigned.
  */

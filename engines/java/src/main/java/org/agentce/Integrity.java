@@ -22,8 +22,8 @@ import java.util.Set;
  * into the caps the assessment applies (SPEC §6.6, §8.1). A faithful port of the reference.
  *
  * <p>A {@code source_signed} stream reads verified only when every event's {@code sig_ref} names a DSSE envelope in
- * the bundle that verifies against a key the run trusts and whose in-toto Statement names that event's hash, or the
- * hash of a later event of the same chain (the head of the signed segment; SPEC §6.6). The trusted keys are the
+ * the bundle that verifies against a key the run trusts and whose in-toto Statement names that event's own hash
+ * (SPEC §6.6); one envelope signs a segment by naming each of its events' hashes. The trusted keys are the
  * operator's own trust root ({@code --trust-root} or {@code AGENTCE_TRUST_ROOT}), never the development root vendored
  * in the engine, whose private seed is published: with no trust root no source signature counts, and the stream reads
  * unsigned.
