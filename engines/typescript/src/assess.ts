@@ -13,7 +13,7 @@ import { effectiveRoles } from "./applicability";
 import { type Assertion, type EvidencePointer, makeAssertion } from "./assertions";
 import { type Catalog, type ControlSpec, evidenceShapeFor, shapeFor } from "./catalog";
 import type { DomainBinding } from "./domain";
-import { buildGraph } from "./graph";
+import { buildGraph, flaggedRecords } from "./graph";
 import { type Withheld, digestOf } from "./ingest";
 import type { IntegrityCaps } from "./integrity";
 import { eventIri } from "./iri";
@@ -337,8 +337,12 @@ interface View {
   judge: () => SourceClassJudge;
 }
 
-function makeView(events: Event[], domain: DomainBinding): View {
-  const store = lazy(() => buildGraph(events, { domain }));
+function makeView(
+  events: Event[],
+  domain: DomainBinding,
+  foreignUntrusted: ReadonlySet<string>,
+): View {
+  const store = lazy(() => buildGraph(events, { domain, foreignUntrusted }));
   const byIri = lazy(() => eventsByIriOf(events));
   return { events, store, byIri, judge: lazy(() => new SourceClassJudge(store(), byIri())) };
 }
@@ -360,6 +364,7 @@ class CappedViews {
     private readonly events: Event[],
     caps: IntegrityCaps,
     private readonly domain: DomainBinding,
+    private readonly foreign: ReadonlySet<string>,
   ) {
     const ids = new Set(events.map((e) => String(e.id)));
     const mine = (set: ReadonlySet<string>) => new Set([...set].filter((id) => ids.has(id)));
@@ -381,6 +386,7 @@ class CappedViews {
       view = makeView(
         this.events.filter((e) => !dropped.has(String(e.id))),
         this.domain,
+        this.foreign,
       );
       this.views.set(key, view);
     }
@@ -513,9 +519,17 @@ export function assessSubjects(
 ): Assertion[] {
   const assertions: Assertion[] = [];
   const eventsBySubject = indexBySubject(accepted);
+  // A record another subject's write marked untrusted, held or withheld, is never ruled on for this one (18.120).
+  const flagged = flaggedRecords([
+    ...accepted,
+    ...withheld.map((w) => w.event).filter((e): e is Event => e !== null),
+  ]);
   for (const subject of profile.subjects) {
     const subjectEvents = eventsBySubject.get(subject.id) ?? [];
-    const store = buildGraph(subjectEvents, { domain });
+    const foreign = new Set(
+      [...flagged].filter(([, by]) => [...by].some((s) => s !== subject.id)).map(([r]) => r),
+    );
+    const store = buildGraph(subjectEvents, { domain, foreignUntrusted: foreign });
     const eventsByIri = eventsByIriOf(subjectEvents);
     const roles = new Set(effectiveRoles(subject.role));
     const win = window(profile, subjectEvents);
@@ -526,12 +540,13 @@ export function assessSubjects(
     // The comparison runs whenever a readable record is withheld, even beside an unreadable one: the unreadable record
     // already decides the outcome, but the exit code still needs what the readable ones show (18.149).
     const cfEvents = readable.length > 0 ? counterfactual(subjectEvents, readable) : [];
-    const cfStore = cfEvents.length > 0 ? buildGraph(cfEvents, { domain }) : store;
+    const cfStore =
+      cfEvents.length > 0 ? buildGraph(cfEvents, { domain, foreignUntrusted: foreign }) : store;
     const cfByIri = eventsByIriOf(cfEvents);
     // Each graph's judge is built once, on the first control whose minimum it may fall below.
     const judge = lazy(() => new SourceClassJudge(store, eventsByIri));
     const cfJudge = lazy(() => new SourceClassJudge(cfStore, cfByIri));
-    const capped = new CappedViews(subjectEvents, integrity, domain);
+    const capped = new CappedViews(subjectEvents, integrity, domain, foreign);
     for (const catalog of catalogs) {
       for (const control of catalog.controls) {
         let assertion = assertControl(

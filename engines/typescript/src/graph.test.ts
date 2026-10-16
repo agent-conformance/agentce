@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { DomainBinding } from "./domain";
-import { buildGraph } from "./graph";
+import { buildGraph, flaggedRecords } from "./graph";
 
 const TESTDATA = join(__dirname, "..", "testdata");
 
@@ -262,6 +262,73 @@ test("ROB-02: ruled on is independent of event order", () => {
   const events = [write, withInputs(decisionEvent("d1"), ["mem:r1"])];
   assert.deepEqual(ruled(events), ["false"]);
   assert.deepEqual(ruled([...events].reverse()), ["false"]);
+});
+
+test("ROB-02: an unruled rewrite of a guarded record is not ruled on (18.120)", () => {
+  const guarded = memoryEvent("w1", "MemoryWrite", { record_ref: "mem:r1", trust: "trusted" });
+  const used = withInputs(decisionEvent("d1"), ["mem:r1"]);
+  const filtered = memoryEvent("m1", "MemoryRead", {
+    record_refs: ["mem:r1"],
+    trust_min: "trusted",
+  });
+  for (const rewrite of [
+    selfReport(memoryEvent("w2", "MemoryWrite", { record_ref: "mem:r1" })),
+    selfReport(memoryEvent("w2", "MemoryWrite", { record_ref: "mem:r1", trust: "trusted" })),
+    memoryEvent("w2", "MemoryWrite", { record_ref: "mem:r1" }),
+  ]) {
+    assert.deepEqual(ruled([guarded, rewrite, used]), ["false"]);
+    assert.deepEqual(ruled([rewrite, used, guarded]), ["false"]);
+    assert.deepEqual(ruled([guarded, rewrite, filtered, used]), ["true"]);
+  }
+  const again = memoryEvent("w2", "MemoryWrite", { record_ref: "mem:r1", guard_verdict: "allow" });
+  assert.deepEqual(ruled([guarded, again, used]), ["true"]);
+});
+
+test("ROB-02: a record another subject flagged is never ruled on (18.120)", () => {
+  const write = memoryEvent("w1", "MemoryWrite", { record_ref: "mem:r1", trust: "trusted" });
+  const filtered = memoryEvent("m1", "MemoryRead", {
+    record_refs: ["mem:r1"],
+    trust_min: "trusted",
+    refs: { consumer: "agentce:event/d1" },
+  });
+  const events = [write, filtered, decisionEvent("d1")];
+  assert.deepEqual(ruled(events), ["true"]);
+  for (const [foreign, expected] of [
+    ["mem:r1", "false"],
+    ["mem:r2", "true"],
+  ]) {
+    const store = buildGraph(events, {
+      domain: MINOR_DOMAIN,
+      foreignUntrusted: new Set([foreign]),
+    });
+    assert.deepEqual(store.literalValues("agentce:event/d1", "agentce:untrustedContentRuledOn"), [
+      expected,
+    ]);
+    assert.deepEqual(store.literalValues("agentce:event/d1", "agentce:robustToUntrustedContent"), [
+      "true",
+    ]);
+  }
+});
+
+test("ROB-02: flaggedRecords names every subject that flagged a record (18.120)", () => {
+  const write = (id: string, subject: string, data: Record<string, unknown>) => ({
+    ...memoryEvent(id, "MemoryWrite", { record_ref: "mem:r1", ...data }),
+    subject,
+  });
+  const events = [
+    write("w1", "a", { trust: "untrusted" }),
+    write("w2", "b", { guard_verdict: "block" }),
+    write("w3", "c", { trust: "trusted" }),
+    write("w4", "d", { provenance_origin_class: "tool_output" }),
+    write("w5", "e", { provenance_origin_class: "tool_output", trust: "trusted" }),
+    memoryEvent("m1", "MemoryRead", { record_refs: ["mem:r1"], trust_min: "untrusted" }),
+    selfReport(write("w6", "f", { trust: "trusted" })),
+  ];
+  const sorted = (m: Map<string, Set<string>>) => [...m].map(([r, by]) => [r, [...by].sort()]);
+  assert.deepEqual(sorted(flaggedRecords(events)), [["mem:r1", ["a", "b", "d", "f"]]]);
+  assert.deepEqual(sorted(flaggedRecords([...events].reverse())), [
+    ["mem:r1", ["a", "b", "d", "f"]],
+  ]);
 });
 
 test("ROB-02: an untrusted origin class with no ruling taints", () => {
