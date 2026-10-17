@@ -515,7 +515,9 @@ def test_an_unknown_version_of_memory_write_is_withheld_as_unreadable(
         write("w8", "org.agent-conformance.evidence.MemoryRead", read),
     ]
     result = _ingest(make_bundle, items)
-    assert [r.reason for r in result.quarantined] == [QuarantineReason.UNKNOWN_TYPE] * 8
+    assert [r.reason for r in result.quarantined] == [
+        QuarantineReason.UNKNOWN_TYPE
+    ] * len(items)
     assert [(w.record.event_id, w.write) for w in result.withheld] == [
         ("w1", UnreadableWrite("mem:r1", "kb")),
         ("w2", UnreadableWrite(None, "kb")),

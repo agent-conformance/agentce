@@ -315,7 +315,7 @@ class IngestTest {
         Ingest.Result result = Ingest.ingest(Fixtures.writeIngestBundle(tempDir.resolve("b"), events, sources));
         List<String> reasons = new ArrayList<>();
         result.quarantined.forEach(q -> reasons.add(q.toJson().get("reason").asText()));
-        assertEquals(java.util.Collections.nCopies(8, "unknown_type"), reasons);
+        assertEquals(java.util.Collections.nCopies(events.size(), "unknown_type"), reasons);
         List<List<Object>> withheld = new ArrayList<>();
         result.withheld.forEach(w -> withheld.add(java.util.Arrays.asList(w.record().eventId, w.write())));
         assertEquals(

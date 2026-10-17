@@ -112,7 +112,7 @@ public final class Ingest {
                 event != null ? unreadableWrite(event) : null);
     }
 
-    /** Whether {@code event}'s envelope type names MemoryWrite at any version, or its {@code data.@type} is
+    /** Whether {@code event}'s envelope type names MemoryWrite at any version or none, or its {@code data.@type} is
      * MemoryWrite. */
     private static boolean namesMemoryWrite(JsonNode event) {
         String type = opt(event, "type");

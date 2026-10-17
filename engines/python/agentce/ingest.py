@@ -372,7 +372,8 @@ def _unreadable(
 
 
 def _names_memory_write(event: dict[str, Any]) -> bool:
-    """Whether ``event``'s envelope type names MemoryWrite at any version, or its ``data.@type`` is MemoryWrite."""
+    """Whether ``event``'s envelope type names MemoryWrite at any version or none, or its ``data.@type`` is
+    MemoryWrite."""
     type_value = event.get("type")
     data = event.get("data")
     return (
