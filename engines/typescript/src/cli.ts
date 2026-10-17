@@ -363,11 +363,13 @@ function effectiveTrustRoot(flagValue: string | undefined): TrustRoot {
  * `_explicit_trust_root`: a given `--trust-root` is always checked, so an empty one is refused; an empty or blank
  * variable is unset. */
 function explicitTrustRoot(flagValue: string | undefined): TrustRoot | null {
-  const env = process.env.AGENTCE_TRUST_ROOT;
-  if (flagValue === undefined && (env === undefined || env.trim() === "")) {
-    return null;
+  let raw = flagValue;
+  if (raw === undefined) {
+    raw = process.env.AGENTCE_TRUST_ROOT;
+    if (raw === undefined || raw.trim() === "") {
+      return null;
+    }
   }
-  const raw = flagValue ?? (env as string);
   const path = requireFile(raw, "trust_root", "the trust root", "pass --trust-root <file>.");
   try {
     return loadTrustRoot(path);

@@ -392,9 +392,9 @@ global options:
 
     /** {@link #requireDir}, with an explicit {@code fix} rather than the computed {@code --key}-style
      * default -- {@code readiness}'s positional {@code report_dir} (item 18.25) needs its own fix text,
-     * mirroring {@link #requireFile}'s existing 4-arg overload. */
-    /** An empty value names no directory ({@code Paths.get("")} is the working directory, which {@code
-     * --flag ''} must never quietly read): refused under the same key as an absent one. */
+     * mirroring {@link #requireFile}'s existing 4-arg overload. An empty value names no directory ({@code
+     * Paths.get("")} is the working directory, which {@code --flag ''} must never quietly read): refused under the
+     * same key as an absent one. */
     private static String requireDir(String raw, String key, String what, String fix) {
         if (raw == null) {
             throw new InputError("input." + key + "_missing", what + " is required.", fix);

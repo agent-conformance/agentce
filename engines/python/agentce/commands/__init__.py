@@ -257,6 +257,16 @@ def _refuse_empty_out(raw: str | None) -> None:
     )
 
 
+def _refuse_empty_adapters_root(raw: str | None) -> None:
+    _refuse_empty(
+        raw,
+        key="input.adapters_root_not_a_directory",
+        flag="--adapters-root",
+        fix="pass --adapters-root <dir> (an adapters checkout), or drop it to use ./adapters.",
+        noun="directory",
+    )
+
+
 def _require_file(
     raw: str | None, *, key: str, what: str, fix: str | None = None
 ) -> Path:
@@ -2412,13 +2422,7 @@ def cmd_ingest(ns: argparse.Namespace) -> CommandResult:
             "pass --adapter, e.g. --adapter otel-genai.",
         )
     raw_adapters_root = _opt_str(ns, "adapters_root")
-    _refuse_empty(
-        raw_adapters_root,
-        key="input.adapters_root_not_a_directory",
-        flag="--adapters-root",
-        fix="pass --adapters-root <dir> (an adapters checkout), or drop it to use ./adapters.",
-        noun="directory",
-    )
+    _refuse_empty_adapters_root(raw_adapters_root)
     adapters_root = Path(raw_adapters_root or "adapters")
     subject = _opt_str(ns, "subject") or DEFAULT_SUBJECT
     source_class = _opt_str(ns, "source_class") or "self_report"
@@ -2495,13 +2499,7 @@ def cmd_collect(ns: argparse.Namespace) -> CommandResult:
             "--adapters-root is never read in a dry run: a dry run adapts no source.",
             "drop --adapters-root, or drop --dry-run to run the collection.",
         )
-    _refuse_empty(
-        raw_adapters_root,
-        key="input.adapters_root_not_a_directory",
-        flag="--adapters-root",
-        fix="pass --adapters-root <dir> (an adapters checkout), or drop it to use ./adapters.",
-        noun="directory",
-    )
+    _refuse_empty_adapters_root(raw_adapters_root)
     config = load_config(config_path)
     adapters_root = Path(raw_adapters_root or "adapters")
     outcome = run_collect(
