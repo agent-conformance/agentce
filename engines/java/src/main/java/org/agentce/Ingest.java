@@ -41,8 +41,8 @@ public final class Ingest {
     private record Candidate(JsonNode event, JsonNode rawEvent, String source, String typeValue, int rank) {}
     private static final Pattern TYPE_RE =
             Pattern.compile("^org\\.agent-conformance\\.evidence\\.(?<name>[A-Za-z0-9]+)\\.v1$");
-    /** The envelope type of a MemoryWrite at any version, known or not (SPEC §7.4, 18.202). */
-    private static final String MEMORY_WRITE_TYPE = "org.agent-conformance.evidence.MemoryWrite.";
+    /** The envelope type prefix of a MemoryWrite at any version or none, known or not (SPEC §7.4, 18.202). */
+    private static final String MEMORY_WRITE_TYPE = "org.agent-conformance.evidence.MemoryWrite";
 
     public static final class Result {
         /** What assessment, activity, and graph building read: an undeclared source's event carries

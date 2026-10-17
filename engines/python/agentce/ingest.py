@@ -41,8 +41,8 @@ _JSON_WHITESPACE = " \t\r\n"
 
 
 _TYPE_RE = re.compile(r"^org\.agent-conformance\.evidence\.(?P<name>[A-Za-z0-9]+)\.v1$")
-#: The envelope type of a MemoryWrite at any version, known or not (SPEC §7.4, 18.202).
-_MEMORY_WRITE_TYPE = "org.agent-conformance.evidence.MemoryWrite."
+#: The envelope type prefix of a MemoryWrite at any version or none, known or not (SPEC §7.4, 18.202).
+_MEMORY_WRITE_TYPE = "org.agent-conformance.evidence.MemoryWrite"
 
 
 @dataclass(frozen=True)

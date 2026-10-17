@@ -33,8 +33,8 @@ import { MAX_JSON_DEPTH } from "./verify";
 
 const DEFAULT_MAX_EVENT_BYTES = 1_048_576;
 const TYPE_RE = /^org\.agent-conformance\.evidence\.([A-Za-z0-9]+)\.v1$/;
-/** The envelope type of a MemoryWrite at any version, known or not (SPEC §7.4, 18.202). */
-const MEMORY_WRITE_TYPE = "org.agent-conformance.evidence.MemoryWrite.";
+/** The envelope type prefix of a MemoryWrite at any version or none, known or not (SPEC §7.4, 18.202). */
+const MEMORY_WRITE_TYPE = "org.agent-conformance.evidence.MemoryWrite";
 /** The whitespace JSON itself allows around a value (RFC 8259 §2); nothing else is trimmed. */
 const JSON_WHITESPACE_EDGES = /^[ \t\r\n]+|[ \t\r\n]+$/g;
 
