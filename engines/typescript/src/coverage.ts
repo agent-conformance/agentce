@@ -65,7 +65,28 @@ function independent(denominator: CoverageDenominator, subject: Subject): boolea
   );
 }
 
+/**
+ * The denominator's counts for the types it covers (every type it counts when `covers` is empty): both its
+ * yardstick and its expected counts (SPEC §6.5).
+ */
 function denominatorCounts(
+  denominator: CoverageDenominator,
+  subject: Subject,
+  bySource: Map<string, Map<string, number>>,
+  bundleRoot: string | null,
+  listed: ReadonlySet<string>,
+): Record<string, number> {
+  const counts = declaredCounts(denominator, subject, bySource, bundleRoot, listed);
+  const kept: Record<string, number> = {};
+  for (const [type, count] of Object.entries(counts)) {
+    if (denominator.covers.length === 0 || denominator.covers.includes(type)) {
+      kept[type] = count;
+    }
+  }
+  return kept;
+}
+
+function declaredCounts(
   denominator: CoverageDenominator,
   subject: Subject,
   bySource: Map<string, Map<string, number>>,
@@ -134,18 +155,9 @@ export function computeCoverage(
 
   const subjectsOut: Record<string, unknown> = {};
   for (const subject of profile.subjects) {
-    // Each denominator's counts for the types it covers: both the yardstick and the expected counts.
-    const countsByDenominator = subject.coverageDenominators.map((d) => {
-      const counts = denominatorCounts(d, subject, bySource, bundleRoot, listed);
-      const covered = d.covers.length > 0 ? d.covers : Object.keys(counts);
-      const kept: Record<string, number> = {};
-      for (const t of covered) {
-        if (t in counts) {
-          kept[t] = counts[t] as number;
-        }
-      }
-      return [d, kept] as const;
-    });
+    const countsByDenominator = subject.coverageDenominators.map(
+      (d) => [d, denominatorCounts(d, subject, bySource, bundleRoot, listed)] as const,
+    );
     // A denominator's own records of a type it covers and counts are the yardstick, not captured operations. One
     // that is not independent, or does not count a type, hides none of that type's events (SPEC §6.5).
     const yardstick = new Set<string>();

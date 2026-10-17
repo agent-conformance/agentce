@@ -85,7 +85,24 @@ public final class Coverage {
         return true;
     }
 
+    /**
+     * The denominator's counts for the types it covers (every type it counts when {@code covers} is empty): both its
+     * yardstick and its expected counts (SPEC §6.5).
+     */
     static Map<String, Integer> denominatorCounts(
+            Profile.CoverageDenominator denominator,
+            Profile.Subject subject,
+            Map<String, Map<String, Integer>> bySource,
+            Path bundleRoot,
+            Set<String> listed) {
+        Map<String, Integer> counts = declaredCounts(denominator, subject, bySource, bundleRoot, listed);
+        if (!denominator.covers.isEmpty()) {
+            counts.keySet().retainAll(denominator.covers);
+        }
+        return counts;
+    }
+
+    private static Map<String, Integer> declaredCounts(
             Profile.CoverageDenominator denominator,
             Profile.Subject subject,
             Map<String, Map<String, Integer>> bySource,
@@ -158,16 +175,7 @@ public final class Coverage {
         for (Profile.Subject subject : profile.subjects) {
             List<Map.Entry<Profile.CoverageDenominator, Map<String, Integer>>> countsByDenominator = new ArrayList<>();
             for (Profile.CoverageDenominator d : subject.coverageDenominators) {
-                // The denominator's counts for the types it covers: both the yardstick and the expected counts.
-                Map<String, Integer> counts = denominatorCounts(d, subject, bySource, bundleRoot, listed);
-                List<String> covered = !d.covers.isEmpty() ? d.covers : new ArrayList<>(counts.keySet());
-                Map<String, Integer> kept = new LinkedHashMap<>();
-                for (String t : covered) {
-                    if (counts.containsKey(t)) {
-                        kept.put(t, counts.get(t));
-                    }
-                }
-                countsByDenominator.add(Map.entry(d, kept));
+                countsByDenominator.add(Map.entry(d, denominatorCounts(d, subject, bySource, bundleRoot, listed)));
             }
             // A denominator's own records of a type it covers and counts are the yardstick, not captured operations.
             // One that is not independent, or does not count a type, hides none of that type's events (SPEC §6.5).

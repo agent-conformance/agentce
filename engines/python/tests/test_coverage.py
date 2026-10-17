@@ -195,9 +195,11 @@ def test_manifest_denominator_own_records_are_not_captured(tmp_path: Path) -> No
 def test_denominator_hides_only_types_it_covers() -> None:
     """A self-counting denominator covering only ToolCall never hides its source's other types: its SessionStart stays
     observed with nothing counting it, so coverage stays unknown (SPEC §6.5)."""
-    events = [event(0, "urn:src:gw", "ToolCall")]
-    events += [event(10, "urn:src:egress", "ToolCall")]
-    events.append(event(20, "urn:src:egress", "SessionStart"))
+    events = [
+        event(0, "urn:src:gw", "ToolCall"),
+        event(10, "urn:src:egress", "ToolCall"),
+        event(20, "urn:src:egress", "SessionStart"),
+    ]
     result = compute_coverage(events, profile_with_denominator(["ToolCall"]))
     subject = result["subjects"][SUBJECT]
     assert subject["event_types"]["SessionStart"]["observed"] == 1

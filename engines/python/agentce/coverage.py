@@ -62,6 +62,23 @@ def _denominator_counts(
     bundle_root: Path | None,
     listed: frozenset[str],
 ) -> dict[str, int]:
+    """The denominator's counts for the types it covers (every type it counts when ``covers`` is empty): both its
+    yardstick and its expected counts (SPEC §6.5)."""
+    counts = _declared_counts(denominator, subject, by_source_type, bundle_root, listed)
+    return {
+        t: n
+        for t, n in counts.items()
+        if not denominator.covers or t in denominator.covers
+    }
+
+
+def _declared_counts(
+    denominator: CoverageDenominator,
+    subject: Subject,
+    by_source_type: dict[tuple[str, str], int],
+    bundle_root: Path | None,
+    listed: frozenset[str],
+) -> dict[str, int]:
     if not _independent(denominator, subject):
         return {}
     if denominator.manifest:
@@ -110,16 +127,10 @@ def compute_coverage(
 
     subjects_out: dict[str, Any] = {}
     for subject in profile.subjects:
-        # Each denominator's counts for the types it covers: both the yardstick and the expected counts.
-        counts_by_denominator: list[tuple[CoverageDenominator, dict[str, int]]] = []
-        for d in subject.coverage_denominators:
-            counts = _denominator_counts(
-                d, subject, by_source_type, bundle_root, listed
-            )
-            covered = d.covers or list(counts)
-            counts_by_denominator.append(
-                (d, {t: counts[t] for t in covered if t in counts})
-            )
+        counts_by_denominator = [
+            (d, _denominator_counts(d, subject, by_source_type, bundle_root, listed))
+            for d in subject.coverage_denominators
+        ]
         # A denominator's own records of a type it covers and counts are the yardstick, not captured operations. One
         # that is not independent, or does not count a type, hides none of that type's events (SPEC §6.5).
         yardstick = {
