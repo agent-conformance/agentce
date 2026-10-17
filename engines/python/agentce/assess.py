@@ -19,8 +19,8 @@ from .applicability import effective_roles
 from .assertions import Assertion, EvidencePointer
 from .catalog import Catalog, ControlSpec
 from .domain import DomainBinding
-from .graph import build_graph, flagged_records
-from .ingest import UnreadableWrite, Withheld, record_digest
+from .graph import UnreadableWrite, build_graph, flagged_records, unkeyed_flags
+from .ingest import Withheld, record_digest
 from .integrity import IntegrityCaps
 from .iri import event_iri
 from .profile import Profile, Subject
@@ -510,18 +510,23 @@ def assess_subjects(
     records read insufficient_evidence names the readable withheld records when judging them too changes it (18.149)."""
     assertions: list[Assertion] = []
     events_by_subject = index_by_subject(accepted)
-    # A record another subject's write marked untrusted, held or withheld, is never ruled on for this one (18.120).
-    flagged = flagged_records(
-        [*accepted, *(w.event for w in withheld if w.event is not None)]
-    )
+    # A record another subject's write marked untrusted, held or withheld, is never ruled on for this one (18.120);
+    # such a write with no readable record_ref, under any subject, counts against its store's records, as an unreadable
+    # write does (18.202).
+    flag_sources = [*accepted, *(w.event for w in withheld if w.event is not None)]
+    flagged = flagged_records(flag_sources)
+    unkeyed = unkeyed_flags(flag_sources)
     for subject in profile.subjects:
         subject_events = events_by_subject.get(subject.id, [])
         foreign = _Foreign(
             frozenset(r for r, by in flagged.items() if by - {subject.id}),
-            tuple(
-                w.write
-                for w in withheld
-                if w.write is not None and w.subject not in (subject.id, None)
+            (
+                *(
+                    w.write
+                    for w in withheld
+                    if w.write is not None and w.subject not in (subject.id, None)
+                ),
+                *unkeyed,
             ),
         )
         store = foreign.graph(subject_events, domain)

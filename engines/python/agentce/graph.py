@@ -16,16 +16,22 @@ materialised so class membership needs no inference (SPEC §7.2). Everything is 
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Collection, Iterable
-from typing import TYPE_CHECKING, Any
+from collections.abc import Collection, Iterable, Iterator
+from typing import Any, NamedTuple
 
 from .domain import TOKEN_CAP, DomainBinding, token_count
 from .iri import ZERO_KEY, event_iri, is_event_ref, principal_iri
 from .store import GraphStore
 from .structural import compare_literals
 
-if TYPE_CHECKING:
-    from .ingest import UnreadableWrite
+
+class UnreadableWrite(NamedTuple):
+    """What ingest can still see of an unreadable record that may be a MemoryWrite (SPEC §7.4, 18.172): its raw
+    ``data.record_ref`` and ``data.store`` when each is a non-empty string, else ``None`` (18.202)."""
+
+    record_ref: str | None
+    store: str | None
+
 
 BOOL = "xsd:boolean"
 #: CND-02's population (SPEC §7.7.4), materialised by :meth:`_Builder._conduct_gate`.
@@ -173,21 +179,39 @@ def _ruled_write(event: dict[str, Any], data: dict[str, Any]) -> bool:
     )
 
 
-def flagged_records(events: Iterable[dict[str, Any]]) -> dict[str, set[str]]:
-    """Each record a MemoryWrite in ``events`` marks untrusted or writes with no guard ruling (anything but an
-    enforcement-point write with a trust or a verdict), with the subjects whose records hold such a write. A subject's
-    graph reads a record another subject flagged or rewrote unruled as one its guard never ruled on (18.120)."""
-    flagged: dict[str, set[str]] = {}
+def _flagged_writes(
+    events: Iterable[dict[str, Any]],
+) -> Iterator[tuple[str, dict[str, Any]]]:
+    """Each MemoryWrite in ``events`` that marks its record untrusted or writes with no guard ruling (anything but an
+    enforcement-point write with a trust or a verdict), with its subject and data."""
     for event in events:
         data = _data(event)
-        record = data.get("record_ref")
-        if (
-            data.get("@type") == "MemoryWrite"
-            and isinstance(record, str)
-            and (_flags_untrusted(data) or not _ruled_write(event, data))
+        if data.get("@type") == "MemoryWrite" and (
+            _flags_untrusted(data) or not _ruled_write(event, data)
         ):
-            flagged.setdefault(record, set()).add(str(event.get("subject", "")))
+            yield str(event.get("subject", "")), data
+
+
+def flagged_records(events: Iterable[dict[str, Any]]) -> dict[str, set[str]]:
+    """Each record a MemoryWrite in ``events`` marks untrusted or writes with no guard ruling, with the subjects whose
+    records hold such a write. A subject's graph reads a record another subject flagged or rewrote unruled as one its
+    guard never ruled on (18.120)."""
+    flagged: dict[str, set[str]] = {}
+    for subject, data in _flagged_writes(events):
+        record = _text(data.get("record_ref"))
+        if record is not None:
+            flagged.setdefault(record, set()).add(subject)
     return flagged
+
+
+def unkeyed_flags(events: Iterable[dict[str, Any]]) -> list[UnreadableWrite]:
+    """Each such write whose ``record_ref`` cannot be read (absent, null or empty), under any subject, as its store: it
+    counts against every record of its store, or every record, as an unreadable write does (SPEC §7.4, 18.202)."""
+    return [
+        UnreadableWrite(None, _text(data.get("store")))
+        for _, data in _flagged_writes(events)
+        if _text(data.get("record_ref")) is None
+    ]
 
 
 def _note_store(stores: dict[str, set[str]], record: str, store: Any) -> None:

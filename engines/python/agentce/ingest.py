@@ -21,11 +21,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, NamedTuple
+from typing import Any
 
 from .bundle import Bundle
 from .canonical import CanonicalizationError, sha256_hex
 from .errors import InputError
+from .graph import UnreadableWrite, _text
 from .quarantine import QuarantineReason, QuarantineRecord
 from .safe_json import JSONError, load_json
 from .schema import event_types, validate_event
@@ -40,14 +41,8 @@ _JSON_WHITESPACE = " \t\r\n"
 
 
 _TYPE_RE = re.compile(r"^org\.agent-conformance\.evidence\.(?P<name>[A-Za-z0-9]+)\.v1$")
-
-
-class UnreadableWrite(NamedTuple):
-    """What ingest can still see of an unreadable record that may be a MemoryWrite (SPEC §7.4, 18.172): its raw
-    ``data.record_ref`` and ``data.store`` when each is a string, else ``None``."""
-
-    record_ref: str | None
-    store: str | None
+#: The envelope type of a MemoryWrite at any version, known or not (SPEC §7.4, 18.202).
+_MEMORY_WRITE_TYPE = "org.agent-conformance.evidence.MemoryWrite."
 
 
 @dataclass(frozen=True)
@@ -58,7 +53,8 @@ class Withheld:
     identical redelivery, ``class_mismatch``, ``unknown_source``); it is ``None`` when ingest could not read
     it at all (``schema_invalid``, ``oversize``). ``subject`` is the record's own subject, ``None`` when
     unknown (then the record may belong to any subject). An ``unknown_type`` record is not withheld: the
-    engine reads nothing from a type it does not model."""
+    engine reads nothing from a type it does not model, unless its type names MemoryWrite, which is withheld as
+    unreadable (SPEC §7.4, 18.202)."""
 
     record: QuarantineRecord
     event: dict[str, Any] | None
@@ -204,14 +200,18 @@ def ingest(
             type_value = str(event["type"])
             name = _event_type_name(type_value)
             if name is None or name not in valid_types:
+                unknown = QuarantineRecord(
+                    QuarantineReason.UNKNOWN_TYPE,
+                    event_id=str(event["id"]),
+                    source=str(event["source"]),
+                    type=type_value,
+                    detail=f"unrecognised event type {type_value!r}",
+                )
+                # A MemoryWrite at a version the engine does not know may still have changed a record (18.202).
                 records.append(
-                    QuarantineRecord(
-                        QuarantineReason.UNKNOWN_TYPE,
-                        event_id=str(event["id"]),
-                        source=str(event["source"]),
-                        type=type_value,
-                        detail=f"unrecognised event type {type_value!r}",
-                    )
+                    _unreadable(unknown, event)
+                    if _names_memory_write(event)
+                    else unknown
                 )
                 continue
 
@@ -371,20 +371,29 @@ def _unreadable(
     )
 
 
+def _names_memory_write(event: dict[str, Any]) -> bool:
+    """Whether ``event``'s envelope type names MemoryWrite at any version, or its ``data.@type`` is MemoryWrite."""
+    type_value = event.get("type")
+    data = event.get("data")
+    return (
+        isinstance(type_value, str) and type_value.startswith(_MEMORY_WRITE_TYPE)
+    ) or (isinstance(data, dict) and data.get("@type") == "MemoryWrite")
+
+
 def _unreadable_write(event: dict[str, Any]) -> UnreadableWrite | None:
     """The raw MemoryWrite facts of an unreadable ``event``: a MemoryWrite unless its envelope or data names another
     known type, so a record whose type cannot be read, or names a type the engine does not know, counts as one (fail
-    closed, 18.172)."""
+    closed, 18.172). An empty record_ref or store is one that cannot be read (18.202)."""
     type_value = event.get("type")
     name = _event_type_name(type_value) if isinstance(type_value, str) else None
     data = event.get("data")
     data = data if isinstance(data, dict) else {}
     declared = data.get("@type")
-    if "MemoryWrite" not in (name, declared) and (
+    if not _names_memory_write(event) and (
         name in event_types() or declared in event_types()
     ):
         return None
-    return UnreadableWrite(_opt(data, "record_ref"), _opt(data, "store"))
+    return UnreadableWrite(_text(data.get("record_ref")), _text(data.get("store")))
 
 
 def _too_deep() -> InputError:

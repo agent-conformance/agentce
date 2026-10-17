@@ -439,7 +439,7 @@ def test_withheld_keeps_the_raw_facts_of_an_unreadable_write(
 ) -> None:
     # 18.172: an unreadable record is a MemoryWrite unless it names another type the engine knows; its record_ref and
     # store are kept when each is a string.
-    from agentce.ingest import UnreadableWrite
+    from agentce.graph import UnreadableWrite
 
     def write(event_id: str, type_: Any, data: dict[str, Any]) -> dict[str, Any]:
         return {
