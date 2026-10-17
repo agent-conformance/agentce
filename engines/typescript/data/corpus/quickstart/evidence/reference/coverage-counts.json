@@ -1,0 +1,10 @@
+{
+  "counts": {
+    "BundleLoaded": 1,
+    "Decision": 1,
+    "DelegationIssued": 1,
+    "Incident": 1,
+    "SessionStart": 1,
+    "ToolCall": 1
+  }
+}

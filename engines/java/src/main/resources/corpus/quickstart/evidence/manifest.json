@@ -21,6 +21,10 @@
     {
       "path": "events/urn-agentce-source-workload-idp-eu-1.jsonl",
       "sha256": "5c4c2b1447855a9c84a47724c7cb0cf00f968926d26f9b2501ed0ab44b7f4d85"
+    },
+    {
+      "path": "reference/coverage-counts.json",
+      "sha256": "10c5807a2162d8e5d99d5d9315f2f7ec9f05bb264565c3a9ad176e28d3f4c3d2"
     }
   ],
   "sources": [

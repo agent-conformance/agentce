@@ -88,5 +88,14 @@ def test_coverage_gap_denominators_use_a_schema_kind_and_name_a_source_with_even
         assert denominators
         for denominator in denominators:
             assert denominator["kind"] in DENOMINATOR_KINDS
-            assert set(denominator) <= {"kind", "source", "covers", "statement"}
-            assert denominator["source"] in _event_sources(path.parent)
+            assert set(denominator) <= {
+                "kind",
+                "source",
+                "covers",
+                "manifest",
+                "statement",
+            }
+            if "manifest" in denominator:
+                assert (path.parent / "evidence" / denominator["manifest"]).is_file()
+            else:
+                assert denominator["source"] in _event_sources(path.parent)

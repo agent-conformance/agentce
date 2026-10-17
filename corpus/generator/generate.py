@@ -996,18 +996,28 @@ def _write_project(
         files.append({"path": rel, "sha256": digest})
         total_events += FILLER_EVENTS
 
-    # The coverage-gap denominator (SPEC §11.2): an independent source whose events outnumber the
-    # captured ones. It is declared by kind, source, and the event types it covers.
-    coverage_denoms: list[dict[str, Any]] = []
+    # Every subject declares an independent denominator (SPEC §6.5): a system-of-record export that
+    # counts the subject's captured events of every type, so coverage reconciles. The coverage-gap
+    # project adds its own denominator (SPEC §11.2), an independent source whose events outnumber the
+    # captured ones, declared by kind, source, and the event types it covers.
+    gap_sources = (
+        {extras["coverage_gap"]["source"]} if "coverage_gap" in extras else set()
+    )
+    # The export counts what the engine accepts: the curated events and the first duplicate delivery.
+    files_entry, reconciled = _coverage_export(
+        evidence, events + quarantine[:1], subject, gap_sources, ""
+    )
+    files.append(files_entry)
+    coverage_denoms: list[dict[str, Any]] = [reconciled]
     if "coverage_gap" in extras:
         gap = extras["coverage_gap"]
-        coverage_denoms = [
+        coverage_denoms.append(
             {
                 "kind": gap["kind"],
                 "source": gap["source"],
                 "covers": [gap["event_type"]],
             }
-        ]
+        )
 
     manifest = {
         "agentce_bundle_version": 1,
@@ -1213,6 +1223,12 @@ def _write_multi_agent(
             {"path": rel, "sha256": _write_jsonl(evidence / rel, by_source[src])}
         )
         total_events += len(by_source[src])
+    denominators: dict[str, dict[str, Any]] = {}
+    for role in ("orchestrator", "worker"):
+        entry, denominators[subjects[role]] = _coverage_export(
+            evidence, events, subjects[role], set(), f"-{role}"
+        )
+        files.append(entry)
 
     manifest = {
         "agentce_bundle_version": 1,
@@ -1231,6 +1247,7 @@ def _write_multi_agent(
         domain,
         subjects,
         sources,
+        denominators,
         {s: _declared_components(events, s) for s in subjects.values()},
     )
     _write_domain(proj_dir, domain)
@@ -1251,6 +1268,58 @@ def _write_multi_agent(
         "expected": expected_by_subject,
         "seeded_faults": sum(1 for f in faults.values() if f is not None),
     }
+
+
+#: The independent source whose export counts each subject's records (SPEC §6.5 system_of_record_export).
+_SYSTEM_OF_RECORD = "urn:agentce:source:system-of-record-export:corp"
+
+
+def _coverage_export(
+    evidence: Path,
+    events: list[dict[str, Any]],
+    subject: str,
+    skip_sources: set[str],
+    suffix: str,
+) -> tuple[dict[str, str], dict[str, Any]]:
+    """Write a system-of-record export counting ``subject``'s events per type (the engine's own key:
+    ``data.@type``), skipping the events of ``skip_sources`` (another denominator's own), and return its
+    manifest file entry and the coverage denominator that declares it (SPEC §6.5)."""
+    counts: dict[str, int] = {}
+    for event in events:
+        if event.get("subject") != subject or event.get("source") in skip_sources:
+            continue
+        data = event.get("data")
+        kind = data.get("@type") if isinstance(data, dict) else None
+        key = kind if isinstance(kind, str) else "Unknown"
+        counts[key] = counts.get(key, 0) + 1
+    rel = f"reference/coverage-counts{suffix}.json"
+    path = evidence / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    body = json.dumps({"counts": counts}, sort_keys=True, indent=2) + "\n"
+    path.write_text(body, encoding="utf-8")
+    entry = {"path": rel, "sha256": hashlib.sha256(body.encode("utf-8")).hexdigest()}
+    denominator = {
+        "kind": "system_of_record_export",
+        "source": _SYSTEM_OF_RECORD,
+        "covers": sorted(counts),
+        "manifest": rel,
+    }
+    return entry, denominator
+
+
+def _profile_denominators(denoms: list[dict[str, Any]]) -> list[str]:
+    """The ``coverage_denominators`` lines of one subject's profile entry."""
+    if not denoms:
+        return []
+    lines = ["    coverage_denominators:"]
+    for denom in denoms:
+        lines.append(f'      - kind: "{denom["kind"]}"')
+        lines.append(f'        source: "{denom["source"]}"')
+        lines.append("        covers:")
+        lines.extend(f'          - "{cover}"' for cover in denom["covers"])
+        if "manifest" in denom:
+            lines.append(f'        manifest: "{denom["manifest"]}"')
+    return lines
 
 
 #: The trust class each evidence source is declared under and why (SPEC §6.5, trust-class
@@ -1277,6 +1346,7 @@ def _write_multi_profile(
     domain: Domain,
     subjects: dict[str, str],
     sources: dict[str, str],
+    denominators: dict[str, dict[str, Any]],
     components: dict[str, list[tuple[str, str]]],
 ) -> None:
     lines = [
@@ -1305,6 +1375,7 @@ def _write_multi_profile(
             lines.append(f'        source: "{sources[key]}"')
             lines.append(f'        class: "{cls}"')
             lines.append(f'        class_justification: "{justification}"')
+        lines.extend(_profile_denominators([denominators[subjects[role]]]))
     (proj_dir / "applicability.yaml").write_text(
         "\n".join(lines) + "\n", encoding="utf-8"
     )
@@ -1428,14 +1499,7 @@ def _write_profile(
         lines.append(f'        source: "{sources[key]}"')
         lines.append(f'        class: "{cls}"')
         lines.append(f'        class_justification: "{justification}"')
-    if coverage_denoms:
-        lines.append("    coverage_denominators:")
-        for denom in coverage_denoms:
-            lines.append(f'      - kind: "{denom["kind"]}"')
-            lines.append(f'        source: "{denom["source"]}"')
-            lines.append("        covers:")
-            for cover in denom["covers"]:
-                lines.append(f'          - "{cover}"')
+    lines.extend(_profile_denominators(coverage_denoms))
     (proj_dir / "applicability.yaml").write_text(
         "\n".join(lines) + "\n", encoding="utf-8"
     )

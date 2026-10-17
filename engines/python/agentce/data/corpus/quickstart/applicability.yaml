@@ -38,3 +38,14 @@ subjects:
         source: "urn:agentce:source:incident-register:corp"
         class: "independent_system"
         class_justification: "incident records are kept by the register; agent identities cannot transition their state."
+    coverage_denominators:
+      - kind: "system_of_record_export"
+        source: "urn:agentce:source:system-of-record-export:corp"
+        covers:
+          - "BundleLoaded"
+          - "Decision"
+          - "DelegationIssued"
+          - "Incident"
+          - "SessionStart"
+          - "ToolCall"
+        manifest: "reference/coverage-counts.json"

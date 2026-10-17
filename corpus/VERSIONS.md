@@ -55,3 +55,10 @@ fails the check.
   manifest anchor at its last record's time, and every other stream stays `export_chained`. The
   tampered-record projects' ground truth now reads `insufficient_evidence` for the controls resting on
   the broken gateway stream (OVS-03, INT-01).
+- **v1 (2026.09), pin re-extended (18.134)** — the corpus was still unpublished, so the pin was again
+  corrected in place. Unknown coverage now reads every INT and REC check of the subject
+  `insufficient_evidence` (SPEC §6.5), so `generate.py`'s new `_coverage_export()` gives every subject an
+  independent `system_of_record_export` denominator whose counts file `reference/coverage-counts[-<role>].json`
+  counts the subject's accepted events per type and is listed with its sha256 in the bundle manifest. The
+  coverage-gap project keeps its own denominator beside it, so it still reads a gap. Every authored ground
+  truth holds unchanged; `corpus/quickstart` carries the same denominator.
