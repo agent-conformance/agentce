@@ -13,3 +13,4 @@ blind-spots.json in the report directory: catalog evidence requirements no asser
 |---|---|---|
 | `blind_spots` | array |  |
 | `no_population` | array |  |
+| `coverage_unknown` | array | Checks that read insufficient_evidence because no independent coverage denominator reconciles the subject's records (SPEC §6.5): every INT and REC check that would otherwise read conformant, partial or not_applicable. |
