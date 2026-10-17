@@ -233,15 +233,26 @@ class ReadinessTest {
     }
 
     @Test
-    void unknownCoverageIsNeverABlocker(@TempDir Path dir) throws IOException {
+    void unknownCoverageIsNotReadyAndNamesTheSubject(@TempDir Path dir) throws IOException {
+        // No independent denominator reconciles the subject's records (SPEC §6.5, §13.3.4).
+        Readiness.Verdict verdict = Readiness.computeReadiness(
+                reportWithCoverage(dir, coverageStatus("unknown")), SEVERITIES, List.of(), Set.of());
+        assertEquals(Readiness.NOT_READY, verdict.verdict());
+        assertEquals(List.of("coverage unknown for subject s: no independent denominator"), verdict.reasons());
+    }
+
+    @Test
+    void okCoverageAddsNoCoverageReason(@TempDir Path dir) throws IOException {
+        Readiness.Verdict verdict = Readiness.computeReadiness(
+                reportWithCoverage(dir, coverageStatus("ok")), SEVERITIES, List.of(), Set.of());
+        assertEquals(Readiness.READY, verdict.verdict());
+    }
+
+    /** coverage.json with one subject {@code s} whose roll-up is {@code status}. */
+    private static ObjectNode coverageStatus(String status) {
         ObjectNode coverage = Json.nodes().objectNode();
-        ObjectNode subjects = Json.nodes().objectNode();
-        ObjectNode s = Json.nodes().objectNode();
-        s.put("coverage_status", "unknown");
-        subjects.set("s", s);
-        coverage.set("subjects", subjects);
-        Path report = reportWithCoverage(dir, coverage);
-        assertEquals(Readiness.READY, Readiness.computeReadiness(report, SEVERITIES, List.of(), Set.of()).verdict());
+        coverage.putObject("subjects").putObject("s").put("coverage_status", status);
+        return coverage;
     }
 
     @Test

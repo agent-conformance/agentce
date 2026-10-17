@@ -53,6 +53,15 @@ class Bundle:
     source_classes: dict[str, str] | None = None
 
     @property
+    def listed_paths(self) -> frozenset[str]:
+        """The file paths the manifest lists, each checked against its sha256 by :func:`load_bundle`."""
+        return frozenset(
+            str(entry["path"])
+            for entry in self.manifest.get("files", [])
+            if isinstance(entry, dict) and isinstance(entry.get("path"), str)
+        )
+
+    @property
     def digest(self) -> str:
         """The bundle digest: SHA-256 of the RFC 8785 canonical manifest (SPEC §8.1)."""
         return "sha256:" + canonical.sha256_hex(self.manifest)

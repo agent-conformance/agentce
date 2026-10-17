@@ -143,9 +143,10 @@ export interface BlindSpot {
 export interface BlindSpots {
   blind_spots: BlindSpot[];
   no_population: CheckRef[];
+  coverage_unknown: CheckRef[];
 }
 
-/** Return `{blindSpots: [...], noPopulation: [...]}` for `assertions`.
+/** Return `{blind_spots: [...], no_population: [...], coverage_unknown: [...]}` for `assertions`.
  *
  * `assertions` must be `assessSubjects`'s own output, in its own order -- that order is meaningful
  * input here (RFC 0008 Sec.6), not incidental: it is replayed positionally against
@@ -197,6 +198,7 @@ export function computeBlindSpots(
     return group;
   };
   const noPopulation: CheckRef[] = [];
+  const coverageUnknown: CheckRef[] = [];
 
   for (let i = 0; i < triples.length; i++) {
     const [subjectId, catalogId, control] = triples[i] as [string, string, ControlSpec];
@@ -211,6 +213,16 @@ export function computeBlindSpots(
       );
     }
     if (a.outcome !== "insufficient_evidence") continue;
+    if (a.coverageUnknown) {
+      // What is missing is an independent count of the subject's calls (SPEC §6.5), not a record type.
+      coverageUnknown.push({
+        subject: subjectId,
+        catalog: catalogId,
+        control: control.id,
+        control_version: control.version,
+      });
+      continue;
+    }
     const missing = control.minimumEvidence.filter((r) => !met(subjectId, r));
     const normalizedByKey = new Map<string, [string, string]>();
     for (const r of missing) {
@@ -283,5 +295,10 @@ export function computeBlindSpots(
     return byteCompare(a.class, b.class);
   });
   noPopulation.sort(compareCheckRefs);
-  return { blind_spots: blindSpots, no_population: noPopulation };
+  coverageUnknown.sort(compareCheckRefs);
+  return {
+    blind_spots: blindSpots,
+    no_population: noPopulation,
+    coverage_unknown: coverageUnknown,
+  };
 }

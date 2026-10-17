@@ -522,7 +522,8 @@ public final class Assess {
             List<Catalog> catalogs,
             DomainBinding domain,
             List<Ingest.Withheld> withheld,
-            Integrity.Caps integrity) {
+            Integrity.Caps integrity,
+            JsonNode coverage) {
         List<Assertions.Assertion> assertions = new ArrayList<>();
         Map<String, List<JsonNode>> eventsBySubject = indexBySubject(accepted);
         // A record another subject's write marked untrusted, held or withheld, is never ruled on for this one (18.120);
@@ -583,8 +584,11 @@ public final class Assess {
             Supplier<SourceClass.Judge> judge = lazy(() -> new SourceClass.Judge(store, eventsByIri));
             Supplier<SourceClass.Judge> cfJudge = lazy(() -> new SourceClass.Judge(cfStore, cfByIri));
             CappedViews capped = new CappedViews(subjectEvents, integrity, domain, foreign);
+            int first = assertions.size();
+            List<Boolean> roleAppliesAt = new ArrayList<>();
             for (Catalog catalog : catalogs) {
                 for (Catalog.ControlSpec control : catalog.controls) {
+                    roleAppliesAt.add(roleApplies(roles, control.appliesToRoles));
                     Assertions.Assertion assertion =
                             assertControl(store, catalog, control, subject, roles, subjectEvents, eventsByIri, win, judge);
                     if (capped.any && "conformant".equals(assertion.outcome)) {
@@ -613,8 +617,51 @@ public final class Assess {
                     assertions.add(assertion);
                 }
             }
+            if (coverageUnknown(coverage, subject.id)) {
+                for (int i = first; i < assertions.size(); i++) {
+                    if (roleAppliesAt.get(i - first)) {
+                        assertions.set(i, uncovered(assertions.get(i)));
+                    }
+                }
+            }
         }
         return assertions;
+    }
+
+    /** The families whose controls read insufficient_evidence while a subject's coverage is unknown (SPEC §6.5). */
+    static final Set<String> COVERAGE_FAMILIES = Set.of("INT", "REC");
+
+    /**
+     * True when {@code coverage} (computeCoverage's structure) does not show the subject's capture reconciled against
+     * an independent denominator: its roll-up is unknown, or the subject has no entry at all (SPEC §6.5).
+     */
+    static boolean coverageUnknown(JsonNode coverage, String subject) {
+        JsonNode subjects = coverage == null ? null : coverage.get("subjects");
+        JsonNode entry = subjects != null && subjects.isObject() ? subjects.get(subject) : null;
+        if (entry == null || !entry.isObject()) {
+            return true;
+        }
+        JsonNode status = entry.get("coverage_status");
+        return status != null && "unknown".equals(status.asText());
+    }
+
+    /**
+     * An INT or REC outcome that reads better than insufficient_evidence while coverage is unknown reads
+     * insufficient_evidence (SPEC §6.5): a call that bypassed capture would not be in the records. A violation stays.
+     */
+    static Assertions.Assertion uncovered(Assertions.Assertion assertion) {
+        if (!COVERAGE_FAMILIES.contains(assertion.family)
+                || !Set.of("conformant", "partial", "not_applicable").contains(assertion.outcome)) {
+            return assertion;
+        }
+        Assertions.Assertion copy = Assertions.copyOf(assertion);
+        copy.outcome = "insufficient_evidence";
+        copy.population = new int[] {assertion.population[0], 0};
+        copy.violations = new ArrayList<>();
+        copy.sourceClassSatisfied = null;
+        copy.evidenceStrength = null;
+        copy.coverageUnknown = true;
+        return copy;
     }
 
     /** Index a deviation register by its {@code control} field ({@code assess.deviations_by_control}).

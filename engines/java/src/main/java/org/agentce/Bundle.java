@@ -59,6 +59,21 @@ public final class Bundle {
         return digestCache;
     }
 
+    /** The file paths the manifest lists, each checked against its sha256 by {@link #load}. */
+    public Set<String> listedPaths() {
+        Set<String> out = new java.util.LinkedHashSet<>();
+        JsonNode files = manifest.get("files");
+        if (files != null && files.isArray()) {
+            for (JsonNode entry : files) {
+                JsonNode path = entry.isObject() ? entry.get("path") : null;
+                if (path != null && path.isTextual()) {
+                    out.add(path.textValue());
+                }
+            }
+        }
+        return out;
+    }
+
     private static String fileSha256Hex(Path path) {
         try {
             return Canonical.sha256Hex(Files.readAllBytes(path));

@@ -7,13 +7,18 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from agentce.store import GraphStore
 from agentce.integrity import NO_CAPS, IntegrityCaps
 from agentce.assess import (
+    COVERAGE_FAMILIES,
     _evidence,
     _reaches_human_actor_failure,
+    _uncovered,
     apply_deviations,
     assess_subjects,
+    evaluated_nothing,
 )
 from agentce.psp import parse_shapes_ttl
 from agentce.structural import property_reads
@@ -21,6 +26,19 @@ from agentce.catalog import load_catalog
 from agentce.domain import DomainBinding
 from agentce.profile import Profile
 from agentce.report import write_report
+
+
+class _Reconciled(dict):  # type: ignore[type-arg]
+    """Coverage that reconciles every subject (SPEC §6.5), for tests of rules other than unknown coverage."""
+
+    def get(self, key, default=None):  # type: ignore[no-untyped-def]
+        return {"coverage_status": "ok"}
+
+    def __bool__(self) -> bool:
+        return True
+
+
+RECONCILED = {"subjects": _Reconciled()}
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _BASE = _REPO_ROOT / "spec" / "catalogs" / "base" / "eu-ai-act"
@@ -55,6 +73,7 @@ def test_conformant_assessment_with_evidence() -> None:
         domain,
         withheld=(),
         integrity=NO_CAPS,
+        coverage=RECONCILED,
     )
     outcomes = _outcomes(assertions)
     assert outcomes["OVS-03"] == "conformant"
@@ -75,6 +94,7 @@ def test_non_conformant_assessment() -> None:
         domain,
         withheld=(),
         integrity=NO_CAPS,
+        coverage=RECONCILED,
     )
     ovs = next(a for a in assertions if a.control == "OVS-03")
     assert ovs.outcome == "non-conformant"
@@ -94,6 +114,7 @@ def _ovs03_capped(fixture: str, cap: str) -> str:
         DomainBinding.load(_BASE / "test" / "domain.yaml"),
         withheld=(),
         integrity=capped,
+        coverage=RECONCILED,
     )
     return next(a for a in assertions if a.control == "OVS-03").outcome
 
@@ -118,6 +139,7 @@ def test_assessment_report_is_dc5_valid(tmp_path: Path) -> None:
         domain,
         withheld=(),
         integrity=NO_CAPS,
+        coverage=RECONCILED,
     )
     # write_report enforces DC-5; a supporting verdict without evidence would raise here.
     write_report(
@@ -143,6 +165,7 @@ def test_crosswalk_is_carried_from_the_control_and_never_verified() -> None:
         domain,
         withheld=(),
         integrity=NO_CAPS,
+        coverage=RECONCILED,
     )
     doc01 = next(a for a in assertions if a.control == "DOC-01")
     source = yaml.safe_load(
@@ -170,6 +193,7 @@ def test_role_mismatch_is_not_applicable() -> None:
         domain,
         withheld=(),
         integrity=NO_CAPS,
+        coverage=RECONCILED,
     )
     assert _outcomes(assertions)["OVS-03"] == "conformant"
 
@@ -201,6 +225,7 @@ def _non_conformant_ovs03() -> Any:
         domain,
         withheld=(),
         integrity=NO_CAPS,
+        coverage=RECONCILED,
     )
     return next(a for a in assertions if a.control == "OVS-03")
 
@@ -230,6 +255,7 @@ def test_apply_deviations_leaves_conformant_and_insufficient_evidence_untouched(
         domain,
         withheld=(),
         integrity=NO_CAPS,
+        coverage=RECONCILED,
     )
     conformant = next(a for a in assertions if a.control == "OVS-03")
     assert conformant.outcome == "conformant"
@@ -301,7 +327,13 @@ def _human_actor_case(
     )
     domain = DomainBinding.load(case / "domain.linkml.yaml")
     assertions = assess_subjects(
-        accepted, profile, catalogs, domain, withheld=(), integrity=NO_CAPS
+        accepted,
+        profile,
+        catalogs,
+        domain,
+        withheld=(),
+        integrity=NO_CAPS,
+        coverage=RECONCILED,
     )
     return {a.control: a for a in assertions}, _load_deviation_register(
         case / "deviations.yaml"
@@ -462,7 +494,13 @@ def _assess_rob02(events: list[Any], withheld: Any = ()) -> Any:
     catalog = load_catalog(_REPO_ROOT / "spec" / "catalogs" / "base" / "baseline")
     domain = DomainBinding.load(_ROB02 / "domain.linkml.yaml")
     assertions = assess_subjects(
-        events, profile, [catalog], domain, withheld=withheld, integrity=NO_CAPS
+        events,
+        profile,
+        [catalog],
+        domain,
+        withheld=withheld,
+        integrity=NO_CAPS,
+        coverage=RECONCILED,
     )
     return next(a for a in assertions if a.control == "ROB-02")
 
@@ -525,3 +563,156 @@ def test_evidence_skips_a_record_with_no_canonical_form() -> None:
         "e:big": {"id": "big", "data": {"n": 2**62}},
     }
     assert [p.ref for p in _evidence(events, ["e:big", "e:ok"])] == ["e:ok"]
+
+
+# --- 18.134: unknown coverage reads INT and REC insufficient_evidence (SPEC §6.5). ---
+
+
+def _assess_coverage(
+    fixture: str, coverage: dict[str, Any], profile: Profile | None = None
+) -> list[Any]:
+    return assess_subjects(
+        _events(fixture),
+        profile or _profile(),
+        [load_catalog(_BASE)],
+        DomainBinding.load(_BASE / "test" / "domain.yaml"),
+        withheld=(),
+        integrity=NO_CAPS,
+        coverage=coverage,
+    )
+
+
+def _status(status: str | None) -> dict[str, Any]:
+    """coverage.json's structure with the subject's roll-up ``status``, or no entry for it when None."""
+    return {
+        "subjects": {} if status is None else {SUBJECT: {"coverage_status": status}}
+    }
+
+
+@pytest.mark.parametrize("family", ["INT", "REC", "OVS"])
+@pytest.mark.parametrize(
+    "outcome",
+    [
+        "conformant",
+        "partial",
+        "not_applicable",
+        "non-conformant",
+        "insufficient_evidence",
+        "not_assessed",
+    ],
+)
+def test_coverage_unknown_lowers_only_a_flattering_int_or_rec_outcome(
+    family: str, outcome: str
+) -> None:
+    base = next(
+        a
+        for a in _assess_coverage("OVS-03/passed.jsonl", RECONCILED)
+        if a.control == "OVS-03"
+    )
+    before = dataclasses.replace(base, family=family, outcome=outcome)
+    after = _uncovered(before)
+    lowered = family in COVERAGE_FAMILIES and outcome in (
+        "conformant",
+        "partial",
+        "not_applicable",
+    )
+    if lowered:
+        assert after.outcome == "insufficient_evidence"
+        assert after.coverage_unknown is True
+        assert after.violations == []
+        assert after.population == (before.population[0], 0)
+        assert after.source_class_satisfied is None
+        assert after.evidence_strength is None
+    else:
+        assert after is before
+
+
+@pytest.mark.parametrize(
+    ("status", "lowered"),
+    [("ok", False), ("gap", False), ("unknown", True), (None, True)],
+)
+def test_coverage_status_decides_the_int_and_rec_outcomes(
+    status: str | None, lowered: bool
+) -> None:
+    by_control = {
+        a.control: a for a in _assess_coverage("OVS-03/passed.jsonl", _status(status))
+    }
+    for control in ("INT-01", "REC-04"):
+        a = by_control[control]
+        assert a.outcome == ("insufficient_evidence" if lowered else "conformant")
+        assert a.coverage_unknown is lowered
+    assert by_control["OVS-03"].outcome == "conformant"
+    assert by_control["OVS-03"].coverage_unknown is False
+
+
+def test_coverage_unknown_keeps_a_violation_non_conformant() -> None:
+    by_control = {
+        a.control: a
+        for a in _assess_coverage("INT-01/failed.jsonl", _status("unknown"))
+    }
+    assert by_control["INT-01"].outcome == "non-conformant"
+    assert by_control["INT-01"].violations
+    assert by_control["INT-01"].coverage_unknown is False
+
+
+def test_coverage_unknown_keeps_a_role_mismatch_not_applicable() -> None:
+    catalog = load_catalog(_BASE)
+    catalog.controls = [
+        dataclasses.replace(c, applies_to_roles=["deployer"]) if c.id == "INT-01" else c
+        for c in catalog.controls
+    ]
+    profile = Profile.from_dict({"subjects": [{"id": SUBJECT, "role": "provider"}]})
+    assertions = assess_subjects(
+        _events("OVS-03/passed.jsonl"),
+        profile,
+        [catalog],
+        DomainBinding.load(_BASE / "test" / "domain.yaml"),
+        withheld=(),
+        integrity=NO_CAPS,
+        coverage=_status("unknown"),
+    )
+    by_control = {a.control: a for a in assertions}
+    assert by_control["INT-01"].outcome == "not_applicable"
+    assert by_control["INT-01"].coverage_unknown is False
+    assert by_control["REC-04"].outcome == "insufficient_evidence"
+
+
+def test_two_subjects_each_read_on_their_own_coverage() -> None:
+    other = "spiffe://corp/agents/b"
+    events = _events("OVS-03/passed.jsonl")
+    events += [{**e, "id": f"{e['id']}-b", "subject": other} for e in events]
+    profile = Profile.from_dict(
+        {"subjects": [{"id": SUBJECT, "role": "both"}, {"id": other, "role": "both"}]}
+    )
+    coverage = {
+        "subjects": {
+            SUBJECT: {"coverage_status": "ok"},
+            other: {"coverage_status": "unknown"},
+        }
+    }
+    assertions = assess_subjects(
+        events,
+        profile,
+        [load_catalog(_BASE)],
+        DomainBinding.load(_BASE / "test" / "domain.yaml"),
+        withheld=(),
+        integrity=NO_CAPS,
+        coverage=coverage,
+    )
+    int01 = {a.subject: a.outcome for a in assertions if a.control == "INT-01"}
+    assert int01 == {SUBJECT: "conformant", other: "insufficient_evidence"}
+
+
+def test_a_coverage_lowered_check_with_no_population_judged_nothing() -> None:
+    base = next(
+        a
+        for a in _assess_coverage("OVS-03/passed.jsonl", RECONCILED)
+        if a.control == "INC-02"
+    )
+    empty = _uncovered(dataclasses.replace(base, family="INT", population=(0, 0)))
+    assert empty.outcome == "insufficient_evidence"
+    assert evaluated_nothing([empty])
+    judged = _uncovered(
+        dataclasses.replace(base, family="INT", outcome="conformant", population=(2, 0))
+    )
+    assert not evaluated_nothing([judged])

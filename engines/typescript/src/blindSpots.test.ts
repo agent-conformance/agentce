@@ -88,7 +88,7 @@ test("a run with zero insufficient_evidence assertions writes the honest empty a
   const profile = profileOneSubject();
   const a = assertion(c, "conformant", [1, 0]);
   const result = computeBlindSpots([a], profile, [cat], []);
-  assert.deepEqual(result, { blind_spots: [], no_population: [] });
+  assert.deepEqual(result, { blind_spots: [], no_population: [], coverage_unknown: [] });
 });
 
 test("any and self_report requirements normalize into one blind spot, never two", () => {

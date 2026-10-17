@@ -365,3 +365,20 @@ def test_gate_reaches_its_end_of_checks_marker_even_under_a_reintroduced_f1_muta
         report_path.write_text(original, encoding="utf-8")
     assert "buyer-view: reached end of checks" in result.stderr
     assert result.returncode != 0
+
+
+def test_insufficient_evidence_in_coverage_unknown_gets_coverage_unknown_marker() -> (
+    None
+):
+    a = _assertion(
+        "REC-01",
+        outcome="insufficient_evidence",
+        crosswalk=[{"framework": "caiq", "clause": "IAM-13.1"}],
+    )
+    blind_spots = {
+        "blind_spots": [],
+        "no_population": [],
+        "coverage_unknown": [_check_ref(a)],
+    }
+    view = compute_buyer_view([a], blind_spots)
+    assert view["answers"][0]["gap_step"] == {"kind": "coverage_unknown"}

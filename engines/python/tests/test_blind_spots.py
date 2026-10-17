@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import locale
 import os
 from pathlib import Path
@@ -107,7 +109,7 @@ def test_no_insufficient_evidence_writes_the_honest_empty_answer() -> None:
     catalog = _catalog([control])
     assertion = _assertion(control, outcome="conformant", population=(1, 0))
     result = compute_blind_spots([assertion], _profile(), [catalog], [])
-    assert result == {"blind_spots": [], "no_population": []}
+    assert result == {"blind_spots": [], "no_population": [], "coverage_unknown": []}
 
 
 def test_two_missing_requirements_go_to_needed_by_never_unlocked() -> None:
@@ -490,3 +492,20 @@ def test_catalog_support_view_never_drops_an_empty_requirements_control() -> Non
             "requirements": [],
         }
     ]
+
+
+def test_a_coverage_unknown_check_goes_to_coverage_unknown_only() -> None:
+    """18.134: a check lowered by unknown coverage misses an independent count of the subject's calls (SPEC §6.5),
+    never a record type, so it lands in coverage_unknown and in neither no_population nor a ladder group."""
+    control = _control("REC-09", [{"event": "Decision", "class": "any"}])
+    catalog = _catalog([control])
+    assertion = dataclasses.replace(
+        _assertion(control, outcome="insufficient_evidence", population=(1, 0)),
+        coverage_unknown=True,
+    )
+    result = compute_blind_spots([assertion], _profile(), [catalog], [])
+    assert result == {
+        "blind_spots": [],
+        "no_population": [],
+        "coverage_unknown": [_check_ref(control)],
+    }

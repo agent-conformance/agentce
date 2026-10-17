@@ -11,7 +11,7 @@
 
 import { readFileSync } from "node:fs";
 import { confineToRoot, safeIsFile } from "./bundle";
-import { type CoverageDenominator, type Profile, denominatorIds } from "./profile";
+import type { CoverageDenominator, Profile, Subject } from "./profile";
 import { byteCompare } from "./util";
 
 const STATUS_COVERED = "covered";
@@ -56,11 +56,35 @@ function firstNonEmpty(...candidates: unknown[]): Record<string, unknown> {
   return {};
 }
 
+/** A denominator counts only when it is independent (SPEC §6.5): never one of the subject's own declared evidence
+ * sources, and never an admission attestation, whose signature and policy digest no engine verifies. */
+function independent(denominator: CoverageDenominator, subject: Subject): boolean {
+  return (
+    denominator.kind !== "admission_attestation" &&
+    !subject.evidenceSources.some((s) => s.source === denominator.source)
+  );
+}
+
+/** True when the denominator's yardstick is its own source's ingested events, which are then left out of the
+ * subject's observed count; a manifest-bearing or non-independent denominator never hides any event. */
+function selfCounting(denominator: CoverageDenominator, subject: Subject): boolean {
+  return !denominator.manifest && independent(denominator, subject);
+}
+
 function denominatorCounts(
   denominator: CoverageDenominator,
+  subject: Subject,
   bySource: Map<string, Map<string, number>>,
   bundleRoot: string | null,
+  listed: ReadonlySet<string>,
 ): Record<string, number> {
+  if (!independent(denominator, subject)) {
+    return {};
+  }
+  if (denominator.manifest && !listed.has(denominator.manifest)) {
+    // A file the bundle manifest does not list is outside the bundle digest: never read (SPEC §6.6).
+    return {};
+  }
   if (denominator.manifest && bundleRoot !== null) {
     // A denominator manifest is a bundle-adjacent reference: confine it to the bundle root so a
     // path that escapes (literally or through a symlink) is not read at all, falling through to
@@ -94,11 +118,13 @@ interface ExpectedEntry {
   denominators: string[];
 }
 
-/** Return the coverage.json structure for `events` under `profile`. */
+/** Return the coverage.json structure for `events` under `profile`. `listed` is the bundle manifest's file paths:
+ * a denominator manifest is read only when listed there. */
 export function computeCoverage(
   events: Event[],
   profile: Profile,
   bundleRoot: string | null = null,
+  listed: ReadonlySet<string> = new Set(),
 ): Record<string, unknown> {
   const bySource = new Map<string, Map<string, number>>();
   for (const event of events) {
@@ -114,7 +140,9 @@ export function computeCoverage(
 
   const subjectsOut: Record<string, unknown> = {};
   for (const subject of profile.subjects) {
-    const denomIds = denominatorIds(subject);
+    const denomIds = new Set(
+      subject.coverageDenominators.filter((d) => selfCounting(d, subject)).map((d) => d.source),
+    );
     const observed = new Map<string, number>();
     const types = new Set<string>();
     for (const event of events) {
@@ -131,7 +159,7 @@ export function computeCoverage(
 
     const expected = new Map<string, ExpectedEntry>();
     for (const denominator of subject.coverageDenominators) {
-      const counts = denominatorCounts(denominator, bySource, bundleRoot);
+      const counts = denominatorCounts(denominator, subject, bySource, bundleRoot, listed);
       const covered = denominator.covers.length > 0 ? denominator.covers : Object.keys(counts);
       for (const type of covered) {
         if (!(type in counts)) {

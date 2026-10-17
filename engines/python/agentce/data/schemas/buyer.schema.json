@@ -57,6 +57,14 @@
           "properties": {
             "kind": {"const": "no_population"}
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": {"const": "coverage_unknown"}
+          }
         }
       ]
     },

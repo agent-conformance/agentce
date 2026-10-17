@@ -942,6 +942,9 @@ public final class Readiness {
             }
             if ("gap".equals(entry.path("coverage_status").asText(null))) {
                 reasons.add("coverage shortfall for subject " + subject);
+            } else if ("unknown".equals(entry.path("coverage_status").asText(null))) {
+                // No independent denominator reconciles the subject's records (SPEC §6.5, §13.3.4).
+                reasons.add("coverage unknown for subject " + subject + ": no independent denominator");
             }
             JsonNode eventTypes = entry.path("event_types");
             if (!eventTypes.isObject()) {

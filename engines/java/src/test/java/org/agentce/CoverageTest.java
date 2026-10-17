@@ -24,9 +24,16 @@ class CoverageTest {
         JsonNode golden = Json.parseFile(TestPaths.testData().resolve("coverage-golden.json"));
         Profile profile = Profile.fromDict(fixture.get("profile"));
         JsonNode result = Coverage.computeCoverage(
-                Fixtures.toList(fixture.get("events")), profile, TestPaths.testData().resolve("coverage-bundle"));
+                Fixtures.toList(fixture.get("events")), profile, TestPaths.testData().resolve("coverage-bundle"),
+                java.util.Set.of("reference/prov-counts.json"));
         assertEquals(Canonical.canonicalString(golden), Canonical.canonicalString(result));
     }
+
+    /** A subject that declares no evidence source, so every denominator here is independent. */
+    private static final Profile.Subject SUBJECT = new Profile.Subject();
+
+    /** The bundle manifest lists the denominator manifest, so its counts may be read (SPEC §6.5). */
+    private static final java.util.Set<String> LISTED = java.util.Set.of("reference/counts.json");
 
     private static Profile.CoverageDenominator denominator(String manifest) {
         Profile.CoverageDenominator denominator = new Profile.CoverageDenominator();
@@ -53,10 +60,12 @@ class CoverageTest {
         // fall back to the source's own counts, exactly as a missing manifest does.
         assertEquals(
                 Map.of("ToolCall", 3),
-                Coverage.denominatorCounts(denominator("../secret.json"), BY_SOURCE, bundleRoot));
+                Coverage.denominatorCounts(
+                        denominator("../secret.json"), SUBJECT, BY_SOURCE, bundleRoot, java.util.Set.of("../secret.json")));
         assertEquals(
                 Map.of("ToolCall", 3),
-                Coverage.denominatorCounts(denominator("reference/counts.json"), BY_SOURCE, bundleRoot));
+                Coverage.denominatorCounts(
+                        denominator("reference/counts.json"), SUBJECT, BY_SOURCE, bundleRoot, LISTED));
     }
 
     @Test
@@ -70,6 +79,7 @@ class CoverageTest {
 
         assertEquals(
                 Map.of("ToolCall", 7),
-                Coverage.denominatorCounts(denominator("reference/counts.json"), BY_SOURCE, bundleRoot));
+                Coverage.denominatorCounts(
+                        denominator("reference/counts.json"), SUBJECT, BY_SOURCE, bundleRoot, LISTED));
     }
 }

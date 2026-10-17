@@ -51,14 +51,14 @@ def blind_spots_by_subject(
     return by_subject
 
 
-def no_population_by_subject(
-    no_population: list[dict[str, str]],
+def checks_by_subject(
+    checks: list[dict[str, str]],
 ) -> dict[str, list[dict[str, str]]]:
-    """Group ``compute_blind_spots``'s global ``no_population`` list by each entry's own ``subject``
-    field: unlike ``blind_spots``, every ``no_population`` entry already names exactly one subject, so
+    """Group one of ``compute_blind_spots``'s global check lists (``no_population``, ``coverage_unknown``) by each
+    entry's own ``subject`` field: unlike ``blind_spots``, every entry already names exactly one subject, so
     no re-scoping is needed, only grouping -- exactly what ``index_by_subject`` (``assess.py``)
     already does for events."""
-    return index_by_subject(no_population)
+    return index_by_subject(checks)
 
 
 def compute_project_view(

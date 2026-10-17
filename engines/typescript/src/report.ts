@@ -26,8 +26,8 @@ import { type Profile, type Subject, profileFromDict } from "./profile";
 import {
   type ProjectView,
   blindSpotsBySubject,
+  checksBySubject,
   computeProjectView,
-  noPopulationBySubject,
 } from "./project";
 import { byteCompare, formatTemplate, jsonStringifyAscii, pyStr, sortKeysDeep } from "./util";
 import { gapText, summarize as summarizeVerdict } from "./verdict";
@@ -530,19 +530,52 @@ function blindSpotRows(blindSpots: BlindSpot[]): [string, string][] {
   });
 }
 
-function noPopulationRows(noPopulation: CheckRef[]): [string, string][] {
-  return noPopulation.map((entry) => [
+/** `(label, value)` for every entry of a check list, each with the list's one fixed sentence: for
+ * `no_population` the deliberately generic one (RFC 0008 Sec.4); for `coverage_unknown` the missing
+ * independent count (SPEC §6.5). */
+function checkRows(checks: CheckRef[], text: (control: string) => string): [string, string][] {
+  return checks.map((entry) => [
     `${sanitizeField(entry.control)} on ${sanitizeField(entry.subject)} ` +
       `(${sanitizeField(entry.catalog)}@${sanitizeField(entry.control_version)})`,
-    `The records show every kind of evidence ${sanitizeField(entry.control)} asks for, but not enough of it in the shape the control expects -- a --domain binding may be needed to identify the relevant decisions; see the control's documentation for what it needs.`,
+    text(sanitizeField(entry.control)),
   ]);
+}
+
+const NO_POPULATION_TEXT = (control: string): string =>
+  `The records show every kind of evidence ${control} asks for, but not enough of it in the shape the control expects -- a --domain binding may be needed to identify the relevant decisions; see the control's documentation for what it needs.`;
+
+const COVERAGE_UNKNOWN_TEXT = (control: string): string =>
+  `AgentCE can't judge ${control} yet. Nothing outside the agent and the enforcement point counts this agent's calls, so a call that went around the records would not show up. To fix it, declare a coverage denominator in the applicability profile, such as a provider usage export, an egress or firewall log, or a system-of-record export.`;
+
+/** The check lists rendered after the ranked blind spots, each as (list key, heading, text). */
+const CHECK_SECTIONS: [
+  "no_population" | "coverage_unknown",
+  string,
+  (control: string) => string,
+][] = [
+  ["no_population", "Records that don't show enough, with no single fix", NO_POPULATION_TEXT],
+  [
+    "coverage_unknown",
+    "Checks waiting on an independent count of your agent's calls",
+    COVERAGE_UNKNOWN_TEXT,
+  ],
+];
+
+/** `[heading, rows]` for each non-empty check list in `blindSpots`, in `CHECK_SECTIONS` order. */
+function checkSections(blindSpots: BlindSpots): [string, [string, string][]][] {
+  const sections: [string, [string, string][]][] = [];
+  for (const [key, heading, text] of CHECK_SECTIONS) {
+    const rows = checkRows(blindSpots[key], text);
+    if (rows.length > 0) sections.push([heading, rows]);
+  }
+  return sections;
 }
 
 function blindSpotsMd(blindSpots: BlindSpots): string[] {
   const rows = blindSpotRows(blindSpots.blind_spots);
-  const noPopRows = noPopulationRows(blindSpots.no_population);
+  const sections = checkSections(blindSpots);
   const lines = ["## Where your records can't show it yet", ""];
-  if (rows.length === 0 && noPopRows.length === 0) {
+  if (rows.length === 0 && sections.length === 0) {
     lines.push("- every check either has enough evidence, or nothing here would unlock more", "");
     return lines;
   }
@@ -553,9 +586,9 @@ function blindSpotsMd(blindSpots: BlindSpots): string[] {
   // payload's own leading character is never the line's first content, and is always the only
   // backtick on the line since sanitizeForMarkdown already substitutes any embedded backtick.
   for (const [label, value] of rows) lines.push(`- \`${label}\`: ${value}`);
-  if (noPopRows.length > 0) {
-    lines.push("", "### Records that don't show enough, with no single fix", "");
-    for (const [label, value] of noPopRows) lines.push(`- \`${label}\`: ${value}`);
+  for (const [heading, sectionRows] of sections) {
+    lines.push("", `### ${heading}`, "");
+    for (const [label, value] of sectionRows) lines.push(`- \`${label}\`: ${value}`);
   }
   lines.push("");
   return lines;
@@ -563,9 +596,9 @@ function blindSpotsMd(blindSpots: BlindSpots): string[] {
 
 function blindSpotsHtml(blindSpots: BlindSpots): string {
   const rows = blindSpotRows(blindSpots.blind_spots);
-  const noPopRows = noPopulationRows(blindSpots.no_population);
+  const sections = checkSections(blindSpots);
   let body: string;
-  if (rows.length === 0 && noPopRows.length === 0) {
+  if (rows.length === 0 && sections.length === 0) {
     body = "<p>every check either has enough evidence, or nothing here would unlock more</p>";
   } else {
     const items = (list: [string, string][]): string =>
@@ -576,8 +609,8 @@ function blindSpotsHtml(blindSpots: BlindSpots): string {
         )
         .join("");
     body = `<ul>${items(rows)}</ul>`;
-    if (noPopRows.length > 0) {
-      body += `<h3>Records that don't show enough, with no single fix</h3><ul>${items(noPopRows)}</ul>`;
+    for (const [heading, sectionRows] of sections) {
+      body += `<h3>${escapeHtml(heading)}</h3><ul>${items(sectionRows)}</ul>`;
     }
   }
   return `<section aria-labelledby="blind-spots"><h2 id="blind-spots">Where your records can't show it yet</h2>${body}</section>`;
@@ -587,16 +620,16 @@ function blindSpotsHtml(blindSpots: BlindSpots): string {
  * render. */
 export function blindSpotsCliLines(blindSpots: BlindSpots): string[] {
   const rows = blindSpotRows(blindSpots.blind_spots);
-  const noPopRows = noPopulationRows(blindSpots.no_population);
+  const sections = checkSections(blindSpots);
   const lines = ["Where your records can't show it yet:"];
-  if (rows.length === 0 && noPopRows.length === 0) {
+  if (rows.length === 0 && sections.length === 0) {
     lines.push("  every check either has enough evidence, or nothing here would unlock more");
     return lines;
   }
   for (const [label, value] of rows) lines.push(`  ${label}: ${value}`);
-  if (noPopRows.length > 0) {
-    lines.push("  Records that don't show enough, with no single fix:");
-    for (const [label, value] of noPopRows) lines.push(`    ${label}: ${value}`);
+  for (const [heading, sectionRows] of sections) {
+    lines.push(`  ${heading}:`);
+    for (const [label, value] of sectionRows) lines.push(`    ${label}: ${value}`);
   }
   return lines;
 }
@@ -1357,7 +1390,11 @@ export function writeReport(
   const language = options.reportLanguage ?? DEFAULT_LANGUAGE;
   const counts = aggregate(assertions);
   const activity = options.activity ?? summarizeActivity([], profileFromDict({}));
-  const blindSpots = options.blindSpots ?? { blind_spots: [], no_population: [] };
+  const blindSpots = options.blindSpots ?? {
+    blind_spots: [],
+    no_population: [],
+    coverage_unknown: [],
+  };
   writeJson("assertions.json", assertions.map(assertionToJson));
   writeJson("activity.json", activity);
   writeJson("blind-spots.json", blindSpots);
@@ -1400,7 +1437,8 @@ export function writeReport(
     );
     writeJson("project.json", projectView);
     const gapsBySubject = blindSpotsBySubject(blindSpots);
-    const noPopBySubject = noPopulationBySubject(blindSpots.no_population);
+    const noPopBySubject = checksBySubject(blindSpots.no_population);
+    const uncoveredBySubject = checksBySubject(blindSpots.coverage_unknown);
     const assertionsBySubject = new Map<string, Assertion[]>();
     for (const assertion of assertions) {
       const list = assertionsBySubject.get(assertion.subject);
@@ -1419,6 +1457,7 @@ export function writeReport(
       const subjectBlindSpots: BlindSpots = {
         blind_spots: gapsBySubject.get(subjectId) ?? [],
         no_population: noPopBySubject.get(subjectId) ?? [],
+        coverage_unknown: uncoveredBySubject.get(subjectId) ?? [],
       };
       writeJson(`agents/${subjectDirname}/assertions.json`, subjectAssertions.map(assertionToJson));
       writeJson(`agents/${subjectDirname}/activity.json`, subjectActivity);

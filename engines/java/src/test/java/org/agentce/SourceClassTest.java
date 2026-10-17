@@ -431,7 +431,7 @@ class SourceClassTest {
         Profile profile = Profile.fromDict(Json.parse("{\"subjects\": [{\"id\": \"" + SUBJECT
                 + "\", \"role\": \"both\"}, {\"id\": \"" + OTHER + "\", \"role\": \"both\"}]}"));
         for (Assertions.Assertion a : Assess.assessSubjects(
-                new ArrayList<>(events), profile, List.of(conduct()), domain, List.of(), Integrity.Caps.NONE)) {
+                new ArrayList<>(events), profile, List.of(conduct()), domain, List.of(), Integrity.Caps.NONE, Fixtures.RECONCILED)) {
             if (a.control.equals(control) && a.subject.equals(SUBJECT)) {
                 return a;
             }
@@ -538,7 +538,7 @@ class SourceClassTest {
         Profile profile = Profile.fromDict(Json.parse("{\"subjects\": [{\"id\": \"" + SUBJECT + "\", \"role\": \"both\"}]}"));
         List<JsonNode> events = List.of(instruction(SR), call());
         List<Catalog> catalogs = List.of(conduct());
-        List<Assertions.Assertion> assertions = Assess.assessSubjects(events, profile, catalogs, DOMAIN, List.of(), Integrity.Caps.NONE);
+        List<Assertions.Assertion> assertions = Assess.assessSubjects(events, profile, catalogs, DOMAIN, List.of(), Integrity.Caps.NONE, Fixtures.RECONCILED);
         ObjectNode spots = BlindSpots.computeBlindSpots(assertions, profile, catalogs, events);
         JsonNode spot = null;
         for (JsonNode s : spots.get("blind_spots")) {
@@ -558,7 +558,7 @@ class SourceClassTest {
         Profile profile = Profile.fromDict(Json.parse("{\"subjects\": [{\"id\": \"" + SUBJECT + "\", \"role\": \"both\"}]}"));
         Catalog catalog = Catalog.load(CATALOGS.resolve("base/baseline"));
         for (Assertions.Assertion a : Assess.assessSubjects(
-                new ArrayList<>(events), profile, List.of(catalog), DOMAIN, List.of(), Integrity.Caps.NONE)) {
+                new ArrayList<>(events), profile, List.of(catalog), DOMAIN, List.of(), Integrity.Caps.NONE, Fixtures.RECONCILED)) {
             if ("ROB-02".equals(a.control)) {
                 return a;
             }

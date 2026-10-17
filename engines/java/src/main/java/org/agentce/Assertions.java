@@ -74,6 +74,7 @@ public final class Assertions {
         c.withheldNonConformant = a.withheldNonConformant;
         c.classGap = a.classGap;
         c.humanActorFailed = a.humanActorFailed;
+        c.coverageUnknown = a.coverageUnknown;
         return c;
     }
 
@@ -108,6 +109,9 @@ public final class Assertions {
          * deviation register cannot waive (18.186). Run state for {@link Assess#applyDeviations}; never written to
          * assertions.json. */
         public boolean humanActorFailed;
+        /** True when this insufficient_evidence outcome comes from the subject's unknown coverage (SPEC §6.5, 18.134).
+         * Run state for the missing-evidence text; never written to assertions.json. */
+        public boolean coverageUnknown;
 
         public ObjectNode toJson() {
             ObjectNode record = Json.nodes().objectNode();

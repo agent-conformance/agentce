@@ -172,7 +172,7 @@ def compute_blind_spots(
     catalogs: list[Catalog],
     events: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """Return ``{"blind_spots": [...], "no_population": [...]}`` for ``assertions``.
+    """Return ``{"blind_spots": [...], "no_population": [...], "coverage_unknown": [...]}`` for ``assertions``.
 
     ``assertions`` must be :func:`agentce.assess.assess_subjects`'s own output, in its own order --
     that order is meaningful input here (RFC 0008 Sec.6), not incidental: it is replayed positionally
@@ -205,6 +205,7 @@ def compute_blind_spots(
     # (event, normalized_class) -> ([unlocked check refs], [needed_by check refs]).
     groups: dict[tuple[str, str], tuple[list[CheckRef], list[CheckRef]]] = {}
     no_population: list[CheckRef] = []
+    coverage_unknown: list[CheckRef] = []
 
     for (subject_id, catalog_id, control), a in zip(triples, assertions, strict=True):
         if (
@@ -220,6 +221,16 @@ def compute_blind_spots(
             )
         if a.outcome != "insufficient_evidence":
             continue
+        check_ref: CheckRef = {
+            "subject": subject_id,
+            "catalog": catalog_id,
+            "control": control.id,
+            "control_version": control.version,
+        }
+        if a.coverage_unknown:
+            # What is missing is an independent count of the subject's calls (SPEC §6.5), not a record type.
+            coverage_unknown.append(check_ref)
+            continue
         missing = [r for r in control.minimum_evidence if not _met(subject_id, r)]
         normalized_keys = sorted(
             {
@@ -227,12 +238,6 @@ def compute_blind_spots(
                 for r in missing
             }
         )
-        check_ref: CheckRef = {
-            "subject": subject_id,
-            "catalog": catalog_id,
-            "control": control.id,
-            "control_version": control.version,
-        }
         # A focus below the control's min_source_class (HR-5) misses a record of that type at the minimum
         # (assess.missing_evidence). Never provably sufficient alone: it only ever lands in needed_by. class_gap
         # is already distinct and sorted.
@@ -286,4 +291,9 @@ def compute_blind_spots(
         )
     )
     no_population.sort(key=_check_sort_key)
-    return {"blind_spots": blind_spots, "no_population": no_population}
+    coverage_unknown.sort(key=_check_sort_key)
+    return {
+        "blind_spots": blind_spots,
+        "no_population": no_population,
+        "coverage_unknown": coverage_unknown,
+    }

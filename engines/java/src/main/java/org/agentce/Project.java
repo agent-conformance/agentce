@@ -73,13 +73,13 @@ public final class Project {
     }
 
     /**
-     * Group {@code computeBlindSpots}'s global {@code no_population} list by each entry's own
-     * {@code subject} field: unlike {@code blind_spots}, every {@code no_population} entry already
-     * names exactly one subject, so no re-scoping is needed, only grouping.
+     * Group one of {@code computeBlindSpots}'s global check lists ({@code no_population},
+     * {@code coverage_unknown}) by each entry's own {@code subject} field: unlike {@code blind_spots},
+     * every entry already names exactly one subject, so no re-scoping is needed, only grouping.
      */
-    public static Map<String, List<ObjectNode>> noPopulationBySubject(ArrayNode noPopulation) {
+    public static Map<String, List<ObjectNode>> checksBySubject(ArrayNode checks) {
         Map<String, List<ObjectNode>> bySubject = new LinkedHashMap<>();
-        for (JsonNode n : noPopulation) {
+        for (JsonNode n : checks) {
             ObjectNode entry = (ObjectNode) n;
             bySubject.computeIfAbsent(entry.get("subject").asText(), k -> new ArrayList<>()).add(entry);
         }

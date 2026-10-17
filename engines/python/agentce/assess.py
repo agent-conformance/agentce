@@ -472,8 +472,13 @@ VERDICT_OUTCOMES = frozenset({"conformant", "non-conformant", "insufficient_evid
 
 
 def evaluated_nothing(assertions: list[Assertion]) -> bool:
-    """True when no assertion reached a verdict (see :data:`VERDICT_OUTCOMES`)."""
-    return not any(a.outcome in VERDICT_OUTCOMES for a in assertions)
+    """True when no assertion reached a verdict (see :data:`VERDICT_OUTCOMES`). A check the unknown-coverage rule
+    lowered with no population in scope (it was not applicable) judged nothing either."""
+    return not any(
+        a.outcome in VERDICT_OUTCOMES
+        and not (a.coverage_unknown and not a.population[0])
+        for a in assertions
+    )
 
 
 def index_by_subject(
@@ -487,6 +492,37 @@ def index_by_subject(
     return index
 
 
+#: The families whose controls read insufficient_evidence while a subject's coverage is unknown (SPEC §6.5).
+COVERAGE_FAMILIES = frozenset({"INT", "REC"})
+
+
+def _coverage_unknown(coverage: dict[str, Any], subject: str) -> bool:
+    """True when ``coverage`` (compute_coverage's structure) does not show the subject's capture reconciled against an
+    independent denominator: its roll-up is unknown, or the subject has no entry at all (SPEC §6.5)."""
+    entry = (coverage.get("subjects") or {}).get(subject)
+    return not isinstance(entry, dict) or entry.get("coverage_status") == "unknown"
+
+
+def _uncovered(assertion: Assertion) -> Assertion:
+    """An INT or REC outcome that reads better than insufficient_evidence while coverage is unknown reads
+    insufficient_evidence (SPEC §6.5): a call that bypassed capture would not be in the records. A violation stays."""
+    if assertion.family not in COVERAGE_FAMILIES or assertion.outcome not in (
+        "conformant",
+        "partial",
+        "not_applicable",
+    ):
+        return assertion
+    return dataclasses.replace(
+        assertion,
+        outcome="insufficient_evidence",
+        population=(assertion.population[0], 0),
+        violations=[],
+        source_class_satisfied=None,
+        evidence_strength=None,
+        coverage_unknown=True,
+    )
+
+
 def assess_subjects(
     accepted: list[dict[str, Any]],
     profile: Profile,
@@ -496,6 +532,7 @@ def assess_subjects(
     applicability_declared: bool = True,
     withheld: Sequence[Withheld],
     integrity: IntegrityCaps,
+    coverage: dict[str, Any],
 ) -> list[Assertion]:
     """Evaluate every catalog control against every subject and return the assertions.
 
@@ -546,8 +583,11 @@ def assess_subjects(
         judge = functools.cache(lambda: SourceClassJudge(store, events_by_iri))
         cf_judge = functools.cache(lambda: SourceClassJudge(cf_store, cf_by_iri))
         capped = _CappedViews(subject_events, integrity, domain, foreign)
+        first = len(assertions)
+        role_applies: list[bool] = []
         for catalog in catalogs:
             for control in catalog.controls:
+                role_applies.append(_role_applies(roles, control.applies_to_roles))
                 assertion = _assert_control(
                     store,
                     catalog,
@@ -612,6 +652,11 @@ def assess_subjects(
                         non_conformant=with_withheld == "non-conformant",
                     )
                 assertions.append(assertion)
+        if _coverage_unknown(coverage, subject.id):
+            assertions[first:] = [
+                _uncovered(a) if applies else a
+                for a, applies in zip(assertions[first:], role_applies, strict=True)
+            ]
     return assertions
 
 

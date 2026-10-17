@@ -27,7 +27,7 @@ import { resolve as resolveApplicability } from "./applicability";
 import { aggregate } from "./assertions";
 import { assessSubjects } from "./assess";
 import { computeBlindSpots } from "./blindSpots";
-import { loadBundle } from "./bundle";
+import { listedPaths, loadBundle } from "./bundle";
 import { type Catalog, loadCatalog } from "./catalog";
 import { computeCoverage } from "./coverage";
 import { DomainBinding } from "./domain";
@@ -128,7 +128,7 @@ function assessProject(
   const streams = verifyStreams(ingested.rawAccepted, bundle.manifest, bundle.root);
   const domain = DomainBinding.load(join(proj, "domain.linkml.yaml"));
   const profile = loadProfile(join(proj, "applicability.yaml"));
-  computeCoverage(ingested.accepted, profile, bundle.root);
+  const coverage = computeCoverage(ingested.accepted, profile, bundle.root, listedPaths(bundle));
   resolveApplicability(profile, ingested.accepted);
   const assertions = assessSubjects(
     ingested.accepted,
@@ -138,6 +138,7 @@ function assessProject(
     true,
     ingested.withheld,
     integrityCaps(ingested.rawAccepted, ingested.accepted, streams),
+    coverage,
   );
   const activity = summarizeActivity(ingested.accepted, profile);
   const blindSpots = computeBlindSpots(assertions, profile, catalogs, ingested.accepted);

@@ -85,6 +85,7 @@ def coverage_golden(testdata: Path) -> dict[str, Any]:
         fixture["events"],
         Profile.from_dict(fixture["profile"]),
         testdata / "coverage-bundle",
+        listed=frozenset({"reference/prov-counts.json"}),
     )
 
 

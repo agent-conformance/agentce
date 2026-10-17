@@ -27,6 +27,22 @@ final class Fixtures {
     static final Path BASE = TestPaths.repoRoot().resolve("spec/catalogs/base/eu-ai-act");
     static final Path CONDUCT = TestPaths.repoRoot().resolve("spec/catalogs/overlays/conduct");
 
+    /** Coverage that reconciles every subject (SPEC §6.5), for tests of rules other than unknown coverage. */
+    static final ObjectNode RECONCILED = reconciled();
+
+    private static ObjectNode reconciled() {
+        ObjectNode ok = Json.nodes().objectNode().put("coverage_status", "ok");
+        ObjectNode every = new ObjectNode(Json.nodes()) {
+            @Override
+            public JsonNode get(String fieldName) {
+                return ok;
+            }
+        };
+        ObjectNode coverage = Json.nodes().objectNode();
+        coverage.set("subjects", every);
+        return coverage;
+    }
+
     /** Runs the real CLI dispatcher ({@link Cli#run}) with {@code --json} appended, captures
      * stdout, and parses the envelope -- asserting the process exit code matches the envelope's own
      * {@code exit_code}. */

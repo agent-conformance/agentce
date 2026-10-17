@@ -519,6 +519,45 @@ function notEnoughWithWithheld(
  * naming them when a record ingest could not read may belong to the subject, or when judging the subject's readable
  * withheld records with its held ones changes that outcome.
  */
+/** The families whose controls read insufficient_evidence while a subject's coverage is unknown (SPEC §6.5). */
+export const COVERAGE_FAMILIES: ReadonlySet<string> = new Set(["INT", "REC"]);
+
+/** True when `coverage` (computeCoverage's structure) does not show the subject's capture reconciled against an
+ * independent denominator: its roll-up is unknown, or the subject has no entry at all (SPEC §6.5). */
+function coverageUnknown(coverage: Record<string, unknown>, subject: string): boolean {
+  const subjects = coverage.subjects;
+  const entry =
+    typeof subjects === "object" && subjects !== null
+      ? (subjects as Record<string, unknown>)[subject]
+      : undefined;
+  return (
+    typeof entry !== "object" ||
+    entry === null ||
+    Array.isArray(entry) ||
+    (entry as Record<string, unknown>).coverage_status === "unknown"
+  );
+}
+
+/** An INT or REC outcome that reads better than insufficient_evidence while coverage is unknown reads
+ * insufficient_evidence (SPEC §6.5): a call that bypassed capture would not be in the records. A violation stays. */
+export function uncovered(assertion: Assertion): Assertion {
+  if (
+    !COVERAGE_FAMILIES.has(assertion.family) ||
+    !["conformant", "partial", "not_applicable"].includes(assertion.outcome)
+  ) {
+    return assertion;
+  }
+  return {
+    ...assertion,
+    outcome: "insufficient_evidence",
+    population: [assertion.population[0], 0],
+    violations: [],
+    sourceClassSatisfied: null,
+    evidenceStrength: null,
+    coverageUnknown: true,
+  };
+}
+
 export function assessSubjects(
   accepted: Event[],
   profile: Profile,
@@ -527,6 +566,7 @@ export function assessSubjects(
   applicabilityDeclared: boolean,
   withheld: Withheld[],
   integrity: IntegrityCaps,
+  coverage: Record<string, unknown>,
 ): Assertion[] {
   const assertions: Assertion[] = [];
   const eventsBySubject = indexBySubject(accepted);
@@ -569,8 +609,11 @@ export function assessSubjects(
     const judge = lazy(() => new SourceClassJudge(store, eventsByIri));
     const cfJudge = lazy(() => new SourceClassJudge(cfStore, cfByIri));
     const capped = new CappedViews(subjectEvents, integrity, domain, foreign);
+    const first = assertions.length;
+    const roleAppliesAt: boolean[] = [];
     for (const catalog of catalogs) {
       for (const control of catalog.controls) {
+        roleAppliesAt.push(roleApplies(roles, control.appliesToRoles));
         let assertion = assertControl(
           store,
           catalog,
@@ -631,6 +674,13 @@ export function assessSubjects(
         assertions.push(assertion);
       }
     }
+    if (coverageUnknown(coverage, subject.id)) {
+      for (let i = first; i < assertions.length; i++) {
+        if (roleAppliesAt[i - first]) {
+          assertions[i] = uncovered(assertions[i] as Assertion);
+        }
+      }
+    }
   }
   return assertions;
 }
@@ -640,7 +690,10 @@ const VERDICT_OUTCOMES = new Set(["conformant", "non-conformant", "insufficient_
 
 /** True when no assertion reached a verdict (see {@link VERDICT_OUTCOMES}). */
 export function evaluatedNothing(assertions: Assertion[]): boolean {
-  return !assertions.some((a) => VERDICT_OUTCOMES.has(a.outcome));
+  // A check the unknown-coverage rule lowered with no population in scope (it was not applicable) judged nothing either.
+  return !assertions.some(
+    (a) => VERDICT_OUTCOMES.has(a.outcome) && !(a.coverageUnknown && a.population[0] === 0),
+  );
 }
 
 /** Index a deviation register by its `control` field (`assess.deviations_by_control`). Shared by every

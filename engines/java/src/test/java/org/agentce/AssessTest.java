@@ -51,7 +51,7 @@ class AssessTest {
         ObjectNode result = Json.nodes().objectNode();
         for (Map.Entry<String, List<JsonNode>> e : scenarios.entrySet()) {
             ArrayNode arr = result.putArray(e.getKey());
-            for (Assertions.Assertion a : Assess.assessSubjects(e.getValue(), profile, List.of(catalog), domain, List.of(), Integrity.Caps.NONE)) {
+            for (Assertions.Assertion a : Assess.assessSubjects(e.getValue(), profile, List.of(catalog), domain, List.of(), Integrity.Caps.NONE, Fixtures.RECONCILED)) {
                 arr.add(a.toJson());
             }
         }
@@ -160,7 +160,7 @@ class AssessTest {
                 Json.parse("{\"subjects\":[{\"id\":\"spiffe://corp/agents/rob02-fixture\",\"role\":\"both\"}]}"));
         Catalog catalog = Catalog.load(TestPaths.repoRoot().resolve("spec/catalogs/base/baseline"));
         DomainBinding domain = DomainBinding.load(fixtures.resolve("rob02_untrusted/domain.linkml.yaml"));
-        return Assess.assessSubjects(ingested.accepted, profile, List.of(catalog), domain, ingested.withheld, Integrity.Caps.NONE).stream()
+        return Assess.assessSubjects(ingested.accepted, profile, List.of(catalog), domain, ingested.withheld, Integrity.Caps.NONE, Fixtures.RECONCILED).stream()
                 .filter(a -> "ROB-02".equals(a.control))
                 .findFirst()
                 .orElseThrow();
@@ -195,7 +195,7 @@ class AssessTest {
         DomainBinding domain = DomainBinding.load(kase.resolve("domain.linkml.yaml"));
         Map<String, Assertions.Assertion> byControl = new LinkedHashMap<>();
         for (Assertions.Assertion a : Assess.assessSubjects(accepted, profile,
-                List.of(Catalog.load(Fixtures.BASE), Catalog.load(Fixtures.CONDUCT)), domain, List.of(), Integrity.Caps.NONE)) {
+                List.of(Catalog.load(Fixtures.BASE), Catalog.load(Fixtures.CONDUCT)), domain, List.of(), Integrity.Caps.NONE, Fixtures.RECONCILED)) {
             byControl.put(a.control, a);
         }
         return byControl;
@@ -338,7 +338,7 @@ class AssessTest {
         };
         Profile profile = Profile.fromDict(Json.parse("{\"subjects\":[{\"id\":\"" + SUBJECT + "\",\"role\":\"both\"}]}"));
         for (Assertions.Assertion a : Assess.assessSubjects(events, profile, List.of(Catalog.load(Fixtures.BASE)),
-                DomainBinding.load(Fixtures.BASE.resolve("test/domain.yaml")), List.of(), caps)) {
+                DomainBinding.load(Fixtures.BASE.resolve("test/domain.yaml")), List.of(), caps, Fixtures.RECONCILED)) {
             if (a.control.equals("OVS-03")) {
                 return a.outcome;
             }
@@ -355,5 +355,149 @@ class AssessTest {
         assertEquals("conformant", ovs03Capped("passed", "time_suspect"));
         assertEquals("non-conformant", ovs03Capped("failed", "broken"));
         assertEquals("non-conformant", ovs03Capped("failed", "weak"));
+    }
+
+    // --- 18.134: unknown coverage reads INT and REC insufficient_evidence (SPEC §6.5). ---
+
+    private static Map<String, Assertions.Assertion> assessCoverage(
+            List<JsonNode> events, JsonNode coverage, Profile profile, Catalog catalog) {
+        Map<String, Assertions.Assertion> byKey = new LinkedHashMap<>();
+        for (Assertions.Assertion a : Assess.assessSubjects(events, profile, List.of(catalog),
+                DomainBinding.load(Fixtures.BASE.resolve("test/domain.yaml")), List.of(), Integrity.Caps.NONE,
+                coverage)) {
+            byKey.put(a.subject + " " + a.control, a);
+        }
+        return byKey;
+    }
+
+    private static Map<String, Assertions.Assertion> assessCoverage(List<JsonNode> events, JsonNode coverage) {
+        return assessCoverage(events, coverage, Profile.fromDict(
+                Json.parse("{\"subjects\":[{\"id\":\"" + SUBJECT + "\",\"role\":\"both\"}]}")),
+                Catalog.load(Fixtures.BASE));
+    }
+
+    /** coverage.json's structure with the subject's roll-up {@code status}, or no entry for it when null. */
+    private static ObjectNode coverageStatus(String status) {
+        ObjectNode coverage = Json.nodes().objectNode();
+        ObjectNode subjects = coverage.putObject("subjects");
+        if (status != null) {
+            subjects.putObject(SUBJECT).put("coverage_status", status);
+        }
+        return coverage;
+    }
+
+    @Test
+    void coverageUnknownLowersOnlyAFlatteringIntOrRecOutcome() throws IOException {
+        Assertions.Assertion base = assessCoverage(eventsOf("OVS-03", "passed"), Fixtures.RECONCILED)
+                .get(SUBJECT + " OVS-03");
+        for (String family : List.of("INT", "REC", "OVS")) {
+            for (String outcome : List.of("conformant", "partial", "not_applicable", "non-conformant",
+                    "insufficient_evidence", "not_assessed")) {
+                Assertions.Assertion before = Assertions.copyOf(base);
+                before.family = family;
+                before.outcome = outcome;
+                Assertions.Assertion after = Assess.uncovered(before);
+                boolean lowered = Assess.COVERAGE_FAMILIES.contains(family)
+                        && List.of("conformant", "partial", "not_applicable").contains(outcome);
+                if (lowered) {
+                    assertEquals("insufficient_evidence", after.outcome, family + " " + outcome);
+                    assertTrue(after.coverageUnknown);
+                    assertTrue(after.violations.isEmpty());
+                    assertEquals(before.population[0], after.population[0]);
+                    assertEquals(0, after.population[1]);
+                    assertNull(after.sourceClassSatisfied);
+                    assertNull(after.evidenceStrength);
+                } else {
+                    assertSame(before, after, family + " " + outcome);
+                }
+            }
+        }
+    }
+
+    @Test
+    void coverageStatusDecidesTheIntAndRecOutcomes() throws IOException {
+        Map<String, Boolean> cases = new LinkedHashMap<>();
+        cases.put("ok", false);
+        cases.put("gap", false);
+        cases.put("unknown", true);
+        cases.put(null, true);
+        for (Map.Entry<String, Boolean> c : cases.entrySet()) {
+            Map<String, Assertions.Assertion> byControl =
+                    assessCoverage(eventsOf("OVS-03", "passed"), coverageStatus(c.getKey()));
+            for (String control : List.of("INT-01", "REC-04")) {
+                Assertions.Assertion a = byControl.get(SUBJECT + " " + control);
+                assertEquals(c.getValue() ? "insufficient_evidence" : "conformant", a.outcome, c.getKey() + " " + control);
+                assertEquals(c.getValue(), a.coverageUnknown);
+            }
+            Assertions.Assertion ovs = byControl.get(SUBJECT + " OVS-03");
+            assertEquals("conformant", ovs.outcome);
+            assertTrue(!ovs.coverageUnknown);
+        }
+    }
+
+    @Test
+    void coverageUnknownKeepsAViolationNonConformant() throws IOException {
+        Assertions.Assertion a = assessCoverage(eventsOf("INT-01", "failed"), coverageStatus("unknown"))
+                .get(SUBJECT + " INT-01");
+        assertEquals("non-conformant", a.outcome);
+        assertTrue(!a.violations.isEmpty());
+        assertTrue(!a.coverageUnknown);
+    }
+
+    @Test
+    void coverageUnknownKeepsARoleMismatchNotApplicable() throws IOException {
+        Catalog catalog = Catalog.load(Fixtures.BASE);
+        for (Catalog.ControlSpec control : catalog.controls) {
+            if (control.id.equals("INT-01")) {
+                control.appliesToRoles = new ArrayList<>(List.of("deployer"));
+            }
+        }
+        Map<String, Assertions.Assertion> byControl = assessCoverage(eventsOf("OVS-03", "passed"),
+                coverageStatus("unknown"),
+                Profile.fromDict(Json.parse("{\"subjects\":[{\"id\":\"" + SUBJECT + "\",\"role\":\"provider\"}]}")),
+                catalog);
+        Assertions.Assertion int01 = byControl.get(SUBJECT + " INT-01");
+        assertEquals("not_applicable", int01.outcome);
+        assertTrue(!int01.coverageUnknown);
+        assertEquals("insufficient_evidence", byControl.get(SUBJECT + " REC-04").outcome);
+    }
+
+    @Test
+    void coverageTwoSubjectsEachReadOnTheirOwnCoverage() throws IOException {
+        String other = "spiffe://corp/agents/b";
+        List<JsonNode> events = new ArrayList<>(eventsOf("OVS-03", "passed"));
+        for (JsonNode e : eventsOf("OVS-03", "passed")) {
+            ObjectNode copy = ((ObjectNode) e).deepCopy();
+            copy.put("id", e.get("id").asText() + "-b");
+            copy.put("subject", other);
+            events.add(copy);
+        }
+        ObjectNode coverage = Json.nodes().objectNode();
+        ObjectNode subjects = coverage.putObject("subjects");
+        subjects.putObject(SUBJECT).put("coverage_status", "ok");
+        subjects.putObject(other).put("coverage_status", "unknown");
+        Map<String, Assertions.Assertion> byControl = assessCoverage(events, coverage,
+                Profile.fromDict(Json.parse("{\"subjects\":[{\"id\":\"" + SUBJECT + "\",\"role\":\"both\"},"
+                        + "{\"id\":\"" + other + "\",\"role\":\"both\"}]}")),
+                Catalog.load(Fixtures.BASE));
+        assertEquals("conformant", byControl.get(SUBJECT + " INT-01").outcome);
+        assertEquals("insufficient_evidence", byControl.get(other + " INT-01").outcome);
+    }
+
+    @Test
+    void aCoverageLoweredCheckWithNoPopulationJudgedNothing() throws IOException {
+        Assertions.Assertion base = assessCoverage(eventsOf("OVS-03", "passed"), Fixtures.RECONCILED)
+                .get(SUBJECT + " INC-02");
+        Assertions.Assertion empty = Assertions.copyOf(base);
+        empty.family = "INT";
+        empty.population = new int[] {0, 0};
+        empty = Assess.uncovered(empty);
+        assertEquals("insufficient_evidence", empty.outcome);
+        assertTrue(Cli.evaluatedNothing(List.of(empty)));
+        Assertions.Assertion judged = Assertions.copyOf(base);
+        judged.family = "INT";
+        judged.outcome = "conformant";
+        judged.population = new int[] {2, 0};
+        assertTrue(!Cli.evaluatedNothing(List.of(Assess.uncovered(judged))));
     }
 }

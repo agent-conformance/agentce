@@ -9,6 +9,9 @@ import { DomainBinding } from "./domain";
 import { NO_CAPS } from "./integrity";
 import { profileFromDict } from "./profile";
 
+/** Coverage that reconciles every subject (SPEC §6.5), for tests of rules other than unknown coverage. */
+const RECONCILED = { subjects: new Proxy({}, { get: () => ({ coverage_status: "ok" }) }) };
+
 const EVENT_COUNT = 300;
 const MANY_SUBJECTS = 60;
 
@@ -41,7 +44,7 @@ function scans(numSubjects: number): number {
     subjects: Array.from({ length: numSubjects }, (_, j) => ({ id: `s${j}` })),
   });
   const accepted = countingProxy(events(), counter);
-  assessSubjects(accepted, profile, [], DomainBinding.empty(), true, [], NO_CAPS);
+  assessSubjects(accepted, profile, [], DomainBinding.empty(), true, [], NO_CAPS, RECONCILED);
   return counter.n;
 }
 

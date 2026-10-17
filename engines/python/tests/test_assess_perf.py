@@ -9,6 +9,19 @@ from agentce.assess import assess_subjects
 from agentce.domain import DomainBinding
 from agentce.profile import Profile
 
+
+class _Reconciled(dict):  # type: ignore[type-arg]
+    """Coverage that reconciles every subject (SPEC §6.5), for tests of rules other than unknown coverage."""
+
+    def get(self, key, default=None):  # type: ignore[no-untyped-def]
+        return {"coverage_status": "ok"}
+
+    def __bool__(self) -> bool:
+        return True
+
+
+RECONCILED = {"subjects": _Reconciled()}
+
 _EVENT_COUNT = 300
 _MANY_SUBJECTS = 60
 
@@ -50,7 +63,13 @@ def _scans(num_subjects: int) -> int:
     )
     accepted = _CountingList(_events(), counter=counter)
     assess_subjects(
-        accepted, profile, [], DomainBinding.empty(), withheld=(), integrity=NO_CAPS
+        accepted,
+        profile,
+        [],
+        DomainBinding.empty(),
+        withheld=(),
+        integrity=NO_CAPS,
+        coverage=RECONCILED,
     )
     return counter["n"]
 

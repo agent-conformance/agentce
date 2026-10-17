@@ -96,6 +96,7 @@
         },
         "source": {"type": "string"},
         "covers": {"type": "array", "items": {"type": "string"}},
+        "manifest": {"type": "string", "description": "A bundle file whose counts per event type are this denominator (SPEC 6.5); without one, the denominator source's own ingested events are counted."},
         "statement": {"type": "string"}
       }
     }

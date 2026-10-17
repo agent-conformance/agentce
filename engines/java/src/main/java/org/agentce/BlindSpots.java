@@ -172,7 +172,7 @@ public final class BlindSpots {
      * the same reason as {@link MetKey}. */
     private record GroupKey(String event, String cls) {}
 
-    /** Return {@code {"blind_spots": [...], "no_population": [...]}} for {@code assertions}.
+    /** Return {@code {"blind_spots": [...], "no_population": [...], "coverage_unknown": [...]}} for {@code assertions}.
      *
      * <p>{@code assertions} must be {@link Assess#assessSubjects}'s own output, in its own order --
      * that order is meaningful input here (RFC 0008 Sec.6), not incidental: it is replayed positionally
@@ -208,6 +208,7 @@ public final class BlindSpots {
 
         Map<GroupKey, Group> groups = new HashMap<>();
         List<CheckRef> noPopulation = new ArrayList<>();
+        List<CheckRef> coverageUnknown = new ArrayList<>();
 
         for (int i = 0; i < triples.size(); i++) {
             Triple t = triples.get(i);
@@ -221,6 +222,12 @@ public final class BlindSpots {
                                 + ") -- assertions is not assessSubjects' own order.");
             }
             if (!"insufficient_evidence".equals(a.outcome)) {
+                continue;
+            }
+            CheckRef checkRef = new CheckRef(t.subjectId(), t.catalogId(), t.control().id, t.control().version);
+            if (a.coverageUnknown) {
+                // What is missing is an independent count of the subject's calls (SPEC §6.5), not a record type.
+                coverageUnknown.add(checkRef);
                 continue;
             }
             List<JsonNode> missing = new ArrayList<>();
@@ -239,7 +246,6 @@ public final class BlindSpots {
             // Never provably sufficient alone: it only ever lands in needed_by. classGap is already distinct and
             // sorted.
             String minimum = normalizeClass(t.control().minSourceClass);
-            CheckRef checkRef = new CheckRef(t.subjectId(), t.catalogId(), t.control().id, t.control().version);
             for (String kind : a.classGap) {
                 groups.computeIfAbsent(new GroupKey(kind, minimum), k -> new Group(k.event(), k.cls()))
                         .needed.add(checkRef);
@@ -302,12 +308,15 @@ public final class BlindSpots {
             return byEvent != 0 ? byEvent : Json.byteCompare(x.get("class").asText(), y.get("class").asText());
         });
         noPopulation.sort(BlindSpots::compareCheckRefs);
+        coverageUnknown.sort(BlindSpots::compareCheckRefs);
 
         ObjectNode out = Json.nodes().objectNode();
         ArrayNode blindSpotsArr = out.putArray("blind_spots");
         blindSpots.forEach(blindSpotsArr::add);
         ArrayNode noPopulationArr = out.putArray("no_population");
         noPopulation.forEach(c -> noPopulationArr.add(c.toJson()));
+        ArrayNode coverageUnknownArr = out.putArray("coverage_unknown");
+        coverageUnknown.forEach(c -> coverageUnknownArr.add(c.toJson()));
         return out;
     }
 }

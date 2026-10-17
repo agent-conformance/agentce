@@ -185,10 +185,20 @@ def test_coverage_gap_is_not_ready(tmp_path: Path) -> None:
     assert any("coverage" in r for r in verdict["reasons"])
 
 
-def test_unknown_coverage_is_not_a_blocker(tmp_path: Path) -> None:
+def test_unknown_coverage_is_not_ready(tmp_path: Path) -> None:
+    # No independent denominator reconciles the subject's records (SPEC §6.5, §13.3.4).
     report = _report(
         tmp_path, coverage={"subjects": {"s": {"coverage_status": "unknown"}}}
     )
+    verdict = compute_readiness(report, severities=_SEVERITIES)
+    assert verdict["verdict"] == NOT_READY
+    assert verdict["reasons"] == [
+        "coverage unknown for subject s: no independent denominator"
+    ]
+
+
+def test_ok_coverage_adds_no_coverage_reason(tmp_path: Path) -> None:
+    report = _report(tmp_path, coverage={"subjects": {"s": {"coverage_status": "ok"}}})
     assert compute_readiness(report, severities=_SEVERITIES)["verdict"] == READY
 
 

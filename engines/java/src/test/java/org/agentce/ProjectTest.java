@@ -143,12 +143,12 @@ class ProjectTest {
     }
 
     @Test
-    void noPopulationBySubjectGroupsByOwnField() {
+    void checksBySubjectGroupsByOwnField() {
         ArrayNode noPopulation = Json.nodes().arrayNode();
         noPopulation.add(checkRef("A", "REC-04"));
         noPopulation.add(checkRef("B", "REC-05"));
         noPopulation.add(checkRef("A", "REC-06"));
-        Map<String, List<ObjectNode>> grouped = Project.noPopulationBySubject(noPopulation);
+        Map<String, List<ObjectNode>> grouped = Project.checksBySubject(noPopulation);
         assertEquals(List.of("REC-04", "REC-06"), controlNames2(grouped.get("A")));
         assertEquals(List.of("REC-05"), controlNames2(grouped.get("B")));
     }

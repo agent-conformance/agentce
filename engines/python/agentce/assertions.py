@@ -83,6 +83,9 @@ class Assertion:
     #: True when this non-conformant outcome rests on a record failing the SPEC §10.4 human-actor rule, which the
     #: deviation register cannot waive (18.186). Run state for ``apply_deviations``; never written to assertions.json.
     human_actor_failed: bool = False
+    #: True when this insufficient_evidence outcome comes from the subject's unknown coverage (SPEC §6.5, 18.134).
+    #: Run state for the missing-evidence text; never written to assertions.json.
+    coverage_unknown: bool = False
 
     def to_json(self) -> dict[str, Any]:
         record: dict[str, Any] = {

@@ -22,7 +22,12 @@ test("coverage reconciliation matches the Python reference golden", () => {
   const fixture = JSON.parse(readFileSync(join(TESTDATA, "coverage-fixture.json"), "utf-8"));
   const golden = JSON.parse(readFileSync(join(TESTDATA, "coverage-golden.json"), "utf-8"));
   const profile = profileFromDict(fixture.profile);
-  const result = computeCoverage(fixture.events, profile, join(TESTDATA, "coverage-bundle"));
+  const result = computeCoverage(
+    fixture.events,
+    profile,
+    join(TESTDATA, "coverage-bundle"),
+    new Set(["reference/prov-counts.json"]),
+  );
   assert.equal(canonicalString(result), canonicalString(golden));
 });
 
@@ -37,6 +42,9 @@ const EVENTS: Array<Record<string, unknown>> = [
   { source: DENOMINATOR_SOURCE, subject: "subj-A", data: { "@type": "ToolCall" } },
   { source: DENOMINATOR_SOURCE, subject: "subj-A", data: { "@type": "ToolCall" } },
 ];
+
+/** The bundle manifest lists the denominator manifest, so its counts may be read (SPEC §6.5). */
+const LISTED: ReadonlySet<string> = new Set(["reference/counts.json"]);
 
 function profileWithManifest(manifest: string) {
   return profileFromDict({
@@ -73,7 +81,12 @@ test("a denominator manifest escaping the bundle root with '..' is not read", ()
   withTempBundle((dir, root) => {
     writeFileSync(join(dir, "secret.json"), '{"expected": {"ToolCall": 999999}}', "utf-8");
 
-    const result = computeCoverage(EVENTS, profileWithManifest("../secret.json"), root);
+    const result = computeCoverage(
+      EVENTS,
+      profileWithManifest("../secret.json"),
+      root,
+      new Set(["../secret.json"]),
+    );
     assert.equal(expectedToolCalls(result), 2); // the source's own ingested events, not the escape
   });
 });
@@ -84,7 +97,12 @@ test("a denominator manifest whose symlink escapes the bundle root is not read",
     writeFileSync(outside, '{"expected": {"ToolCall": 999999}}', "utf-8");
     symlinkSync(outside, join(root, "reference", "counts.json"));
 
-    const result = computeCoverage(EVENTS, profileWithManifest("reference/counts.json"), root);
+    const result = computeCoverage(
+      EVENTS,
+      profileWithManifest("reference/counts.json"),
+      root,
+      LISTED,
+    );
     assert.equal(expectedToolCalls(result), 2);
   });
 });
@@ -93,7 +111,12 @@ test("a denominator manifest inside the bundle root is still read", () => {
   withTempBundle((_dir, root) => {
     writeFileSync(join(root, "reference", "counts.json"), '{"expected": {"ToolCall": 7}}', "utf-8");
 
-    const result = computeCoverage(EVENTS, profileWithManifest("reference/counts.json"), root);
+    const result = computeCoverage(
+      EVENTS,
+      profileWithManifest("reference/counts.json"),
+      root,
+      LISTED,
+    );
     assert.equal(expectedToolCalls(result), 7);
   });
 });
@@ -104,7 +127,12 @@ test("a denominator manifest that is a symlink inside the bundle root is still r
     writeFileSync(real, '{"counts": {"ToolCall": 5}}', "utf-8");
     symlinkSync(real, join(root, "reference", "counts.json"));
 
-    const result = computeCoverage(EVENTS, profileWithManifest("reference/counts.json"), root);
+    const result = computeCoverage(
+      EVENTS,
+      profileWithManifest("reference/counts.json"),
+      root,
+      LISTED,
+    );
     assert.equal(expectedToolCalls(result), 5);
   });
 });

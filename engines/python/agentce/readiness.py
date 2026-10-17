@@ -182,6 +182,11 @@ def compute_readiness(
     for subject, entry in sorted((coverage.get("subjects") or {}).items()):
         if entry.get("coverage_status") == "gap":
             reasons.append(f"coverage shortfall for subject {subject}")
+        elif entry.get("coverage_status") == "unknown":
+            # No independent denominator reconciles the subject's records (SPEC §6.5, §13.3.4).
+            reasons.append(
+                f"coverage unknown for subject {subject}: no independent denominator"
+            )
         for event_type, detail in sorted((entry.get("event_types") or {}).items()):
             # A declared source below the coverage threshold is a shortfall even when another event
             # type has unknown coverage and masks it in the subject-level roll-up (SPEC §13.3.4).

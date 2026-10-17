@@ -42,7 +42,7 @@ class ReportTest {
         DomainBinding domain = DomainBinding.load(Fixtures.BASE.resolve("test/domain.yaml"));
         Profile profile = Profile.fromDict(Json.parse("{\"subjects\":[{\"id\":\"spiffe://corp/agents/a\",\"role\":\"both\"}]}"));
         List<JsonNode> events = Fixtures.readJsonl(Fixtures.BASE.resolve("test/OVS-03/failed.jsonl"));
-        return Assess.assessSubjects(events, profile, List.of(catalog), domain, List.of(), Integrity.Caps.NONE);
+        return Assess.assessSubjects(events, profile, List.of(catalog), domain, List.of(), Integrity.Caps.NONE, Fixtures.RECONCILED);
     }
 
     @Test

@@ -1,5 +1,7 @@
 {
   "report.assertions_heading": "Aussagen",
+  "report.blind_spots_coverage_unknown_heading": "Prüfungen, die auf eine unabhängige Zählung der Aufrufe Ihres Agenten warten",
+  "report.blind_spots_coverage_unknown_text": "AgentCE kann {control} noch nicht beurteilen. Keine Quelle außerhalb des Agenten und des Durchsetzungspunkts zählt die Aufrufe dieses Agenten, daher würde ein Aufruf, der an den Aufzeichnungen vorbeiging, nicht auftauchen. Tragen Sie dafür im Anwendbarkeitsprofil einen Abdeckungsnenner ein, etwa einen Nutzungsexport des Anbieters, ein Egress- oder Firewall-Protokoll oder einen Export aus dem führenden System.",
   "report.no_controls": "Es wurden keine Kontrollen bewertet.",
   "report.summary_heading": "Ergebnisübersicht",
   "report.title": "AgentCE-Konformitätsbericht"

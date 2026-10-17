@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import os
 from collections.abc import Callable
 from pathlib import Path
@@ -2480,7 +2481,19 @@ def _signable_dev_bundle(tmp_path: Path) -> Path:
         "strength": "export_chained",
     }
     event["data"]["integrity"]["hash"] = recompute_hash(event)
-    return write_bundle(tmp_path / "signable-evidence", [json.dumps(event)])
+    root = write_bundle(tmp_path / "signable-evidence", [json.dumps(event)])
+    # Carry the fixture's listed coverage denominator so the subject's coverage still reconciles.
+    shipped = json.loads((_DEV_FIXTURE / "evidence" / "manifest.json").read_text())
+    manifest = json.loads((root / "manifest.json").read_text())
+    for entry in shipped["files"]:
+        if entry["path"].startswith("reference/"):
+            (root / "reference").mkdir(exist_ok=True)
+            shutil.copy2(
+                _DEV_FIXTURE / "evidence" / entry["path"], root / entry["path"]
+            )
+            manifest["files"].append(entry)
+    (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    return root
 
 
 def test_assess_with_deviations_flag_produces_partial_outcome_end_to_end(

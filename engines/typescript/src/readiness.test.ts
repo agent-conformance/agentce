@@ -166,8 +166,16 @@ test("a coverage gap is NOT READY", () => {
   assert.ok(verdict.reasons.some((r) => r.includes("coverage")));
 });
 
-test("unknown coverage is never a blocker", () => {
+test("unknown coverage is NOT READY and names the subject", () => {
+  // No independent denominator reconciles the subject's records (SPEC §6.5, §13.3.4).
   const dir = report({ coverage: { subjects: { s: { coverage_status: "unknown" } } } });
+  const verdict = computeReadiness(dir, { severities: SEVERITIES });
+  assert.equal(verdict.verdict, NOT_READY);
+  assert.deepEqual(verdict.reasons, ["coverage unknown for subject s: no independent denominator"]);
+});
+
+test("ok coverage adds no coverage reason", () => {
+  const dir = report({ coverage: { subjects: { s: { coverage_status: "ok" } } } });
   assert.equal(computeReadiness(dir, { severities: SEVERITIES }).verdict, READY);
 });
 

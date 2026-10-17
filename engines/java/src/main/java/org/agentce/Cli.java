@@ -723,9 +723,11 @@ global options:
         return new Resolved(catalogs, labels, limitations);
     }
 
-    private static boolean evaluatedNothing(List<Assertions.Assertion> assertions) {
+    static boolean evaluatedNothing(List<Assertions.Assertion> assertions) {
         for (Assertions.Assertion a : assertions) {
-            if (VERDICT_OUTCOMES.contains(a.outcome)) {
+            // A check the unknown-coverage rule lowered with no population in scope (it was not applicable) judged
+            // nothing either.
+            if (VERDICT_OUTCOMES.contains(a.outcome) && !(a.coverageUnknown && a.population[0] == 0)) {
                 return false;
             }
         }
@@ -1168,7 +1170,8 @@ global options:
         int graphTriples = store.tripleCount();
 
         // Stage 4: coverage and reconciliation against independent denominators.
-        ObjectNode coverage = Coverage.computeCoverage(ingested.accepted, profileObj, Paths.get(bundleDir));
+        ObjectNode coverage = Coverage.computeCoverage(
+                ingested.accepted, profileObj, Paths.get(bundleDir), bundle.listedPaths());
         try {
             Files.createDirectories(out);
             Files.write(out.resolve("coverage.json"), (Json.pretty(coverage) + "\n").getBytes(StandardCharsets.UTF_8));
@@ -1195,7 +1198,8 @@ global options:
         List<Assertions.Assertion> evaluated =
                 Assess.assessSubjects(
                         ingested.accepted, profileObj, resolved.catalogs(), domain, ingested.withheld,
-                        Integrity.integrityCaps(ingested.rawAccepted, ingested.accepted, integrityStreams));
+                        Integrity.integrityCaps(ingested.rawAccepted, ingested.accepted, integrityStreams),
+                        coverage);
 
         // Stage 6a: incremental state (SPEC §5.4 B7, HR-10).
         String newWindowEnd = StateDir.windowEnd(profileObj.observationWindow, ingested.accepted);

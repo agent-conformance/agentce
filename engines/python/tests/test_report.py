@@ -278,7 +278,11 @@ def test_blind_spots_defaults_to_the_honest_empty_answer(tmp_path: Path) -> None
         catalogs=[_catalog()],
     )
     on_disk = json.loads((tmp_path / "blind-spots.json").read_text(encoding="utf-8"))
-    assert on_disk == {"blind_spots": [], "no_population": []}
+    assert on_disk == {
+        "blind_spots": [],
+        "no_population": [],
+        "coverage_unknown": [],
+    }
     md = (tmp_path / "report.md").read_text(encoding="utf-8")
     assert "every check either has enough evidence" in md
 
@@ -334,6 +338,64 @@ def test_no_population_entry_renders_the_one_fixed_generic_sentence(
     assert "Records that don't show enough, with no single fix" in md
     assert "BSP-02" in md
     assert "--domain binding may be needed" in md
+    assert validate_report(tmp_path) == []
+
+
+def test_coverage_unknown_entry_renders_under_its_own_heading(
+    tmp_path: Path,
+) -> None:
+    control = _minimum_evidence_control("BSP-02", "Decision")
+    catalog = Catalog(
+        id="cat",
+        version="2026.09",
+        directory=_BASE_CATALOG_DIR,
+        controls=[control],
+        shapes={},
+    )
+    assertion = Assertion(
+        control=control.id,
+        control_version=control.version,
+        subject="spiffe://corp/agents/a",
+        outcome="insufficient_evidence",
+        rung=2,
+        mode="automated",
+        window=_WINDOW,
+        population=(0, 0),
+        severity="high",
+        family="BSP",
+        coverage_unknown=True,
+    )
+    profile = Profile(subjects=[Subject(id="spiffe://corp/agents/a")])
+    events = [
+        {
+            "subject": "spiffe://corp/agents/a",
+            "agentcesourceclass": "self_report",
+            "data": {"@type": "Decision"},
+        }
+    ]
+    blind_spots = compute_blind_spots([assertion], profile, [catalog], events)
+    assert blind_spots["no_population"] == []
+    assert blind_spots["coverage_unknown"] == [
+        {
+            "subject": "spiffe://corp/agents/a",
+            "catalog": "cat",
+            "control": "BSP-02",
+            "control_version": "2026.09",
+        }
+    ]
+    write_report(
+        tmp_path,
+        [assertion],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[catalog],
+        blind_spots=blind_spots,
+    )
+    md = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "Checks waiting on an independent count of your agent's calls" in md
+    assert "AgentCE can't judge BSP-02 yet." in md
+    assert "--domain binding may be needed" not in md
+    html_text = (tmp_path / "report.html").read_text(encoding="utf-8")
+    assert "Checks waiting on an independent count" in html_text
     assert validate_report(tmp_path) == []
 
 

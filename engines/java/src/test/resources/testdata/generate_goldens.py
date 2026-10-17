@@ -59,6 +59,8 @@ BASE = REPO / "spec" / "catalogs" / "base" / "eu-ai-act"
 CONDUCT = REPO / "spec" / "catalogs" / "overlays" / "conduct"
 TESTDATA = REPO / "engines" / "java" / "src" / "test" / "resources" / "testdata"
 SUBJECT = "spiffe://corp/agents/a"
+# Coverage reconciled for the golden's subject, as the ports' tests pass it (SPEC §6.5; 18.134).
+RECONCILED = {"subjects": {SUBJECT: {"coverage_status": "ok"}}}
 CASES = ("passed", "failed", "inapplicable")
 
 
@@ -111,7 +113,13 @@ def build_assess_golden(catalog: Catalog, domain: DomainBinding) -> dict[str, ob
     result: dict[str, object] = {}
     for name, events in scenarios.items():
         assertions = assess_subjects(
-            events, profile, [catalog], domain, withheld=(), integrity=NO_CAPS
+            events,
+            profile,
+            [catalog],
+            domain,
+            withheld=(),
+            integrity=NO_CAPS,
+            coverage=RECONCILED,
         )
         result[name] = [a.to_json() for a in assertions]
     return result
@@ -209,7 +217,13 @@ def build_report_golden(catalog: Catalog, domain: DomainBinding) -> dict[str, ob
     profile = Profile.from_dict({"subjects": [{"id": SUBJECT, "role": "both"}]})
     events = events_of("OVS-03", "failed")
     assertions: list[Assertion] = assess_subjects(
-        events, profile, [catalog], domain, withheld=(), integrity=NO_CAPS
+        events,
+        profile,
+        [catalog],
+        domain,
+        withheld=(),
+        integrity=NO_CAPS,
+        coverage=RECONCILED,
     )
     counts = aggregate(assertions)
 

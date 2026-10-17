@@ -68,9 +68,45 @@ public final class Coverage {
         return whole[0].toString() + "." + frac;
     }
 
+    /**
+     * A denominator counts only when it is independent (SPEC §6.5): never one of the subject's own declared evidence
+     * sources, and never an admission attestation, whose signature and policy digest no engine verifies.
+     */
+    static boolean independent(Profile.CoverageDenominator denominator, Profile.Subject subject) {
+        if ("admission_attestation".equals(denominator.kind)) {
+            return false;
+        }
+        for (Profile.EvidenceSource s : subject.evidenceSources) {
+            if (s.source != null && s.source.equals(denominator.source)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * True when the denominator's yardstick is its own source's ingested events, which are then left out of the
+     * subject's observed count; a manifest-bearing or non-independent denominator never hides any event.
+     */
+    static boolean selfCounting(Profile.CoverageDenominator denominator, Profile.Subject subject) {
+        return (denominator.manifest == null || denominator.manifest.isEmpty()) && independent(denominator, subject);
+    }
+
     static Map<String, Integer> denominatorCounts(
-            Profile.CoverageDenominator denominator, Map<String, Map<String, Integer>> bySource, Path bundleRoot) {
-        if (denominator.manifest != null && !denominator.manifest.isEmpty() && bundleRoot != null) {
+            Profile.CoverageDenominator denominator,
+            Profile.Subject subject,
+            Map<String, Map<String, Integer>> bySource,
+            Path bundleRoot,
+            Set<String> listed) {
+        if (!independent(denominator, subject)) {
+            return new LinkedHashMap<>();
+        }
+        boolean hasManifest = denominator.manifest != null && !denominator.manifest.isEmpty();
+        if (hasManifest && !listed.contains(denominator.manifest)) {
+            // A file the bundle manifest does not list is outside the bundle digest: never read (SPEC §6.6).
+            return new LinkedHashMap<>();
+        }
+        if (hasManifest && bundleRoot != null) {
             // The denominator's manifest path comes from the applicability profile: confine it to the
             // bundle root the same way the primary manifest's own entries are, so it cannot escape (by
             // '..', by an absolute path, or by a symlink) and read a file from outside into the report.
@@ -113,8 +149,12 @@ public final class Coverage {
         List<String> denominators = new ArrayList<>();
     }
 
-    /** Return the coverage.json structure for {@code events} under {@code profile}. */
-    public static ObjectNode computeCoverage(List<JsonNode> events, Profile profile, Path bundleRoot) {
+    /**
+     * Return the coverage.json structure for {@code events} under {@code profile}. {@code listed} is the bundle
+     * manifest's file paths: a denominator manifest is read only when listed there.
+     */
+    public static ObjectNode computeCoverage(
+            List<JsonNode> events, Profile profile, Path bundleRoot, Set<String> listed) {
         Map<String, Map<String, Integer>> bySource = new LinkedHashMap<>();
         for (JsonNode event : events) {
             bySource.computeIfAbsent(source(event), k -> new LinkedHashMap<>())
@@ -123,7 +163,12 @@ public final class Coverage {
 
         ObjectNode subjectsOut = Json.nodes().objectNode();
         for (Profile.Subject subject : profile.subjects) {
-            Set<String> denomIds = Profile.denominatorIds(subject);
+            Set<String> denomIds = new LinkedHashSet<>();
+            for (Profile.CoverageDenominator d : subject.coverageDenominators) {
+                if (selfCounting(d, subject)) {
+                    denomIds.add(d.source);
+                }
+            }
             Map<String, Integer> observed = new LinkedHashMap<>();
             Set<String> types = new LinkedHashSet<>();
             for (JsonNode event : events) {
@@ -140,7 +185,7 @@ public final class Coverage {
 
             Map<String, ExpectedEntry> expected = new LinkedHashMap<>();
             for (Profile.CoverageDenominator denominator : subject.coverageDenominators) {
-                Map<String, Integer> counts = denominatorCounts(denominator, bySource, bundleRoot);
+                Map<String, Integer> counts = denominatorCounts(denominator, subject, bySource, bundleRoot, listed);
                 List<String> covered = !denominator.covers.isEmpty()
                         ? denominator.covers
                         : new ArrayList<>(counts.keySet());

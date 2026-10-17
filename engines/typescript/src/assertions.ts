@@ -66,6 +66,9 @@ export interface Assertion {
   /** True when this non-conformant outcome rests on a record failing the SPEC §10.4 human-actor rule, which the
    * deviation register cannot waive (18.186). Run state for `applyDeviations`; never written to assertions.json. */
   humanActorFailed?: boolean;
+  /** True when this insufficient_evidence outcome comes from the subject's unknown coverage (SPEC §6.5, 18.134).
+   * Run state for the missing-evidence text; never written to assertions.json. */
+  coverageUnknown?: boolean;
 }
 
 /** Build an assertion, defaulting the optional collections and nullable fields (mirrors the dataclass). */

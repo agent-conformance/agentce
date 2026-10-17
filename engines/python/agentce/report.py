@@ -62,7 +62,7 @@ from .safe_json import JSONError, load_json
 from .project import (
     blind_spots_by_subject,
     compute_project_view,
-    no_population_by_subject,
+    checks_by_subject,
 )
 from .security_view import (
     FRAMEWORK_DISPLAY_NAMES,
@@ -74,7 +74,11 @@ from .security_view import (
 #: docstring): never recomputed from an empty `Profile()`, unlike `activity`'s fallback -- an empty
 #: profile has zero subjects, which would fail `compute_blind_spots`' positional pairing immediately
 #: against any non-empty `assertions` list (RFC 0008 Sec.6).
-_EMPTY_BLIND_SPOTS: dict[str, Any] = {"blind_spots": [], "no_population": []}
+_EMPTY_BLIND_SPOTS: dict[str, Any] = {
+    "blind_spots": [],
+    "no_population": [],
+    "coverage_unknown": [],
+}
 
 #: Always written, regardless of `--emit`: the run's structural core (write_report's docstring).
 _MANDATORY_ARTIFACT_SCHEMAS = {
@@ -475,22 +479,49 @@ def _blind_spot_rows(
     return rows
 
 
-def _no_population_rows(
-    no_population: list[dict[str, str]], cat: dict[str, str]
+def _check_rows(
+    checks: list[dict[str, str]], cat: dict[str, str], text_key: str
 ) -> list[tuple[str, str]]:
-    """``(label, value)`` for every ``no_population`` entry: the one fixed, deliberately generic
-    sentence (RFC 0008 Sec.4) -- no rung, owner, or step, since none is knowable for this case."""
+    """``(label, value)`` for every entry of a check list, each with the list's one fixed sentence: for
+    ``no_population`` the deliberately generic one (RFC 0008 Sec.4) -- no rung, owner, or step, since none is
+    knowable for this case; for ``coverage_unknown`` the missing independent count (SPEC §6.5)."""
     return [
         (
             f"{_sanitize_field(entry['control'])} on {_sanitize_field(entry['subject'])} "
             f"({_sanitize_field(entry['catalog'])}@{_sanitize_field(entry['control_version'])})",
             i18n_format.format_message(
-                cat["report.blind_spots_no_population_text"],
-                control=_sanitize_field(entry["control"]),
+                cat[text_key], control=_sanitize_field(entry["control"])
             ),
         )
-        for entry in no_population
+        for entry in checks
     ]
+
+
+#: The check lists rendered after the ranked blind spots, each as (list key, heading key, text key).
+_CHECK_SECTIONS = (
+    (
+        "no_population",
+        "report.blind_spots_no_population_heading",
+        "report.blind_spots_no_population_text",
+    ),
+    (
+        "coverage_unknown",
+        "report.blind_spots_coverage_unknown_heading",
+        "report.blind_spots_coverage_unknown_text",
+    ),
+)
+
+
+def _check_sections(
+    blind_spots: dict[str, Any], cat: dict[str, str]
+) -> list[tuple[str, list[tuple[str, str]]]]:
+    """``(heading, rows)`` for each non-empty check list in ``blind_spots``, in :data:`_CHECK_SECTIONS` order."""
+    sections = []
+    for key, heading, text in _CHECK_SECTIONS:
+        rows = _check_rows(blind_spots.get(key, []), cat, text)
+        if rows:
+            sections.append((cat[heading], rows))
+    return sections
 
 
 def _blind_spots_md(blind_spots: dict[str, Any], cat: dict[str, str]) -> list[str]:
@@ -499,9 +530,9 @@ def _blind_spots_md(blind_spots: dict[str, Any], cat: dict[str, str]) -> list[st
     verdict (``VALUE-PROP.md``: "the first report is never empty ... the not-enough-evidence grid
     comes second")."""
     rows = _blind_spot_rows(blind_spots["blind_spots"], cat)
-    no_pop_rows = _no_population_rows(blind_spots["no_population"], cat)
+    sections = _check_sections(blind_spots, cat)
     lines = [f"## {cat['report.blind_spots_heading']}", ""]
-    if not rows and not no_pop_rows:
+    if not rows and not sections:
         lines += [f"- {cat['report.blind_spots_none']}", ""]
         return lines
     # The label is backtick-wrapped, not just interpolated after the list marker (post-implementation
@@ -516,9 +547,9 @@ def _blind_spots_md(blind_spots: dict[str, Any], cat: dict[str, str]) -> list[st
     # backtick, so this added pair is always the only backtick on the line (never three or more, which
     # would instead risk opening a fenced code block).
     lines += [f"- `{label}`: {value}" for label, value in rows]
-    if no_pop_rows:
-        lines += ["", f"### {cat['report.blind_spots_no_population_heading']}", ""]
-        lines += [f"- `{label}`: {value}" for label, value in no_pop_rows]
+    for heading, section_rows in sections:
+        lines += ["", f"### {heading}", ""]
+        lines += [f"- `{label}`: {value}" for label, value in section_rows]
     lines.append("")
     return lines
 
@@ -532,16 +563,13 @@ def _li_items(rows: list[tuple[str, str]]) -> str:
 
 def _blind_spots_html(blind_spots: dict[str, Any], cat: dict[str, str]) -> str:
     rows = _blind_spot_rows(blind_spots["blind_spots"], cat)
-    no_pop_rows = _no_population_rows(blind_spots["no_population"], cat)
-    if not rows and not no_pop_rows:
+    sections = _check_sections(blind_spots, cat)
+    if not rows and not sections:
         body = f"<p>{html.escape(cat['report.blind_spots_none'])}</p>"
     else:
         body = f"<ul>{_li_items(rows)}</ul>"
-        if no_pop_rows:
-            body += (
-                f"<h3>{html.escape(cat['report.blind_spots_no_population_heading'])}</h3>"
-                f"<ul>{_li_items(no_pop_rows)}</ul>"
-            )
+        for heading, section_rows in sections:
+            body += f"<h3>{html.escape(heading)}</h3><ul>{_li_items(section_rows)}</ul>"
     return (
         '<section aria-labelledby="blind-spots"><h2 id="blind-spots">'
         f"{html.escape(cat['report.blind_spots_heading'])}</h2>{body}</section>"
@@ -554,15 +582,15 @@ def blind_spots_cli_lines(
     """The lines a command prints for ``blind_spots``: the same dictionary
     :func:`_blind_spots_md`/:func:`_blind_spots_html` render."""
     rows = _blind_spot_rows(blind_spots["blind_spots"], catalogue)
-    no_pop_rows = _no_population_rows(blind_spots["no_population"], catalogue)
+    sections = _check_sections(blind_spots, catalogue)
     lines = [f"{catalogue['report.blind_spots_heading']}:"]
-    if not rows and not no_pop_rows:
+    if not rows and not sections:
         lines.append(f"  {catalogue['report.blind_spots_none']}")
         return lines
     lines += [f"  {label}: {value}" for label, value in rows]
-    if no_pop_rows:
-        lines.append(f"  {catalogue['report.blind_spots_no_population_heading']}:")
-        lines += [f"    {label}: {value}" for label, value in no_pop_rows]
+    for heading, section_rows in sections:
+        lines.append(f"  {heading}:")
+        lines += [f"    {label}: {value}" for label, value in section_rows]
     return lines
 
 
@@ -1253,10 +1281,10 @@ def _buyer_gap_lines(entry: dict[str, Any], cat: dict[str, str]) -> list[str]:
     gap_step = entry["gap_step"]
     if gap_step is None:
         return [cat["report.buyer_gap_step_unavailable"]]
-    if gap_step["kind"] == "no_population":
+    if gap_step["kind"] in ("no_population", "coverage_unknown"):
         return [
             i18n_format.format_message(
-                cat["report.blind_spots_no_population_text"],
+                cat[f"report.blind_spots_{gap_step['kind']}_text"],
                 control=_sanitize_field(entry["control"]),
             )
         ]
@@ -3351,8 +3379,9 @@ def write_report(
         )
         write_json("project.json", project_view)
         gaps_by_subject = blind_spots_by_subject(blind_spots)
-        no_pop_by_subject = no_population_by_subject(
-            blind_spots.get("no_population", [])
+        no_pop_by_subject = checks_by_subject(blind_spots.get("no_population", []))
+        uncovered_by_subject = checks_by_subject(
+            blind_spots.get("coverage_unknown", [])
         )
         assertions_by_subject: dict[str, list[Assertion]] = {}
         for assertion in assertions:
@@ -3365,6 +3394,7 @@ def write_report(
             subject_blind_spots = {
                 "blind_spots": gaps_by_subject.get(subject_id, []),
                 "no_population": no_pop_by_subject.get(subject_id, []),
+                "coverage_unknown": uncovered_by_subject.get(subject_id, []),
             }
             write_json(
                 f"agents/{dirname}/assertions.json",

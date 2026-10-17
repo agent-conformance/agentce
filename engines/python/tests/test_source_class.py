@@ -31,6 +31,19 @@ from agentce.source_class import (
     class_rank,
 )
 
+
+class _Reconciled(dict):  # type: ignore[type-arg]
+    """Coverage that reconciles every subject (SPEC §6.5), for tests of rules other than unknown coverage."""
+
+    def get(self, key, default=None):  # type: ignore[no-untyped-def]
+        return {"coverage_status": "ok"}
+
+    def __bool__(self) -> bool:
+        return True
+
+
+RECONCILED = {"subjects": _Reconciled()}
+
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _CATALOGS = _REPO_ROOT / "spec" / "catalogs"
 SUBJECT = "spiffe://corp/agents/source-class"
@@ -429,7 +442,13 @@ def _assess(
         {"subjects": [{"id": SUBJECT, "role": "both"}, {"id": OTHER, "role": "both"}]}
     )
     assertions = assess_subjects(
-        events, profile, [_conduct()], domain, withheld=(), integrity=NO_CAPS
+        events,
+        profile,
+        [_conduct()],
+        domain,
+        withheld=(),
+        integrity=NO_CAPS,
+        coverage=RECONCILED,
     )
     return next(a for a in assertions if a.control == control and a.subject == SUBJECT)
 
@@ -550,7 +569,13 @@ def test_a_blind_spot_names_the_record_below_the_minimum() -> None:
     events = [_instruction(cls=SR), _call()]
     catalogs = [_conduct()]
     assertions = assess_subjects(
-        events, profile, catalogs, DOMAIN, withheld=(), integrity=NO_CAPS
+        events,
+        profile,
+        catalogs,
+        DOMAIN,
+        withheld=(),
+        integrity=NO_CAPS,
+        coverage=RECONCILED,
     )
     spots = compute_blind_spots(assertions, profile, catalogs, events)
     spot = next(s for s in spots["blind_spots"] if s["event"] == "Instruction")
@@ -565,7 +590,13 @@ def _rob02(events: list[dict[str, Any]]) -> Any:
     profile = Profile.from_dict({"subjects": [{"id": SUBJECT, "role": "both"}]})
     catalog = load_catalog(_CATALOGS / "base" / "baseline")
     assertions = assess_subjects(
-        events, profile, [catalog], DOMAIN, withheld=(), integrity=NO_CAPS
+        events,
+        profile,
+        [catalog],
+        DOMAIN,
+        withheld=(),
+        integrity=NO_CAPS,
+        coverage=RECONCILED,
     )
     return next(a for a in assertions if a.control == "ROB-02")
 

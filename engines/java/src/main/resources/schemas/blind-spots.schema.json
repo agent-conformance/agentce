@@ -5,7 +5,7 @@
   "description": "blind-spots.json in the report directory: catalog evidence requirements no assertion's records can yet show, grouped by the one requirement that would satisfy them and ranked by how many checks it alone would unlock, each with an evidence-ladder rung, an owner, and whether the step is a code change or a request to another team. Built only from (assertions, catalogs); never affects an outcome or the verdict. No natural-language text is stored here -- the report renders owner_key/step_kind/event/class/checks_unlocked into the ladder's sentence per report language.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["blind_spots", "no_population"],
+  "required": ["blind_spots", "no_population", "coverage_unknown"],
   "$defs": {
     "check_ref": {
       "type": "object",
@@ -52,6 +52,11 @@
       }
     },
     "no_population": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/check_ref"}
+    },
+    "coverage_unknown": {
+      "description": "Checks that read insufficient_evidence because no independent coverage denominator reconciles the subject's records (SPEC §6.5): every INT and REC check that would otherwise read conformant, partial or not_applicable.",
       "type": "array",
       "items": {"$ref": "#/$defs/check_ref"}
     }

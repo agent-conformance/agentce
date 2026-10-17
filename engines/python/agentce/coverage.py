@@ -21,7 +21,7 @@ from typing import Any
 from . import signing
 from .bundle import confine_to_root, safe_is_file
 from .errors import InputError
-from .profile import CoverageDenominator, Profile
+from .profile import CoverageDenominator, Profile, Subject
 
 STATUS_COVERED = "covered"
 STATUS_BELOW = "below_threshold"
@@ -44,11 +44,33 @@ def _ratio(observed: int, expected: int) -> str | None:
     return str(value)
 
 
+def _independent(denominator: CoverageDenominator, subject: Subject) -> bool:
+    """A denominator counts only when it is independent (SPEC §6.5): never one of the subject's own declared
+    evidence sources, and never an admission attestation, whose signature and policy digest no engine verifies."""
+    return (
+        denominator.kind != "admission_attestation"
+        and denominator.source not in subject.source_ids
+    )
+
+
+def _self_counting(denominator: CoverageDenominator, subject: Subject) -> bool:
+    """True when the denominator's yardstick is its own source's ingested events, which are then left out of the
+    subject's observed count; a manifest-bearing or non-independent denominator never hides any event."""
+    return not denominator.manifest and _independent(denominator, subject)
+
+
 def _denominator_counts(
     denominator: CoverageDenominator,
+    subject: Subject,
     by_source_type: dict[tuple[str, str], int],
     bundle_root: Path | None,
+    listed: frozenset[str],
 ) -> dict[str, int]:
+    if not _independent(denominator, subject):
+        return {}
+    if denominator.manifest and denominator.manifest not in listed:
+        # A file the bundle manifest does not list is outside the bundle digest: never read (SPEC §6.6).
+        return {}
     if denominator.manifest and bundle_root is not None:
         path = confine_to_root(bundle_root, denominator.manifest)
         if path is not None and safe_is_file(path):
@@ -80,15 +102,22 @@ def compute_coverage(
     events: list[dict[str, Any]],
     profile: Profile,
     bundle_root: Path | None = None,
+    *,
+    listed: frozenset[str] = frozenset(),
 ) -> dict[str, Any]:
-    """Return the coverage.json structure for ``events`` under ``profile``."""
+    """Return the coverage.json structure for ``events`` under ``profile``. ``listed`` is the bundle manifest's file
+    paths: a denominator manifest is read only when listed there."""
     by_source_type: dict[tuple[str, str], int] = defaultdict(int)
     for event in events:
         by_source_type[(str(event.get("source", "")), _event_type(event))] += 1
 
     subjects_out: dict[str, Any] = {}
     for subject in profile.subjects:
-        denominator_ids = subject.denominator_ids
+        denominator_ids = {
+            d.source
+            for d in subject.coverage_denominators
+            if _self_counting(d, subject)
+        }
         observed: dict[str, int] = defaultdict(int)
         types: set[str] = set()
         for event in events:
@@ -102,7 +131,9 @@ def compute_coverage(
 
         expected: dict[str, dict[str, Any]] = {}
         for denominator in subject.coverage_denominators:
-            counts = _denominator_counts(denominator, by_source_type, bundle_root)
+            counts = _denominator_counts(
+                denominator, subject, by_source_type, bundle_root, listed
+            )
             covered = denominator.covers or list(counts)
             for event_type in covered:
                 if event_type not in counts:

@@ -176,6 +176,20 @@ function safeMember(root: string, rel: string): string {
   return member;
 }
 
+/** The file paths the manifest lists, each checked against its sha256 by `loadBundle`. */
+export function listedPaths(bundle: Bundle): Set<string> {
+  const files = bundle.manifest.files;
+  const out = new Set<string>();
+  if (Array.isArray(files)) {
+    for (const entry of files) {
+      if (isRecord(entry) && typeof entry.path === "string") {
+        out.add(entry.path);
+      }
+    }
+  }
+  return out;
+}
+
 export function loadBundle(bundleDir: string): Bundle {
   const manifestPath = join(bundleDir, "manifest.json");
   if (!safeIsFile(manifestPath)) {

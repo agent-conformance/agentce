@@ -403,6 +403,8 @@
   "report.auditor_oscal_text": "The same findings are also available as an OSCAL 1.1.2 Assessment Results document (`oscal-ar.json`/`oscal-ar.xml` -- a deviated finding's entry there carries a matching `risk`) and as one evidence pack per subject (`packs/<subject>/pack.json`).",
   "report.auditor_rerun_heading": "How to re-run",
   "report.auditor_title": "AgentCE auditor view",
+  "report.blind_spots_coverage_unknown_heading": "Checks waiting on an independent count of your agent's calls",
+  "report.blind_spots_coverage_unknown_text": "AgentCE can't judge {control} yet. Nothing outside the agent and the enforcement point counts this agent's calls, so a call that went around the records would not show up. To fix it, declare a coverage denominator in the applicability profile, such as a provider usage export, an egress or firewall log, or a system-of-record export.",
   "report.blind_spots_heading": "Where your records can't show it yet",
   "report.blind_spots_no_adapters": "no adapter today",
   "report.blind_spots_no_population_heading": "Records that don't show enough, with no single fix",

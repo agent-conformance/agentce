@@ -728,6 +728,9 @@ export function computeReadiness(
     }
     if (entry.coverage_status === "gap") {
       reasons.push(`coverage shortfall for subject ${subject}`);
+    } else if (entry.coverage_status === "unknown") {
+      // No independent denominator reconciles the subject's records (SPEC §6.5, §13.3.4).
+      reasons.push(`coverage unknown for subject ${subject}: no independent denominator`);
     }
     const eventTypes = isRecord(entry.event_types) ? entry.event_types : {};
     for (const eventType of Object.keys(eventTypes).sort(byteCompare)) {

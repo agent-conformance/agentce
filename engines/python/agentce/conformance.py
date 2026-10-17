@@ -111,7 +111,9 @@ def _assess_project(
     streams = verify_streams(ingested.raw_accepted, bundle.manifest, bundle.root)
     domain = DomainBinding.load(proj / "domain.linkml.yaml")
     profile = Profile.load(proj / "applicability.yaml")
-    compute_coverage(ingested.accepted, profile, bundle.root)
+    coverage = compute_coverage(
+        ingested.accepted, profile, bundle.root, listed=bundle.listed_paths
+    )
     resolve_applicability(profile, ingested.accepted)
     assertions = assess_subjects(
         ingested.accepted,
@@ -120,6 +122,7 @@ def _assess_project(
         domain,
         withheld=ingested.withheld,
         integrity=integrity_caps(ingested.raw_accepted, ingested.accepted, streams),
+        coverage=coverage,
     )
     write_report(
         out_dir,

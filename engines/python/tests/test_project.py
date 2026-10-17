@@ -9,7 +9,7 @@ from agentce.profile import Profile, Subject
 from agentce.project import (
     blind_spots_by_subject,
     compute_project_view,
-    no_population_by_subject,
+    checks_by_subject,
 )
 
 _WINDOW = ("2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
@@ -95,8 +95,8 @@ def test_blind_spots_by_subject_drops_entries_that_do_not_touch_a_subject() -> N
     assert "B" not in by_subject
 
 
-def test_no_population_by_subject_groups_by_own_field() -> None:
-    grouped = no_population_by_subject(
+def test_checks_by_subject_groups_by_own_field() -> None:
+    grouped = checks_by_subject(
         [
             _check_ref("A", "REC-04"),
             _check_ref("B", "REC-05"),

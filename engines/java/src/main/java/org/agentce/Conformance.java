@@ -122,11 +122,11 @@ public final class Conformance {
                 Integrity.verifyStreams(ingested.rawAccepted, bundle.manifest, bundle.root);
         DomainBinding domain = DomainBinding.load(proj.resolve("domain.linkml.yaml"));
         Profile profile = Profile.load(proj.resolve("applicability.yaml"));
-        Coverage.computeCoverage(ingested.accepted, profile, bundle.root);
+        ObjectNode coverage = Coverage.computeCoverage(ingested.accepted, profile, bundle.root, bundle.listedPaths());
         Applicability.resolve(profile, ingested.accepted, List.of());
         List<Assertions.Assertion> assertions = Assess.assessSubjects(
                 ingested.accepted, profile, cat.catalogs, domain, ingested.withheld,
-                Integrity.integrityCaps(ingested.rawAccepted, ingested.accepted, streams));
+                Integrity.integrityCaps(ingested.rawAccepted, ingested.accepted, streams), coverage);
         var activity = Activity.summarizeActivity(ingested.accepted, profile);
         var blindSpots = BlindSpots.computeBlindSpots(assertions, profile, cat.catalogs, ingested.accepted);
         Report.writeReport(

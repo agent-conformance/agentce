@@ -21,7 +21,7 @@ import {
   evaluatedNothing,
 } from "./assess";
 import { computeBlindSpots } from "./blindSpots";
-import { loadBundle } from "./bundle";
+import { listedPaths, loadBundle } from "./bundle";
 import { DEFAULT_LENS, catalogsDir as bundledCatalogsDir, quickstartDir } from "./bundled";
 import { type Catalog, loadCatalog } from "./catalog";
 import { runEcs } from "./conformance";
@@ -1059,7 +1059,7 @@ function runAssess(options: AssessOptions): CommandResult {
   const graphTriples = store.tripleCount();
 
   // Stage 4: coverage and reconciliation against independent denominators.
-  const coverage = computeCoverage(ingested.accepted, profileObj, bundleDir);
+  const coverage = computeCoverage(ingested.accepted, profileObj, bundleDir, listedPaths(bundle));
   mkdirSync(out, { recursive: true });
   writeFileSync(join(out, "coverage.json"), `${JSON.stringify(sortKeysDeep(coverage), null, 2)}\n`);
 
@@ -1080,6 +1080,7 @@ function runAssess(options: AssessOptions): CommandResult {
     scanned === undefined,
     ingested.withheld,
     integrityCaps(ingested.rawAccepted, ingested.accepted, integrityStreams),
+    coverage,
   );
   // A records run that judged nothing renders no report: its headline would read "Conformant".
   if (scanned !== undefined && evaluatedNothing(evaluated)) {

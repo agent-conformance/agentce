@@ -63,13 +63,13 @@ export function blindSpotsBySubject(blindSpots: BlindSpots): Map<string, BlindSp
 }
 
 /**
- * Group `computeBlindSpots`'s global `no_population` list by each entry's own `subject` field:
- * unlike `blind_spots`, every `no_population` entry already names exactly one subject, so no
- * re-scoping is needed, only grouping.
+ * Group one of `computeBlindSpots`'s global check lists (`no_population`, `coverage_unknown`) by
+ * each entry's own `subject` field: unlike `blind_spots`, every entry already names exactly one
+ * subject, so no re-scoping is needed, only grouping.
  */
-export function noPopulationBySubject(noPopulation: CheckRef[]): Map<string, CheckRef[]> {
+export function checksBySubject(checks: CheckRef[]): Map<string, CheckRef[]> {
   const bySubject = new Map<string, CheckRef[]>();
-  for (const entry of noPopulation) {
+  for (const entry of checks) {
     const list = bySubject.get(entry.subject);
     if (list === undefined) {
       bySubject.set(entry.subject, [entry]);

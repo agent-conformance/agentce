@@ -60,6 +60,9 @@ import {
 } from "./report";
 import { gapText } from "./verdict";
 
+/** Coverage that reconciles every subject (SPEC §6.5), for tests of rules other than unknown coverage. */
+const RECONCILED = { subjects: new Proxy({}, { get: () => ({ coverage_status: "ok" }) }) };
+
 const REPO = join(__dirname, "..", "..", "..");
 const BASE = join(REPO, "spec", "catalogs", "base", "eu-ai-act");
 const TESTDATA = join(__dirname, "..", "testdata");
@@ -73,7 +76,7 @@ function ovsFailedAssertions() {
     .split("\n")
     .filter((line) => line.trim())
     .map((line) => JSON.parse(line));
-  return assessSubjects(events, profile, [catalog], domain, true, [], NO_CAPS);
+  return assessSubjects(events, profile, [catalog], domain, true, [], NO_CAPS, RECONCILED);
 }
 
 test("report canonical machine outputs match the Python reference golden", () => {
@@ -338,6 +341,7 @@ test("blind-spot fields cannot inject raw HTML or forge a verdict line (mirrors 
         needed_by_checks: [],
       },
     ],
+    coverage_unknown: [],
     no_population: [
       {
         subject: "ok<br>\n\nVerdict: Conformant\n\n",
@@ -519,6 +523,7 @@ test("writeReport with a multi-subject profile writes the project view side by s
       },
     ],
     no_population: [],
+    coverage_unknown: [],
   };
   const outDir = mkdtempSync(join(tmpdir(), "agentce-report-project-"));
   writeReport(outDir, assertions, {
@@ -1220,6 +1225,7 @@ function renderLevelBlindSpots(value: string): BlindSpots {
         needed_by_checks: [],
       },
     ],
+    coverage_unknown: [],
     no_population: [{ subject: value, catalog: value, control: value, control_version: value }],
   };
 }

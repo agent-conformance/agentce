@@ -14,7 +14,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { type Assertion, assertionToJson, makeAssertion } from "./assertions";
-import { applyDeviations, assessSubjects, reachesHumanActorFailure } from "./assess";
+import {
+  COVERAGE_FAMILIES,
+  applyDeviations,
+  assessSubjects,
+  evaluatedNothing,
+  reachesHumanActorFailure,
+  uncovered,
+} from "./assess";
 import { loadBundle } from "./bundle";
 import { canonicalString } from "./canonical";
 import { loadCatalog } from "./catalog";
@@ -27,6 +34,9 @@ import { parseShapesTtl } from "./psp";
 import { loadDeviationRegister } from "./readiness";
 import { GraphStore } from "./store";
 import { propertyReads } from "./structural";
+
+/** Coverage that reconciles every subject (SPEC §6.5), for tests of rules other than unknown coverage. */
+const RECONCILED = { subjects: new Proxy({}, { get: () => ({ coverage_status: "ok" }) }) };
 
 const REPO = join(__dirname, "..", "..", "..");
 const BASE = join(REPO, "spec", "catalogs", "base", "eu-ai-act");
@@ -58,9 +68,16 @@ test("assess_subjects over the base catalog matches the Python reference", () =>
 
   const result: Record<string, unknown> = {};
   for (const [name, events] of Object.entries(scenarios)) {
-    result[name] = assessSubjects(events, profile, [catalog], domain, true, [], NO_CAPS).map(
-      assertionToJson,
-    );
+    result[name] = assessSubjects(
+      events,
+      profile,
+      [catalog],
+      domain,
+      true,
+      [],
+      NO_CAPS,
+      RECONCILED,
+    ).map(assertionToJson);
   }
   assert.equal(canonicalString(result), canonicalString(golden));
 });
@@ -202,6 +219,7 @@ function quarantineRob02(kase: string): Assertion {
       true,
       ingested.withheld,
       NO_CAPS,
+      RECONCILED,
     );
     return assertions.find((a) => a.control === "ROB-02") as Assertion;
   } finally {
@@ -241,7 +259,16 @@ function humanActorCase(
     subjects: [{ id: "spiffe://corp/agents/cnd05-fixture", role: "both" }],
   });
   const domain = DomainBinding.load(join(kase, "domain.linkml.yaml"));
-  const assertions = assessSubjects(accepted, profile, catalogs, domain, true, [], NO_CAPS);
+  const assertions = assessSubjects(
+    accepted,
+    profile,
+    catalogs,
+    domain,
+    true,
+    [],
+    NO_CAPS,
+    RECONCILED,
+  );
   return {
     byControl: new Map(assertions.map((a) => [a.control, a])),
     register: loadDeviationRegister(join(kase, "deviations.yaml")),
@@ -380,4 +407,136 @@ agentce:Q a sh:NodeShape ; sh:property [ sh:path agentce:reviewedBy ; sh:minCoun
       ["agentce:calls", ["agentce:calls", "agentce:reviewedBy"]],
     ]),
   );
+});
+
+// --- 18.134: unknown coverage reads INT and REC insufficient_evidence (SPEC §6.5). ---
+
+function assessCoverage(
+  events: Array<Record<string, unknown>>,
+  coverage: Record<string, unknown>,
+  profile = profileFromDict({ subjects: [{ id: SUBJECT, role: "both" }] }),
+  catalog = loadCatalog(BASE),
+): Map<string, Assertion> {
+  const assertions = assessSubjects(
+    events,
+    profile,
+    [catalog],
+    DomainBinding.load(join(BASE, "test", "domain.yaml")),
+    true,
+    [],
+    NO_CAPS,
+    coverage,
+  );
+  return new Map(assertions.map((a) => [`${a.subject} ${a.control}`, a]));
+}
+
+/** coverage.json's structure with the subject's roll-up `status`, or no entry for it when null. */
+function coverageStatus(status: string | null): Record<string, unknown> {
+  return { subjects: status === null ? {} : { [SUBJECT]: { coverage_status: status } } };
+}
+
+for (const family of ["INT", "REC", "OVS"]) {
+  for (const outcome of [
+    "conformant",
+    "partial",
+    "not_applicable",
+    "non-conformant",
+    "insufficient_evidence",
+    "not_assessed",
+  ]) {
+    test(`coverage unknown on ${family} ${outcome} lowers only a flattering INT or REC outcome`, () => {
+      const base = pick(
+        assessCoverage(eventsOf("OVS-03", "passed"), RECONCILED),
+        `${SUBJECT} OVS-03`,
+      );
+      const before: Assertion = { ...base, family, outcome };
+      const after = uncovered(before);
+      if (
+        COVERAGE_FAMILIES.has(family) &&
+        ["conformant", "partial", "not_applicable"].includes(outcome)
+      ) {
+        assert.equal(after.outcome, "insufficient_evidence");
+        assert.equal(after.coverageUnknown, true);
+        assert.deepEqual(after.violations, []);
+        assert.deepEqual(after.population, [before.population[0], 0]);
+        assert.equal(after.sourceClassSatisfied, null);
+        assert.equal(after.evidenceStrength, null);
+      } else {
+        assert.equal(after, before);
+      }
+    });
+  }
+}
+
+for (const [status, lowered] of [
+  ["ok", false],
+  ["gap", false],
+  ["unknown", true],
+  [null, true],
+] as const) {
+  test(`coverage status ${status} decides the INT and REC outcomes`, () => {
+    const byControl = assessCoverage(eventsOf("OVS-03", "passed"), coverageStatus(status));
+    for (const control of ["INT-01", "REC-04"]) {
+      const a = pick(byControl, `${SUBJECT} ${control}`);
+      assert.equal(a.outcome, lowered ? "insufficient_evidence" : "conformant");
+      assert.equal(a.coverageUnknown === true, lowered);
+    }
+    const ovs = pick(byControl, `${SUBJECT} OVS-03`);
+    assert.equal(ovs.outcome, "conformant");
+    assert.ok(!ovs.coverageUnknown);
+  });
+}
+
+test("coverage unknown keeps a violation non-conformant", () => {
+  const a = pick(
+    assessCoverage(eventsOf("INT-01", "failed"), coverageStatus("unknown")),
+    `${SUBJECT} INT-01`,
+  );
+  assert.equal(a.outcome, "non-conformant");
+  assert.ok(a.violations.length > 0);
+  assert.ok(!a.coverageUnknown);
+});
+
+test("coverage unknown keeps a role mismatch not_applicable", () => {
+  const catalog = loadCatalog(BASE);
+  catalog.controls = catalog.controls.map((c) =>
+    c.id === "INT-01" ? { ...c, appliesToRoles: ["deployer"] } : c,
+  );
+  const byControl = assessCoverage(
+    eventsOf("OVS-03", "passed"),
+    coverageStatus("unknown"),
+    profileFromDict({ subjects: [{ id: SUBJECT, role: "provider" }] }),
+    catalog,
+  );
+  const int01 = pick(byControl, `${SUBJECT} INT-01`);
+  assert.equal(int01.outcome, "not_applicable");
+  assert.ok(!int01.coverageUnknown);
+  assert.equal(pick(byControl, `${SUBJECT} REC-04`).outcome, "insufficient_evidence");
+});
+
+test("coverage: two subjects each read on their own coverage", () => {
+  const other = "spiffe://corp/agents/b";
+  const events = eventsOf("OVS-03", "passed");
+  const all = [...events, ...events.map((e) => ({ ...e, id: `${e.id}-b`, subject: other }))];
+  const byControl = assessCoverage(
+    all,
+    { subjects: { [SUBJECT]: { coverage_status: "ok" }, [other]: { coverage_status: "unknown" } } },
+    profileFromDict({
+      subjects: [
+        { id: SUBJECT, role: "both" },
+        { id: other, role: "both" },
+      ],
+    }),
+  );
+  assert.equal(pick(byControl, `${SUBJECT} INT-01`).outcome, "conformant");
+  assert.equal(pick(byControl, `${other} INT-01`).outcome, "insufficient_evidence");
+});
+
+test("a coverage-lowered check with no population judged nothing", () => {
+  const base = pick(assessCoverage(eventsOf("OVS-03", "passed"), RECONCILED), `${SUBJECT} INC-02`);
+  const empty = uncovered({ ...base, family: "INT", population: [0, 0] });
+  assert.equal(empty.outcome, "insufficient_evidence");
+  assert.ok(evaluatedNothing([empty]));
+  const judged = uncovered({ ...base, family: "INT", outcome: "conformant", population: [2, 0] });
+  assert.ok(!evaluatedNothing([judged]));
 });

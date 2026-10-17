@@ -77,6 +77,8 @@ def _buyer_gap_step_index(
         index[key] = {"kind": "blind_spot", "missing": missing}
     for ref in blind_spots.get("no_population", []):
         index.setdefault(_ref_key(ref), {"kind": "no_population"})
+    for ref in blind_spots.get("coverage_unknown", []):
+        index.setdefault(_ref_key(ref), {"kind": "coverage_unknown"})
     return index
 
 

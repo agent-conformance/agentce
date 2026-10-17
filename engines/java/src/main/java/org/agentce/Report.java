@@ -520,29 +520,68 @@ public final class Report {
         return rows;
     }
 
-    private static List<Map.Entry<String, String>> noPopulationRows(ArrayNode noPopulation) {
+    /** {@code (label, value)} for every entry of a check list, each with the list's one fixed sentence: for
+     * {@code no_population} the deliberately generic one (RFC 0008 Sec.4); for {@code coverage_unknown} the
+     * missing independent count (SPEC §6.5). */
+    private static List<Map.Entry<String, String>> checkRows(
+            JsonNode checks, java.util.function.UnaryOperator<String> text) {
         List<Map.Entry<String, String>> rows = new ArrayList<>();
-        for (JsonNode entry : noPopulation) {
+        if (checks == null) {
+            return rows;
+        }
+        for (JsonNode entry : checks) {
             String control = sanitizeField(entry.get("control").asText());
             String label = control + " on " + sanitizeField(entry.get("subject").asText()) + " ("
                     + sanitizeField(entry.get("catalog").asText()) + "@"
                     + sanitizeField(entry.get("control_version").asText())
                     + ")";
-            String value = "The records show every kind of evidence " + control + " asks for, but not enough of "
-                    + "it in the shape the control expects -- a --domain binding may be needed to identify the "
-                    + "relevant decisions; see the control's documentation for what it needs.";
-            rows.add(Map.entry(label, value));
+            rows.add(Map.entry(label, text.apply(control)));
         }
         return rows;
     }
 
+    private static String noPopulationText(String control) {
+        return "The records show every kind of evidence " + control + " asks for, but not enough of "
+                + "it in the shape the control expects -- a --domain binding may be needed to identify the "
+                + "relevant decisions; see the control's documentation for what it needs.";
+    }
+
+    private static String coverageUnknownText(String control) {
+        return "AgentCE can't judge " + control + " yet. Nothing outside the agent and the enforcement point counts "
+                + "this agent's calls, so a call that went around the records would not show up. To fix it, declare a "
+                + "coverage denominator in the applicability profile, such as a provider usage export, an egress or "
+                + "firewall log, or a system-of-record export.";
+    }
+
+    /** The check lists rendered after the ranked blind spots: list key, heading, text. */
+    private record CheckSection(String key, String heading, java.util.function.UnaryOperator<String> text) {}
+
+    private static final List<CheckSection> CHECK_SECTIONS = List.of(
+            new CheckSection("no_population", "Records that don't show enough, with no single fix",
+                    Report::noPopulationText),
+            new CheckSection("coverage_unknown", "Checks waiting on an independent count of your agent's calls",
+                    Report::coverageUnknownText));
+
+    /** {@code (heading, rows)} for each non-empty check list in {@code blindSpots}, in {@link #CHECK_SECTIONS}
+     * order. */
+    private static List<Map.Entry<String, List<Map.Entry<String, String>>>> checkSections(ObjectNode blindSpots) {
+        List<Map.Entry<String, List<Map.Entry<String, String>>>> sections = new ArrayList<>();
+        for (CheckSection section : CHECK_SECTIONS) {
+            List<Map.Entry<String, String>> rows = checkRows(blindSpots.get(section.key()), section.text());
+            if (!rows.isEmpty()) {
+                sections.add(Map.entry(section.heading(), rows));
+            }
+        }
+        return sections;
+    }
+
     private static List<String> blindSpotsMd(ObjectNode blindSpots) {
         List<Map.Entry<String, String>> rows = blindSpotRows((ArrayNode) blindSpots.get("blind_spots"));
-        List<Map.Entry<String, String>> noPopRows = noPopulationRows((ArrayNode) blindSpots.get("no_population"));
+        List<Map.Entry<String, List<Map.Entry<String, String>>>> sections = checkSections(blindSpots);
         List<String> lines = new ArrayList<>();
         lines.add("## Where your records can't show it yet");
         lines.add("");
-        if (rows.isEmpty() && noPopRows.isEmpty()) {
+        if (rows.isEmpty() && sections.isEmpty()) {
             lines.add("- every check either has enough evidence, or nothing here would unlock more");
             lines.add("");
             return lines;
@@ -556,11 +595,11 @@ public final class Report {
         for (Map.Entry<String, String> row : rows) {
             lines.add("- `" + row.getKey() + "`: " + row.getValue());
         }
-        if (!noPopRows.isEmpty()) {
+        for (Map.Entry<String, List<Map.Entry<String, String>>> section : sections) {
             lines.add("");
-            lines.add("### Records that don't show enough, with no single fix");
+            lines.add("### " + section.getKey());
             lines.add("");
-            for (Map.Entry<String, String> row : noPopRows) {
+            for (Map.Entry<String, String> row : section.getValue()) {
                 lines.add("- `" + row.getKey() + "`: " + row.getValue());
             }
         }
@@ -570,9 +609,9 @@ public final class Report {
 
     private static String blindSpotsHtml(ObjectNode blindSpots) {
         List<Map.Entry<String, String>> rows = blindSpotRows((ArrayNode) blindSpots.get("blind_spots"));
-        List<Map.Entry<String, String>> noPopRows = noPopulationRows((ArrayNode) blindSpots.get("no_population"));
+        List<Map.Entry<String, List<Map.Entry<String, String>>>> sections = checkSections(blindSpots);
         String body;
-        if (rows.isEmpty() && noPopRows.isEmpty()) {
+        if (rows.isEmpty() && sections.isEmpty()) {
             body = "<p>every check either has enough evidence, or nothing here would unlock more</p>";
         } else {
             StringBuilder items = new StringBuilder();
@@ -581,14 +620,14 @@ public final class Report {
                         .append(esc(row.getValue())).append("</li>");
             }
             StringBuilder b = new StringBuilder("<ul>").append(items).append("</ul>");
-            if (!noPopRows.isEmpty()) {
-                StringBuilder noPopItems = new StringBuilder();
-                for (Map.Entry<String, String> row : noPopRows) {
-                    noPopItems.append("<li><strong>").append(esc(row.getKey())).append("</strong>: ")
+            for (Map.Entry<String, List<Map.Entry<String, String>>> section : sections) {
+                StringBuilder sectionItems = new StringBuilder();
+                for (Map.Entry<String, String> row : section.getValue()) {
+                    sectionItems.append("<li><strong>").append(esc(row.getKey())).append("</strong>: ")
                             .append(esc(row.getValue())).append("</li>");
                 }
-                b.append("<h3>Records that don't show enough, with no single fix</h3><ul>")
-                        .append(noPopItems).append("</ul>");
+                b.append("<h3>").append(esc(section.getKey())).append("</h3><ul>")
+                        .append(sectionItems).append("</ul>");
             }
             body = b.toString();
         }
@@ -600,19 +639,19 @@ public final class Report {
      * {@link #blindSpotsHtml} render. */
     public static List<String> blindSpotsCliLines(ObjectNode blindSpots) {
         List<Map.Entry<String, String>> rows = blindSpotRows((ArrayNode) blindSpots.get("blind_spots"));
-        List<Map.Entry<String, String>> noPopRows = noPopulationRows((ArrayNode) blindSpots.get("no_population"));
+        List<Map.Entry<String, List<Map.Entry<String, String>>>> sections = checkSections(blindSpots);
         List<String> lines = new ArrayList<>();
         lines.add("Where your records can't show it yet:");
-        if (rows.isEmpty() && noPopRows.isEmpty()) {
+        if (rows.isEmpty() && sections.isEmpty()) {
             lines.add("  every check either has enough evidence, or nothing here would unlock more");
             return lines;
         }
         for (Map.Entry<String, String> row : rows) {
             lines.add("  " + row.getKey() + ": " + row.getValue());
         }
-        if (!noPopRows.isEmpty()) {
-            lines.add("  Records that don't show enough, with no single fix:");
-            for (Map.Entry<String, String> row : noPopRows) {
+        for (Map.Entry<String, List<Map.Entry<String, String>>> section : sections) {
+            lines.add("  " + section.getKey() + ":");
+            for (Map.Entry<String, String> row : section.getValue()) {
                 lines.add("    " + row.getKey() + ": " + row.getValue());
             }
         }
@@ -1518,7 +1557,9 @@ public final class Report {
                 outputs.put("project.json", writeJson(outDir, "project.json", projectView));
                 Map<String, List<ObjectNode>> gapsBySubject = Project.blindSpotsBySubject(blindSpotsNode);
                 Map<String, List<ObjectNode>> noPopBySubject =
-                        Project.noPopulationBySubject((ArrayNode) blindSpotsNode.get("no_population"));
+                        Project.checksBySubject((ArrayNode) blindSpotsNode.get("no_population"));
+                Map<String, List<ObjectNode>> uncoveredBySubject =
+                        Project.checksBySubject((ArrayNode) blindSpotsNode.get("coverage_unknown"));
                 Map<String, List<Assertions.Assertion>> assertionsBySubject = new LinkedHashMap<>();
                 for (Assertions.Assertion a : assertions) {
                     assertionsBySubject.computeIfAbsent(a.subject, k -> new ArrayList<>()).add(a);
@@ -1535,6 +1576,8 @@ public final class Report {
                     gapsBySubject.getOrDefault(subjectId, List.of()).forEach(subjectGaps::add);
                     ArrayNode subjectNoPop = subjectBlindSpots.putArray("no_population");
                     noPopBySubject.getOrDefault(subjectId, List.of()).forEach(subjectNoPop::add);
+                    ArrayNode subjectUncovered = subjectBlindSpots.putArray("coverage_unknown");
+                    uncoveredBySubject.getOrDefault(subjectId, List.of()).forEach(subjectUncovered::add);
 
                     ArrayNode subjectAssertionsJson = Json.nodes().arrayNode();
                     for (Assertions.Assertion a : subjectAssertions) {
@@ -1667,6 +1710,7 @@ public final class Report {
         ObjectNode empty = Json.nodes().objectNode();
         empty.putArray("blind_spots");
         empty.putArray("no_population");
+        empty.putArray("coverage_unknown");
         return empty;
     }
 

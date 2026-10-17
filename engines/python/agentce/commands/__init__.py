@@ -1433,7 +1433,9 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     graph_triples = graph_store.triple_count()
     graph_store.close()
     # Stage 4: coverage and reconciliation against independent denominators.
-    coverage = compute_coverage(ingested.accepted, profile_obj, loaded.root)
+    coverage = compute_coverage(
+        ingested.accepted, profile_obj, loaded.root, listed=loaded.listed_paths
+    )
     (out_dir / "coverage.json").write_text(
         json.dumps(coverage, sort_keys=True, indent=2), encoding="utf-8"
     )
@@ -1453,6 +1455,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         integrity=integrity_caps(
             ingested.raw_accepted, ingested.accepted, integrity_streams
         ),
+        coverage=coverage,
     )
     # A records run that judged nothing renders no report: its headline would read "Conformant".
     if scanned is not None and evaluated_nothing(evaluated):

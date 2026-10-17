@@ -142,8 +142,8 @@ def test_expected_from_source_manifest(tmp_path: Path) -> None:
         }
     )
     events = [event(i, "urn:src:gw", "ToolCall") for i in range(4)]
-    tool = compute_coverage(events, profile, tmp_path)["subjects"][SUBJECT][
-        "event_types"
-    ]["ToolCall"]
+    tool = compute_coverage(
+        events, profile, tmp_path, listed=frozenset({"reference/egress.json"})
+    )["subjects"][SUBJECT]["event_types"]["ToolCall"]
     assert tool["expected"] == 4
     assert tool["status"] == STATUS_COVERED

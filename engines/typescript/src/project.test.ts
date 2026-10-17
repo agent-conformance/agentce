@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { makeAssertion } from "./assertions";
 import type { BlindSpot, BlindSpots, CheckRef } from "./blindSpots";
-import { blindSpotsBySubject, computeProjectView, noPopulationBySubject } from "./project";
+import { blindSpotsBySubject, checksBySubject, computeProjectView } from "./project";
 
 const WINDOW: [string, string] = ["2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"];
 
@@ -78,7 +78,11 @@ test("blindSpotsBySubject rescopes counts and refs", () => {
     [checkRef("A", "REC-01"), checkRef("A", "REC-02"), checkRef("B", "REC-03")],
     [],
   );
-  const bySubject = blindSpotsBySubject({ blind_spots: [entry], no_population: [] });
+  const bySubject = blindSpotsBySubject({
+    blind_spots: [entry],
+    no_population: [],
+    coverage_unknown: [],
+  });
   assert.deepEqual(
     (bySubject.get("A") as BlindSpot[])[0]?.unlocked_checks.map((cr) => cr.control),
     ["REC-01", "REC-02"],
@@ -94,12 +98,16 @@ test("blindSpotsBySubject rescopes counts and refs", () => {
 
 test("blindSpotsBySubject drops entries that do not touch a subject", () => {
   const entry = blindSpot([checkRef("A", "REC-01")], []);
-  const bySubject = blindSpotsBySubject({ blind_spots: [entry], no_population: [] });
+  const bySubject = blindSpotsBySubject({
+    blind_spots: [entry],
+    no_population: [],
+    coverage_unknown: [],
+  });
   assert.equal(bySubject.has("B"), false);
 });
 
-test("noPopulationBySubject groups by own field", () => {
-  const grouped = noPopulationBySubject([
+test("checksBySubject groups by own field", () => {
+  const grouped = checksBySubject([
     checkRef("A", "REC-04"),
     checkRef("B", "REC-05"),
     checkRef("A", "REC-06"),
@@ -128,7 +136,11 @@ test("three-subject rollup: declared, undeclared, and top gaps", () => {
   ]);
   const sharedGap = blindSpot([checkRef("A", "REC-01")], [checkRef("C", "REC-01")], "ModelCall");
   const otherGap = blindSpot([checkRef("B", "REC-02")], [], "ToolCall");
-  const blindSpots: BlindSpots = { blind_spots: [sharedGap, otherGap], no_population: [] };
+  const blindSpots: BlindSpots = {
+    blind_spots: [sharedGap, otherGap],
+    no_population: [],
+    coverage_unknown: [],
+  };
 
   const view = computeProjectView(
     assertions,
@@ -160,7 +172,7 @@ test("single-subject profile still returns a valid one-row view", () => {
     profile,
     new Set(["A"]),
     new Map([["A", { agents: ["A"] }]]),
-    { blind_spots: [], no_population: [] },
+    { blind_spots: [], no_population: [], coverage_unknown: [] },
   );
   assert.equal(view.agents.length, 1);
   assert.equal(view.agents[0]?.id, "A");
@@ -186,7 +198,7 @@ test("deviation surfaces per subject without leaking", () => {
       ["A", { agents: ["A"] }],
       ["B", { agents: ["B"] }],
     ]),
-    { blind_spots: [], no_population: [] },
+    { blind_spots: [], no_population: [], coverage_unknown: [] },
     [{ control: "REC-01", expiry: "2026-06-01T00:00:00.000Z" }],
   );
   const rows = new Map(view.agents.map((row) => [row.id, row]));
@@ -204,7 +216,7 @@ test("deviation omits unknown expiry", () => {
     profile,
     new Set(["A"]),
     new Map([["A", { agents: ["A"] }]]),
-    { blind_spots: [], no_population: [] },
+    { blind_spots: [], no_population: [], coverage_unknown: [] },
   );
   assert.deepEqual(view.agents[0]?.deviations, [{ control: "REC-01" }]);
 });
