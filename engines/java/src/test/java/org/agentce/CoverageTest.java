@@ -110,4 +110,23 @@ class CoverageTest {
         assertEquals(1, types.get("SessionStart").get("observed").asInt());
         assertEquals("unknown", types.get("SessionStart").get("status").asText());
     }
+
+    @Test
+    void selfCountingDenominatorHidesOnlyTheTypesItCovers() {
+        Profile profile = Profile.fromDict(Json.parse("{\"subjects\": [{\"id\": \"subj-A\", \"evidence_sources\": "
+                + "[{\"adapter\": \"gw\", \"source\": \"urn:src:gw\", \"class\": \"enforcement_point\"}], "
+                + "\"coverage_denominators\": [{\"kind\": \"egress_proxy_log\", \"source\": \"urn:src:egress\", "
+                + "\"covers\": [\"ToolCall\"]}]}]}"));
+        List<JsonNode> events = Fixtures.toList(Json.parse("["
+                + "{\"source\": \"urn:src:gw\", \"subject\": \"subj-A\", \"data\": {\"@type\": \"ToolCall\"}},"
+                + "{\"source\": \"urn:src:egress\", \"subject\": \"subj-A\", \"data\": {\"@type\": \"ToolCall\"}},"
+                + "{\"source\": \"urn:src:egress\", \"subject\": \"subj-A\", \"data\": {\"@type\": \"SessionStart\"}}]"));
+
+        // The egress log covers only ToolCall, so its SessionStart is a captured record nothing counts (SPEC §6.5).
+        JsonNode subject = Coverage.computeCoverage(events, profile, null, java.util.Set.of())
+                .get("subjects").get("subj-A");
+        assertEquals(1, subject.get("event_types").get("SessionStart").get("observed").asInt());
+        assertEquals("unknown", subject.get("event_types").get("SessionStart").get("status").asText());
+        assertEquals("unknown", subject.get("coverage_status").asText());
+    }
 }

@@ -162,3 +162,32 @@ test("a manifest-reading denominator's own records of a type it counts are never
     assert.equal(types.SessionStart?.status, "unknown");
   });
 });
+
+test("a self-counting denominator hides only the types it covers", () => {
+  const profile = profileFromDict({
+    subjects: [
+      {
+        id: "subj-A",
+        evidence_sources: [{ adapter: "gw", source: "urn:src:gw", class: "enforcement_point" }],
+        coverage_denominators: [
+          { kind: "egress_proxy_log", source: DENOMINATOR_SOURCE, covers: ["ToolCall"] },
+        ],
+      },
+    ],
+  });
+  const events = [
+    { source: "urn:src:gw", subject: "subj-A", data: { "@type": "ToolCall" } },
+    { source: DENOMINATOR_SOURCE, subject: "subj-A", data: { "@type": "ToolCall" } },
+    { source: DENOMINATOR_SOURCE, subject: "subj-A", data: { "@type": "SessionStart" } },
+  ];
+
+  const result = computeCoverage(events, profile);
+  const subjects = result.subjects as Record<
+    string,
+    { coverage_status: string; event_types: Record<string, { observed: number; status: string }> }
+  >;
+  const subject = subjects["subj-A"];
+  assert.equal(subject?.event_types.SessionStart?.observed, 1);
+  assert.equal(subject?.event_types.SessionStart?.status, "unknown");
+  assert.equal(subject?.coverage_status, "unknown");
+});
