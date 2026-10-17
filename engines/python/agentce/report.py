@@ -1281,11 +1281,10 @@ def _buyer_gap_lines(entry: dict[str, Any], cat: dict[str, str]) -> list[str]:
     gap_step = entry["gap_step"]
     if gap_step is None:
         return [cat["report.buyer_gap_step_unavailable"]]
-    check_text = {key: text for key, _, text in _CHECK_SECTIONS}.get(gap_step["kind"])
-    if check_text is not None:
+    if gap_step["kind"] in ("no_population", "coverage_unknown"):
         return [
             i18n_format.format_message(
-                cat[check_text],
+                cat[f"report.blind_spots_{gap_step['kind']}_text"],
                 control=_sanitize_field(entry["control"]),
             )
         ]

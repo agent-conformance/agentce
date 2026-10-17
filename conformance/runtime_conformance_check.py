@@ -72,7 +72,9 @@ class SetupError(Exception):
 # --- building the scenario's bundles, in memory ---------------------------------------------------
 
 
-def _incident(eid: str, subject: str, time: str, *, accountable: bool) -> dict[str, Any]:
+def _incident(
+    eid: str, subject: str, time: str, *, accountable: bool
+) -> dict[str, Any]:
     data: dict[str, Any] = {"@context": CONTEXT, "@type": "Incident"}
     if accountable:
         data["agent"] = {"id": subject}
@@ -108,20 +110,44 @@ def _chain(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for event in events:
         body = json.dumps(event, sort_keys=True, separators=(",", ":"))
         digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
-        integrity = {"stream": SOURCE, "strength": "export_chained", "prev": prev, "hash": digest}
+        integrity = {
+            "stream": SOURCE,
+            "strength": "export_chained",
+            "prev": prev,
+            "hash": digest,
+        }
         chained.append({**event, "data": {**event["data"], "integrity": integrity}})
         prev = digest
     return chained
 
 
+def _coverage_manifest(subject: str) -> str:
+    """The bundle path of ``subject``'s system-of-record export (SPEC §6.5)."""
+    return f"reference/coverage-{hashlib.sha256(subject.encode('utf-8')).hexdigest()[:16]}.json"
+
+
 def _write_bundle(bundle: Path, events: list[dict[str, Any]]) -> None:
     rel = "events/incidents.jsonl"
     digest = _write_jsonl(bundle / rel, _chain(events))
+    files = [{"path": rel, "sha256": digest}]
+    # A system-of-record export counting each subject's incidents reconciles its coverage, so its INT and REC
+    # checks keep their verdicts and the exit code reflects INC-02's findings (SPEC §6.5).
+    for subject in sorted({str(e["subject"]) for e in events}):
+        counts = sum(1 for e in events if e["subject"] == subject)
+        body = json.dumps({"counts": {"Incident": counts}}, sort_keys=True) + "\n"
+        (bundle / _coverage_manifest(subject)).parent.mkdir(parents=True, exist_ok=True)
+        (bundle / _coverage_manifest(subject)).write_text(body, encoding="utf-8")
+        files.append(
+            {
+                "path": _coverage_manifest(subject),
+                "sha256": hashlib.sha256(body.encode("utf-8")).hexdigest(),
+            }
+        )
     manifest = {
         "agentce_bundle_version": 1,
         "domain": "runtime-conformance",
         "sources": [{"id": SOURCE, "class": "independent_system"}],
-        "files": [{"path": rel, "sha256": digest}],
+        "files": files,
     }
     (bundle / "manifest.json").write_text(
         json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8"
@@ -146,6 +172,10 @@ def _write_profile(path: Path, subjects: list[str]) -> None:
             '      - adapter: "register"',
             f'        source: "{SOURCE}"',
             '        class: "independent_system"',
+            "    coverage_denominators:",
+            "      - kind: system_of_record_export",
+            '        source: "urn:agentce:source:system-of-record-export:incidents"',
+            f'        manifest: "{_coverage_manifest(subject)}"',
         ]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -207,7 +237,9 @@ def _drift_lines(out: Path) -> list[dict[str, Any]]:
     if not path.is_file():
         return []
     return [
-        json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
     ]
 
 
@@ -240,7 +272,9 @@ def run_scenario(work: Path) -> dict[str, Any]:
     _write_profile(profile, [SUBJECT_A])
     state = work / "state"
 
-    step1_events = [_incident("inc-a1", SUBJECT_A, "2026-05-02T09:00:00Z", accountable=True)]
+    step1_events = [
+        _incident("inc-a1", SUBJECT_A, "2026-05-02T09:00:00Z", accountable=True)
+    ]
     bundle1 = work / "bundle-1"
     _write_bundle(bundle1, step1_events)
     out1 = work / "out-1"
@@ -293,7 +327,9 @@ def _scenario_problems(result: dict[str, Any]) -> list[str]:
 
     a1 = _inc02(step1["assertions"], SUBJECT_A)
     if a1 is None or a1["outcome"] != "conformant":
-        problems.append(f"step 1: INC-02 for {SUBJECT_A} did not evaluate conformant: {a1}")
+        problems.append(
+            f"step 1: INC-02 for {SUBJECT_A} did not evaluate conformant: {a1}"
+        )
     if step1["drift"]:
         problems.append(f"step 1 (first tracked run) produced drift: {step1['drift']}")
 
@@ -301,11 +337,15 @@ def _scenario_problems(result: dict[str, Any]) -> list[str]:
     if a2 is None or a2["outcome"] != "conformant":
         problems.append(f"step 2: INC-02 for {SUBJECT_A} did not stay conformant: {a2}")
     if step2["drift"]:
-        problems.append(f"step 2 (identical bundle, no-op) produced drift: {step2['drift']}")
+        problems.append(
+            f"step 2 (identical bundle, no-op) produced drift: {step2['drift']}"
+        )
 
     a3 = _inc02(step3["assertions"], SUBJECT_A)
     if a3 is None or a3["outcome"] != "non-conformant":
-        problems.append(f"step 3: INC-02 for {SUBJECT_A} did not flip non-conformant: {a3}")
+        problems.append(
+            f"step 3: INC-02 for {SUBJECT_A} did not flip non-conformant: {a3}"
+        )
     expected_evidence = ["agentce:event/inc-a2"]
     if step3["drift"] != [
         {
@@ -316,9 +356,13 @@ def _scenario_problems(result: dict[str, Any]) -> list[str]:
             "subject": SUBJECT_A,
         }
     ]:
-        problems.append(f"step 3 drift was {step3['drift']}, expected exactly one entry naming inc-a2")
+        problems.append(
+            f"step 3 drift was {step3['drift']}, expected exactly one entry naming inc-a2"
+        )
     if step3["env"].get("exit_code") != 1:
-        problems.append(f"step 3 (a non-conformant pair) did not exit 1 (findings): {step3['env']}")
+        problems.append(
+            f"step 3 (a non-conformant pair) did not exit 1 (findings): {step3['env']}"
+        )
     return problems
 
 
@@ -333,9 +377,13 @@ def check_scenario() -> str | None:
     problems = _scenario_problems(result_a)
     for step in ("step1", "step2", "step3"):
         if result_a[step]["assertions_bytes"] != result_b[step]["assertions_bytes"]:
-            problems.append(f"{step}: assertions.json was not byte-identical across two fresh runs")
+            problems.append(
+                f"{step}: assertions.json was not byte-identical across two fresh runs"
+            )
         if result_a[step]["drift_bytes"] != result_b[step]["drift_bytes"]:
-            problems.append(f"{step}: runtime_drift.jsonl was not byte-identical across two fresh runs")
+            problems.append(
+                f"{step}: runtime_drift.jsonl was not byte-identical across two fresh runs"
+            )
     return "; ".join(problems) if problems else None
 
 
@@ -349,7 +397,9 @@ def self_test_idempotent_rerun() -> str | None:
         profile = work / "profile.yaml"
         _write_profile(profile, [SUBJECT_A])
         state = work / "state"
-        events = [_incident("inc-a1", SUBJECT_A, "2026-05-02T09:00:00Z", accountable=True)]
+        events = [
+            _incident("inc-a1", SUBJECT_A, "2026-05-02T09:00:00Z", accountable=True)
+        ]
         bundle = work / "bundle"
         _write_bundle(bundle, events)
         _assess(bundle, profile, work / "out-1", state)
@@ -384,7 +434,9 @@ def self_test_pre_upgrade_state() -> str | None:
             + "\n",
             encoding="utf-8",
         )
-        events = [_incident("inc-a1", SUBJECT_A, "2026-05-02T09:00:00Z", accountable=True)]
+        events = [
+            _incident("inc-a1", SUBJECT_A, "2026-05-02T09:00:00Z", accountable=True)
+        ]
         bundle = work / "bundle"
         _write_bundle(bundle, events)
         out = work / "out"
@@ -475,7 +527,8 @@ def check_guard(doc: WorkflowDoc) -> str | None:
         "runtime_conformance_check.py" in t and "--self-test" in t for t in run_texts
     )
     has_real_run = any(
-        "runtime_conformance_check.py" in t and "--self-test" not in t for t in run_texts
+        "runtime_conformance_check.py" in t and "--self-test" not in t
+        for t in run_texts
     )
     if not has_self_test:
         return f"jobs.{GUARD_JOB} never runs runtime_conformance_check.py --self-test"
@@ -526,7 +579,9 @@ def main(argv: list[str] | None = None) -> int:
         "series of real agentce assess runs (SPEC.md:249 DC-9/HR-10).",
     )
     parser.add_argument(
-        "--self-test", action="store_true", help="prove the negative cases discriminate (C1)"
+        "--self-test",
+        action="store_true",
+        help="prove the negative cases discriminate (C1)",
     )
     parser.add_argument(
         "--check-guard",
