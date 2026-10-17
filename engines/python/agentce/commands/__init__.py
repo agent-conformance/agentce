@@ -219,17 +219,14 @@ def _require_dir(
     key: str,
     what: str,
     fix: str | None = None,
-    empty_is_no_dir: bool = False,
 ) -> Path:
-    """``empty_is_no_dir``: an empty value names no directory (``Path("")`` is the working
-    directory, so without it ``--flag ''`` would quietly read the working directory)."""
+    """An empty value names no directory (``Path("")`` is the working directory, so ``--flag ''``
+    must never quietly read it): refused under the same key as an absent one."""
     fix = fix or f"pass --{key.replace('_', '-')} <dir>."
     if raw is None:
         raise InputError(f"input.{key}_missing", f"{what} is required.", fix)
     path = Path(raw)
-    if (empty_is_no_dir and raw == "") or not signing.is_directory(
-        path, unreadable_is_absent=True
-    ):
+    if raw == "" or not signing.is_directory(path, unreadable_is_absent=True):
         raise InputError(
             f"input.{key}_not_a_directory",
             f"{what} {raw!r} is not an existing directory.",
@@ -238,15 +235,26 @@ def _require_dir(
     return path
 
 
-def _refuse_empty_out(raw: str | None) -> None:
-    """An empty --out names no directory (``Path("")`` is the working directory): refused before
-    anything is written or run, never read as the working directory or as no --out."""
+def _refuse_empty(
+    raw: str | None, *, key: str, flag: str, fix: str, noun: str = "file"
+) -> None:
+    """The one empty-value rule for a path option the command reads with a default or writes to: an
+    empty value names no path (``Path("")`` is the working directory), so it is refused under the
+    role's key before anything is read or written, never read as the working directory, as the
+    default, or as no value. ``_require_dir`` and ``_require_file`` apply the same rule to the paths
+    they check."""
     if raw == "":
-        raise InputError(
-            "input.out_dir_unwritable",
-            "--out '' names no directory.",
-            "choose a writable --out directory.",
-        )
+        raise InputError(key, f"{flag} '' names no {noun}.", fix)
+
+
+def _refuse_empty_out(raw: str | None) -> None:
+    _refuse_empty(
+        raw,
+        key="input.out_dir_unwritable",
+        flag="--out",
+        fix="choose a writable --out directory.",
+        noun="directory",
+    )
 
 
 def _require_file(
@@ -256,7 +264,7 @@ def _require_file(
     if raw is None:
         raise InputError(f"input.{key}_missing", f"{what} is required.", fix)
     path = Path(raw)
-    if not signing.is_regular_file(path, unreadable_is_absent=True):
+    if raw == "" or not signing.is_regular_file(path, unreadable_is_absent=True):
         raise InputError(
             f"input.{key}_not_a_file",
             f"{what} {raw!r} is not an existing file.",
@@ -292,7 +300,6 @@ def cmd_validate(ns: argparse.Namespace) -> CommandResult:
         _opt_str(ns, "bundle"),
         key="bundle",
         what="the evidence bundle",
-        empty_is_no_dir=True,
     )
     out = _opt_str(ns, "out")
     _refuse_empty_out(out)
@@ -1265,6 +1272,14 @@ def _package_catalog(catalog: Catalog, dest: Path) -> str:
 
 def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     result = CommandResult(command="assess")
+    _refuse_empty_out(_opt_str(ns, "out"))
+    _refuse_empty(
+        _opt_str(ns, "state"),
+        key="input.state_dir_unwritable",
+        flag="--state",
+        fix="choose a writable --state directory.",
+        noun="directory",
+    )
     out = _opt_str(ns, "out") or DEFAULT_OUT_DIR
     folder_arg = _opt_str(ns, "folder")
     scanned: ScannedRecords | None = None
@@ -1858,10 +1873,14 @@ def _effective_trust_root(ns: argparse.Namespace) -> signing.TrustRoot:
 
 
 def _explicit_trust_root(ns: argparse.Namespace) -> signing.TrustRoot | None:
-    """The trust root the operator named (``--trust-root``, else ``AGENTCE_TRUST_ROOT``), or ``None``."""
-    raw = _opt_str(ns, "trust_root") or os.environ.get("AGENTCE_TRUST_ROOT")
-    if raw is None or not raw.strip():
-        return None
+    """The trust root the operator named (``--trust-root``, else ``AGENTCE_TRUST_ROOT``), or ``None``.
+    A ``--trust-root`` that was given is always checked, so an empty one is refused, never read as
+    no flag; an empty or blank ``AGENTCE_TRUST_ROOT`` is an unset variable."""
+    raw = _opt_str(ns, "trust_root")
+    if raw is None:
+        raw = os.environ.get("AGENTCE_TRUST_ROOT")
+        if raw is None or not raw.strip():
+            return None
     path = _require_file(raw, key="trust_root", what="the trust root")
     try:
         return signing.load_trust_root(path)
@@ -2187,7 +2206,9 @@ def cmd_report(ns: argparse.Namespace) -> CommandResult:
                     f"drop {flag}, or drop --validate to re-render with --from.",
                 )
         report_dir = _require_dir(
-            validate, key="validate", what="the report directory", empty_is_no_dir=True
+            validate,
+            key="validate",
+            what="the report directory",
         )
         problems = validate_report(report_dir)
         result.data.update(
@@ -2199,6 +2220,12 @@ def cmd_report(ns: argparse.Namespace) -> CommandResult:
         else:
             result.note(f"{report_dir}: all artifacts valid")
         return result
+    _refuse_empty(
+        _opt_str(ns, "out"),
+        key="input.out_file_unwritable",
+        flag="--out",
+        fix="pass --out <file> with a writable path.",
+    )
     source = _require_file(
         _opt_str(ns, "from_"), key="from", what="the assertions file"
     )
@@ -2384,7 +2411,15 @@ def cmd_ingest(ns: argparse.Namespace) -> CommandResult:
             "ingest needs an adapter.",
             "pass --adapter, e.g. --adapter otel-genai.",
         )
-    adapters_root = Path(_opt_str(ns, "adapters_root") or "adapters")
+    raw_adapters_root = _opt_str(ns, "adapters_root")
+    _refuse_empty(
+        raw_adapters_root,
+        key="input.adapters_root_not_a_directory",
+        flag="--adapters-root",
+        fix="pass --adapters-root <dir> (an adapters checkout), or drop it to use ./adapters.",
+        noun="directory",
+    )
+    adapters_root = Path(raw_adapters_root or "adapters")
     subject = _opt_str(ns, "subject") or DEFAULT_SUBJECT
     source_class = _opt_str(ns, "source_class") or "self_report"
     source = _opt_str(ns, "source")
@@ -2460,12 +2495,13 @@ def cmd_collect(ns: argparse.Namespace) -> CommandResult:
             "--adapters-root is never read in a dry run: a dry run adapts no source.",
             "drop --adapters-root, or drop --dry-run to run the collection.",
         )
-    if raw_adapters_root == "":
-        raise InputError(
-            "input.adapters_root_not_a_directory",
-            "--adapters-root '' names no directory.",
-            "pass --adapters-root <dir> (an adapters checkout), or drop it to use ./adapters.",
-        )
+    _refuse_empty(
+        raw_adapters_root,
+        key="input.adapters_root_not_a_directory",
+        flag="--adapters-root",
+        fix="pass --adapters-root <dir> (an adapters checkout), or drop it to use ./adapters.",
+        noun="directory",
+    )
     config = load_config(config_path)
     adapters_root = Path(raw_adapters_root or "adapters")
     outcome = run_collect(
@@ -2574,6 +2610,12 @@ def cmd_catalog(ns: argparse.Namespace) -> CommandResult:
         return _cmd_catalog_sign(ns)
     if action != "lint":
         raise catalog_action_error()
+    _refuse_empty(
+        _opt_str(ns, "support_matrix"),
+        key="input.support_matrix_unwritable",
+        flag="--support-matrix",
+        fix="pass --support-matrix <file> with a writable path outside the catalog directory.",
+    )
     directory = _require_dir(
         _opt_str(ns, "dir"),
         key="dir",
@@ -2680,7 +2722,15 @@ def _default_family(dir_path: Path) -> str:
 def _cmd_catalog_init(ns: argparse.Namespace) -> CommandResult:
     """Scaffold a from-scratch, lint-clean, `mode: automated` custom catalog (SPEC §7.3)."""
     result = CommandResult(command="catalog")
-    directory = Path(_opt_str(ns, "dir") or ".")
+    raw_dir = _opt_str(ns, "dir")
+    _refuse_empty(
+        raw_dir,
+        key="catalog.init_dir_unwritable",
+        flag="catalog init",
+        fix="pass the directory to scaffold the catalog in, or drop it to use the working directory.",
+        noun="directory",
+    )
+    directory = Path(raw_dir or ".")
     family = _opt_str(ns, "family")
     if family is None:
         family = _default_family(directory)
@@ -2891,13 +2941,11 @@ def cmd_conformance(ns: argparse.Namespace) -> CommandResult:
         _opt_str(ns, "engine"),
         key="engine",
         what="the engine path",
-        empty_is_no_dir=True,
     )
     corpus = _require_dir(
         _opt_str(ns, "corpus"),
         key="corpus",
         what="the corpus directory",
-        empty_is_no_dir=True,
     )
     adapters = _opt_str(ns, "adapters")
     adapters_dir = (
@@ -2905,7 +2953,6 @@ def cmd_conformance(ns: argparse.Namespace) -> CommandResult:
             adapters,
             key="adapters",
             what="the adapters directory",
-            empty_is_no_dir=True,
         )
         if adapters is not None
         else None
@@ -3289,7 +3336,7 @@ def _sign_signer(ns: argparse.Namespace, profile: str) -> signing.Signer:
     """
     key_path = _opt_str(ns, "key")
     if profile == "kms":
-        if not key_path:
+        if key_path is None:
             raise InputError(
                 "sign.kms_key_missing",
                 "the kms profile signs with an operator-held key.",
@@ -3355,6 +3402,12 @@ def _load_ed25519_private_key(
 def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
     """Sign a catalog directory with an operator-held Ed25519 key (SPEC §8.7, §9.1)."""
     result = CommandResult(command="catalog")
+    _refuse_empty(
+        _opt_str(ns, "write_trust_root"),
+        key="input.write_trust_root_unwritable",
+        flag="--write-trust-root",
+        fix="pass --write-trust-root <file> with a writable path outside the catalog directory.",
+    )
     directory = _require_dir(
         _opt_str(ns, "dir"),
         key="dir",
@@ -3523,14 +3576,14 @@ def cmd_readiness(ns: argparse.Namespace) -> CommandResult:
     )
     gaps: set[str] = set()
     gaps_path = _opt_str(ns, "gaps")
-    if gaps_path:
+    if gaps_path is not None:
         text = _require_file(gaps_path, key="gaps", what="the gaps file").read_text(
             "utf-8"
         )
         gaps = set(re.findall(r"\b[A-Z]{2,4}-[0-9]{2}\b", text))
     deviations: list[dict[str, Any]] = []
     dev_path = _opt_str(ns, "deviations")
-    if dev_path:
+    if dev_path is not None:
         deviations = _load_deviation_register(
             _require_file(dev_path, key="deviations", what="the deviation register")
         )
@@ -3607,8 +3660,9 @@ def cmd_doctor(ns: argparse.Namespace) -> CommandResult:
         result.note(f"wrote {path}")
         return result
 
+    project_arg = _opt_str(ns, "project")
     project = _require_dir(
-        _opt_str(ns, "project") or DEFAULT_PROJECT_DIR,
+        DEFAULT_PROJECT_DIR if project_arg is None else project_arg,
         key="project",
         what="the project directory",
         fix="pass --project <dir> (a project from agentce quickstart or agentce init).",
@@ -3721,6 +3775,7 @@ DEFAULT_EMIT_SOURCE = "urn:agentce:emit:local"
 def cmd_quickstart(ns: argparse.Namespace) -> CommandResult:
     """Assess the bundled quickstart project end to end — one command, offline (SPEC §13.4 AX-1)."""
     result = CommandResult(command="quickstart")
+    _refuse_empty_out(_opt_str(ns, "out"))
     out = _opt_str(ns, "out") or DEFAULT_OUT_DIR
     quickstart = bundled.quickstart_dir()
     catalog_dir = bundled.catalogs_dir() / "base" / "eu-ai-act"

@@ -387,31 +387,20 @@ global options:
     }
 
     private static String requireDir(String raw, String key, String what) {
-        return requireDir(raw, key, what, false);
-    }
-
-    /** {@link #requireDir} with the computed {@code --key}-style fix; with {@code emptyIsNoDir} an empty
-     * value names no directory. */
-    private static String requireDir(String raw, String key, String what, boolean emptyIsNoDir) {
-        return requireDir(raw, key, what, "pass --" + key + " <dir>.", emptyIsNoDir);
+        return requireDir(raw, key, what, "pass --" + key + " <dir>.");
     }
 
     /** {@link #requireDir}, with an explicit {@code fix} rather than the computed {@code --key}-style
      * default -- {@code readiness}'s positional {@code report_dir} (item 18.25) needs its own fix text,
      * mirroring {@link #requireFile}'s existing 4-arg overload. */
+    /** An empty value names no directory ({@code Paths.get("")} is the working directory, which {@code
+     * --flag ''} must never quietly read): refused under the same key as an absent one. */
     private static String requireDir(String raw, String key, String what, String fix) {
-        return requireDir(raw, key, what, fix, false);
-    }
-
-    /** {@link #requireDir}; with {@code emptyIsNoDir} an empty value names no directory (Python's {@code
-     * empty_is_no_dir}: {@code Paths.get("")} is the working directory, which {@code --flag ''} must never
-     * quietly read). */
-    private static String requireDir(String raw, String key, String what, String fix, boolean emptyIsNoDir) {
         if (raw == null) {
             throw new InputError("input." + key + "_missing", what + " is required.", fix);
         }
         Path path = Paths.get(raw);
-        if ((emptyIsNoDir && raw.isEmpty()) || !Files.isDirectory(path)) {
+        if (raw.isEmpty() || !Files.isDirectory(path)) {
             throw new InputError(
                     "input." + key + "_not_a_directory", what + " " + Readiness.pyRepr(raw) + " is not an existing directory.", fix);
         }
@@ -429,7 +418,7 @@ global options:
             throw new InputError("input." + key + "_missing", what + " is required.", fix);
         }
         Path path = Paths.get(raw);
-        if (!Files.isRegularFile(path)) {
+        if (raw.isEmpty() || !Files.isRegularFile(path)) {
             throw new InputError(
                     "input." + key + "_not_a_file", what + " " + Readiness.pyRepr(raw) + " is not an existing file.", fix);
         }
@@ -549,11 +538,15 @@ global options:
     }
 
     /** The trust root the operator named ({@code --trust-root}, else {@code AGENTCE_TRUST_ROOT}), or null. Mirrors
-     * {@code _explicit_trust_root}. */
+     * {@code _explicit_trust_root}: a given {@code --trust-root} is always checked, so an empty one is refused; an
+     * empty or blank variable is unset. */
     private static Verify.TrustRoot explicitTrustRoot(String flagValue) {
-        String raw = flagValue != null && !flagValue.isEmpty() ? flagValue : System.getenv("AGENTCE_TRUST_ROOT");
-        if (raw == null || raw.isBlank()) {
-            return null;
+        String raw = flagValue;
+        if (raw == null) {
+            raw = System.getenv("AGENTCE_TRUST_ROOT");
+            if (raw == null || raw.isBlank()) {
+                return null;
+            }
         }
         String path = requireFile(raw, "trust_root", "the trust root", "pass --trust-root <file>.");
         try {
@@ -875,13 +868,19 @@ global options:
                 new Argv.Action(Map.of("run", run), Cli::conformanceActionError));
     }
 
-    /** Python's {@code _refuse_empty_out}: an empty --out names no directory, refused before anything is
-     * written or run. */
-    private static void refuseEmptyOut(String out) {
-        if (out != null && out.isEmpty()) {
-            throw new InputError(
-                    "input.out_dir_unwritable", "--out '' names no directory.", "choose a writable --out directory.");
+    /** Python's {@code _refuse_empty}, the one empty-value rule for a path option the command reads with a
+     * default or writes to: an empty value names no path, so it is refused under the role's key before
+     * anything is read or written, never read as the working directory, the default, or no value. {@link
+     * #requireDir} and {@link #requireFile} apply the same rule to the paths they check. */
+    private static void refuseEmpty(String raw, String key, String flag, String fix, String noun) {
+        if (raw != null && raw.isEmpty()) {
+            throw new InputError(key, flag + " '' names no " + noun + ".", fix);
         }
+    }
+
+    /** Python's {@code _refuse_empty_out}. */
+    private static void refuseEmptyOut(String out) {
+        refuseEmpty(out, "input.out_dir_unwritable", "--out", "choose a writable --out directory.", "directory");
     }
 
     /** {@code agentce conformance run}: reads its argv only through {@link #CONFORMANCE_GRAMMAR}, then makes
@@ -896,11 +895,11 @@ global options:
         if (parsed.action() == null) {
             throw conformanceActionError(); // the scanner refuses any action but run itself
         }
-        String engine = requireDir(parsed.value("--engine"), "engine", "the engine path", true);
-        String corpus = requireDir(parsed.value("--corpus"), "corpus", "the corpus directory", true);
+        String engine = requireDir(parsed.value("--engine"), "engine", "the engine path");
+        String corpus = requireDir(parsed.value("--corpus"), "corpus", "the corpus directory");
         String adapters = parsed.value("--adapters");
         if (adapters != null) {
-            requireDir(adapters, "adapters", "the adapters directory", true);
+            requireDir(adapters, "adapters", "the adapters directory");
         }
         String out = parsed.value("--out");
         refuseEmptyOut(out);
@@ -968,7 +967,7 @@ global options:
             result.usage = VALIDATE_USAGE;
             return result;
         }
-        String bundleDir = requireDir(parsed.value("--bundle"), "bundle", "the evidence bundle", true);
+        String bundleDir = requireDir(parsed.value("--bundle"), "bundle", "the evidence bundle");
         String out = parsed.value("--out");
         refuseEmptyOut(out);
         Bundle bundle = Bundle.load(Paths.get(bundleDir)); // raises InputError (exit 3) on a missing/mismatching manifest
@@ -1521,7 +1520,10 @@ global options:
             result.usage = ASSESS_USAGE;
             return result;
         }
-        String outArg = emptyToNull(parsed.value("--out"));
+        refuseEmptyOut(parsed.value("--out"));
+        refuseEmpty(parsed.value("--state"), "input.state_dir_unwritable", "--state",
+                "choose a writable --state directory.", "directory");
+        String outArg = parsed.value("--out");
         return runAssess(new AssessOptions(
                 parsed.value("--bundle"),
                 parsed.value("--profile"),
@@ -1629,8 +1631,8 @@ global options:
             result.usage = QUICKSTART_USAGE;
             return result;
         }
-        String outArg = emptyToNull(parsed.out());
-        String out = outArg != null ? outArg : DEFAULT_OUT_DIR;
+        refuseEmptyOut(parsed.out());
+        String out = parsed.out() != null ? parsed.out() : DEFAULT_OUT_DIR;
         Path quickstart = Bundled.quickstartDir();
         if (!Files.isDirectory(quickstart)) {
             throw new InputError(
@@ -1783,7 +1785,7 @@ global options:
                             "drop " + flag + ", or drop --validate to re-render with --from.");
                 }
             }
-            String reportDir = requireDir(validate, "validate", "the report directory", true);
+            String reportDir = requireDir(validate, "validate", "the report directory");
             List<String> problems = ReportValidate.validateReport(Paths.get(reportDir));
             result.data.put("report_dir", reportDir);
             result.data.put("valid", problems.isEmpty());
@@ -1800,6 +1802,8 @@ global options:
             }
             return result;
         }
+        refuseEmpty(parsed.value("--out"), "input.out_file_unwritable", "--out",
+                "pass --out <file> with a writable path.", "file");
         String source = requireFile(parsed.value("--from"), "from", "the assertions file");
         String format = Objects.requireNonNullElse(parsed.value("--format"), "md");
         String role = parsed.value("--role");
@@ -2057,9 +2061,9 @@ global options:
                 if ("--catalog-dir".equals(name)) {
                     catalogDirs.add(value);
                 } else if ("--gaps".equals(name)) {
-                    gaps = value.isEmpty() ? null : value;
+                    gaps = value;
                 } else {
-                    deviations = value.isEmpty() ? null : value;
+                    deviations = value;
                 }
                 continue;
             }
@@ -2299,7 +2303,7 @@ global options:
      * certificate). */
     private static Sign.Signer signSigner(String keyPath, String profile) {
         if ("kms".equals(profile)) {
-            if (keyPath == null || keyPath.isEmpty()) {
+            if (keyPath == null) {
                 throw new InputError(
                         "sign.kms_key_missing",
                         "the kms profile signs with an operator-held key.",

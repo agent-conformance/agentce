@@ -261,7 +261,7 @@ function requireDir(
   } catch {
     isDir = false;
   }
-  if (!isDir) {
+  if (raw === "" || !isDir) {
     throw new InputError(
       `input.${key}_not_a_directory`,
       `${what} ${pyRepr(raw)} is not an existing directory.`,
@@ -287,7 +287,7 @@ function requireFile(
   } catch {
     isFile = false;
   }
-  if (!isFile) {
+  if (raw === "" || !isFile) {
     throw new InputError(
       `input.${key}_not_a_file`,
       `${what} ${pyRepr(raw)} is not an existing file.`,
@@ -360,12 +360,14 @@ function effectiveTrustRoot(flagValue: string | undefined): TrustRoot {
 }
 
 /** The trust root the operator named (`--trust-root`, else `AGENTCE_TRUST_ROOT`), or null. Mirrors
- * `_explicit_trust_root`. */
+ * `_explicit_trust_root`: a given `--trust-root` is always checked, so an empty one is refused; an empty or blank
+ * variable is unset. */
 function explicitTrustRoot(flagValue: string | undefined): TrustRoot | null {
-  const raw = flagValue || process.env.AGENTCE_TRUST_ROOT;
-  if (raw === undefined || raw.trim() === "") {
+  const env = process.env.AGENTCE_TRUST_ROOT;
+  if (flagValue === undefined && (env === undefined || env.trim() === "")) {
     return null;
   }
+  const raw = flagValue ?? (env as string);
   const path = requireFile(raw, "trust_root", "the trust root", "pass --trust-root <file>.");
   try {
     return loadTrustRoot(path);
@@ -691,20 +693,35 @@ const CONFORMANCE_GRAMMAR: Grammar = utilityGrammar(
   },
 );
 
-/** Python's `commands._refuse_empty_out`: an empty --out names no directory, refused before anything
- * is written or run. */
-function refuseEmptyOut(out: string | undefined): void {
-  if (out === "") {
-    throw new InputError(
-      "input.out_dir_unwritable",
-      "--out '' names no directory.",
-      "choose a writable --out directory.",
-    );
+/** Python's `commands._refuse_empty`, the one empty-value rule for a path option the command reads
+ * with a default or writes to: an empty value names no path, so it is refused under the role's key
+ * before anything is read or written, never read as the working directory, the default, or no value.
+ * `requireDir` and `requireFile` apply the same rule to the paths they check. */
+function refuseEmpty(
+  raw: string | undefined,
+  key: string,
+  flag: string,
+  fix: string,
+  noun = "file",
+): void {
+  if (raw === "") {
+    throw new InputError(key, `${flag} '' names no ${noun}.`, fix);
   }
 }
 
+/** Python's `commands._refuse_empty_out`. */
+function refuseEmptyOut(out: string | undefined): void {
+  refuseEmpty(
+    out,
+    "input.out_dir_unwritable",
+    "--out",
+    "choose a writable --out directory.",
+    "directory",
+  );
+}
+
 /** `agentce conformance run`, read from its grammar's scan alone. An empty --engine, --corpus or
- * --adapters names no directory (Node's stat of `""` fails, as Python's `empty_is_no_dir` refuses). */
+ * --adapters names no directory (Node's stat of `""` fails, as Python's `_require_dir` refuses ''). */
 function cmdConformance(argv: string[]): CommandResult {
   const args = scanArgv(argv.slice(1), CONFORMANCE_GRAMMAR);
   const result = new CommandResult("conformance");
@@ -1406,6 +1423,14 @@ function cmdAssess(argv: string[]): CommandResult {
     return result;
   }
   const v = args.values;
+  refuseEmptyOut(v["--out"]);
+  refuseEmpty(
+    v["--state"],
+    "input.state_dir_unwritable",
+    "--state",
+    "choose a writable --state directory.",
+    "directory",
+  );
   return runAssess({
     folder: args.positionals[0],
     packageForSharing: args.flags.has("--package-for-sharing"),
@@ -1418,7 +1443,7 @@ function cmdAssess(argv: string[]): CommandResult {
     catalog: v["--catalog"],
     domain: v["--domain"],
     catalogDirs: [...(args.lists["--catalog-dir"] ?? [])],
-    out: emptyToUndefined(v["--out"]) ?? DEFAULT_OUT_DIR,
+    out: v["--out"] ?? DEFAULT_OUT_DIR,
     state: v["--state"],
     invocationCommand: "assess",
     trustRootFlag: v["--trust-root"],
@@ -1510,7 +1535,8 @@ function cmdQuickstart(argv: string[]): CommandResult {
     result.usage = QUICKSTART_USAGE;
     return result;
   }
-  const out = emptyToUndefined(args.out) ?? DEFAULT_OUT_DIR;
+  refuseEmptyOut(args.out);
+  const out = args.out ?? DEFAULT_OUT_DIR;
   const quickstart = quickstartDir();
   if (!statSync(quickstart, { throwIfNoEntry: false })?.isDirectory()) {
     throw new InputError(
@@ -1683,6 +1709,12 @@ function cmdReport(argv: string[]): CommandResult {
     }
     return result;
   }
+  refuseEmpty(
+    v["--out"],
+    "input.out_file_unwritable",
+    "--out",
+    "pass --out <file> with a writable path.",
+  );
   const source = requireFile(v["--from"], "from", "the assertions file");
   const format = v["--format"] || "md";
   for (const [flag, reads, add] of REPORT_FORMAT_ONLY) {
@@ -1959,7 +1991,7 @@ function parseReadinessArgv(argv: string[]): ReadinessArgs {
       if (name === "--catalog-dir") {
         parsed.catalogDirs.push(value);
       } else {
-        parsed[name === "--gaps" ? "gaps" : "deviations"] = value === "" ? undefined : value;
+        parsed[name === "--gaps" ? "gaps" : "deviations"] = value;
       }
       continue;
     }
@@ -2135,7 +2167,7 @@ function pyGetField(obj: unknown, key: string, defaultValue: unknown): unknown {
  * refuse offline (this port never obtains a Fulcio certificate). */
 function signSigner(keyPath: string | undefined, profile: string): Signer {
   if (profile === "kms") {
-    if (!keyPath) {
+    if (keyPath === undefined) {
       throw new InputError(
         "sign.kms_key_missing",
         "the kms profile signs with an operator-held key.",

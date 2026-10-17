@@ -116,6 +116,7 @@ _KINDS: dict[str, str] = {
     "catalog.init_family_invalid": "error",
     "catalog.init_family_collision": "error",
     "catalog.init_exists": "error",
+    "catalog.init_dir_unwritable": "error",
     "catalog.sign_not_a_catalog": "error",
     "catalog.sign_lint_failed": "error",
     "catalog.sign_key_missing": "error",
@@ -217,6 +218,9 @@ _KINDS: dict[str, str] = {
     "input.doctor_flag_unused": "error",
     "input.init_value_empty": "error",
     "input.write_errors_unwritable": "error",
+    "input.out_file_unwritable": "error",
+    "input.support_matrix_unwritable": "error",
+    "input.write_trust_root_unwritable": "error",
     # Warnings.
     "environment.cryptography_source_build": "warning",
     "warning.pilot_window": "warning",
