@@ -3053,7 +3053,7 @@
     },
     {
       "id": "VG-ROB02-UNTRUSTED",
-      "title": "ROB-02 checks what its title says in all three engines: a consequential decision fails when untrusted content reached it, by any number of hops through its inputs, the reads it consumed, tool calls, model calls, other decisions, its origin or the instruction it acts on; the memory guard's trust and verdicts, a write's untrusted provenance_origin_class and an instruction's source class mark what is untrusted; a decision whose used content the guard never ruled on (its own reads only self-reported, a record no ruled enforcement-point write and no enforcement-point read at trust_min trusted covers, a ref the bundle does not hold, a guard ruling held only under another subject, a ruled record rewritten by a write no guard ruled on under any subject, a record another subject's write marked untrusted whatever the subject's own guard says, a record another subject's unreadable MemoryWrite may have changed) reads insufficient_evidence, never a pass; and a declared evidence shape that cannot be resolved is refused (18.37b, 18.37k, 18.120, 18.172)",
+      "title": "ROB-02 checks what its title says in all three engines: a consequential decision fails when untrusted content reached it, by any number of hops through its inputs, the reads it consumed, tool calls, model calls, other decisions, its origin or the instruction it acts on; the memory guard's trust and verdicts, a write's untrusted provenance_origin_class and an instruction's source class mark what is untrusted; a decision whose used content the guard never ruled on (its own reads only self-reported, a record no ruled enforcement-point write and no enforcement-point read at trust_min trusted covers, a ref the bundle does not hold, a guard ruling held only under another subject, a ruled record rewritten by a write no guard ruled on under any subject, a record another subject's write marked untrusted whatever the subject's own guard says, a record another subject's unreadable MemoryWrite, a MemoryWrite of an unknown version under any subject, or a flagged write with no readable record_ref under any subject may have changed) reads insufficient_evidence, never a pass; and a declared evidence shape that cannot be resolved is refused (18.37b, 18.37k, 18.120, 18.172, 18.202)",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -3070,8 +3070,8 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/rob02_untrusted/cases.json (at least 75: clean memory; an input the guard wrote untrusted or quarantined; guard verdicts quarantine and block; sanitize is not untrusted; a consumed read with trust_min untrusted or quarantined, or of an untrusted record; acting on a tool_output or a user instruction; untrusted content the decision did not use; a minor decision tainted; two decisions, one tainted; a decision with no inputs; the untrusted write after the decision; a record written twice; memory reads only from self_report; no memory records; no decisions; inputs naming an untrusted read or write event or a model call that consumed an untrusted read; chains through another decision, a tool call's used[], two model calls, a model call's input_ref or output_ref and the decision's refs.origin, each with a trusted twin; a trusted write of a tainted record; an instruction derived from a tool_output instruction; acting on an instruction that declares no source_class; a decision whose own reads are only self-reported, an input record no enforcement-point read or write covers, and an input event the bundle does not hold, each beside an enforcement-point memory read elsewhere in the bundle; a guarded twin; a write whose only trust signal is an untrusted provenance_origin_class and its trusted twin; a tainted decision beside an unruled one; an enforcement-point read with no trust_min of a record the agent wrote; an untrusted write under another subject used as an input or through the deciding subject's own read with no trust_min; a record another subject's write marked untrusted read through the deciding subject's own read filtered at trust_min trusted, and its trusted twin; a record the guard wrote trusted then rewritten by a self-reported write, a self-reported trusted write or an enforcement-point write with no ruling, and the twin whose own read filtered by trust; the same rewrite by another subject, self-reported or by an enforcement point with no ruling, and its twin whose rewrite a guard ruled on) gives the expected ROB-02 outcome for the deciding subject, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined but the reasons a case names (another subject's unreadable write: its record_ref, its store, a record with no store, no store, an unreadable or unknown type, and the other-store and other-type twins; a read at trust_min untrusted or quarantined of an input record and its trusted twins); and assess in all three engines refuses, with catalog.evidence_shape.unresolved, a baseline copy whose ROB-02 evidence shape has no target, is declared empty or points outside the catalog folder, while a copy whose evidence shape is renamed still judges; Python's catalog lint refuses the targetless copy and a mistyped target class",
-        "fail": "any case gives another ROB-02 outcome, another set of failing events or another exit code in any engine, quarantines a record, or the case file has fewer than 75 cases, or an unresolvable evidence shape is not refused with its key"
+        "pass": "every case in verification/gates/fixtures/rob02_untrusted/cases.json (at least 93: clean memory; an input the guard wrote untrusted or quarantined; guard verdicts quarantine and block; sanitize is not untrusted; a consumed read with trust_min untrusted or quarantined, or of an untrusted record; acting on a tool_output or a user instruction; untrusted content the decision did not use; a minor decision tainted; two decisions, one tainted; a decision with no inputs; the untrusted write after the decision; a record written twice; memory reads only from self_report; no memory records; no decisions; inputs naming an untrusted read or write event or a model call that consumed an untrusted read; chains through another decision, a tool call's used[], two model calls, a model call's input_ref or output_ref and the decision's refs.origin, each with a trusted twin; a trusted write of a tainted record; an instruction derived from a tool_output instruction; acting on an instruction that declares no source_class; a decision whose own reads are only self-reported, an input record no enforcement-point read or write covers, and an input event the bundle does not hold, each beside an enforcement-point memory read elsewhere in the bundle; a guarded twin; a write whose only trust signal is an untrusted provenance_origin_class and its trusted twin; a tainted decision beside an unruled one; an enforcement-point read with no trust_min of a record the agent wrote; an untrusted write under another subject used as an input or through the deciding subject's own read with no trust_min; a record another subject's write marked untrusted read through the deciding subject's own read filtered at trust_min trusted, and its trusted twin; a record the guard wrote trusted then rewritten by a self-reported write, a self-reported trusted write or an enforcement-point write with no ruling, and the twin whose own read filtered by trust; the same rewrite by another subject, self-reported or by an enforcement point with no ruling, and its twin whose rewrite a guard ruled on; a MemoryWrite of an unknown version under another subject or the subject itself, an unknown envelope whose data names MemoryWrite, and an envelope naming MemoryWrite.v2 over MemoryRead data; a flagged write, own or another subject's, untrusted, blocked or self-reported, whose record_ref is absent, null or empty; with the other-store, MemoryRead.v2 and other-record twins) gives the expected ROB-02 outcome for the deciding subject, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined but the reasons a case names (another subject's unreadable write: its record_ref, its store, a record with no store, no store, an unreadable or unknown type, and the other-store and other-type twins; a read at trust_min untrusted or quarantined of an input record and its trusted twins); and assess in all three engines refuses, with catalog.evidence_shape.unresolved, a baseline copy whose ROB-02 evidence shape has no target, is declared empty or points outside the catalog folder, while a copy whose evidence shape is renamed still judges; Python's catalog lint refuses the targetless copy and a mistyped target class",
+        "fail": "any case gives another ROB-02 outcome, another set of failing events or another exit code in any engine, quarantines a record, or the case file has fewer than 93 cases, or an unresolvable evidence shape is not refused with its key"
       },
       "faults": [
         {
@@ -3199,6 +3199,96 @@
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "if (write.store() == null || named.isEmpty() || named.contains(write.store())) {",
           "replace": "if (write.store() == null || named.contains(write.store())) {"
+        },
+        {
+          "description": "Python quarantines a MemoryWrite of an unknown version (MemoryWrite.v2) as unknown_type without withholding it as unreadable, so another subject's or the subject's own rewrite reads conformant (18.202)",
+          "file": "engines/python/agentce/ingest.py",
+          "search": "                    if _names_memory_write(event)",
+          "replace": "                    if _names_memory_write(event) and False"
+        },
+        {
+          "description": "TypeScript quarantines a MemoryWrite of an unknown version (MemoryWrite.v2) as unknown_type without withholding it as unreadable (18.202)",
+          "file": "engines/typescript/src/ingest.ts",
+          "search": "records.push(namesMemoryWrite(event) ? unreadable(unknown, event) : unknown);",
+          "replace": "records.push(unknown);"
+        },
+        {
+          "description": "Java quarantines a MemoryWrite of an unknown version (MemoryWrite.v2) as unknown_type without withholding it as unreadable (18.202)",
+          "file": "engines/java/src/main/java/org/agentce/Ingest.java",
+          "search": "records.add(namesMemoryWrite(event) ? unreadable(unknown, event) : unknown);",
+          "replace": "records.add(unknown);"
+        },
+        {
+          "description": "Python names MemoryWrite only by the envelope type, so an unknown envelope whose data @type is MemoryWrite is no write (18.202 critic r1 F2)",
+          "file": "engines/python/agentce/ingest.py",
+          "search": "    ) or (isinstance(data, dict) and data.get(\"@type\") == \"MemoryWrite\")",
+          "replace": "    )"
+        },
+        {
+          "description": "TypeScript names MemoryWrite only by the envelope type, so an unknown envelope whose data @type is MemoryWrite is no write (18.202 critic r1 F2)",
+          "file": "engines/typescript/src/ingest.ts",
+          "search": "    (isRecord(event.data) && event.data[\"@type\"] === \"MemoryWrite\")",
+          "replace": "    false"
+        },
+        {
+          "description": "Java names MemoryWrite only by the envelope type, so an unknown envelope whose data @type is MemoryWrite is no write (18.202 critic r1 F2)",
+          "file": "engines/java/src/main/java/org/agentce/Ingest.java",
+          "search": "                || (data != null && data.isObject() && \"MemoryWrite\".equals(opt(data, \"@type\")));",
+          "replace": "                || false;"
+        },
+        {
+          "description": "Python drops a flagged write with no readable record_ref (absent, null or empty), so it taints no record (18.202)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "        if _text(data.get(\"record_ref\")) is None",
+          "replace": "        if False"
+        },
+        {
+          "description": "TypeScript drops a flagged write with no readable record_ref (absent, null or empty), so it taints no record (18.202)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "    if (text(data.record_ref) === null) {",
+          "replace": "    if (false) {"
+        },
+        {
+          "description": "Java drops a flagged write with no readable record_ref (absent, null or empty), so it taints no record (18.202)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "            if (text(write.data().get(\"record_ref\")) == null) {",
+          "replace": "            if (false) {"
+        },
+        {
+          "description": "Python counts a flagged write with no readable record_ref only for other subjects, so the subject's own such write reads conformant (18.202 critic r1 F1)",
+          "file": "engines/python/agentce/assess.py",
+          "search": "                *unkeyed,",
+          "replace": "                *unkeyed_flags(e for e in flag_sources if e.get(\"subject\") != subject.id),"
+        },
+        {
+          "description": "TypeScript counts a flagged write with no readable record_ref only for other subjects, so the subject's own such write reads conformant (18.202 critic r1 F1)",
+          "file": "engines/typescript/src/assess.ts",
+          "search": "        ...unkeyed,",
+          "replace": "        ...unkeyedFlags(flagSources.filter((e) => e.subject !== subject.id)),"
+        },
+        {
+          "description": "Java counts a flagged write with no readable record_ref only for other subjects, so the subject's own such write reads conformant (18.202 critic r1 F1)",
+          "file": "engines/java/src/main/java/org/agentce/Assess.java",
+          "search": "            foreignUnreadable.addAll(unkeyed);",
+          "replace": "            foreignUnreadable.addAll(Graph.unkeyedFlags(flagSources.stream().filter(e -> !subject.id.equals(Graph.str(e.get(\"subject\")))).toList()));"
+        },
+        {
+          "description": "Python reads an unreadable write's empty record_ref as a record named \"\", so the record the decision used reads conformant (18.202)",
+          "file": "engines/python/agentce/ingest.py",
+          "search": "    return UnreadableWrite(_text(data.get(\"record_ref\")), _text(data.get(\"store\")))",
+          "replace": "    return UnreadableWrite(data.get(\"record_ref\") if isinstance(data.get(\"record_ref\"), str) else None, _text(data.get(\"store\")))"
+        },
+        {
+          "description": "TypeScript reads an unreadable write's empty record_ref as a record named \"\" (18.202)",
+          "file": "engines/typescript/src/ingest.ts",
+          "search": "    write: { recordRef: text(data.record_ref), store: text(data.store) },",
+          "replace": "    write: { recordRef: typeof data.record_ref === \"string\" ? data.record_ref : null, store: text(data.store) },"
+        },
+        {
+          "description": "Java reads an unreadable write's empty record_ref as a record named \"\" (18.202)",
+          "file": "engines/java/src/main/java/org/agentce/Ingest.java",
+          "search": "        return new UnreadableWrite(Graph.text(data.get(\"record_ref\")), Graph.text(data.get(\"store\")));",
+          "replace": "        return new UnreadableWrite(Graph.str(data.get(\"record_ref\")), Graph.text(data.get(\"store\")));"
         }
       ],
       "fix_hint": "Run verification/gates/rob02_untrusted.sh; it names the engine, the case, the ROB-02 outcome and failing events it gave and the ones expected. The rules are each engine's two closures (tainted, and not ruled on) in robustToUntrusted in its graph builder (the CONTENT_IN, CONTENT_OUT and REFS_IN tables), and the records another subject flagged, which assess passes to each subject's graph (flagged_records)."

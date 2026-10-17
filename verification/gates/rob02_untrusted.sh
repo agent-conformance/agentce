@@ -177,8 +177,8 @@ for engine in python typescript java; do
 done
 
 count="$(ls -d "$work"/*/ | wc -l | tr -d ' ')"
-if [ "$count" -lt 75 ]; then
-  echo "rob02-untrusted: only $count cases in cases.json, expected at least 75" >&2
+if [ "$count" -lt 93 ]; then
+  echo "rob02-untrusted: only $count cases in cases.json, expected at least 93" >&2
   status=1
 fi
 [ "$status" -eq 0 ] && echo "rob02-untrusted: $count cases, three engines agree with the expected ROB-02 outcome"
