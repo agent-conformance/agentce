@@ -17,6 +17,10 @@ member its exporter writes, which holds the record's own hash and the hash of th
 same stream. The engine counts an independent-system record at its class only on a stream whose chain
 verifies. Without the member, `INC-02` reads insufficient evidence rather than conformant (SPEC §8.1).
 
+An incident register is not an independent count of the agent's calls, so these subjects' coverage is
+unknown. Their INT and REC checks read insufficient evidence and every `assess` run below exits 2
+(SPEC §6.5). Drift is still tracked for each check, and `INC-02` is the one these examples follow.
+
 ## Re-running over an unchanged bundle is a no-op
 
 The state directory (`--state`) remembers each `(subject, control)` pair's most recently recorded
@@ -46,8 +50,9 @@ subjects:
         source: "urn:example:incidents"
         class: "independent_system"
 EOF
-uv run --project engines/python agentce assess --bundle rc --profile rc/profile.yaml --catalog "eu-ai-act@2026.09" --catalog-dir spec/catalogs/base/eu-ai-act --out rc/out-1 --state rc/state --json | python3 -c "import json,sys; print(json.load(sys.stdin)['exit_code'])"
-uv run --project engines/python agentce assess --bundle rc --profile rc/profile.yaml --catalog "eu-ai-act@2026.09" --catalog-dir spec/catalogs/base/eu-ai-act --out rc/out-2 --state rc/state --json > /dev/null
+uv run --project engines/python agentce assess --bundle rc --profile rc/profile.yaml --catalog "eu-ai-act@2026.09" --catalog-dir spec/catalogs/base/eu-ai-act --out rc/out-1 --state rc/state --json > rc/out-1.json || true
+python3 -c "import json,sys; print(json.load(open('rc/out-1.json'))['exit_code'])"
+uv run --project engines/python agentce assess --bundle rc --profile rc/profile.yaml --catalog "eu-ai-act@2026.09" --catalog-dir spec/catalogs/base/eu-ai-act --out rc/out-2 --state rc/state --json > /dev/null || true
 test ! -f rc/out-2/runtime_drift.jsonl && echo "no drift on the identical re-run"
 ```
 
@@ -79,7 +84,7 @@ subjects:
         source: "urn:example:incidents"
         class: "independent_system"
 EOF
-uv run --project engines/python agentce assess --bundle rc0 --profile rc0/profile.yaml --catalog "eu-ai-act@2026.09" --catalog-dir spec/catalogs/base/eu-ai-act --out rc0/out --state rc0/state --json > /dev/null
+uv run --project engines/python agentce assess --bundle rc0 --profile rc0/profile.yaml --catalog "eu-ai-act@2026.09" --catalog-dir spec/catalogs/base/eu-ai-act --out rc0/out --state rc0/state --json > /dev/null || true
 test ! -f rc0/out/runtime_drift.jsonl && echo "no drift on a state directory's first tracked run"
 ```
 
@@ -117,7 +122,7 @@ subjects:
         source: "urn:example:incidents"
         class: "independent_system"
 EOF
-uv run --project engines/python agentce assess --bundle rc2 --profile rc2/profile.yaml --catalog "eu-ai-act@2026.09" --catalog-dir spec/catalogs/base/eu-ai-act --out rc2/out-1 --state rc2/state --json > /dev/null
+uv run --project engines/python agentce assess --bundle rc2 --profile rc2/profile.yaml --catalog "eu-ai-act@2026.09" --catalog-dir spec/catalogs/base/eu-ai-act --out rc2/out-1 --state rc2/state --json > /dev/null || true
 
 cat >> rc2/events/incidents.jsonl <<'EOF'
 {"specversion":"1.0","id":"inc2","source":"urn:example:incidents","type":"org.agent-conformance.evidence.Incident.v1","time":"2026-05-02T09:05:00Z","subject":"spiffe://example/agents/a","datacontenttype":"application/ld+json","agentcesourceclass":"independent_system","data":{"@context":"https://agent-conformance.org/contexts/evidence/v1","@type":"Incident","detected_at":"2026-05-02T09:05:00Z","reported_at":"2026-05-02T09:05:00Z","integrity":{"stream":"urn:example:incidents","strength":"export_chained","prev":"49c190a47f041498ea688dd5d586694eddc28a5947ba9fd77daa6bf128dd69eb","hash":"3ec4bcaa02a13b0d58331409625469618f886cb5f95ad94798129caa502ebc58"}}}
@@ -126,7 +131,7 @@ DIGEST2=$(shasum -a 256 rc2/events/incidents.jsonl | cut -d' ' -f1)
 cat > rc2/manifest.json <<EOF
 {"agentce_bundle_version": 1, "domain": "runtime-conformance-example", "sources": [{"id": "urn:example:incidents", "class": "independent_system"}], "files": [{"path": "events/incidents.jsonl", "sha256": "$DIGEST2"}]}
 EOF
-uv run --project engines/python agentce assess --bundle rc2 --profile rc2/profile.yaml --catalog "eu-ai-act@2026.09" --catalog-dir spec/catalogs/base/eu-ai-act --out rc2/out-2 --state rc2/state --json > /dev/null || true # exit 1: the run now has a non-conformant finding
+uv run --project engines/python agentce assess --bundle rc2 --profile rc2/profile.yaml --catalog "eu-ai-act@2026.09" --catalog-dir spec/catalogs/base/eu-ai-act --out rc2/out-2 --state rc2/state --json > /dev/null || true # exit 2: INC-02 now reads non-conformant, and INT and REC still read insufficient evidence
 
 cat rc2/out-2/runtime_drift.jsonl
 python3 -c "import json; s = json.load(open('rc2/state/state.json')); print('remembered:', s['last_outcomes']['spiffe://example/agents/a|INC-02'])"
@@ -170,7 +175,7 @@ subjects:
         source: "urn:example:incidents"
         class: "independent_system"
 EOF
-uv run --project engines/python agentce assess --bundle rc3 --profile rc3/profile.yaml --catalog "eu-ai-act@2026.09" --catalog-dir spec/catalogs/base/eu-ai-act --out rc3/out-1 --state rc3/state --json > /dev/null
+uv run --project engines/python agentce assess --bundle rc3 --profile rc3/profile.yaml --catalog "eu-ai-act@2026.09" --catalog-dir spec/catalogs/base/eu-ai-act --out rc3/out-1 --state rc3/state --json > /dev/null || true
 
 cat >> rc3/events/incidents.jsonl <<'EOF'
 {"specversion":"1.0","id":"inc-a2","source":"urn:example:incidents","type":"org.agent-conformance.evidence.Incident.v1","time":"2026-05-02T09:05:00Z","subject":"spiffe://example/agents/a","datacontenttype":"application/ld+json","agentcesourceclass":"independent_system","data":{"@context":"https://agent-conformance.org/contexts/evidence/v1","@type":"Incident","detected_at":"2026-05-02T09:05:00Z","reported_at":"2026-05-02T09:05:00Z","integrity":{"stream":"urn:example:incidents","strength":"export_chained","prev":"6bdf0fdc375a6d59023eef282859560fcd606fc4e2353358565a91f4b17197a5","hash":"7afaad868f69f6e9e9deb253d70695eee9a716dccbb0ccfc01177bcd1befe6c4"}}}
@@ -179,7 +184,7 @@ DIGEST2=$(shasum -a 256 rc3/events/incidents.jsonl | cut -d' ' -f1)
 cat > rc3/manifest.json <<EOF
 {"agentce_bundle_version": 1, "domain": "runtime-conformance-example", "sources": [{"id": "urn:example:incidents", "class": "independent_system"}], "files": [{"path": "events/incidents.jsonl", "sha256": "$DIGEST2"}]}
 EOF
-uv run --project engines/python agentce assess --bundle rc3 --profile rc3/profile.yaml --catalog "eu-ai-act@2026.09" --catalog-dir spec/catalogs/base/eu-ai-act --out rc3/out-2 --state rc3/state --json > /dev/null || true # exit 1: agent a now has a non-conformant finding
+uv run --project engines/python agentce assess --bundle rc3 --profile rc3/profile.yaml --catalog "eu-ai-act@2026.09" --catalog-dir spec/catalogs/base/eu-ai-act --out rc3/out-2 --state rc3/state --json > /dev/null || true # exit 2: agent a's INC-02 now reads non-conformant, and INT and REC still read insufficient evidence
 python3 -c "import json; d = [json.loads(l) for l in open('rc3/out-2/runtime_drift.jsonl')]; print([e['subject'] for e in d])"
 ```
 
