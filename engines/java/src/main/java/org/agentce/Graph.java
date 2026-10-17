@@ -1154,11 +1154,7 @@ public final class Graph {
             return new Chain(met, judged, terminus);
         }
 
-        /** {met, judged}: whether the chain's last principal holds a role every scope of the action's task authorises
-         * (SPEC §7.7.4 "for the task type", §7.7.6 {@code authorised_principal_roles}); the Python engine's
-         * {@code _role_authorised} documents the reading. Below enforcement_point the role is the agent's word, so
-         * each enforcement-point witness of the same principal must record the same role ({@link #witnessRoles}). */
-        /** CND-06's population and judgment (SPEC §7.7.4; rulings 16 A, 17 B, 18 B), as graph.py
+/** CND-06's population and judgment (SPEC §7.7.4; rulings 16 A, 17 B, 18 B), as graph.py
          * {@code _conduct_refusals}: an Instruction needs a Refusal when its source_class is absent, not a string or
          * untrusted; one declaring an authorised class is in scope, unjudged, when the records do not show it (no
          * principal id where §6.2.3 requires one, or not attested for every held call or Decision acting on it, or for
@@ -1253,6 +1249,10 @@ public final class Graph {
             return isOneOf(event.get("agentcesourceclass"), AT_OR_ABOVE_EP) ? "" : null;
         }
 
+        /** {met, judged}: whether the chain's last principal holds a role every scope of the action's task authorises
+         * (SPEC §7.7.4 "for the task type", §7.7.6 {@code authorised_principal_roles}); the Python engine's
+         * {@code _role_authorised} documents the reading. Below enforcement_point the role is the agent's word, so
+         * each enforcement-point witness of the same principal must record the same role ({@link #witnessRoles}). */
         private boolean[] roleAuthorised(
                 Map<String, JsonNode> byIri, String node, JsonNode event, List<JsonNode> calls, JsonNode terminus) {
             Set<String> tasks = actionTasks(event);

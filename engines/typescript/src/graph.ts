@@ -1107,12 +1107,6 @@ class Builder {
     return [met, judged, terminus];
   }
 
-  /** [met, judged]: whether the chain's last principal holds a role every scope of the action's task authorises
-   * (SPEC §7.7.4 "for the task type", §7.7.6 `authorised_principal_roles`). A Decision naming no task takes the
-   * tasks of the calls executing it. No scope, a scope that declares no roles, or a principal with no role cannot
-   * be judged (fail closed, HR-5); a role outside a declared list does not meet the control. Below
-   * enforcement_point the role is the agent's word, so each enforcement-point witness of the same principal must
-   * record the same role (`witnessRoles`; inbox row 358). */
   /**
    * CND-06's population and judgment (SPEC §7.7.4; rulings 16 A, 17 B, 18 B), as graph.py `_conduct_refusals`: an
    * Instruction needs a Refusal when its source_class is absent, not a string or untrusted; one declaring an authorised
@@ -1127,7 +1121,9 @@ class Builder {
     for (const [node, event] of byIri) {
       const instruction = refsOf(event).instruction;
       if (["ToolCall", "Decision"].includes(this.ptype(event)) && typeof instruction === "string") {
-        acting.set(instruction, [...(acting.get(instruction) ?? []), node]);
+        const list = acting.get(instruction) ?? [];
+        list.push(node);
+        acting.set(instruction, list);
       }
     }
     let judge: SourceClassJudge | null = null;
@@ -1191,6 +1187,12 @@ class Builder {
     return isOneOf(event.agentcesourceclass, AT_OR_ABOVE_EP) ? "" : null;
   }
 
+  /** [met, judged]: whether the chain's last principal holds a role every scope of the action's task authorises
+   * (SPEC §7.7.4 "for the task type", §7.7.6 `authorised_principal_roles`). A Decision naming no task takes the
+   * tasks of the calls executing it. No scope, a scope that declares no roles, or a principal with no role cannot
+   * be judged (fail closed, HR-5); a role outside a declared list does not meet the control. Below
+   * enforcement_point the role is the agent's word, so each enforcement-point witness of the same principal must
+   * record the same role (`witnessRoles`; inbox row 358). */
   private roleAuthorised(
     byIri: Map<string, Event>,
     node: string,

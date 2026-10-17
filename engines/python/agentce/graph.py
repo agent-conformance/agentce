@@ -1085,7 +1085,7 @@ class _Builder:
                 if judge is None:
                     judge = SourceClassJudge(self.store, by_iri)
                 shown = (
-                    source_class not in _AUTHORISED_INSTRUCTION
+                    not _is_one_of(source_class, _AUTHORISED_INSTRUCTION)
                     or _principal_key(data.get("principal")) != ""
                 ) and all(
                     judge.attested(focus, node) for focus in acting.get(node, [node])
