@@ -41,6 +41,8 @@ public final class Ingest {
     private record Candidate(JsonNode event, JsonNode rawEvent, String source, String typeValue, int rank) {}
     private static final Pattern TYPE_RE =
             Pattern.compile("^org\\.agent-conformance\\.evidence\\.(?<name>[A-Za-z0-9]+)\\.v1$");
+    /** The envelope type of a MemoryWrite at any version, known or not (SPEC §7.4, 18.202). */
+    private static final String MEMORY_WRITE_TYPE = "org.agent-conformance.evidence.MemoryWrite.";
 
     public static final class Result {
         /** What assessment, activity, and graph building read: an undeclared source's event carries
@@ -60,7 +62,8 @@ public final class Ingest {
      * identical redelivery, class_mismatch, unknown_source); it is null when ingest could not read it at all
      * (schema_invalid, oversize). {@code subject} is the record's own subject, null when unknown (then the
      * record may belong to any subject). An unknown_type record is not withheld: the engine reads nothing from
-     * a type it does not model.
+     * a type it does not model, unless its type names MemoryWrite, which is withheld as unreadable (SPEC §7.4,
+     * 18.202).
      */
     public record Withheld(
             Quarantine.Record record, JsonNode event, String subject, String digest, UnreadableWrite write) {
@@ -71,7 +74,7 @@ public final class Ingest {
 
     /**
      * What ingest can still see of an unreadable record that may be a MemoryWrite (SPEC §7.4, 18.172): its raw
-     * {@code data.record_ref} and {@code data.store} when each is a string, else null. {@link Withheld#write} is set
+     * {@code data.record_ref} and {@code data.store} when each is a non-empty string, else null (18.202). {@link Withheld#write} is set
      * on an unreadable record whose raw type names MemoryWrite, or whose type cannot be read at all.
      */
     public record UnreadableWrite(String recordRef, String store) {}
@@ -109,21 +112,29 @@ public final class Ingest {
                 event != null ? unreadableWrite(event) : null);
     }
 
+    /** Whether {@code event}'s envelope type names MemoryWrite at any version, or its {@code data.@type} is
+     * MemoryWrite. */
+    private static boolean namesMemoryWrite(JsonNode event) {
+        String type = opt(event, "type");
+        JsonNode data = event.get("data");
+        return (type != null && type.startsWith(MEMORY_WRITE_TYPE))
+                || (data != null && data.isObject() && "MemoryWrite".equals(opt(data, "@type")));
+    }
+
     /** The raw MemoryWrite facts of an unreadable {@code event}: a MemoryWrite unless its envelope or data names
      * another known type, so a record whose type cannot be read, or names a type the engine does not know, counts as
-     * one (fail closed, 18.172). */
+     * one (fail closed, 18.172). An empty record_ref or store is one that cannot be read (18.202). */
     private static UnreadableWrite unreadableWrite(JsonNode event) {
         String type = opt(event, "type");
         String name = type != null ? typeNameOf(type) : null;
         JsonNode raw = event.get("data");
         JsonNode data = raw != null && raw.isObject() ? raw : Json.nodes().objectNode();
         String declared = opt(data, "@type");
-        if (!"MemoryWrite".equals(name)
-                && !"MemoryWrite".equals(declared)
+        if (!namesMemoryWrite(event)
                 && (Schema.eventTypes().contains(name) || Schema.eventTypes().contains(declared))) {
             return null;
         }
-        return new UnreadableWrite(opt(data, "record_ref"), opt(data, "store"));
+        return new UnreadableWrite(Graph.text(data.get("record_ref")), Graph.text(data.get("store")));
     }
 
     private static String typeNameOf(String typeValue) {
@@ -235,11 +246,13 @@ public final class Ingest {
                 String typeValue = event.get("type").asText();
                 String name = typeNameOf(typeValue);
                 if (name == null || !validTypes.contains(name)) {
-                    records.add(new Quarantine.Record(Quarantine.Reason.UNKNOWN_TYPE)
+                    Quarantine.Record unknown = new Quarantine.Record(Quarantine.Reason.UNKNOWN_TYPE)
                             .eventId(event.get("id").asText())
                             .source(event.get("source").asText())
                             .type(typeValue)
-                            .detail("unrecognised event type '" + typeValue + "'"));
+                            .detail("unrecognised event type '" + typeValue + "'");
+                    // A MemoryWrite at a version the engine does not know may still have changed a record (18.202).
+                    records.add(namesMemoryWrite(event) ? unreadable(unknown, event) : unknown);
                     continue;
                 }
 

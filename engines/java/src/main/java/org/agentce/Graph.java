@@ -152,22 +152,46 @@ public final class Graph {
         return new Builder(new GraphStore(), domain, Iri.ZERO_KEY, foreignUntrusted, foreignUnreadable).build(events);
     }
 
-    /** Each record a MemoryWrite in {@code events} marks untrusted or writes with no guard ruling (anything but an
-     * enforcement-point write with a trust or a verdict), with the subjects whose records hold such a write. A
-     * subject's graph reads a record another subject flagged or rewrote unruled as one its guard never ruled on
-     * (18.120). */
-    public static Map<String, Set<String>> flaggedRecords(Iterable<JsonNode> events) {
-        Map<String, Set<String>> flagged = new LinkedHashMap<>();
+    /** A MemoryWrite that marks its record untrusted or writes with no guard ruling (anything but an
+     * enforcement-point write with a trust or a verdict), with its subject and data. */
+    private record FlaggedWrite(String subject, JsonNode data) {}
+
+    private static List<FlaggedWrite> flaggedWrites(Iterable<JsonNode> events) {
+        List<FlaggedWrite> writes = new ArrayList<>();
         for (JsonNode event : events) {
             JsonNode data = dataOf(event);
-            String record = str(data.get("record_ref"));
-            if ("MemoryWrite".equals(str(data.get("@type"))) && record != null
-                    && (flagsUntrusted(data) || !ruledWrite(event, data))) {
-                flagged.computeIfAbsent(record, r -> new LinkedHashSet<>())
-                        .add(Objects.toString(str(event.get("subject")), ""));
+            if ("MemoryWrite".equals(str(data.get("@type"))) && (flagsUntrusted(data) || !ruledWrite(event, data))) {
+                writes.add(new FlaggedWrite(Objects.toString(str(event.get("subject")), ""), data));
+            }
+        }
+        return writes;
+    }
+
+    /** Each record a MemoryWrite in {@code events} marks untrusted or writes with no guard ruling, with the subjects
+     * whose records hold such a write. A subject's graph reads a record another subject flagged or rewrote unruled as
+     * one its guard never ruled on (18.120). */
+    public static Map<String, Set<String>> flaggedRecords(Iterable<JsonNode> events) {
+        Map<String, Set<String>> flagged = new LinkedHashMap<>();
+        for (FlaggedWrite write : flaggedWrites(events)) {
+            String record = text(write.data().get("record_ref"));
+            if (record != null) {
+                flagged.computeIfAbsent(record, r -> new LinkedHashSet<>()).add(write.subject());
             }
         }
         return flagged;
+    }
+
+    /** Each such write whose {@code record_ref} cannot be read (absent, null or empty), under any subject, as its
+     * store: it counts against every record of its store, or every record, as an unreadable write does (SPEC §7.4,
+     * 18.202). */
+    public static List<Ingest.UnreadableWrite> unkeyedFlags(Iterable<JsonNode> events) {
+        List<Ingest.UnreadableWrite> unkeyed = new ArrayList<>();
+        for (FlaggedWrite write : flaggedWrites(events)) {
+            if (text(write.data().get("record_ref")) == null) {
+                unkeyed.add(new Ingest.UnreadableWrite(null, text(write.data().get("store"))));
+            }
+        }
+        return unkeyed;
     }
 
     // --- helpers ---

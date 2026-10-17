@@ -525,7 +525,9 @@ public final class Assess {
             Integrity.Caps integrity) {
         List<Assertions.Assertion> assertions = new ArrayList<>();
         Map<String, List<JsonNode>> eventsBySubject = indexBySubject(accepted);
-        // A record another subject's write marked untrusted, held or withheld, is never ruled on for this one (18.120).
+        // A record another subject's write marked untrusted, held or withheld, is never ruled on for this one (18.120);
+        // such a write with no readable record_ref, under any subject, counts against its store's records, as an
+        // unreadable write does (18.202).
         List<JsonNode> flagSources = new ArrayList<>(accepted);
         for (Ingest.Withheld w : withheld) {
             if (w.event() != null) {
@@ -533,6 +535,7 @@ public final class Assess {
             }
         }
         Map<String, Set<String>> flagged = Graph.flaggedRecords(flagSources);
+        List<Ingest.UnreadableWrite> unkeyed = Graph.unkeyedFlags(flagSources);
         for (Profile.Subject subject : profile.subjects) {
             List<JsonNode> subjectEvents = eventsBySubject.getOrDefault(subject.id, java.util.List.of());
             Set<String> foreignUntrusted = new LinkedHashSet<>();
@@ -547,6 +550,7 @@ public final class Assess {
                     foreignUnreadable.add(w.write());
                 }
             }
+            foreignUnreadable.addAll(unkeyed);
             Foreign foreign = new Foreign(foreignUntrusted, foreignUnreadable);
             GraphStore store = foreign.graph(subjectEvents, domain);
             Map<String, JsonNode> eventsByIri = eventsByIriOf(subjectEvents);
