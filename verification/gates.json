@@ -3844,9 +3844,27 @@
           "file": "engines/java/src/main/java/org/agentce/Coverage.java",
           "search": "                for (String t : e.getValue().keySet()) {\n                    yardstick.add(",
           "replace": "                for (String t : (e.getKey().manifest == null || e.getKey().manifest.isEmpty()) ? e.getValue().keySet() : java.util.Set.<String>of()) {\n                    yardstick.add("
+        },
+        {
+          "description": "Python keeps a denominator's counts for event types it does not cover, so a self-counting denominator hides its source's other types from the observed count",
+          "file": "engines/python/agentce/coverage.py",
+          "search": "                (d, {t: counts[t] for t in covered if t in counts})\n",
+          "replace": "                (d, counts)\n"
+        },
+        {
+          "description": "TypeScript keeps a denominator's counts for event types it does not cover, so a self-counting denominator hides its source's other types from the observed count",
+          "file": "engines/typescript/src/coverage.ts",
+          "search": "      return [d, kept] as const;\n",
+          "replace": "      return [d, counts] as const;\n"
+        },
+        {
+          "description": "Java keeps a denominator's counts for event types it does not cover, so a self-counting denominator hides its source's other types from the observed count",
+          "file": "engines/java/src/main/java/org/agentce/Coverage.java",
+          "search": "                countsByDenominator.add(Map.entry(d, kept));\n",
+          "replace": "                countsByDenominator.add(Map.entry(d, counts));\n"
         }
       ],
-      "fix_hint": "Run verification/gates/coverage_unknown.sh; it names the engine, the case, what it gave and what was expected. The rule is the coverage post-pass in each engine's assess (assess.py _coverage_unknown, _uncovered and COVERAGE_FAMILIES; coverageUnknown and uncovered in assess.ts and Assess.java) over compute_coverage's per-subject coverage_status; what counts as an independent denominator, and which events leave the observed count, are coverage.py _independent and the yardstick set in compute_coverage (a denominator's own records of each type it counts) and their ports in coverage.ts and Coverage.java."
+      "fix_hint": "Run verification/gates/coverage_unknown.sh; it names the engine, the case, what it gave and what was expected. The rule is the coverage post-pass in each engine's assess (assess.py _coverage_unknown, _uncovered and COVERAGE_FAMILIES; coverageUnknown and uncovered in assess.ts and Assess.java) over compute_coverage's per-subject coverage_status; what counts as an independent denominator, and which events leave the observed count, are coverage.py _independent and the yardstick set in compute_coverage (a denominator's own records of each type it covers and counts) and their ports in coverage.ts and Coverage.java."
     },
     {
       "id": "VG-CND04-PROVENANCE",

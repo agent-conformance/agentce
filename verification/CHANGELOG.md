@@ -13,9 +13,10 @@ fails if a gate in `gates.json` is not named in this file.
   counts only when it is independent: never one of the subject's own evidence sources, never an admission
   attestation no engine can verify, and never a manifest the bundle manifest does not list. `agentce readiness`
   prints NOT READY and names the unknown coverage. A denominator's own records are left out of the agent's captured
-  count only for the types that denominator counts, so a firewall whose listed manifest counts three calls while the
-  gateway recorded one reads as a gap, never as covered. The gate runs 31 cases through the three real CLIs, with
-  five seeded faults in each engine.
+  count only for the types that denominator covers and counts, so a firewall whose listed manifest counts three calls
+  while the gateway recorded one reads as a gap, never as covered, and an egress log that covers only tool calls never
+  hides its own session records. The gate runs 32 cases through the three real CLIs, with six seeded faults in each
+  engine.
 - `VG-TRUST-MATRIX` (18.134, changed). The cells fx-INT-01-en-coverage-unknown and fx-INT-04-en-coverage-unknown leave
   the open list: they now read insufficient_evidence in all three engines.
 - `VG-QUICK-PATH` (18.134, changed). Step 2's derived profile names no independent denominator, so the INT and REC

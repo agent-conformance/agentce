@@ -878,6 +878,99 @@
         "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
       }
     },
+    "denominator-hides-only-covered-types": {
+      "events": "passed",
+      "extra_events": [
+        {
+          "agentcesourceclass": "independent_system",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/a"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "write"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "fw-call",
+          "source": "urn:src:fw",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/a",
+          "time": "2026-01-02T00:00:09Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        },
+        {
+          "agentcesourceclass": "independent_system",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "spiffe://corp/agents/a"
+            },
+            "refs": {}
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "fw1",
+          "source": "urn:src:fw",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/a",
+          "time": "2026-01-02T00:00:09Z",
+          "type": "org.agent-conformance.evidence.SessionStart.v1"
+        }
+      ],
+      "denominators": [
+        {
+          "kind": "system_of_record_export",
+          "source": "urn:src:sor",
+          "covers": [
+            "Decision",
+            "DelegationIssued",
+            "ToolCall"
+          ],
+          "manifest": "reference/counts.json"
+        },
+        {
+          "kind": "egress_proxy_log",
+          "source": "urn:src:fw",
+          "covers": [
+            "ToolCall"
+          ]
+        }
+      ],
+      "files": [
+        {
+          "path": "reference/counts.json",
+          "content": {
+            "counts": {
+              "Decision": 1,
+              "DelegationIssued": 1,
+              "ToolCall": 1
+            }
+          }
+        }
+      ],
+      "why": "a self-counting egress log covering only ToolCall never hides its source's other types: its own SessionStart stays observed with nothing counting it",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "INT-01": "insufficient_evidence",
+          "REC-04": "insufficient_evidence",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    },
     "denominator-manifest-unlisted": {
       "events": "passed",
       "denominators": [
