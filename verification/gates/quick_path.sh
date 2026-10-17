@@ -69,19 +69,35 @@ assert_only_outcome "$work/step1" insufficient_evidence "step 1"
 
 # Step 2: the very same derived evidence, reduced to a formal --bundle/--profile assessment -- every
 # control the records give no population for flips to not_applicable (the bundle side of the
-# divergence this gate exists to prove). DOC-01 is the one exception: the records hold a ToolCall,
+# divergence this gate exists to prove). DOC-01 is one exception: the records hold a ToolCall,
 # which is DOC-01's population, and no BundleLoaded manifest declaring it, so DOC-01 reads
-# insufficient_evidence and, being severity high, the run exits 2.
+# insufficient_evidence and, being severity high, the run exits 2. The INT and REC controls are the
+# other: a derived profile names no independent denominator, so the subject's coverage is unknown and
+# each reads insufficient_evidence, listed under blind-spots.json's coverage_unknown (SPEC §6.5; 18.134).
 run_step "step 2 (--bundle/--profile on the same evidence)" 2 "$work/step2.json" "$work/step2.err" \
   assess --bundle "$work/step1/records-bundle" --profile "$work/step1/applicability.yaml" \
   --out "$work/step2" --json
-outcomes="$(python3 -c "
+if ! problem="$(python3 - "$work/step2" <<'PY'
 import json
-data = json.load(open('$work/step2/assertions.json'))
-print(sorted({(a['outcome'] if a['control'] == 'DOC-01' else 'other:' + a['outcome']) for a in data}))
-")"
-if [ "$outcomes" != "['insufficient_evidence', 'other:not_applicable']" ]; then
-  fail "step 2: expected DOC-01 insufficient_evidence and every other control not_applicable, got $outcomes"
+import sys
+from pathlib import Path
+
+out = Path(sys.argv[1])
+data = json.loads((out / "assertions.json").read_text(encoding="utf-8"))
+flagged = {r["control"] for r in json.loads((out / "blind-spots.json").read_text(encoding="utf-8"))["coverage_unknown"]}
+coverage = {a["control"] for a in data if a["control"].startswith(("INT-", "REC-")) and a["outcome"] != "not_applicable"}
+other = sorted({a["outcome"] for a in data if a["control"] != "DOC-01" and a["control"] not in coverage})
+doc01 = [a["outcome"] for a in data if a["control"] == "DOC-01"]
+if doc01 != ["insufficient_evidence"] or other != ["not_applicable"]:
+    print(f"expected DOC-01 insufficient_evidence and every non-INT/REC control not_applicable, got DOC-01 {doc01}, others {other}")
+elif not coverage or {a["outcome"] for a in data if a["control"] in coverage} != {"insufficient_evidence"} or flagged != coverage:
+    print(f"expected the INT/REC controls insufficient_evidence and each listed under coverage_unknown, got {sorted(coverage)} vs {sorted(flagged)}")
+else:
+    sys.exit(0)
+sys.exit(1)
+PY
+)"; then
+  fail "step 2: $problem"
 fi
 
 # Step 3: the same records folder against the gate-only QP-UNLOCK catalog -- a self-reported

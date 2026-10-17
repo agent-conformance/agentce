@@ -21,6 +21,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from agentce.bundle import load_bundle
 from agentce.ingest import ingest
 from agentce.integrity import GENESIS_PREV, recompute_hash
@@ -86,3 +88,34 @@ def chain_streams(events: list[Any], manifest: dict[str, Any]) -> tuple[list[Any
         for s, h in sorted(heads.items())
     ]
     return out, streams
+
+
+def coverage_counts(events: list[Any], subjects: list[str]) -> dict[str, str]:
+    """A reconciling system-of-record denominator manifest per profile subject (SPEC §6.5; 18.134).
+
+    Returns {bundle path: file body}: ``reference/coverage-counts-<i>.json`` for the i-th subject, counting that
+    subject's records per data.@type as compute_coverage names them. A fixture whose profile names these manifests
+    under a system_of_record_export denominator reads its coverage reconciled, so its INT and REC checks keep their
+    verdicts. Every record the case writes is counted, so a quarantined one leaves a coverage gap, never unknown.
+    """
+    files = {}
+    for i, subject in enumerate(subjects):
+        counts: Counter[str] = Counter()
+        for event in events:
+            if isinstance(event, dict) and event.get("subject") == subject:
+                data = event.get("data")
+                typ = data.get("@type") if isinstance(data, dict) else None
+                counts[typ if isinstance(typ, str) else "Unknown"] += 1
+        body = json.dumps({"counts": dict(sorted(counts.items()))}, sort_keys=True, indent=2) + "\n"
+        files[f"reference/coverage-counts-{i}.json"] = body
+    return files
+
+
+def add_coverage_counts(bundle: Path, events: list[Any], profile: Path, manifest: dict[str, Any]) -> None:
+    """Write coverage_counts' files for ``profile``'s subjects, in profile order, into ``bundle`` and list each, with
+    its sha256, in ``manifest``."""
+    subjects = [str(s["id"]) for s in yaml.safe_load(profile.read_text(encoding="utf-8"))["subjects"]]
+    for rel, body in coverage_counts(events, subjects).items():
+        (bundle / rel).parent.mkdir(parents=True, exist_ok=True)
+        (bundle / rel).write_text(body, encoding="utf-8")
+        manifest["files"].append({"path": rel, "sha256": hashlib.sha256(body.encode("utf-8")).hexdigest()})

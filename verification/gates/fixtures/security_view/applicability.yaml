@@ -18,5 +18,17 @@ content_capture:
 catalogs: []
 subjects:
   - id: "spiffe://corp/agents/security-view-fixture"
+    coverage_denominators:
+      - kind: "system_of_record_export"
+        source: "urn:agentce:source:system-of-record-export:corp"
+        covers:
+          - "AuthzCheck"
+          - "BundleLoaded"
+          - "Decision"
+          - "MemoryRead"
+          - "MemoryWrite"
+          - "ModelCall"
+          - "ToolCall"
+        manifest: "reference/coverage-counts.json"
     name: "Security view gate fixture subject"
     role: "both"

@@ -73,8 +73,6 @@ OPEN_PINNED: frozenset[str] = frozenset(
     {
         "fx-DOC-03-en-pass-uea",
         "fx-DOC-03-en-pass-uep",
-        "fx-INT-01-en-coverage-unknown",
-        "fx-INT-04-en-coverage-unknown",
         "fx-ROB-05-en-pass-uea",
         "fx-ROB-05-en-pass-uep",
         "fx-ROB-06-en-pass-uea",

@@ -1,0 +1,11 @@
+{
+  "counts": {
+    "AuthzCheck": 1,
+    "BundleLoaded": 1,
+    "Decision": 1,
+    "MemoryRead": 1,
+    "MemoryWrite": 1,
+    "ModelCall": 1,
+    "ToolCall": 1
+  }
+}

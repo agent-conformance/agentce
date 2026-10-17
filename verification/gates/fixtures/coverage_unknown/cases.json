@@ -1,0 +1,1567 @@
+{
+  "_description": "VG-COVERAGE-UNKNOWN cases (18.134), written by the item's make_cases.py: SPEC \u00a76.5 unknown coverage reads INT and REC insufficient_evidence; readiness never prints READY while it is unknown.",
+  "subject": "spiffe://corp/agents/a",
+  "event_sets": {
+    "passed": [
+      {
+        "agentcesourceclass": "enforcement_point",
+        "data": {
+          "@context": "https://agent-conformance.org/contexts/evidence/v1",
+          "@type": "DelegationIssued",
+          "token_ref": "jti-1",
+          "issuer": "https://idp.example",
+          "chain": [
+            {
+              "id": "spiffe://corp/humans/alice",
+              "kind": "human"
+            },
+            {
+              "id": "spiffe://corp/agents/a",
+              "kind": "agent"
+            }
+          ],
+          "subject_principal": "spiffe://corp/humans/alice",
+          "actor_principal": "spiffe://corp/agents/a",
+          "scope_granted": [
+            "credit:write"
+          ],
+          "scope_parent": [
+            "credit:write"
+          ],
+          "expires": "2026-02-01T00:00:00Z",
+          "verification": {
+            "status": "verified",
+            "method": "rfc8693"
+          }
+        },
+        "id": "dl1",
+        "source": "urn:src:policy",
+        "subject": "spiffe://corp/agents/a",
+        "time": "2026-01-01T00:00:00Z",
+        "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+      },
+      {
+        "agentcesourceclass": "self_report",
+        "data": {
+          "@context": "https://agent-conformance.org/contexts/evidence/v1",
+          "@type": "Decision",
+          "agent": {
+            "id": "spiffe://corp/agents/a"
+          },
+          "decision_type": "dom:Credit",
+          "oversight_modality": "review_before",
+          "acted_for": [
+            "spiffe://corp/humans/alice"
+          ]
+        },
+        "id": "d1",
+        "source": "urn:src:agent",
+        "subject": "spiffe://corp/agents/a",
+        "time": "2026-01-01T00:00:01Z",
+        "type": "org.agent-conformance.evidence.Decision.v1"
+      },
+      {
+        "agentcesourceclass": "enforcement_point",
+        "data": {
+          "@context": "https://agent-conformance.org/contexts/evidence/v1",
+          "@type": "ToolCall",
+          "agent": {
+            "id": "spiffe://corp/agents/a"
+          },
+          "tool": {
+            "name": "lookup",
+            "protocol": "native"
+          },
+          "effect_class": "write",
+          "acted_for": [
+            "spiffe://corp/humans/alice"
+          ],
+          "refs": {
+            "decision": "agentce:event/d1",
+            "delegation": "agentce:event/dl1"
+          }
+        },
+        "id": "tc1",
+        "source": "urn:src:gw",
+        "subject": "spiffe://corp/agents/a",
+        "time": "2026-01-01T00:00:02Z",
+        "type": "org.agent-conformance.evidence.ToolCall.v1"
+      }
+    ],
+    "failed": [
+      {
+        "agentcesourceclass": "enforcement_point",
+        "data": {
+          "@context": "https://agent-conformance.org/contexts/evidence/v1",
+          "@type": "DelegationIssued",
+          "token_ref": "jti-1",
+          "issuer": "https://idp.example",
+          "chain": [
+            {
+              "id": "spiffe://corp/humans/alice",
+              "kind": "human"
+            },
+            {
+              "id": "spiffe://corp/agents/a",
+              "kind": "agent"
+            }
+          ],
+          "subject_principal": "spiffe://corp/humans/alice",
+          "actor_principal": "spiffe://corp/agents/a",
+          "scope_granted": [
+            "credit:write"
+          ],
+          "scope_parent": [
+            "credit:write"
+          ],
+          "expires": "2026-02-01T00:00:00Z",
+          "verification": {
+            "status": "verified",
+            "method": "rfc8693"
+          }
+        },
+        "id": "dl1",
+        "source": "urn:src:policy",
+        "subject": "spiffe://corp/agents/a",
+        "time": "2026-01-01T00:00:00Z",
+        "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+      },
+      {
+        "agentcesourceclass": "self_report",
+        "data": {
+          "@context": "https://agent-conformance.org/contexts/evidence/v1",
+          "@type": "Decision",
+          "agent": {
+            "id": "spiffe://corp/agents/a"
+          },
+          "decision_type": "dom:Credit",
+          "oversight_modality": "review_before",
+          "acted_for": [
+            "spiffe://corp/humans/alice"
+          ]
+        },
+        "id": "d1",
+        "source": "urn:src:agent",
+        "subject": "spiffe://corp/agents/a",
+        "time": "2026-01-01T00:00:01Z",
+        "type": "org.agent-conformance.evidence.Decision.v1"
+      },
+      {
+        "agentcesourceclass": "self_report",
+        "data": {
+          "@context": "https://agent-conformance.org/contexts/evidence/v1",
+          "@type": "ToolCall",
+          "agent": {
+            "id": "spiffe://corp/agents/a"
+          },
+          "tool": {
+            "name": "lookup",
+            "protocol": "native"
+          },
+          "effect_class": "write",
+          "acted_for": [
+            "spiffe://corp/humans/alice"
+          ],
+          "refs": {
+            "decision": "agentce:event/d1",
+            "delegation": "agentce:event/dl1"
+          }
+        },
+        "id": "tc1",
+        "source": "urn:src:agent",
+        "subject": "spiffe://corp/agents/a",
+        "time": "2026-01-01T00:00:02Z",
+        "type": "org.agent-conformance.evidence.ToolCall.v1"
+      }
+    ],
+    "inapplicable": [
+      {
+        "agentcesourceclass": "enforcement_point",
+        "data": {
+          "@context": "https://agent-conformance.org/contexts/evidence/v1",
+          "@type": "DelegationIssued",
+          "token_ref": "jti-1",
+          "issuer": "https://idp.example",
+          "chain": [
+            {
+              "id": "spiffe://corp/humans/alice",
+              "kind": "human"
+            },
+            {
+              "id": "spiffe://corp/agents/a",
+              "kind": "agent"
+            }
+          ],
+          "subject_principal": "spiffe://corp/humans/alice",
+          "actor_principal": "spiffe://corp/agents/a",
+          "scope_granted": [
+            "credit:write"
+          ],
+          "scope_parent": [
+            "credit:write"
+          ],
+          "expires": "2026-02-01T00:00:00Z",
+          "verification": {
+            "status": "verified",
+            "method": "rfc8693"
+          }
+        },
+        "id": "dl1",
+        "source": "urn:src:policy",
+        "subject": "spiffe://corp/agents/a",
+        "time": "2026-01-01T00:00:00Z",
+        "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+      },
+      {
+        "agentcesourceclass": "self_report",
+        "data": {
+          "@context": "https://agent-conformance.org/contexts/evidence/v1",
+          "@type": "Decision",
+          "agent": {
+            "id": "spiffe://corp/agents/a"
+          },
+          "decision_type": "dom:Minor",
+          "oversight_modality": "review_before",
+          "acted_for": [
+            "spiffe://corp/humans/alice"
+          ]
+        },
+        "id": "d1",
+        "source": "urn:src:agent",
+        "subject": "spiffe://corp/agents/a",
+        "time": "2026-01-01T00:00:01Z",
+        "type": "org.agent-conformance.evidence.Decision.v1"
+      },
+      {
+        "agentcesourceclass": "enforcement_point",
+        "data": {
+          "@context": "https://agent-conformance.org/contexts/evidence/v1",
+          "@type": "ToolCall",
+          "agent": {
+            "id": "spiffe://corp/agents/a"
+          },
+          "tool": {
+            "name": "lookup",
+            "protocol": "native"
+          },
+          "effect_class": "write",
+          "acted_for": [
+            "spiffe://corp/humans/alice"
+          ],
+          "refs": {
+            "decision": "agentce:event/d1",
+            "delegation": "agentce:event/dl1"
+          }
+        },
+        "id": "tc1",
+        "source": "urn:src:gw",
+        "subject": "spiffe://corp/agents/a",
+        "time": "2026-01-01T00:00:02Z",
+        "type": "org.agent-conformance.evidence.ToolCall.v1"
+      }
+    ]
+  },
+  "sources": [
+    {
+      "id": "urn:src:agent",
+      "class": "self_report"
+    },
+    {
+      "id": "urn:src:gw",
+      "class": "enforcement_point"
+    },
+    {
+      "id": "urn:src:policy",
+      "class": "enforcement_point"
+    },
+    {
+      "id": "urn:src:sor",
+      "class": "independent_system"
+    },
+    {
+      "id": "urn:src:fw",
+      "class": "independent_system"
+    }
+  ],
+  "evidence_sources": [
+    {
+      "adapter": "cloudevents",
+      "source": "urn:src:agent",
+      "class": "self_report"
+    },
+    {
+      "adapter": "cloudevents",
+      "source": "urn:src:gw",
+      "class": "enforcement_point"
+    },
+    {
+      "adapter": "cloudevents",
+      "source": "urn:src:policy",
+      "class": "enforcement_point"
+    }
+  ],
+  "cases": {
+    "int-unknown-coverage": {
+      "events": "passed",
+      "why": "no denominator: coverage unknown, INT reads insufficient_evidence, exit 2",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "INT-01": "insufficient_evidence",
+          "REC-04": "insufficient_evidence",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    },
+    "rec-unknown-coverage": {
+      "events": "passed",
+      "why": "no denominator: REC reads insufficient_evidence",
+      "expected": {
+        "control": "REC-04",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "INT-01": "insufficient_evidence",
+          "REC-04": "insufficient_evidence",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    },
+    "ovs-unknown-coverage-unchanged": {
+      "events": "passed",
+      "why": "another family keeps its verdict under unknown coverage",
+      "expected": {
+        "control": "OVS-03",
+        "outcome": "conformant",
+        "outcomes": {
+          "INT-01": "insufficient_evidence",
+          "REC-04": "insufficient_evidence",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    },
+    "int-reconciled-denominator": {
+      "events": "passed",
+      "denominators": [
+        {
+          "kind": "system_of_record_export",
+          "source": "urn:src:sor",
+          "covers": [
+            "Decision",
+            "DelegationIssued",
+            "ToolCall"
+          ],
+          "manifest": "reference/counts.json"
+        }
+      ],
+      "files": [
+        {
+          "path": "reference/counts.json",
+          "content": {
+            "counts": {
+              "Decision": 1,
+              "DelegationIssued": 1,
+              "ToolCall": 1
+            }
+          }
+        }
+      ],
+      "why": "a listed system-of-record manifest reconciles every type",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "conformant",
+        "outcomes": {
+          "INT-01": "conformant",
+          "REC-04": "conformant",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": "none",
+        "readiness": "NOT READY",
+        "no_reason": "coverage unknown"
+      }
+    },
+    "rec-reconciled-denominator": {
+      "events": "passed",
+      "denominators": [
+        {
+          "kind": "system_of_record_export",
+          "source": "urn:src:sor",
+          "covers": [
+            "Decision",
+            "DelegationIssued",
+            "ToolCall"
+          ],
+          "manifest": "reference/counts.json"
+        }
+      ],
+      "files": [
+        {
+          "path": "reference/counts.json",
+          "content": {
+            "counts": {
+              "Decision": 1,
+              "DelegationIssued": 1,
+              "ToolCall": 1
+            }
+          }
+        }
+      ],
+      "why": "REC keeps its verdict when coverage reconciles",
+      "expected": {
+        "control": "REC-04",
+        "outcome": "conformant",
+        "outcomes": {
+          "INT-01": "conformant",
+          "REC-04": "conformant",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": "none",
+        "readiness": "NOT READY",
+        "no_reason": "coverage unknown"
+      }
+    },
+    "int-unknown-coverage-non-conformant": {
+      "events": "failed",
+      "why": "a recorded violation stays non-conformant whatever the coverage",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "non-conformant",
+        "outcomes": {
+          "INT-01": "non-conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": [],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    },
+    "int-partial-denominator": {
+      "events": "passed",
+      "denominators": [
+        {
+          "kind": "system_of_record_export",
+          "source": "urn:src:sor",
+          "covers": [
+            "ToolCall"
+          ],
+          "manifest": "reference/counts.json"
+        }
+      ],
+      "files": [
+        {
+          "path": "reference/counts.json",
+          "content": {
+            "counts": {
+              "ToolCall": 1
+            }
+          }
+        }
+      ],
+      "why": "a denominator covering only ToolCall leaves the subject unknown",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "INT-01": "insufficient_evidence",
+          "REC-04": "insufficient_evidence",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    },
+    "kind-provider-usage-export": {
+      "events": "passed",
+      "denominators": [
+        {
+          "kind": "provider_usage_export",
+          "source": "urn:src:sor",
+          "covers": [
+            "Decision",
+            "DelegationIssued",
+            "ToolCall"
+          ],
+          "manifest": "reference/counts.json"
+        }
+      ],
+      "files": [
+        {
+          "path": "reference/counts.json",
+          "content": {
+            "counts": {
+              "Decision": 1,
+              "DelegationIssued": 1,
+              "ToolCall": 1
+            }
+          }
+        }
+      ],
+      "why": "provider usage export with a listed manifest reconciles",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "conformant",
+        "outcomes": {
+          "INT-01": "conformant",
+          "REC-04": "conformant",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": "none",
+        "readiness": "NOT READY",
+        "no_reason": "coverage unknown"
+      }
+    },
+    "kind-firewall-log": {
+      "events": "passed",
+      "denominators": [
+        {
+          "kind": "firewall_log",
+          "source": "urn:src:sor",
+          "covers": [
+            "Decision",
+            "DelegationIssued",
+            "ToolCall"
+          ],
+          "manifest": "reference/counts.json"
+        }
+      ],
+      "files": [
+        {
+          "path": "reference/counts.json",
+          "content": {
+            "counts": {
+              "Decision": 1,
+              "DelegationIssued": 1,
+              "ToolCall": 1
+            }
+          }
+        }
+      ],
+      "why": "firewall log with a listed manifest reconciles",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "conformant",
+        "outcomes": {
+          "INT-01": "conformant",
+          "REC-04": "conformant",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": "none",
+        "readiness": "NOT READY",
+        "no_reason": "coverage unknown"
+      }
+    },
+    "kind-admission-attestation-statement": {
+      "events": "passed",
+      "denominators": [
+        {
+          "kind": "admission_attestation",
+          "source": "urn:src:sor",
+          "covers": [
+            "Decision",
+            "DelegationIssued",
+            "ToolCall"
+          ],
+          "statement": "no other egress path exists"
+        }
+      ],
+      "why": "an admission attestation no engine verifies reconciles nothing",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "INT-01": "insufficient_evidence",
+          "REC-04": "insufficient_evidence",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    },
+    "kind-admission-attestation-manifest": {
+      "events": "passed",
+      "denominators": [
+        {
+          "kind": "admission_attestation",
+          "source": "urn:src:sor",
+          "covers": [
+            "Decision",
+            "DelegationIssued",
+            "ToolCall"
+          ],
+          "manifest": "reference/counts.json"
+        }
+      ],
+      "files": [
+        {
+          "path": "reference/counts.json",
+          "content": {
+            "counts": {
+              "Decision": 1,
+              "DelegationIssued": 1,
+              "ToolCall": 1
+            }
+          }
+        }
+      ],
+      "why": "an attestation reconciles nothing even with a manifest",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "INT-01": "insufficient_evidence",
+          "REC-04": "insufficient_evidence",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    },
+    "denominator-is-the-agent": {
+      "events": "passed",
+      "denominators": [
+        {
+          "kind": "system_of_record_export",
+          "source": "urn:src:agent",
+          "covers": [
+            "Decision",
+            "DelegationIssued",
+            "ToolCall"
+          ],
+          "manifest": "reference/counts.json"
+        }
+      ],
+      "files": [
+        {
+          "path": "reference/counts.json",
+          "content": {
+            "counts": {
+              "Decision": 1,
+              "DelegationIssued": 1,
+              "ToolCall": 1
+            }
+          }
+        }
+      ],
+      "why": "the subject's own self_report runtime is not independent",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "INT-01": "insufficient_evidence",
+          "REC-04": "insufficient_evidence",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    },
+    "denominator-is-the-gateway": {
+      "events": "passed",
+      "denominators": [
+        {
+          "kind": "system_of_record_export",
+          "source": "urn:src:gw",
+          "covers": [
+            "Decision",
+            "DelegationIssued",
+            "ToolCall"
+          ],
+          "manifest": "reference/counts.json"
+        }
+      ],
+      "files": [
+        {
+          "path": "reference/counts.json",
+          "content": {
+            "counts": {
+              "Decision": 1,
+              "DelegationIssued": 1,
+              "ToolCall": 1
+            }
+          }
+        }
+      ],
+      "why": "the subject's own enforcement point is not independent",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "INT-01": "insufficient_evidence",
+          "REC-04": "insufficient_evidence",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    },
+    "denominator-is-the-agent-empty-manifest": {
+      "events": "passed",
+      "denominators": [
+        {
+          "kind": "system_of_record_export",
+          "source": "urn:src:sor",
+          "covers": [
+            "DelegationIssued",
+            "ToolCall"
+          ],
+          "manifest": "reference/counts.json"
+        },
+        {
+          "kind": "system_of_record_export",
+          "source": "urn:src:agent",
+          "covers": [
+            "Decision"
+          ],
+          "manifest": "reference/empty.json"
+        }
+      ],
+      "files": [
+        {
+          "path": "reference/counts.json",
+          "content": {
+            "counts": {
+              "DelegationIssued": 1,
+              "ToolCall": 1
+            }
+          }
+        },
+        {
+          "path": "reference/empty.json",
+          "content": {
+            "counts": {}
+          }
+        }
+      ],
+      "why": "a non-independent denominator never hides the agent's own events from observed: Decision, which only the agent records, stays observed with nothing counting it",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "INT-01": "insufficient_evidence",
+          "REC-04": "insufficient_evidence",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    },
+    "denominator-undeclared-source-empty-manifest": {
+      "events": "passed",
+      "extra_events": [
+        {
+          "agentcesourceclass": "independent_system",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "spiffe://corp/agents/a"
+            },
+            "refs": {}
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "fw1",
+          "source": "urn:src:fw",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/a",
+          "time": "2026-01-02T00:00:09Z",
+          "type": "org.agent-conformance.evidence.SessionStart.v1"
+        }
+      ],
+      "denominators": [
+        {
+          "kind": "system_of_record_export",
+          "source": "urn:src:sor",
+          "covers": [
+            "Decision",
+            "DelegationIssued",
+            "ToolCall"
+          ],
+          "manifest": "reference/counts.json"
+        },
+        {
+          "kind": "firewall_log",
+          "source": "urn:src:fw",
+          "covers": [
+            "SessionStart"
+          ],
+          "manifest": "reference/empty.json"
+        }
+      ],
+      "files": [
+        {
+          "path": "reference/counts.json",
+          "content": {
+            "counts": {
+              "Decision": 1,
+              "DelegationIssued": 1,
+              "ToolCall": 1
+            }
+          }
+        },
+        {
+          "path": "reference/empty.json",
+          "content": {
+            "counts": {}
+          }
+        }
+      ],
+      "why": "a manifest-bearing denominator never hides its source's events from observed: the firewall's own SessionStart stays observed with nothing counting it",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "INT-01": "insufficient_evidence",
+          "REC-04": "insufficient_evidence",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    },
+    "denominator-manifest-unlisted": {
+      "events": "passed",
+      "denominators": [
+        {
+          "kind": "system_of_record_export",
+          "source": "urn:src:sor",
+          "covers": [
+            "Decision",
+            "DelegationIssued",
+            "ToolCall"
+          ],
+          "manifest": "reference/counts.json"
+        }
+      ],
+      "files": [
+        {
+          "path": "reference/counts.json",
+          "content": {
+            "counts": {
+              "Decision": 1,
+              "DelegationIssued": 1,
+              "ToolCall": 1
+            }
+          },
+          "listed": false
+        }
+      ],
+      "why": "a manifest the bundle manifest does not list is not read",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "INT-01": "insufficient_evidence",
+          "REC-04": "insufficient_evidence",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    },
+    "denominator-manifest-digest-mismatch": {
+      "events": "passed",
+      "denominators": [
+        {
+          "kind": "system_of_record_export",
+          "source": "urn:src:sor",
+          "covers": [
+            "Decision",
+            "DelegationIssued",
+            "ToolCall"
+          ],
+          "manifest": "reference/counts.json"
+        }
+      ],
+      "files": [
+        {
+          "path": "reference/counts.json",
+          "content": {
+            "counts": {
+              "Decision": 1,
+              "DelegationIssued": 1,
+              "ToolCall": 1
+            }
+          },
+          "tamper": true
+        }
+      ],
+      "expected": {
+        "exit": 3,
+        "refusal": "input.bundle_manifest_mismatch"
+      },
+      "why": "a listed manifest whose bytes do not match its sha256 is refused"
+    },
+    "int-denominator-manifest-missing": {
+      "events": "passed",
+      "denominators": [
+        {
+          "kind": "system_of_record_export",
+          "source": "urn:src:sor",
+          "covers": [
+            "Decision",
+            "DelegationIssued",
+            "ToolCall"
+          ],
+          "manifest": "reference/absent.json"
+        }
+      ],
+      "why": "a manifest path naming no file counts nothing",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "INT-01": "insufficient_evidence",
+          "REC-04": "insufficient_evidence",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    },
+    "denominator-manifest-not-object": {
+      "events": "passed",
+      "denominators": [
+        {
+          "kind": "system_of_record_export",
+          "source": "urn:src:sor",
+          "covers": [
+            "Decision",
+            "DelegationIssued",
+            "ToolCall"
+          ],
+          "manifest": "reference/counts.json"
+        }
+      ],
+      "files": [
+        {
+          "path": "reference/counts.json",
+          "content": [
+            1,
+            2
+          ]
+        }
+      ],
+      "why": "a manifest whose root is not an object declares no counts",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "INT-01": "insufficient_evidence",
+          "REC-04": "insufficient_evidence",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    },
+    "denominator-manifest-escapes": {
+      "events": "passed",
+      "denominators": [
+        {
+          "kind": "system_of_record_export",
+          "source": "urn:src:sor",
+          "covers": [
+            "Decision",
+            "DelegationIssued",
+            "ToolCall"
+          ],
+          "manifest": "../counts.json"
+        }
+      ],
+      "why": "a manifest path escaping the bundle is confined and counts nothing",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "INT-01": "insufficient_evidence",
+          "REC-04": "insufficient_evidence",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    },
+    "int-reconciled-by-source-events": {
+      "events": "passed",
+      "extra_events": [
+        {
+          "agentcesourceclass": "independent_system",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/a"
+            },
+            "refs": {}
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "sor-Decision",
+          "source": "urn:src:sor",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/a",
+          "time": "2026-01-02T00:00:09Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "independent_system",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "agent": {
+              "id": "spiffe://corp/agents/a"
+            },
+            "refs": {}
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "sor-DelegationIssued",
+          "source": "urn:src:sor",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/a",
+          "time": "2026-01-02T00:00:09Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "independent_system",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/a"
+            },
+            "refs": {}
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "sor-ToolCall",
+          "source": "urn:src:sor",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/a",
+          "time": "2026-01-02T00:00:09Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ],
+      "denominators": [
+        {
+          "kind": "system_of_record_export",
+          "source": "urn:src:sor",
+          "covers": [
+            "Decision",
+            "DelegationIssued",
+            "ToolCall"
+          ]
+        }
+      ],
+      "why": "the denominator source's own events count when it has no manifest",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "conformant",
+        "outcomes": {
+          "INT-01": "conformant",
+          "REC-04": "conformant",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": "none",
+        "readiness": "NOT READY",
+        "no_reason": "coverage unknown"
+      }
+    },
+    "two-subjects-one-unknown": {
+      "events": "passed",
+      "subjects": [
+        "spiffe://corp/agents/a",
+        "spiffe://corp/agents/b"
+      ],
+      "denominators_by_subject": {
+        "spiffe://corp/agents/b": [
+          {
+            "kind": "system_of_record_export",
+            "source": "urn:src:sor",
+            "covers": [
+              "Decision",
+              "DelegationIssued",
+              "ToolCall"
+            ],
+            "manifest": "reference/counts.json"
+          }
+        ]
+      },
+      "files": [
+        {
+          "path": "reference/counts.json",
+          "content": {
+            "counts": {
+              "Decision": 1,
+              "DelegationIssued": 1,
+              "ToolCall": 1
+            }
+          }
+        }
+      ],
+      "why": "each subject reads on its own coverage",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "spiffe://corp/agents/a INT-01": "insufficient_evidence",
+          "spiffe://corp/agents/b INT-01": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    },
+    "records-mode-unknown": {
+      "mode": "records",
+      "records": "adapters/otel-genai/fixtures/otel-genai-agent-session/input.json",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "REC-04": "insufficient_evidence"
+        },
+        "exit": 0,
+        "coverage_unknown": [],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/credit-underwriter: no independent denominator",
+        "by_engine": {
+          "java": {
+            "exit": 3,
+            "refusal": "input.records_unsupported"
+          }
+        }
+      },
+      "why": "records mode derives a profile with no denominator: readiness names the unknown coverage (Java reads no folder of trace exports and refuses it)"
+    },
+    "int-coverage-gap": {
+      "events": "passed",
+      "extra_events": [
+        {
+          "agentcesourceclass": "independent_system",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/a"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "write"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "fw-0",
+          "source": "urn:src:fw",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/a",
+          "time": "2026-01-02T00:00:09Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        },
+        {
+          "agentcesourceclass": "independent_system",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/a"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "write"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "fw-1",
+          "source": "urn:src:fw",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/a",
+          "time": "2026-01-02T00:00:09Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        },
+        {
+          "agentcesourceclass": "independent_system",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/a"
+            },
+            "tool": {
+              "name": "lookup",
+              "protocol": "native"
+            },
+            "effect_class": "write"
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "fw-2",
+          "source": "urn:src:fw",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/a",
+          "time": "2026-01-02T00:00:09Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ],
+      "denominators": [
+        {
+          "kind": "system_of_record_export",
+          "source": "urn:src:sor",
+          "covers": [
+            "Decision",
+            "DelegationIssued",
+            "ToolCall"
+          ],
+          "manifest": "reference/counts.json"
+        },
+        {
+          "kind": "firewall_log",
+          "source": "urn:src:fw",
+          "covers": [
+            "ToolCall"
+          ]
+        }
+      ],
+      "files": [
+        {
+          "path": "reference/counts.json",
+          "content": {
+            "counts": {
+              "Decision": 1,
+              "DelegationIssued": 1,
+              "ToolCall": 1
+            }
+          }
+        }
+      ],
+      "why": "a firewall ledger counting more calls than the records hold is a gap, not unknown: verdicts stand and readiness names the shortfall",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "conformant",
+        "outcomes": {
+          "INT-01": "conformant",
+          "REC-04": "conformant",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": "none",
+        "readiness": "NOT READY",
+        "no_reason": "coverage unknown",
+        "reason": "coverage shortfall for subject spiffe://corp/agents/a"
+      }
+    },
+    "int-unknown-not-applicable": {
+      "events": "inapplicable",
+      "why": "INT-01 with no consequential decision is not_applicable, which unknown coverage lowers",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "INT-01": "insufficient_evidence",
+          "REC-04": "insufficient_evidence"
+        },
+        "exit": 2,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    },
+    "int-reconciled-not-applicable": {
+      "events": "inapplicable",
+      "denominators": [
+        {
+          "kind": "system_of_record_export",
+          "source": "urn:src:sor",
+          "covers": [
+            "Decision",
+            "DelegationIssued",
+            "ToolCall"
+          ],
+          "manifest": "reference/counts.json"
+        }
+      ],
+      "files": [
+        {
+          "path": "reference/counts.json",
+          "content": {
+            "counts": {
+              "Decision": 1,
+              "DelegationIssued": 1,
+              "ToolCall": 1
+            }
+          }
+        }
+      ],
+      "why": "the same not_applicable stands when coverage reconciles",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "not_applicable",
+        "outcomes": {
+          "INT-01": "not_applicable"
+        },
+        "exit": 2,
+        "coverage_unknown": "none",
+        "readiness": "NOT READY",
+        "no_reason": "coverage unknown"
+      }
+    },
+    "rec-unknown-deviation": {
+      "events": "passed",
+      "deviations": {
+        "deviation_register_version": 1,
+        "deviations": [
+          {
+            "control": "REC-04",
+            "rationale": "Accepted while the export is set up.",
+            "compensating_control": "Weekly manual review.",
+            "owner": "user:ops@example.com",
+            "approver": "user:ciso@example.com",
+            "granted": "2025-12-01T00:00:00.000Z",
+            "expiry": "2026-05-01T00:00:00.000Z",
+            "evidence_refs": []
+          }
+        ]
+      },
+      "why": "a deviation never lifts insufficient_evidence (SPEC \u00a713.3.4): the register naming the lowered REC-04 is refused as an evidence gap, not a risk acceptance",
+      "expected": {
+        "control": "REC-04",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "INT-01": "insufficient_evidence",
+          "REC-04": "insufficient_evidence",
+          "OVS-03": "conformant"
+        },
+        "exit": 3,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator",
+        "refusal": "input.deviation_invalid"
+      }
+    },
+    "kind-egress-proxy-log": {
+      "events": "passed",
+      "extra_events": [
+        {
+          "agentcesourceclass": "independent_system",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/a"
+            },
+            "refs": {}
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "egress-Decision",
+          "source": "urn:src:sor",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/a",
+          "time": "2026-01-02T00:00:09Z",
+          "type": "org.agent-conformance.evidence.Decision.v1"
+        },
+        {
+          "agentcesourceclass": "independent_system",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "agent": {
+              "id": "spiffe://corp/agents/a"
+            },
+            "refs": {}
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "egress-DelegationIssued",
+          "source": "urn:src:sor",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/a",
+          "time": "2026-01-02T00:00:09Z",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1"
+        },
+        {
+          "agentcesourceclass": "independent_system",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/a"
+            },
+            "refs": {}
+          },
+          "datacontenttype": "application/ld+json",
+          "id": "egress-ToolCall",
+          "source": "urn:src:sor",
+          "specversion": "1.0",
+          "subject": "spiffe://corp/agents/a",
+          "time": "2026-01-02T00:00:09Z",
+          "type": "org.agent-conformance.evidence.ToolCall.v1"
+        }
+      ],
+      "denominators": [
+        {
+          "kind": "egress_proxy_log",
+          "source": "urn:src:sor",
+          "covers": [
+            "Decision",
+            "DelegationIssued",
+            "ToolCall"
+          ]
+        }
+      ],
+      "why": "an egress proxy log counted from its own events reconciles, as any kind but an attestation does",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "conformant",
+        "outcomes": {
+          "INT-01": "conformant",
+          "REC-04": "conformant",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": "none",
+        "readiness": "NOT READY",
+        "no_reason": "coverage unknown"
+      }
+    },
+    "readiness-unknown-coverage": {
+      "events": "passed",
+      "why": "readiness names the unknown coverage and never prints READY",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "INT-01": "insufficient_evidence",
+          "REC-04": "insufficient_evidence",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    },
+    "readiness-unknown-with-gaps": {
+      "events": "passed",
+      "gaps": {
+        "gaps": [
+          {
+            "control": "INT-01",
+            "reason": "known"
+          },
+          {
+            "control": "REC-04",
+            "reason": "known"
+          }
+        ]
+      },
+      "why": "recording the INT and REC gaps does not lift the unknown coverage",
+      "expected": {
+        "control": "INT-01",
+        "outcome": "insufficient_evidence",
+        "outcomes": {
+          "INT-01": "insufficient_evidence",
+          "REC-04": "insufficient_evidence",
+          "OVS-03": "conformant"
+        },
+        "exit": 2,
+        "coverage_unknown": [
+          "spiffe://corp/agents/a INT-01",
+          "spiffe://corp/agents/a REC-04"
+        ],
+        "readiness": "NOT READY",
+        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+      }
+    }
+  }
+}

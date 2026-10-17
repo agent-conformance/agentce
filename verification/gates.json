@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.111.0",
+  "suite_version": "0.112.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -997,7 +997,7 @@
       "timeout_s": 300,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "a records-folder run against the default baseline catalog has every assertion insufficient_evidence and none not_applicable (exit 0); the very same derived evidence, reduced to a formal --bundle/--profile run, has every assertion not_applicable except DOC-01, which reads insufficient_evidence because the records hold a ToolCall and no BundleLoaded manifest declaring it (exit 2); the same records folder against the gate-only QP-UNLOCK catalog (one control requiring a self-reported ToolCall and ModelCall) has exactly one assertion (QP-UNLOCK, insufficient_evidence) and exactly one blind spot (event: ModelCall, class: self_report, checks_unlocked: 1, naming QP-UNLOCK in unlocked_checks); and the step-1 derived applicability.yaml passes the agentce-get-evidence skill's own lint_profile.py (clean: true) despite its short, exploratory window",
+        "pass": "a records-folder run against the default baseline catalog has every assertion insufficient_evidence and none not_applicable (exit 0); the very same derived evidence, reduced to a formal --bundle/--profile run, has every assertion not_applicable except DOC-01, which reads insufficient_evidence because the records hold a ToolCall and no BundleLoaded manifest declaring it (exit 2), and the INT and REC controls, which read insufficient_evidence because a derived profile names no independent denominator, each listed under blind-spots.json coverage_unknown (18.134); the same records folder against the gate-only QP-UNLOCK catalog (one control requiring a self-reported ToolCall and ModelCall) has exactly one assertion (QP-UNLOCK, insufficient_evidence) and exactly one blind spot (event: ModelCall, class: self_report, checks_unlocked: 1, naming QP-UNLOCK in unlocked_checks); and the step-1 derived applicability.yaml passes the agentce-get-evidence skill's own lint_profile.py (clean: true) despite its short, exploratory window",
         "fail": "any of the four assertions above does not hold: a wrong exit code, an assertion outcome other than the one named, a missing or wrong blind spot, or the derived profile failing the skill's lint"
       },
       "faults": [
@@ -3731,6 +3731,104 @@
         }
       ],
       "fix_hint": "Run verification/gates/cnd06_refusals.sh; it names the engine, the case, the CND-06 outcome and failing events it gave and the ones expected. The rule is the refusal pass in each engine's graph builder (graph.py _conduct_refusals and _denied_instruction, graph.ts conductRefusals and deniedInstruction, Graph.java conductRefusals and deniedInstruction), which writes agentce:refusalInScope, agentce:refusalMet and agentce:refusalNeedShown for CND-06's shape and evidence shape; an authorised class is shown through SourceClassJudge.attested (source_class.py and its ports)."
+    },
+    {
+      "id": "VG-COVERAGE-UNKNOWN",
+      "title": "Unknown coverage reads insufficient_evidence on every INT and REC control for that subject, in all three engines (SPEC §6.5): with no independent denominator, or one that covers only some event types, names one of the subject's own evidence sources, is an admission attestation, or reads a manifest the bundle manifest does not list, a conformant or not_applicable INT or REC check reads insufficient_evidence and is listed under blind-spots.json coverage_unknown, a recorded violation stays non-conformant, another family keeps its verdict, a reconciling denominator of any other kind keeps every verdict, and agentce readiness never prints READY while coverage is unknown (18.134)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/coverage_unknown.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/coverage_unknown/cases.json (no denominator; a partial, non-independent, unlisted, missing, non-object, escaping or attestation denominator; reconciling denominators of each kind, by listed manifest or by the source's own events; a coverage gap; two subjects; records mode; a deviation; readiness with and without recorded gaps) gives the expected outcome per named control, assess exit code or refusal key, blind-spots coverage_unknown list and readiness verdict and reason from the real Python, TypeScript and Java CLIs, and the engines agree on every control's outcome and the whole coverage_unknown list",
+        "fail": "any case gives another outcome, exit code, refusal, coverage_unknown list or readiness verdict or reason in any engine, or the engines disagree on any control's outcome"
+      },
+      "faults": [
+        {
+          "description": "Python never lowers an INT or REC check on a subject whose coverage is unknown (the family set is empty)",
+          "file": "engines/python/agentce/assess.py",
+          "search": "COVERAGE_FAMILIES = frozenset({\"INT\", \"REC\"})\n",
+          "replace": "COVERAGE_FAMILIES: frozenset[str] = frozenset()\n"
+        },
+        {
+          "description": "TypeScript never lowers an INT or REC check on a subject whose coverage is unknown (the family set is empty)",
+          "file": "engines/typescript/src/assess.ts",
+          "search": "export const COVERAGE_FAMILIES: ReadonlySet<string> = new Set([\"INT\", \"REC\"]);\n",
+          "replace": "export const COVERAGE_FAMILIES: ReadonlySet<string> = new Set<string>([]);\n"
+        },
+        {
+          "description": "Java never lowers an INT or REC check on a subject whose coverage is unknown (the family set is empty)",
+          "file": "engines/java/src/main/java/org/agentce/Assess.java",
+          "search": "    static final Set<String> COVERAGE_FAMILIES = Set.of(\"INT\", \"REC\");\n",
+          "replace": "    static final Set<String> COVERAGE_FAMILIES = Set.of();\n"
+        },
+        {
+          "description": "Python reads a denominator manifest the bundle manifest does not list",
+          "file": "engines/python/agentce/coverage.py",
+          "search": "    if denominator.manifest and denominator.manifest not in listed:\n",
+          "replace": "    if denominator.manifest and listed is None:\n"
+        },
+        {
+          "description": "TypeScript reads a denominator manifest the bundle manifest does not list",
+          "file": "engines/typescript/src/coverage.ts",
+          "search": "  if (denominator.manifest && !listed.has(denominator.manifest)) {\n",
+          "replace": "  if (denominator.manifest && listed.size < 0) {\n"
+        },
+        {
+          "description": "Java reads a denominator manifest the bundle manifest does not list",
+          "file": "engines/java/src/main/java/org/agentce/Coverage.java",
+          "search": "        if (hasManifest && !listed.contains(denominator.manifest)) {\n",
+          "replace": "        if (hasManifest && listed == null) {\n"
+        },
+        {
+          "description": "Python takes a denominator naming one of the subject's own evidence sources as independent",
+          "file": "engines/python/agentce/coverage.py",
+          "search": "        and denominator.source not in subject.source_ids\n",
+          "replace": "        and denominator.source is not None\n"
+        },
+        {
+          "description": "TypeScript takes a denominator naming one of the subject's own evidence sources as independent",
+          "file": "engines/typescript/src/coverage.ts",
+          "search": "    !subject.evidenceSources.some((s) => s.source === denominator.source)\n",
+          "replace": "    !subject.evidenceSources.some((s) => s.source === null)\n"
+        },
+        {
+          "description": "Java takes a denominator naming one of the subject's own evidence sources as independent",
+          "file": "engines/java/src/main/java/org/agentce/Coverage.java",
+          "search": "            if (s.source != null && s.source.equals(denominator.source)) {\n",
+          "replace": "            if (s.source == null && denominator.source == null) {\n"
+        },
+        {
+          "description": "Python leaves every denominator source's events out of the observed count, a manifest-bearing or non-independent one included",
+          "file": "engines/python/agentce/coverage.py",
+          "search": "            if _self_counting(d, subject)\n",
+          "replace": "            if d.source\n"
+        },
+        {
+          "description": "TypeScript leaves every denominator source's events out of the observed count, a manifest-bearing or non-independent one included",
+          "file": "engines/typescript/src/coverage.ts",
+          "search": "      subject.coverageDenominators.filter((d) => selfCounting(d, subject)).map((d) => d.source),\n",
+          "replace": "      subject.coverageDenominators.filter((d) => d.source !== \"\").map((d) => d.source),\n"
+        },
+        {
+          "description": "Java leaves every denominator source's events out of the observed count, a manifest-bearing or non-independent one included",
+          "file": "engines/java/src/main/java/org/agentce/Coverage.java",
+          "search": "                if (selfCounting(d, subject)) {\n                    denomIds.add(d.source);\n",
+          "replace": "                if (d.source != null) {\n                    denomIds.add(d.source);\n"
+        }
+      ],
+      "fix_hint": "Run verification/gates/coverage_unknown.sh; it names the engine, the case, what it gave and what was expected. The rule is the coverage post-pass in each engine's assess (assess.py _coverage_unknown, _uncovered and COVERAGE_FAMILIES; coverageUnknown and uncovered in assess.ts and Assess.java) over compute_coverage's per-subject coverage_status; what counts as an independent denominator, and which events leave the observed count, are coverage.py _independent and _self_counting and their ports in coverage.ts and Coverage.java."
     },
     {
       "id": "VG-CND04-PROVENANCE",

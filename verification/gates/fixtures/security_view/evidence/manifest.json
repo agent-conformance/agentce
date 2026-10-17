@@ -5,6 +5,10 @@
     {
       "path": "events/subject.jsonl",
       "sha256": "75886a825c46808ef9703377c5836ad808ac1ae8bfdddeb58ecc59a6195c990e"
+    },
+    {
+      "path": "reference/coverage-counts.json",
+      "sha256": "c7535aabd8be19de6effe9bd5aa9f9132ea74aa31a765467039b741a456b250f"
     }
   ],
   "sources": [

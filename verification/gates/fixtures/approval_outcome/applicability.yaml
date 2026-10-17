@@ -11,5 +11,10 @@ catalogs:
   - "conduct@2026.09"
 subjects:
   - id: "spiffe://corp/agents/approval-outcome"
+    # A system-of-record export counting the case's records reconciles coverage (SPEC §6.5; 18.134).
+    coverage_denominators:
+      - kind: system_of_record_export
+        source: "urn:agentce:source:system-of-record-export:corp"
+        manifest: "reference/coverage-counts-0.json"
     name: "Approval-outcome gate fixture subject"
     role: "both"

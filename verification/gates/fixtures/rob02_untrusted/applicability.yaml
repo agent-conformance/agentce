@@ -12,8 +12,18 @@ catalogs:
   - "baseline@2026.09"
 subjects:
   - id: "spiffe://corp/agents/other"
+    # A system-of-record export counting the case's records reconciles coverage (SPEC §6.5; 18.134).
+    coverage_denominators:
+      - kind: system_of_record_export
+        source: "urn:agentce:source:system-of-record-export:corp"
+        manifest: "reference/coverage-counts-0.json"
     name: "ROB-02 gate fixture, other subject"
     role: "both"
   - id: "spiffe://corp/agents/rob02-fixture"
+    # A system-of-record export counting the case's records reconciles coverage (SPEC §6.5; 18.134).
+    coverage_denominators:
+      - kind: system_of_record_export
+        source: "urn:agentce:source:system-of-record-export:corp"
+        manifest: "reference/coverage-counts-1.json"
     name: "ROB-02 gate fixture subject"
     role: "both"

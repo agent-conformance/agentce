@@ -10,11 +10,13 @@ fixtures="$root/verification/gates/fixtures/doc01_components"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-(cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen python - "$fixtures/cases.json" "$work") <<'PY'
+(cd "$root/engines/python" && PYTHONPATH="$root/verification/gates" env -u VIRTUAL_ENV uv run --frozen python - "$fixtures/cases.json" "$work") <<'PY'
 import hashlib
 import json
 import sys
 from pathlib import Path
+
+from fixture_integrity import add_coverage_counts
 
 cases = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))["cases"]
 for name, case in cases.items():
@@ -32,6 +34,7 @@ for name, case in cases.items():
             }
         ],
     }
+    add_coverage_counts(bundle, case["events"], Path(sys.argv[1]).parent / "applicability.yaml", manifest)
     (bundle / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     expected = case["expected"]
     failing = ",".join(sorted(expected["failing"]))

@@ -28,7 +28,7 @@ import json
 import sys
 from pathlib import Path
 
-from fixture_integrity import chain_streams
+from fixture_integrity import add_coverage_counts, chain_streams
 
 cases = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))["cases"]
 for name, case in cases.items():
@@ -70,6 +70,12 @@ for name, case in cases.items():
         streams = case["streams"] + streams
     if streams:
         manifest["streams"] = streams
+    add_coverage_counts(
+        bundle,
+        events,
+        Path(sys.argv[1]).parents[1] / "approval_outcome" / ("applicability-nist.yaml" if case["profile"] == "nist" else "applicability.yaml"),
+        manifest,
+    )
     (bundle / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     expected = case["expected"]
     failing = ",".join(sorted(expected["failing"]))

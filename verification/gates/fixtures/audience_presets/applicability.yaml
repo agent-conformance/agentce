@@ -9,6 +9,12 @@ content_capture:
 catalogs: []
 subjects:
   - id: "spiffe://corp/agents/audience-presets-fixture"
+    coverage_denominators:
+      - kind: "system_of_record_export"
+        source: "urn:agentce:source:system-of-record-export:corp"
+        covers:
+          - "Decision"
+        manifest: "reference/coverage-counts.json"
     name: "Audience-presets gate fixture subject"
     role: "both"
     declared_decision_types:

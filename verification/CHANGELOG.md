@@ -3,6 +3,27 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.112.0
+
+- `VG-COVERAGE-UNKNOWN` (18.134, added). The engines worked out whether an independent count of an agent's calls
+  backed its records and wrote that to coverage.json, but no verdict used it, so an agent with no such count could
+  read clean on the integrity and record-keeping checks even if it called a provider around the gateway. All three
+  engines now read every INT and REC check insufficient_evidence for a subject whose coverage is unknown (SPEC §6.5)
+  and list it under blind-spots.json `coverage_unknown`; a recorded violation stays non-conformant. A denominator
+  counts only when it is independent: never one of the subject's own evidence sources, never an admission
+  attestation no engine can verify, and never a manifest the bundle manifest does not list. `agentce readiness`
+  prints NOT READY and names the unknown coverage. The gate runs 30 cases through the three real CLIs, with four
+  seeded faults in each engine.
+- `VG-TRUST-MATRIX` (18.134, changed). The cells fx-INT-01-en-coverage-unknown and fx-INT-04-en-coverage-unknown leave
+  the open list: they now read insufficient_evidence in all three engines.
+- `VG-QUICK-PATH` (18.134, changed). Step 2's derived profile names no independent denominator, so the INT and REC
+  controls now read insufficient_evidence there, beside DOC-01; the step checks each is listed under blind-spots.json
+  `coverage_unknown` and every other control still reads not_applicable.
+- `VG-ROB02-UNTRUSTED`, `VG-CND05-CHAIN`, `VG-QUARANTINE-NO-PASS`, `VG-DOC01-COMPONENTS`, `VG-EUAIACT-CLUSTER1`, the ten
+  gates built by approval_outcome.sh (`VG-APPROVAL-OUTCOME` and the nine that share it), `VG-AUDIENCE-PRESETS` and `VG-SECURITY-VIEW` (18.134, changed). Each fixture subject is
+  meant to be fully captured, so its bundle now lists a system-of-record export counting the case's own records and
+  its profile names it as the subject's denominator; every pinned verdict and exit code holds.
+
 ## 0.111.0
 
 - `VG-CND06-REFUSALS` (18.173, added). CND-06 looked only at instructions that declared an untrusted source. The
