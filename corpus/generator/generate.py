@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Any
 
 from agentce import canonical
+from agentce.coverage import event_type_of
 
 # --- Corpus shape (SPEC §11.2). -------------------------------------------------------------------
 
@@ -1281,16 +1282,14 @@ def _coverage_export(
     skip_sources: set[str],
     suffix: str,
 ) -> tuple[dict[str, str], dict[str, Any]]:
-    """Write a system-of-record export counting ``subject``'s events per type (the engine's own key:
-    ``data.@type``), skipping the events of ``skip_sources`` (another denominator's own), and return its
+    """Write a system-of-record export counting ``subject``'s events per type (the engine's own key,
+    ``event_type_of``), skipping the events of ``skip_sources`` (another denominator's own), and return its
     manifest file entry and the coverage denominator that declares it (SPEC §6.5)."""
     counts: dict[str, int] = {}
     for event in events:
         if event.get("subject") != subject or event.get("source") in skip_sources:
             continue
-        data = event.get("data")
-        kind = data.get("@type") if isinstance(data, dict) else None
-        key = kind if isinstance(kind, str) else "Unknown"
+        key = event_type_of(event)
         counts[key] = counts.get(key, 0) + 1
     rel = f"reference/coverage-counts{suffix}.json"
     path = evidence / rel

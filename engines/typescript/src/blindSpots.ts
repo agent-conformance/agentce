@@ -213,14 +213,15 @@ export function computeBlindSpots(
       );
     }
     if (a.outcome !== "insufficient_evidence") continue;
+    const checkRef: CheckRef = {
+      subject: subjectId,
+      catalog: catalogId,
+      control: control.id,
+      control_version: control.version,
+    };
     if (a.coverageUnknown) {
       // What is missing is an independent count of the subject's calls (SPEC §6.5), not a record type.
-      coverageUnknown.push({
-        subject: subjectId,
-        catalog: catalogId,
-        control: control.id,
-        control_version: control.version,
-      });
+      coverageUnknown.push(checkRef);
       continue;
     }
     const missing = control.minimumEvidence.filter((r) => !met(subjectId, r));
@@ -233,12 +234,6 @@ export function computeBlindSpots(
       const byEvent = byteCompare(x[0], y[0]);
       return byEvent !== 0 ? byEvent : byteCompare(x[1], y[1]);
     });
-    const checkRef: CheckRef = {
-      subject: subjectId,
-      catalog: catalogId,
-      control: control.id,
-      control_version: control.version,
-    };
     // A focus below the control's min_source_class (HR-5) misses a record of that type at the minimum
     // (assess.missingEvidence). Never provably sufficient alone: it only ever lands in needed_by.
     // classGap is already distinct and sorted.

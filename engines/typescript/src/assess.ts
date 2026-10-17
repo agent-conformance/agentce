@@ -521,6 +521,8 @@ function notEnoughWithWithheld(
  */
 /** The families whose controls read insufficient_evidence while a subject's coverage is unknown (SPEC §6.5). */
 export const COVERAGE_FAMILIES: ReadonlySet<string> = new Set(["INT", "REC"]);
+/** The outcomes unknown coverage lowers: each reads better than insufficient_evidence. */
+const LOWERED_OUTCOMES: ReadonlySet<string> = new Set(["conformant", "partial", "not_applicable"]);
 
 /** True when `coverage` (computeCoverage's structure) does not show the subject's capture reconciled against an
  * independent denominator: its roll-up is unknown, or the subject has no entry at all (SPEC §6.5). */
@@ -541,10 +543,7 @@ function coverageUnknown(coverage: Record<string, unknown>, subject: string): bo
 /** An INT or REC outcome that reads better than insufficient_evidence while coverage is unknown reads
  * insufficient_evidence (SPEC §6.5): a call that bypassed capture would not be in the records. A violation stays. */
 export function uncovered(assertion: Assertion): Assertion {
-  if (
-    !COVERAGE_FAMILIES.has(assertion.family) ||
-    !["conformant", "partial", "not_applicable"].includes(assertion.outcome)
-  ) {
+  if (!COVERAGE_FAMILIES.has(assertion.family) || !LOWERED_OUTCOMES.has(assertion.outcome)) {
     return assertion;
   }
   return {
@@ -609,11 +608,11 @@ export function assessSubjects(
     const judge = lazy(() => new SourceClassJudge(store, eventsByIri));
     const cfJudge = lazy(() => new SourceClassJudge(cfStore, cfByIri));
     const capped = new CappedViews(subjectEvents, integrity, domain, foreign);
-    const first = assertions.length;
-    const roleAppliesAt: boolean[] = [];
+    // Unknown coverage lowers the subject's INT and REC checks wherever its role applies (SPEC §6.5).
+    const isUncovered = coverageUnknown(coverage, subject.id);
     for (const catalog of catalogs) {
       for (const control of catalog.controls) {
-        roleAppliesAt.push(roleApplies(roles, control.appliesToRoles));
+        const applies = roleApplies(roles, control.appliesToRoles);
         let assertion = assertControl(
           store,
           catalog,
@@ -645,40 +644,34 @@ export function assessSubjects(
         const flattered =
           own.length > 0 &&
           (assertion.outcome === "conformant" ||
-            (assertion.outcome === "not_applicable" && roleApplies(roles, control.appliesToRoles)));
+            (assertion.outcome === "not_applicable" && applies));
         // Held records that read insufficient_evidence may lack only what a late record supplies, so a
         // readable withheld record is judged with them too: it can still read non-conformant (18.149).
         const short = readable.length > 0 && assertion.outcome === "insufficient_evidence";
-        if (!(flattered || short)) {
-          assertions.push(assertion);
-          continue;
+        if (flattered || short) {
+          const withWithheld =
+            readable.length === 0
+              ? assertion.outcome
+              : assertControl(
+                  cfStore,
+                  catalog,
+                  control,
+                  subject,
+                  roles,
+                  cfEvents,
+                  cfByIri,
+                  win,
+                  cfJudge,
+                  applicabilityDeclared,
+                ).outcome;
+          if ((unreadable && flattered) || withWithheld !== assertion.outcome) {
+            assertion = notEnoughWithWithheld(assertion, own, withWithheld === "non-conformant");
+          }
         }
-        const withWithheld =
-          readable.length === 0
-            ? assertion.outcome
-            : assertControl(
-                cfStore,
-                catalog,
-                control,
-                subject,
-                roles,
-                cfEvents,
-                cfByIri,
-                win,
-                cfJudge,
-                applicabilityDeclared,
-              ).outcome;
-        if ((unreadable && flattered) || withWithheld !== assertion.outcome) {
-          assertion = notEnoughWithWithheld(assertion, own, withWithheld === "non-conformant");
+        if (isUncovered && applies) {
+          assertion = uncovered(assertion);
         }
         assertions.push(assertion);
-      }
-    }
-    if (coverageUnknown(coverage, subject.id)) {
-      for (let i = first; i < assertions.length; i++) {
-        if (roleAppliesAt[i - first]) {
-          assertions[i] = uncovered(assertions[i] as Assertion);
-        }
       }
     }
   }

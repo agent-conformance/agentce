@@ -18,6 +18,7 @@ from typing import Any
 from .applicability import effective_roles
 from .assertions import Assertion, EvidencePointer
 from .catalog import Catalog, ControlSpec
+from .coverage import STATUS_UNKNOWN
 from .domain import DomainBinding
 from .graph import UnreadableWrite, build_graph, flagged_records, unkeyed_flags
 from .ingest import Withheld, record_digest
@@ -500,7 +501,7 @@ def _coverage_unknown(coverage: dict[str, Any], subject: str) -> bool:
     """True when ``coverage`` (compute_coverage's structure) does not show the subject's capture reconciled against an
     independent denominator: its roll-up is unknown, or the subject has no entry at all (SPEC §6.5)."""
     entry = (coverage.get("subjects") or {}).get(subject)
-    return not isinstance(entry, dict) or entry.get("coverage_status") == "unknown"
+    return not isinstance(entry, dict) or entry.get("coverage_status") == STATUS_UNKNOWN
 
 
 def _uncovered(assertion: Assertion) -> Assertion:
@@ -583,11 +584,11 @@ def assess_subjects(
         judge = functools.cache(lambda: SourceClassJudge(store, events_by_iri))
         cf_judge = functools.cache(lambda: SourceClassJudge(cf_store, cf_by_iri))
         capped = _CappedViews(subject_events, integrity, domain, foreign)
-        first = len(assertions)
-        role_applies: list[bool] = []
+        # Unknown coverage lowers the subject's INT and REC checks wherever its role applies (SPEC §6.5).
+        uncovered = _coverage_unknown(coverage, subject.id)
         for catalog in catalogs:
             for control in catalog.controls:
-                role_applies.append(_role_applies(roles, control.applies_to_roles))
+                applies = _role_applies(roles, control.applies_to_roles)
                 assertion = _assert_control(
                     store,
                     catalog,
@@ -618,45 +619,37 @@ def assess_subjects(
                     )
                 flattered = bool(own) and (
                     assertion.outcome == "conformant"
-                    or (
-                        assertion.outcome == "not_applicable"
-                        and _role_applies(roles, control.applies_to_roles)
-                    )
+                    or (assertion.outcome == "not_applicable" and applies)
                 )
                 # Held records that read insufficient_evidence may lack only what a late record supplies, so a
                 # readable withheld record is judged with them too: it can still read non-conformant (18.149).
                 short = bool(readable) and assertion.outcome == "insufficient_evidence"
-                if not (flattered or short):
-                    assertions.append(assertion)
-                    continue
-                with_withheld = (
-                    assertion.outcome
-                    if not readable
-                    else _assert_control(
-                        cf_store,
-                        catalog,
-                        control,
-                        subject,
-                        roles,
-                        cf_events,
-                        cf_by_iri,
-                        window,
-                        cf_judge,
-                        applicability_declared=applicability_declared,
-                    ).outcome
-                )
-                if (unreadable and flattered) or with_withheld != assertion.outcome:
-                    assertion = _not_enough_with_withheld(
-                        assertion,
-                        own,
-                        non_conformant=with_withheld == "non-conformant",
+                if flattered or short:
+                    with_withheld = (
+                        assertion.outcome
+                        if not readable
+                        else _assert_control(
+                            cf_store,
+                            catalog,
+                            control,
+                            subject,
+                            roles,
+                            cf_events,
+                            cf_by_iri,
+                            window,
+                            cf_judge,
+                            applicability_declared=applicability_declared,
+                        ).outcome
                     )
+                    if (unreadable and flattered) or with_withheld != assertion.outcome:
+                        assertion = _not_enough_with_withheld(
+                            assertion,
+                            own,
+                            non_conformant=with_withheld == "non-conformant",
+                        )
+                if uncovered and applies:
+                    assertion = _uncovered(assertion)
                 assertions.append(assertion)
-        if _coverage_unknown(coverage, subject.id):
-            assertions[first:] = [
-                _uncovered(a) if applies else a
-                for a, applies in zip(assertions[first:], role_applies, strict=True)
-            ]
     return assertions
 
 

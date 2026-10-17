@@ -48,11 +48,6 @@ export interface Profile {
   catalogs: string[];
 }
 
-/** The independent coverage-denominator source ids of a subject. */
-export function denominatorIds(subject: Subject): Set<string> {
-  return new Set(subject.coverageDenominators.map((d) => d.source));
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

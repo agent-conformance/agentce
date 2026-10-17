@@ -4,10 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * The applicability profile (SPEC §6.5): what the adopter declares about the assessed system — the
@@ -47,15 +45,6 @@ public final class Profile {
         public List<String> declaredComponents = new ArrayList<>();
         public List<String> declaredTools = new ArrayList<>();
         public List<String> declaredModels = new ArrayList<>();
-    }
-
-    /** The independent coverage-denominator source ids of a subject. */
-    public static Set<String> denominatorIds(Subject subject) {
-        Set<String> ids = new LinkedHashSet<>();
-        for (CoverageDenominator d : subject.coverageDenominators) {
-            ids.add(d.source);
-        }
-        return ids;
     }
 
     private static String opt(JsonNode node) {

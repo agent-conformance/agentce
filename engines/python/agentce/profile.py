@@ -54,10 +54,6 @@ class Subject:
     def source_ids(self) -> set[str]:
         return {s.source for s in self.evidence_sources}
 
-    @property
-    def denominator_ids(self) -> set[str]:
-        return {d.source for d in self.coverage_denominators}
-
 
 @dataclass
 class Profile:

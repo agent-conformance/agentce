@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { OUTCOMES, aggregate, assertionToJson, checkDc5, makeAssertion } from "./assertions";
 import { AgentceError } from "./errors";
-import { denominatorIds, profileFromDict } from "./profile";
+import { profileFromDict } from "./profile";
 
 test("aggregate lists every outcome, even at zero", () => {
   const conformant = makeAssertion({
@@ -73,7 +73,7 @@ test("checkDc5 refuses a supporting verdict with no evidence", () => {
   );
 });
 
-test("profile parsing collects denominator source ids", () => {
+test("profile parsing collects coverage denominators", () => {
   const profile = profileFromDict({
     subjects: [
       {
@@ -85,5 +85,8 @@ test("profile parsing collects denominator source ids", () => {
       },
     ],
   });
-  assert.deepEqual([...denominatorIds(profile.subjects[0] as never)].sort(), ["r-1", "r-2"]);
+  assert.deepEqual(
+    profile.subjects[0]?.coverageDenominators.map((d) => d.source),
+    ["r-1", "r-2"],
+  );
 });

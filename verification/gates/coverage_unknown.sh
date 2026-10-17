@@ -12,6 +12,11 @@ base="$root/spec/catalogs/base/eu-ai-act"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
+# The TypeScript and Java builds run beside the fixture writer; the case loop waits for them.
+builds=()
+(cd "$root/engines/typescript" && pnpm --silent build >/dev/null) & builds+=("$!")
+(cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist) & builds+=("$!")
+
 (cd "$root/engines/python" && PYTHONPATH="$root/verification/gates" env -u VIRTUAL_ENV uv run --frozen python - "$fixtures/cases.json" "$work" "$root") <<'PY'
 import copy
 import hashlib
@@ -78,8 +83,9 @@ for name, case in doc["cases"].items():
         (case_dir / "gaps.yaml").write_text(yaml.safe_dump(case["gaps"], sort_keys=False), encoding="utf-8")
 PY
 
-(cd "$root/engines/typescript" && pnpm --silent build >/dev/null)
-(cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist)
+for pid in "${builds[@]}"; do
+  wait "$pid"
+done
 
 run() {
   local engine="$1"

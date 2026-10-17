@@ -39,7 +39,6 @@ def test_load_profile(tmp_path: Path) -> None:
     assert subject.evidence_sources[0].manifest == "reference/gw-counts.json"
     assert subject.coverage_denominators[0].covers == ["ToolCall", "ModelCall"]
     assert subject.source_ids == {"urn:src:gw"}
-    assert subject.denominator_ids == {"urn:src:egress"}
 
 
 def test_empty_profile() -> None:

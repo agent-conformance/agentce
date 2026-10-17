@@ -20,6 +20,7 @@ from typing import Any
 
 import jsonschema
 
+from .coverage import STATUS_UNKNOWN
 from .signing import is_regular_file
 
 READY = "READY"
@@ -182,7 +183,7 @@ def compute_readiness(
     for subject, entry in sorted((coverage.get("subjects") or {}).items()):
         if entry.get("coverage_status") == "gap":
             reasons.append(f"coverage shortfall for subject {subject}")
-        elif entry.get("coverage_status") == "unknown":
+        elif entry.get("coverage_status") == STATUS_UNKNOWN:
             # No independent denominator reconciles the subject's records (SPEC §6.5, §13.3.4).
             reasons.append(
                 f"coverage unknown for subject {subject}: no independent denominator"

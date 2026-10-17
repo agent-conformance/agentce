@@ -24,6 +24,7 @@ from typing import Any
 import yaml
 
 from agentce.bundle import load_bundle
+from agentce.coverage import event_type_of
 from agentce.ingest import ingest
 from agentce.integrity import GENESIS_PREV, recompute_hash
 
@@ -50,19 +51,30 @@ def _accepted(events: list[Any], manifest: dict[str, Any]) -> Counter[str]:
         (bundle / "events").mkdir()
         text = "".join((e if isinstance(e, str) else _line(e)) + "\n" for e in events)
         (bundle / "events" / "subject.jsonl").write_text(text, encoding="utf-8")
-        files = [{"path": "events/subject.jsonl", "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}]
-        (bundle / "manifest.json").write_text(json.dumps({**manifest, "files": files}), encoding="utf-8")
+        files = [
+            {
+                "path": "events/subject.jsonl",
+                "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            }
+        ]
+        (bundle / "manifest.json").write_text(
+            json.dumps({**manifest, "files": files}), encoding="utf-8"
+        )
         return Counter(_line(e) for e in ingest(load_bundle(bundle)).raw_accepted)
 
 
-def chain_streams(events: list[Any], manifest: dict[str, Any]) -> tuple[list[Any], list[dict[str, Any]]]:
+def chain_streams(
+    events: list[Any], manifest: dict[str, Any]
+) -> tuple[list[Any], list[dict[str, Any]]]:
     """``events`` with each source's stream chained over its accepted records (export_anchored), and the manifest's
     ``streams`` entries anchoring each chained stream's head."""
     accepted = _accepted(events, manifest)
     own = {
         str(e.get("source", ""))
         for e in events
-        if isinstance(e, dict) and isinstance(e.get("data"), dict) and "integrity" in e["data"]
+        if isinstance(e, dict)
+        and isinstance(e.get("data"), dict)
+        and "integrity" in e["data"]
     }
     out: list[Any] = []
     heads: dict[str, str] = {}
@@ -70,13 +82,24 @@ def chain_streams(events: list[Any], manifest: dict[str, Any]) -> tuple[list[Any
     for event in events:
         line = _line(event)
         stream = str(event.get("source", "")) if isinstance(event, dict) else ""
-        if not isinstance(event, dict) or not accepted[line] or stream in own or not isinstance(event.get("data"), dict):
+        if (
+            not isinstance(event, dict)
+            or not accepted[line]
+            or stream in own
+            or not isinstance(event.get("data"), dict)
+        ):
             out.append(event)
             continue
         accepted[line] -= 1
         event = copy.deepcopy(event)
-        block = {"stream": stream, "strength": "export_anchored", "prev": heads.get(stream, GENESIS_PREV)}
-        block["hash"] = recompute_hash(event)  # the hash leaves data.integrity out (SPEC §6.6)
+        block = {
+            "stream": stream,
+            "strength": "export_anchored",
+            "prev": heads.get(stream, GENESIS_PREV),
+        }
+        block["hash"] = recompute_hash(
+            event
+        )  # the hash leaves data.integrity out (SPEC §6.6)
         event["data"]["integrity"] = block
         heads[stream] = block["hash"]
         when = _instant(event["time"]) if isinstance(event.get("time"), str) else None
@@ -84,7 +107,13 @@ def chain_streams(events: list[Any], manifest: dict[str, Any]) -> tuple[list[Any
             last[stream] = (when, event["time"])
         out.append(event)
     streams = [
-        {"stream": s, "head": h, "anchors": [{"kind": "rfc3161", "at": last[s][1] if s in last else _FALLBACK_AT}]}
+        {
+            "stream": s,
+            "head": h,
+            "anchors": [
+                {"kind": "rfc3161", "at": last[s][1] if s in last else _FALLBACK_AT}
+            ],
+        }
         for s, h in sorted(heads.items())
     ]
     return out, streams
@@ -103,19 +132,29 @@ def coverage_counts(events: list[Any], subjects: list[str]) -> dict[str, str]:
         counts: Counter[str] = Counter()
         for event in events:
             if isinstance(event, dict) and event.get("subject") == subject:
-                data = event.get("data")
-                typ = data.get("@type") if isinstance(data, dict) else None
-                counts[typ if isinstance(typ, str) else "Unknown"] += 1
-        body = json.dumps({"counts": dict(sorted(counts.items()))}, sort_keys=True, indent=2) + "\n"
+                counts[event_type_of(event)] += 1
+        body = (
+            json.dumps(
+                {"counts": dict(sorted(counts.items()))}, sort_keys=True, indent=2
+            )
+            + "\n"
+        )
         files[f"reference/coverage-counts-{i}.json"] = body
     return files
 
 
-def add_coverage_counts(bundle: Path, events: list[Any], profile: Path, manifest: dict[str, Any]) -> None:
+def add_coverage_counts(
+    bundle: Path, events: list[Any], profile: Path, manifest: dict[str, Any]
+) -> None:
     """Write coverage_counts' files for ``profile``'s subjects, in profile order, into ``bundle`` and list each, with
     its sha256, in ``manifest``."""
-    subjects = [str(s["id"]) for s in yaml.safe_load(profile.read_text(encoding="utf-8"))["subjects"]]
+    subjects = [
+        str(s["id"])
+        for s in yaml.safe_load(profile.read_text(encoding="utf-8"))["subjects"]
+    ]
     for rel, body in coverage_counts(events, subjects).items():
         (bundle / rel).parent.mkdir(parents=True, exist_ok=True)
         (bundle / rel).write_text(body, encoding="utf-8")
-        manifest["files"].append({"path": rel, "sha256": hashlib.sha256(body.encode("utf-8")).hexdigest()})
+        manifest["files"].append(
+            {"path": rel, "sha256": hashlib.sha256(body.encode("utf-8")).hexdigest()}
+        )

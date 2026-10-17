@@ -584,11 +584,11 @@ public final class Assess {
             Supplier<SourceClass.Judge> judge = lazy(() -> new SourceClass.Judge(store, eventsByIri));
             Supplier<SourceClass.Judge> cfJudge = lazy(() -> new SourceClass.Judge(cfStore, cfByIri));
             CappedViews capped = new CappedViews(subjectEvents, integrity, domain, foreign);
-            int first = assertions.size();
-            List<Boolean> roleAppliesAt = new ArrayList<>();
+            // Unknown coverage lowers the subject's INT and REC checks wherever its role applies (SPEC §6.5).
+            boolean isUncovered = coverageUnknown(coverage, subject.id);
             for (Catalog catalog : catalogs) {
                 for (Catalog.ControlSpec control : catalog.controls) {
-                    roleAppliesAt.add(roleApplies(roles, control.appliesToRoles));
+                    boolean applies = roleApplies(roles, control.appliesToRoles);
                     Assertions.Assertion assertion =
                             assertControl(store, catalog, control, subject, roles, subjectEvents, eventsByIri, win, judge);
                     if (capped.any && "conformant".equals(assertion.outcome)) {
@@ -598,30 +598,25 @@ public final class Assess {
                     }
                     boolean flattered = !own.isEmpty()
                             && ("conformant".equals(assertion.outcome)
-                                    || ("not_applicable".equals(assertion.outcome)
-                                            && roleApplies(roles, control.appliesToRoles)));
+                                    || ("not_applicable".equals(assertion.outcome) && applies));
                     // Held records that read insufficient_evidence may lack only what a late record supplies, so a
                     // readable withheld record is judged with them too: it can still read non-conformant (18.149).
                     boolean isShort = !readable.isEmpty() && "insufficient_evidence".equals(assertion.outcome);
-                    if (!(flattered || isShort)) {
-                        assertions.add(assertion);
-                        continue;
+                    if (flattered || isShort) {
+                        String withWithheld = readable.isEmpty()
+                                ? assertion.outcome
+                                : assertControl(
+                                                cfStore, catalog, control, subject, roles, cfEvents, cfByIri, win,
+                                                cfJudge)
+                                        .outcome;
+                        if ((unreadable && flattered) || !assertion.outcome.equals(withWithheld)) {
+                            assertion = notEnoughWithWithheld(assertion, own, "non-conformant".equals(withWithheld));
+                        }
                     }
-                    String withWithheld = readable.isEmpty()
-                            ? assertion.outcome
-                            : assertControl(cfStore, catalog, control, subject, roles, cfEvents, cfByIri, win, cfJudge)
-                                    .outcome;
-                    if ((unreadable && flattered) || !assertion.outcome.equals(withWithheld)) {
-                        assertion = notEnoughWithWithheld(assertion, own, "non-conformant".equals(withWithheld));
+                    if (isUncovered && applies) {
+                        assertion = uncovered(assertion);
                     }
                     assertions.add(assertion);
-                }
-            }
-            if (coverageUnknown(coverage, subject.id)) {
-                for (int i = first; i < assertions.size(); i++) {
-                    if (roleAppliesAt.get(i - first)) {
-                        assertions.set(i, uncovered(assertions.get(i)));
-                    }
                 }
             }
         }
@@ -630,6 +625,9 @@ public final class Assess {
 
     /** The families whose controls read insufficient_evidence while a subject's coverage is unknown (SPEC §6.5). */
     static final Set<String> COVERAGE_FAMILIES = Set.of("INT", "REC");
+
+    /** The outcomes unknown coverage lowers: each reads better than insufficient_evidence. */
+    private static final Set<String> LOWERED_OUTCOMES = Set.of("conformant", "partial", "not_applicable");
 
     /**
      * True when {@code coverage} (computeCoverage's structure) does not show the subject's capture reconciled against
@@ -651,7 +649,7 @@ public final class Assess {
      */
     static Assertions.Assertion uncovered(Assertions.Assertion assertion) {
         if (!COVERAGE_FAMILIES.contains(assertion.family)
-                || !Set.of("conformant", "partial", "not_applicable").contains(assertion.outcome)) {
+                || !LOWERED_OUTCOMES.contains(assertion.outcome)) {
             return assertion;
         }
         Assertions.Assertion copy = Assertions.copyOf(assertion);

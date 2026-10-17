@@ -3776,8 +3776,8 @@
         {
           "description": "Python reads a denominator manifest the bundle manifest does not list",
           "file": "engines/python/agentce/coverage.py",
-          "search": "    if denominator.manifest and denominator.manifest not in listed:\n",
-          "replace": "    if denominator.manifest and listed is None:\n"
+          "search": "        if denominator.manifest not in listed:\n",
+          "replace": "        if listed is None:\n"
         },
         {
           "description": "TypeScript reads a denominator manifest the bundle manifest does not list",
