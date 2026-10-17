@@ -473,3 +473,49 @@ def test_withheld_keeps_the_raw_facts_of_an_unreadable_write(
         UnreadableWrite("mem:r1", "kb"),
     ]
     assert {w.subject for w in result.withheld} == {"spiffe://corp/agents/other"}
+
+
+def test_an_unknown_version_of_memory_write_is_withheld_as_unreadable(
+    make_bundle: Callable[..., Any],
+) -> None:
+    # 18.202: an unknown_type record whose envelope type names MemoryWrite at any version, or whose data @type is
+    # MemoryWrite, is withheld as an unreadable write; another unknown type is only quarantined. An empty record_ref
+    # or store reads as absent.
+    from agentce.graph import UnreadableWrite
+
+    def write(event_id: str, type_: str, data: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "id": event_id,
+            "source": "urn:src:guard",
+            "subject": "spiffe://corp/agents/other",
+            "type": type_,
+            "time": "2026-01-02T00:00:01Z",
+            "specversion": "1.0",
+            "datacontenttype": "application/ld+json",
+            "agentcesourceclass": "enforcement_point",
+            "data": data
+            or {"@type": "MemoryWrite", "store": "kb", "record_ref": "mem:r1"},
+        }
+
+    read = {"@type": "MemoryRead", "store": "kb", "record_refs": ["mem:r1"]}
+
+    v2 = "org.agent-conformance.evidence.{}.v2".format
+    items = [
+        write("w1", v2("MemoryWrite"), {}),
+        write("w2", v2("MemoryWrite"), read),
+        write("w3", "com.example.Thing.v1", {}),
+        write("w4", v2("MemoryRead"), read),
+        write(
+            "w5",
+            v2("MemoryWrite"),
+            {"@type": "MemoryWrite", "record_ref": "", "store": ""},
+        ),
+    ]
+    result = _ingest(make_bundle, items)
+    assert [r.reason for r in result.quarantined] == [QuarantineReason.UNKNOWN_TYPE] * 5
+    assert [(w.record.event_id, w.write) for w in result.withheld] == [
+        ("w1", UnreadableWrite("mem:r1", "kb")),
+        ("w2", UnreadableWrite(None, "kb")),
+        ("w3", UnreadableWrite("mem:r1", "kb")),
+        ("w5", UnreadableWrite(None, None)),
+    ]

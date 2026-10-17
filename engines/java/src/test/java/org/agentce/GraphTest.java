@@ -338,6 +338,28 @@ class GraphTest {
     }
 
     @Test
+    void rob02AFlaggedWriteWithNoReadableRecordRefIsUnkeyed() {
+        // 18.202: a flagged write whose record_ref is absent, null or empty names no record; it counts against its
+        // store.
+        String[][] writes = {
+            {"w1", "a", "\"store\": \"kb\", \"trust\": \"untrusted\""},
+            {"w2", "b", "\"store\": \"kb\", \"trust\": \"untrusted\", \"record_ref\": null"},
+            {"w3", "c", "\"store\": \"\", \"trust\": \"untrusted\", \"record_ref\": \"\""},
+            {"w4", "d", "\"store\": \"kb\", \"trust\": \"untrusted\", \"record_ref\": \"mem:r1\""},
+            {"w5", "e", "\"store\": \"kb\", \"trust\": \"trusted\", \"record_ref\": \"\""},
+        };
+        List<JsonNode> events = new ArrayList<>();
+        for (String[] w : writes) {
+            JsonNode e = event(w[0], "MemoryWrite", w[2]);
+            ((ObjectNode) e).put("subject", w[1]);
+            events.add(e);
+        }
+        assertEquals(Map.of("mem:r1", Set.of("d")), Graph.flaggedRecords(events));
+        Ingest.UnreadableWrite kb = new Ingest.UnreadableWrite(null, "kb");
+        assertEquals(List.of(kb, kb, new Ingest.UnreadableWrite(null, null)), Graph.unkeyedFlags(events));
+    }
+
+    @Test
     void rob02NotRuledOnARefTheBundleDoesNotHold() {
         for (String ref : List.of("mem:missing", "agentce:event/missing")) {
             assertEquals(List.of("false"), ruled(List.of(decisionWith("d1", "\"inputs\": [\"" + ref + "\"]"))), ref);

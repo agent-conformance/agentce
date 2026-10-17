@@ -394,3 +394,49 @@ test("withheld keeps the raw facts of an unreadable write (18.172)", () => {
     new Set(["spiffe://corp/agents/other"]),
   );
 });
+
+test("an unknown version of MemoryWrite is withheld as unreadable (18.202)", () => {
+  // An unknown_type record whose envelope type names MemoryWrite at any version, or whose data @type is
+  // MemoryWrite, is withheld as an unreadable write; another unknown type is only quarantined. An empty record_ref
+  // or store reads as absent.
+  const v2 = (name: string) => `org.agent-conformance.evidence.${name}.v2`;
+  const write = (id: string, type: string, data?: Record<string, unknown>) => ({
+    id,
+    source: "urn:src:guard",
+    subject: "spiffe://corp/agents/other",
+    type,
+    time: "2026-01-02T00:00:01Z",
+    specversion: "1.0",
+    datacontenttype: "application/ld+json",
+    agentcesourceclass: "enforcement_point",
+    data: data ?? { "@type": "MemoryWrite", store: "kb", record_ref: "mem:r1" },
+  });
+  const read = { "@type": "MemoryRead", store: "kb", record_refs: ["mem:r1"] };
+  const result = ingest(
+    loadBundle(
+      writeBundle(
+        [
+          write("w1", v2("MemoryWrite")),
+          write("w2", v2("MemoryWrite"), read),
+          write("w3", "com.example.Thing.v1"),
+          write("w4", v2("MemoryRead"), read),
+          write("w5", v2("MemoryWrite"), { "@type": "MemoryWrite", record_ref: "", store: "" }),
+        ],
+        ["urn:src:guard"],
+      ),
+    ),
+  );
+  assert.deepEqual(
+    result.quarantined.map((q) => q.reason),
+    Array(5).fill("unknown_type"),
+  );
+  assert.deepEqual(
+    result.withheld.map((w) => [w.record.eventId, w.write ?? null]),
+    [
+      ["w1", { recordRef: "mem:r1", store: "kb" }],
+      ["w2", { recordRef: null, store: "kb" }],
+      ["w3", { recordRef: "mem:r1", store: "kb" }],
+      ["w5", { recordRef: null, store: null }],
+    ],
+  );
+});

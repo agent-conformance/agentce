@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from agentce.domain import DomainBinding
-from agentce.graph import build_graph, flagged_records
+from agentce.graph import UnreadableWrite, build_graph, flagged_records, unkeyed_flags
 from agentce.iri import event_iri, principal_iri
 
 CREDIT = "agentce:CreditDecision"
@@ -779,6 +779,30 @@ def test_flagged_records_names_every_subject_that_flagged_a_record() -> None:
     events.append(_self_report(write("w6", "f", trust="trusted")))
     assert flagged_records(events) == {"mem:r1": {"a", "b", "d", "f"}}
     assert flagged_records(reversed(events)) == flagged_records(events)
+
+
+def test_a_flagged_write_with_no_readable_record_ref_is_unkeyed() -> None:
+    # 18.202: a flagged write whose record_ref is absent, null or empty names no record; it counts against its store.
+    def write(event_id: str, subject: str, **data: Any) -> dict[str, Any]:
+        event = _event(
+            event_id, "MemoryWrite", {"store": "kb", "trust": "untrusted", **data}
+        )
+        event["subject"] = subject
+        return event
+
+    events = [
+        write("w1", "a"),
+        write("w2", "b", record_ref=None),
+        write("w3", "c", record_ref="", store=""),
+        write("w4", "d", record_ref="mem:r1"),
+        write("w5", "e", record_ref="", trust="trusted"),
+    ]
+    assert flagged_records(events) == {"mem:r1": {"d"}}
+    assert unkeyed_flags(events) == [
+        UnreadableWrite(None, "kb"),
+        UnreadableWrite(None, "kb"),
+        UnreadableWrite(None, None),
+    ]
 
 
 def test_an_untrusted_origin_class_with_no_ruling_taints() -> None:

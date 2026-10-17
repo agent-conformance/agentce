@@ -284,4 +284,43 @@ class IngestTest {
                 writes);
         result.withheld.forEach(w -> assertEquals("spiffe://corp/agents/other", w.subject()));
     }
+
+    private static JsonNode unknownType(String id, String type, String dataJson) {
+        return Json.parse("{\"id\": \"" + id + "\", \"source\": \"" + SOURCE + "\", "
+                + "\"subject\": \"spiffe://corp/agents/other\", \"type\": \"" + type + "\", "
+                + "\"time\": \"2026-01-02T00:00:01Z\", \"specversion\": \"1.0\", "
+                + "\"datacontenttype\": \"application/ld+json\", \"agentcesourceclass\": \"enforcement_point\", "
+                + "\"data\": " + dataJson + "}");
+    }
+
+    @Test
+    void anUnknownVersionOfMemoryWriteIsWithheldAsUnreadable(@TempDir Path tempDir) throws IOException {
+        // 18.202: an unknown_type record whose envelope type names MemoryWrite at any version, or whose data @type is
+        // MemoryWrite, is withheld as an unreadable write; another unknown type is only quarantined. An empty
+        // record_ref or store reads as absent.
+        String writeV2 = "org.agent-conformance.evidence.MemoryWrite.v2";
+        String write = "{\"@type\": \"MemoryWrite\", \"store\": \"kb\", \"record_ref\": \"mem:r1\"}";
+        String read = "{\"@type\": \"MemoryRead\", \"store\": \"kb\", \"record_refs\": [\"mem:r1\"]}";
+        List<JsonNode> events = List.of(
+                unknownType("w1", writeV2, write),
+                unknownType("w2", writeV2, read),
+                unknownType("w3", "com.example.Thing.v1", write),
+                unknownType("w4", "org.agent-conformance.evidence.MemoryRead.v2", read),
+                unknownType("w5", writeV2, "{\"@type\": \"MemoryWrite\", \"store\": \"\", \"record_ref\": \"\"}"));
+        ArrayNode sources = Json.nodes().arrayNode();
+        sources.addObject().put("id", SOURCE).put("class", "enforcement_point");
+        Ingest.Result result = Ingest.ingest(Fixtures.writeIngestBundle(tempDir.resolve("b"), events, sources));
+        List<String> reasons = new ArrayList<>();
+        result.quarantined.forEach(q -> reasons.add(q.toJson().get("reason").asText()));
+        assertEquals(java.util.Collections.nCopies(5, "unknown_type"), reasons);
+        List<List<Object>> withheld = new ArrayList<>();
+        result.withheld.forEach(w -> withheld.add(java.util.Arrays.asList(w.record().eventId, w.write())));
+        assertEquals(
+                List.of(
+                        java.util.Arrays.asList("w1", new Ingest.UnreadableWrite("mem:r1", "kb")),
+                        java.util.Arrays.asList("w2", new Ingest.UnreadableWrite(null, "kb")),
+                        java.util.Arrays.asList("w3", new Ingest.UnreadableWrite("mem:r1", "kb")),
+                        java.util.Arrays.asList("w5", new Ingest.UnreadableWrite(null, null))),
+                withheld);
+    }
 }

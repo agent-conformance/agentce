@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { DomainBinding } from "./domain";
-import { buildGraph, flaggedRecords } from "./graph";
+import { buildGraph, flaggedRecords, unkeyedFlags } from "./graph";
 
 const TESTDATA = join(__dirname, "..", "testdata");
 
@@ -391,6 +391,30 @@ test("ROB-02: flaggedRecords names every subject that flagged a record (18.120)"
   assert.deepEqual(sorted(flaggedRecords(events)), [["mem:r1", ["a", "b", "d", "f"]]]);
   assert.deepEqual(sorted(flaggedRecords([...events].reverse())), [
     ["mem:r1", ["a", "b", "d", "f"]],
+  ]);
+});
+
+test("ROB-02: a flagged write with no readable record_ref is unkeyed (18.202)", () => {
+  // A flagged write whose record_ref is absent, null or empty names no record; it counts against its store.
+  const write = (id: string, subject: string, data: Record<string, unknown>) => ({
+    ...memoryEvent(id, "MemoryWrite", { store: "kb", trust: "untrusted", ...data }),
+    subject,
+  });
+  const events = [
+    write("w1", "a", {}),
+    write("w2", "b", { record_ref: null }),
+    write("w3", "c", { record_ref: "", store: "" }),
+    write("w4", "d", { record_ref: "mem:r1" }),
+    write("w5", "e", { record_ref: "", trust: "trusted" }),
+  ];
+  assert.deepEqual(
+    [...flaggedRecords(events)].map(([r, by]) => [r, [...by]]),
+    [["mem:r1", ["d"]]],
+  );
+  assert.deepEqual(unkeyedFlags(events), [
+    { recordRef: null, store: "kb" },
+    { recordRef: null, store: "kb" },
+    { recordRef: null, store: null },
   ]);
 });
 
