@@ -158,10 +158,19 @@ public final class Coverage {
         for (Profile.Subject subject : profile.subjects) {
             List<Map.Entry<Profile.CoverageDenominator, Map<String, Integer>>> countsByDenominator = new ArrayList<>();
             for (Profile.CoverageDenominator d : subject.coverageDenominators) {
-                countsByDenominator.add(Map.entry(d, denominatorCounts(d, subject, bySource, bundleRoot, listed)));
+                // The denominator's counts for the types it covers: both the yardstick and the expected counts.
+                Map<String, Integer> counts = denominatorCounts(d, subject, bySource, bundleRoot, listed);
+                List<String> covered = !d.covers.isEmpty() ? d.covers : new ArrayList<>(counts.keySet());
+                Map<String, Integer> kept = new LinkedHashMap<>();
+                for (String t : covered) {
+                    if (counts.containsKey(t)) {
+                        kept.put(t, counts.get(t));
+                    }
+                }
+                countsByDenominator.add(Map.entry(d, kept));
             }
-            // A denominator's own records of a type it counts are the yardstick, not captured operations. One that is
-            // not independent, or counts nothing for a type, hides none of that type's events (SPEC §6.5).
+            // A denominator's own records of a type it covers and counts are the yardstick, not captured operations.
+            // One that is not independent, or does not count a type, hides none of that type's events (SPEC §6.5).
             Set<String> yardstick = new HashSet<>();
             for (Map.Entry<Profile.CoverageDenominator, Map<String, Integer>> e : countsByDenominator) {
                 for (String t : e.getValue().keySet()) {
@@ -186,13 +195,7 @@ public final class Coverage {
             for (Map.Entry<Profile.CoverageDenominator, Map<String, Integer>> e : countsByDenominator) {
                 Profile.CoverageDenominator denominator = e.getKey();
                 Map<String, Integer> counts = e.getValue();
-                List<String> covered = !denominator.covers.isEmpty()
-                        ? denominator.covers
-                        : new ArrayList<>(counts.keySet());
-                for (String type : covered) {
-                    if (!counts.containsKey(type)) {
-                        continue;
-                    }
+                for (String type : counts.keySet()) {
                     types.add(type);
                     ExpectedEntry entry = expected.computeIfAbsent(type, k -> new ExpectedEntry());
                     int value = counts.get(type);

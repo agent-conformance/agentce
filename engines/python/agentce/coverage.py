@@ -110,12 +110,18 @@ def compute_coverage(
 
     subjects_out: dict[str, Any] = {}
     for subject in profile.subjects:
-        counts_by_denominator = [
-            (d, _denominator_counts(d, subject, by_source_type, bundle_root, listed))
-            for d in subject.coverage_denominators
-        ]
-        # A denominator's own records of a type it counts are the yardstick, not captured operations. One that is
-        # not independent, or counts nothing for a type, hides none of that type's events (SPEC §6.5).
+        # Each denominator's counts for the types it covers: both the yardstick and the expected counts.
+        counts_by_denominator: list[tuple[CoverageDenominator, dict[str, int]]] = []
+        for d in subject.coverage_denominators:
+            counts = _denominator_counts(
+                d, subject, by_source_type, bundle_root, listed
+            )
+            covered = d.covers or list(counts)
+            counts_by_denominator.append(
+                (d, {t: counts[t] for t in covered if t in counts})
+            )
+        # A denominator's own records of a type it covers and counts are the yardstick, not captured operations. One
+        # that is not independent, or does not count a type, hides none of that type's events (SPEC §6.5).
         yardstick = {
             (d.source, t) for d, counts in counts_by_denominator for t in counts
         }
@@ -132,10 +138,7 @@ def compute_coverage(
 
         expected: dict[str, dict[str, Any]] = {}
         for denominator, counts in counts_by_denominator:
-            covered = denominator.covers or list(counts)
-            for event_type in covered:
-                if event_type not in counts:
-                    continue
+            for event_type in counts:
                 types.add(event_type)
                 entry = expected.setdefault(
                     event_type, {"count": -1, "denominators": []}

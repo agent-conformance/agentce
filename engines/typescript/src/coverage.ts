@@ -134,11 +134,20 @@ export function computeCoverage(
 
   const subjectsOut: Record<string, unknown> = {};
   for (const subject of profile.subjects) {
-    const countsByDenominator = subject.coverageDenominators.map(
-      (d) => [d, denominatorCounts(d, subject, bySource, bundleRoot, listed)] as const,
-    );
-    // A denominator's own records of a type it counts are the yardstick, not captured operations. One that is
-    // not independent, or counts nothing for a type, hides none of that type's events (SPEC §6.5).
+    // Each denominator's counts for the types it covers: both the yardstick and the expected counts.
+    const countsByDenominator = subject.coverageDenominators.map((d) => {
+      const counts = denominatorCounts(d, subject, bySource, bundleRoot, listed);
+      const covered = d.covers.length > 0 ? d.covers : Object.keys(counts);
+      const kept: Record<string, number> = {};
+      for (const t of covered) {
+        if (t in counts) {
+          kept[t] = counts[t] as number;
+        }
+      }
+      return [d, kept] as const;
+    });
+    // A denominator's own records of a type it covers and counts are the yardstick, not captured operations. One
+    // that is not independent, or does not count a type, hides none of that type's events (SPEC §6.5).
     const yardstick = new Set<string>();
     for (const [d, counts] of countsByDenominator) {
       for (const t of Object.keys(counts)) {
@@ -161,11 +170,7 @@ export function computeCoverage(
 
     const expected = new Map<string, ExpectedEntry>();
     for (const [denominator, counts] of countsByDenominator) {
-      const covered = denominator.covers.length > 0 ? denominator.covers : Object.keys(counts);
-      for (const type of covered) {
-        if (!(type in counts)) {
-          continue;
-        }
+      for (const type of Object.keys(counts)) {
         types.add(type);
         let entry = expected.get(type);
         if (entry === undefined) {
