@@ -13,7 +13,7 @@ import { effectiveRoles } from "./applicability";
 import { type Assertion, type EvidencePointer, makeAssertion } from "./assertions";
 import { type Catalog, type ControlSpec, evidenceShapeFor, shapeFor } from "./catalog";
 import type { DomainBinding } from "./domain";
-import { buildGraph, flaggedRecords } from "./graph";
+import { buildGraph, flaggedRecords, unkeyedFlags } from "./graph";
 import { type UnreadableWrite, type Withheld, digestOf } from "./ingest";
 import type { IntegrityCaps } from "./integrity";
 import { eventIri } from "./iri";
@@ -530,20 +530,27 @@ export function assessSubjects(
 ): Assertion[] {
   const assertions: Assertion[] = [];
   const eventsBySubject = indexBySubject(accepted);
-  // A record another subject's write marked untrusted, held or withheld, is never ruled on for this one (18.120).
-  const flagged = flaggedRecords([
+  // A record another subject's write marked untrusted, held or withheld, is never ruled on for this one (18.120);
+  // such a write with no readable record_ref, under any subject, counts against its store's records, as an unreadable
+  // write does (18.202).
+  const flagSources = [
     ...accepted,
     ...withheld.map((w) => w.event).filter((e): e is Event => e !== null),
-  ]);
+  ];
+  const flagged = flaggedRecords(flagSources);
+  const unkeyed = unkeyedFlags(flagSources);
   for (const subject of profile.subjects) {
     const subjectEvents = eventsBySubject.get(subject.id) ?? [];
     const foreign: Foreign = {
       untrusted: new Set(
         [...flagged].filter(([, by]) => [...by].some((s) => s !== subject.id)).map(([r]) => r),
       ),
-      unreadable: withheld
-        .filter((w) => w.subject !== null && w.subject !== subject.id)
-        .flatMap((w) => (w.write !== undefined ? [w.write] : [])),
+      unreadable: [
+        ...withheld
+          .filter((w) => w.subject !== null && w.subject !== subject.id)
+          .flatMap((w) => (w.write !== undefined ? [w.write] : [])),
+        ...unkeyed,
+      ],
     };
     const store = foreignGraph(subjectEvents, domain, foreign);
     const eventsByIri = eventsByIriOf(subjectEvents);

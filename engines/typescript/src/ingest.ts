@@ -22,6 +22,7 @@ import { readFileSync } from "node:fs";
 import type { Bundle } from "./bundle";
 import { CanonicalizationError, canonicalString } from "./canonical";
 import { InputError } from "./errors";
+import { text } from "./graph";
 import { parseJson } from "./json";
 import { QuarantineReason, type QuarantineRecord } from "./quarantine";
 import { eventTypes, validateEvent } from "./schema";
@@ -32,6 +33,8 @@ import { MAX_JSON_DEPTH } from "./verify";
 
 const DEFAULT_MAX_EVENT_BYTES = 1_048_576;
 const TYPE_RE = /^org\.agent-conformance\.evidence\.([A-Za-z0-9]+)\.v1$/;
+/** The envelope type of a MemoryWrite at any version, known or not (SPEC §7.4, 18.202). */
+const MEMORY_WRITE_TYPE = "org.agent-conformance.evidence.MemoryWrite.";
 /** The whitespace JSON itself allows around a value (RFC 8259 §2); nothing else is trimmed. */
 const JSON_WHITESPACE_EDGES = /^[ \t\r\n]+|[ \t\r\n]+$/g;
 
@@ -125,7 +128,8 @@ interface Candidate {
  * but refused it for where it sits (time_order, a duplicate_id that is not an identical redelivery, class_mismatch,
  * unknown_source); it is null when ingest could not read it at all (schema_invalid, oversize). `subject` is the
  * record's own subject, null when unknown (then the record may belong to any subject). An unknown_type record is not
- * withheld: the engine reads nothing from a type it does not model.
+ * withheld: the engine reads nothing from a type it does not model, unless its type names MemoryWrite, which is
+ * withheld as unreadable (SPEC §7.4, 18.202).
  */
 export interface Withheld {
   record: QuarantineRecord;
@@ -137,7 +141,7 @@ export interface Withheld {
 }
 
 /** What ingest can still see of an unreadable record that may be a MemoryWrite (SPEC §7.4, 18.172): its raw
- * `data.record_ref` and `data.store` when each is a string, else null. */
+ * `data.record_ref` and `data.store` when each is a non-empty string, else null (18.202). */
 export interface UnreadableWrite {
   recordRef: string | null;
   store: string | null;
@@ -189,23 +193,30 @@ function unreadable(record: QuarantineRecord, event?: Record<string, unknown>): 
   };
 }
 
+/** Whether `event`'s envelope type names MemoryWrite at any version, or its `data.@type` is MemoryWrite. */
+function namesMemoryWrite(event: Record<string, unknown>): boolean {
+  return (
+    (typeof event.type === "string" && event.type.startsWith(MEMORY_WRITE_TYPE)) ||
+    (isRecord(event.data) && event.data["@type"] === "MemoryWrite")
+  );
+}
+
 /** The raw MemoryWrite facts of an unreadable `event`: a MemoryWrite unless its envelope or data names another
  * known type, so a record whose type cannot be read, or names a type the engine does not know, counts as one (fail
- * closed, 18.172). */
+ * closed, 18.172). An empty record_ref or store is one that cannot be read (18.202). */
 function unreadableWrite(event: Record<string, unknown>): { write?: UnreadableWrite } {
   const name = typeof event.type === "string" ? eventTypeName(event.type) : null;
   const data = isRecord(event.data) ? event.data : {};
   const declared = data["@type"];
   if (
-    name !== "MemoryWrite" &&
-    declared !== "MemoryWrite" &&
+    !namesMemoryWrite(event) &&
     ((name !== null && eventTypes().has(name)) ||
       (typeof declared === "string" && eventTypes().has(declared)))
   ) {
     return {};
   }
   return {
-    write: { recordRef: optStr(data, "record_ref") ?? null, store: optStr(data, "store") ?? null },
+    write: { recordRef: text(data.record_ref), store: text(data.store) },
   };
 }
 
@@ -324,13 +335,15 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
       const typeValue = String(event.type);
       const name = eventTypeName(typeValue);
       if (name === null || !validTypes.has(name)) {
-        records.push({
+        const unknown: QuarantineRecord = {
           reason: QuarantineReason.UNKNOWN_TYPE,
           eventId: String(event.id),
           source: String(event.source),
           type: typeValue,
           detail: `unrecognised event type '${typeValue}'`,
-        });
+        };
+        // A MemoryWrite at a version the engine does not know may still have changed a record (18.202).
+        records.push(namesMemoryWrite(event) ? unreadable(unknown, event) : unknown);
         continue;
       }
 

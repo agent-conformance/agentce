@@ -231,28 +231,46 @@ function unreadRecords(
   return unread;
 }
 
-/** Each record a MemoryWrite in `events` marks untrusted or writes with no guard ruling (anything but an
- * enforcement-point write with a trust or a verdict), with the subjects whose records hold such a write. A subject's
- * graph reads a record another subject flagged or rewrote unruled as one its guard never ruled on (18.120). */
-export function flaggedRecords(events: Iterable<Event>): Map<string, Set<string>> {
-  const flagged = new Map<string, Set<string>>();
+/** Each MemoryWrite in `events` that marks its record untrusted or writes with no guard ruling (anything but an
+ * enforcement-point write with a trust or a verdict), with its subject and data. */
+function* flaggedWrites(events: Iterable<Event>): Generator<[string, Record<string, unknown>]> {
   for (const event of events) {
     const data = dataOf(event);
-    const record = data.record_ref;
-    if (
-      data["@type"] === "MemoryWrite" &&
-      typeof record === "string" &&
-      (flagsUntrusted(data) || !ruledWrite(event, data))
-    ) {
+    if (data["@type"] === "MemoryWrite" && (flagsUntrusted(data) || !ruledWrite(event, data))) {
+      yield [String(event.subject ?? ""), data];
+    }
+  }
+}
+
+/** Each record a MemoryWrite in `events` marks untrusted or writes with no guard ruling, with the subjects whose
+ * records hold such a write. A subject's graph reads a record another subject flagged or rewrote unruled as one its
+ * guard never ruled on (18.120). */
+export function flaggedRecords(events: Iterable<Event>): Map<string, Set<string>> {
+  const flagged = new Map<string, Set<string>>();
+  for (const [subject, data] of flaggedWrites(events)) {
+    const record = text(data.record_ref);
+    if (record !== null) {
       let subjects = flagged.get(record);
       if (subjects === undefined) {
         subjects = new Set();
         flagged.set(record, subjects);
       }
-      subjects.add(String(event.subject ?? ""));
+      subjects.add(subject);
     }
   }
   return flagged;
+}
+
+/** Each such write whose `record_ref` cannot be read (absent, null or empty), under any subject, as its store: it
+ * counts against every record of its store, or every record, as an unreadable write does (SPEC §7.4, 18.202). */
+export function unkeyedFlags(events: Iterable<Event>): UnreadableWrite[] {
+  const unkeyed: UnreadableWrite[] = [];
+  for (const [, data] of flaggedWrites(events)) {
+    if (text(data.record_ref) === null) {
+      unkeyed.push({ recordRef: null, store: text(data.store) });
+    }
+  }
+  return unkeyed;
 }
 
 function flow(edges: Map<string, Set<string>>, source: unknown, target: unknown): void {
