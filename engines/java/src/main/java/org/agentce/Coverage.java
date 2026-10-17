@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -84,14 +85,6 @@ public final class Coverage {
         return true;
     }
 
-    /**
-     * True when the denominator's yardstick is its own source's ingested events, which are then left out of the
-     * subject's observed count; a manifest-bearing or non-independent denominator never hides any event.
-     */
-    static boolean selfCounting(Profile.CoverageDenominator denominator, Profile.Subject subject) {
-        return (denominator.manifest == null || denominator.manifest.isEmpty()) && independent(denominator, subject);
-    }
-
     static Map<String, Integer> denominatorCounts(
             Profile.CoverageDenominator denominator,
             Profile.Subject subject,
@@ -163,10 +156,16 @@ public final class Coverage {
 
         ObjectNode subjectsOut = Json.nodes().objectNode();
         for (Profile.Subject subject : profile.subjects) {
-            Set<String> denomIds = new LinkedHashSet<>();
+            List<Map.Entry<Profile.CoverageDenominator, Map<String, Integer>>> countsByDenominator = new ArrayList<>();
             for (Profile.CoverageDenominator d : subject.coverageDenominators) {
-                if (selfCounting(d, subject)) {
-                    denomIds.add(d.source);
+                countsByDenominator.add(Map.entry(d, denominatorCounts(d, subject, bySource, bundleRoot, listed)));
+            }
+            // A denominator's own records of a type it counts are the yardstick, not captured operations. One that is
+            // not independent, or counts nothing for a type, hides none of that type's events (SPEC §6.5).
+            Set<String> yardstick = new HashSet<>();
+            for (Map.Entry<Profile.CoverageDenominator, Map<String, Integer>> e : countsByDenominator) {
+                for (String t : e.getValue().keySet()) {
+                    yardstick.add(e.getKey().source + "\u0000" + t);
                 }
             }
             Map<String, Integer> observed = new LinkedHashMap<>();
@@ -175,17 +174,18 @@ public final class Coverage {
                 if (!subject(event).equals(subject.id)) {
                     continue;
                 }
-                if (denomIds.contains(source(event))) {
+                String type = eventType(event);
+                if (yardstick.contains(source(event) + "\u0000" + type)) {
                     continue;
                 }
-                String type = eventType(event);
                 observed.merge(type, 1, Integer::sum);
                 types.add(type);
             }
 
             Map<String, ExpectedEntry> expected = new LinkedHashMap<>();
-            for (Profile.CoverageDenominator denominator : subject.coverageDenominators) {
-                Map<String, Integer> counts = denominatorCounts(denominator, subject, bySource, bundleRoot, listed);
+            for (Map.Entry<Profile.CoverageDenominator, Map<String, Integer>> e : countsByDenominator) {
+                Profile.CoverageDenominator denominator = e.getKey();
+                Map<String, Integer> counts = e.getValue();
                 List<String> covered = !denominator.covers.isEmpty()
                         ? denominator.covers
                         : new ArrayList<>(counts.keySet());

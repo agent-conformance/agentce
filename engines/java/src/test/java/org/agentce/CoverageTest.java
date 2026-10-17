@@ -82,4 +82,32 @@ class CoverageTest {
                 Coverage.denominatorCounts(
                         denominator("reference/counts.json"), SUBJECT, BY_SOURCE, bundleRoot, LISTED));
     }
+
+    @Test
+    void manifestDenominatorOwnRecordsAreNeverCapturedCalls(@TempDir Path tempDir) throws IOException {
+        Path bundleRoot = tempDir.resolve("bundle");
+        Files.createDirectories(bundleRoot.resolve("reference"));
+        Files.writeString(
+                bundleRoot.resolve("reference").resolve("counts.json"),
+                "{\"counts\": {\"ToolCall\": 2}}",
+                StandardCharsets.UTF_8);
+        Profile profile = Profile.fromDict(Json.parse("{\"subjects\": [{\"id\": \"subj-A\", \"coverage_denominators\": "
+                + "[{\"kind\": \"egress_proxy_log\", \"source\": \"urn:src:egress\", \"covers\": [\"ToolCall\"], "
+                + "\"manifest\": \"reference/counts.json\"}]}]}"));
+        List<JsonNode> events = Fixtures.toList(Json.parse("["
+                + "{\"source\": \"urn:src:agent\", \"subject\": \"subj-A\", \"data\": {\"@type\": \"ToolCall\"}},"
+                + "{\"source\": \"urn:src:egress\", \"subject\": \"subj-A\", \"data\": {\"@type\": \"ToolCall\"}},"
+                + "{\"source\": \"urn:src:egress\", \"subject\": \"subj-A\", \"data\": {\"@type\": \"ToolCall\"}},"
+                + "{\"source\": \"urn:src:egress\", \"subject\": \"subj-A\", \"data\": {\"@type\": \"SessionStart\"}}]"));
+
+        // The egress log's own ToolCall records are its yardstick, never captured calls (SPEC §6.5); its SessionStart,
+        // a type it does not count, stays observed.
+        JsonNode types = Coverage.computeCoverage(events, profile, bundleRoot, LISTED)
+                .get("subjects").get("subj-A").get("event_types");
+        assertEquals(1, types.get("ToolCall").get("observed").asInt());
+        assertEquals(2, types.get("ToolCall").get("expected").asInt());
+        assertEquals("below_threshold", types.get("ToolCall").get("status").asText());
+        assertEquals(1, types.get("SessionStart").get("observed").asInt());
+        assertEquals("unknown", types.get("SessionStart").get("status").asText());
+    }
 }

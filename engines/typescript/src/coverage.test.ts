@@ -136,3 +136,29 @@ test("a denominator manifest that is a symlink inside the bundle root is still r
     assert.equal(expectedToolCalls(result), 5);
   });
 });
+
+test("a manifest-reading denominator's own records of a type it counts are never captured calls", () => {
+  withTempBundle((_dir, root) => {
+    writeFileSync(join(root, "reference", "counts.json"), '{"counts": {"ToolCall": 2}}', "utf-8");
+    const events = [
+      ...EVENTS,
+      { source: DENOMINATOR_SOURCE, subject: "subj-A", data: { "@type": "SessionStart" } },
+    ];
+
+    const result = computeCoverage(
+      events,
+      profileWithManifest("reference/counts.json"),
+      root,
+      LISTED,
+    );
+    const subjects = result.subjects as Record<
+      string,
+      { event_types: Record<string, { observed: number; expected: unknown; status: string }> }
+    >;
+    const types = subjects["subj-A"]?.event_types ?? {};
+    assert.deepEqual([types.ToolCall?.observed, types.ToolCall?.expected], [1, 2]);
+    assert.equal(types.ToolCall?.status, "below_threshold");
+    assert.equal(types.SessionStart?.observed, 1);
+    assert.equal(types.SessionStart?.status, "unknown");
+  });
+});

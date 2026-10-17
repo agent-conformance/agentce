@@ -147,3 +147,46 @@ def test_expected_from_source_manifest(tmp_path: Path) -> None:
     )["subjects"][SUBJECT]["event_types"]["ToolCall"]
     assert tool["expected"] == 4
     assert tool["status"] == STATUS_COVERED
+
+
+def test_manifest_denominator_own_records_are_not_captured(tmp_path: Path) -> None:
+    """A manifest-reading denominator's own records of a type it counts are its yardstick, never captured calls, so
+    they cannot reconcile it (SPEC §6.5); its records of a type it does not count stay observed."""
+    (tmp_path / "reference").mkdir()
+    (tmp_path / "reference" / "egress.json").write_text(
+        json.dumps({"counts": {"ToolCall": 2}}), encoding="utf-8"
+    )
+    profile = Profile.from_dict(
+        {
+            "subjects": [
+                {
+                    "id": SUBJECT,
+                    "evidence_sources": [
+                        {
+                            "adapter": "gw",
+                            "source": "urn:src:gw",
+                            "class": "enforcement_point",
+                        }
+                    ],
+                    "coverage_denominators": [
+                        {
+                            "kind": "egress_proxy_log",
+                            "source": "urn:src:egress",
+                            "covers": ["ToolCall"],
+                            "manifest": "reference/egress.json",
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+    events = [event(0, "urn:src:gw", "ToolCall")]
+    events += [event(10 + i, "urn:src:egress", "ToolCall") for i in range(2)]
+    events.append(event(20, "urn:src:egress", "SessionStart"))
+    types = compute_coverage(
+        events, profile, tmp_path, listed=frozenset({"reference/egress.json"})
+    )["subjects"][SUBJECT]["event_types"]
+    assert (types["ToolCall"]["observed"], types["ToolCall"]["expected"]) == (1, 2)
+    assert types["ToolCall"]["status"] == STATUS_BELOW
+    assert types["SessionStart"]["observed"] == 1
+    assert types["SessionStart"]["status"] == STATUS_UNKNOWN

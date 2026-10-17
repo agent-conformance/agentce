@@ -65,12 +65,6 @@ function independent(denominator: CoverageDenominator, subject: Subject): boolea
   );
 }
 
-/** True when the denominator's yardstick is its own source's ingested events, which are then left out of the
- * subject's observed count; a manifest-bearing or non-independent denominator never hides any event. */
-function selfCounting(denominator: CoverageDenominator, subject: Subject): boolean {
-  return !denominator.manifest && independent(denominator, subject);
-}
-
 function denominatorCounts(
   denominator: CoverageDenominator,
   subject: Subject,
@@ -140,26 +134,33 @@ export function computeCoverage(
 
   const subjectsOut: Record<string, unknown> = {};
   for (const subject of profile.subjects) {
-    const denomIds = new Set(
-      subject.coverageDenominators.filter((d) => selfCounting(d, subject)).map((d) => d.source),
+    const countsByDenominator = subject.coverageDenominators.map(
+      (d) => [d, denominatorCounts(d, subject, bySource, bundleRoot, listed)] as const,
     );
+    // A denominator's own records of a type it counts are the yardstick, not captured operations. One that is
+    // not independent, or counts nothing for a type, hides none of that type's events (SPEC §6.5).
+    const yardstick = new Set<string>();
+    for (const [d, counts] of countsByDenominator) {
+      for (const t of Object.keys(counts)) {
+        yardstick.add(`${d.source}\u0000${t}`);
+      }
+    }
     const observed = new Map<string, number>();
     const types = new Set<string>();
     for (const event of events) {
       if (String(event.subject ?? "") !== subject.id) {
         continue;
       }
-      if (denomIds.has(String(event.source ?? ""))) {
-        continue; // a denominator's own events are the yardstick, not captured operations
-      }
       const type = eventType(event);
+      if (yardstick.has(`${String(event.source ?? "")}\u0000${type}`)) {
+        continue;
+      }
       observed.set(type, (observed.get(type) ?? 0) + 1);
       types.add(type);
     }
 
     const expected = new Map<string, ExpectedEntry>();
-    for (const denominator of subject.coverageDenominators) {
-      const counts = denominatorCounts(denominator, subject, bySource, bundleRoot, listed);
+    for (const [denominator, counts] of countsByDenominator) {
       const covered = denominator.covers.length > 0 ? denominator.covers : Object.keys(counts);
       for (const type of covered) {
         if (!(type in counts)) {

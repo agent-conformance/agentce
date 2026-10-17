@@ -55,12 +55,6 @@ def _independent(denominator: CoverageDenominator, subject: Subject) -> bool:
     )
 
 
-def _self_counting(denominator: CoverageDenominator, subject: Subject) -> bool:
-    """True when the denominator's yardstick is its own source's ingested events, which are then left out of the
-    subject's observed count; a manifest-bearing or non-independent denominator never hides any event."""
-    return not denominator.manifest and _independent(denominator, subject)
-
-
 def _denominator_counts(
     denominator: CoverageDenominator,
     subject: Subject,
@@ -116,27 +110,28 @@ def compute_coverage(
 
     subjects_out: dict[str, Any] = {}
     for subject in profile.subjects:
-        denominator_ids = {
-            d.source
+        counts_by_denominator = [
+            (d, _denominator_counts(d, subject, by_source_type, bundle_root, listed))
             for d in subject.coverage_denominators
-            if _self_counting(d, subject)
+        ]
+        # A denominator's own records of a type it counts are the yardstick, not captured operations. One that is
+        # not independent, or counts nothing for a type, hides none of that type's events (SPEC §6.5).
+        yardstick = {
+            (d.source, t) for d, counts in counts_by_denominator for t in counts
         }
         observed: dict[str, int] = defaultdict(int)
         types: set[str] = set()
         for event in events:
             if str(event.get("subject", "")) != subject.id:
                 continue
-            if str(event.get("source", "")) in denominator_ids:
-                continue  # a denominator's own events are the yardstick, not captured operations
             event_type = event_type_of(event)
+            if (str(event.get("source", "")), event_type) in yardstick:
+                continue
             observed[event_type] += 1
             types.add(event_type)
 
         expected: dict[str, dict[str, Any]] = {}
-        for denominator in subject.coverage_denominators:
-            counts = _denominator_counts(
-                denominator, subject, by_source_type, bundle_root, listed
-            )
+        for denominator, counts in counts_by_denominator:
             covered = denominator.covers or list(counts)
             for event_type in covered:
                 if event_type not in counts:
