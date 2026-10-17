@@ -159,10 +159,10 @@
       },
       "violations": [
         {
-          "constraint": "sh:minCount",
+          "constraint": "sh:hasValue",
           "focus": "agentce:event/i1",
           "message_key": "CND-06.S1",
-          "path": "agentce:refusedBy"
+          "path": "agentce:refusalMet"
         }
       ]
     },

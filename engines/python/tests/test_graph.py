@@ -2241,3 +2241,128 @@ def test_cnd04_reads_the_delegation_chain() -> None:
         "true",
         "false",
     )
+
+
+# --- CND-06: refusals of instructions and of enforcement-point denies (SPEC §7.7.4; 18.173) ---
+
+CND06_FAILS = ("true", "false", "true")
+CND06_MEETS = ("true", "true", "true")
+CND06_UNJUDGED = ("true", "true", "false")
+CND06_OUTSIDE = (None, None, None)
+
+
+def _refusal(events: list[dict[str, Any]], node: str = "i1") -> tuple[str | None, ...]:
+    """CND-06's literals on ``node``: in scope, Refusal met, and whether the need for one is shown."""
+    store = build_graph(events, domain=DOMAIN)
+    return tuple(
+        next(iter(store.literal_values(event_iri(node), p)), None)
+        for p in (
+            "agentce:refusalInScope",
+            "agentce:refusalMet",
+            "agentce:refusalNeedShown",
+        )
+    )
+
+
+def _refused(instruction: Any = "agentce:event/i1") -> dict[str, Any]:
+    """The agent's own Refusal of ``instruction`` (a self_report Refusal counts, ruling 16 A)."""
+    return _self_report(
+        _event("rf1", "Refusal", {"refs": {"instruction": instruction}})
+    )
+
+
+def _user(principal: Any = None) -> dict[str, Any]:
+    principal = {"kind": "human", "id": "u1"} if principal is None else principal
+    return _event("i1", "Instruction", {"source_class": "user", "principal": principal})
+
+
+def _deny(refs: dict[str, Any], decision_word: str = "deny") -> dict[str, Any]:
+    return _event("pd1", "PolicyDecision", {"decision": decision_word, "refs": refs})
+
+
+DENY_TC1 = {"request": "agentce:event/tc1"}
+
+
+def test_cnd06_an_instruction_from_an_untrusted_or_unknown_source_needs_a_refusal() -> (
+    None
+):
+    for data in ({}, {"source_class": 7}, {"source_class": "tool_output"}):
+        events = [_event("i1", "Instruction", data), _call()]
+        assert _refusal(events) == CND06_FAILS, data
+        assert _refusal([*events, _refused()]) == CND06_MEETS, data
+        assert _refusal([*events, _refused(7)]) == CND06_FAILS, data
+    assert _refusal([_instruction("i1", "retrieved")]) == CND06_FAILS
+
+
+def test_cnd06_an_authorised_class_its_own_enforcement_point_record_shows_is_outside() -> (
+    None
+):
+    assert _refusal([_user(), _call()]) == CND06_OUTSIDE
+    assert _refusal([_user()]) == CND06_OUTSIDE
+    memory = _instruction("i1", "memory_trusted")
+    assert _refusal([memory, _call()]) == CND06_OUTSIDE
+
+
+def test_cnd06_an_authorised_class_the_records_do_not_show_is_unjudged() -> None:
+    reported = _self_report(_user())
+    assert _refusal([reported, _call()]) == CND06_UNJUDGED
+    assert _refusal([reported]) == CND06_UNJUDGED
+    assert _refusal([reported, _call(), _refused()]) == CND06_MEETS
+    for principal in ({}, {"kind": "human", "id": ""}, "u1"):
+        assert _refusal([_user(principal), _call()]) == CND06_UNJUDGED, principal
+    bare = _instruction("i1", "user")
+    assert _refusal([bare, _call()]) == CND06_UNJUDGED
+    assert _refusal([_instruction("i1", "user", parent="gone")]) == CND06_UNJUDGED
+
+
+def test_cnd06_an_enforcement_point_deny_needs_a_refusal_of_the_instruction_it_blocked() -> (
+    None
+):
+    events = [_user(), _call(), _deny(DENY_TC1)]
+    assert _refusal(events, "pd1") == CND06_FAILS
+    assert _refusal([*events, _refused()], "pd1") == CND06_MEETS
+    assert _refusal([*events, _refused("agentce:event/i2")], "pd1") == CND06_FAILS
+    independent = _deny(DENY_TC1)
+    independent["agentcesourceclass"] = "independent_system"
+    assert _refusal([_user(), _call(), independent], "pd1") == CND06_FAILS
+    for deny in (
+        _self_report(_deny(DENY_TC1)),
+        _deny(DENY_TC1, "allow"),
+        _deny(DENY_TC1, "Deny"),
+    ):
+        assert _refusal([_user(), _call(), deny], "pd1") == CND06_OUTSIDE
+
+
+def test_cnd06_a_deny_whose_request_cannot_show_its_instruction_is_unjudged() -> None:
+    for refs in ({}, {"request": 7}, {"request": "agentce:event/gone"}):
+        assert _refusal([_deny(refs)], "pd1") == CND06_UNJUDGED, refs
+    plain = _event("tc1", "ToolCall", {"refs": {}})
+    assert _refusal([plain, _deny(DENY_TC1)], "pd1") == CND06_OUTSIDE
+    plain_null = _event("tc1", "ToolCall", {"refs": {"instruction": None}})
+    assert _refusal([plain_null, _deny(DENY_TC1)], "pd1") == CND06_OUTSIDE
+    reported = _self_report(_event("tc1", "ToolCall", {"refs": {}}))
+    assert _refusal([reported, _deny(DENY_TC1)], "pd1") == CND06_UNJUDGED
+
+
+def test_cnd06_a_deny_of_a_call_executing_an_instructed_decision_needs_a_refusal() -> (
+    None
+):
+    dec = decision("d1", "t")
+    dec["data"]["refs"] = {"instruction": "agentce:event/i1"}
+    executes = _event("tc1", "ToolCall", {"refs": {"decision": "agentce:event/d1"}})
+    events = [_user(), dec, executes, _deny(DENY_TC1)]
+    assert _refusal(events, "pd1") == CND06_FAILS
+    assert _refusal([*events, _refused()], "pd1") == CND06_MEETS
+    assert _refusal([_user(), executes, _deny(DENY_TC1)], "pd1") == CND06_UNJUDGED
+
+
+def test_cnd06_is_independent_of_event_order() -> None:
+    events = [
+        _instruction("i1", "tool_output"),
+        _call(),
+        _deny(DENY_TC1),
+        _refused(),
+        _self_report(_instruction("i2", "user")),
+    ]
+    for node in ("i1", "pd1", "i2"):
+        assert _refusal(events, node) == _refusal(events[::-1], node), node

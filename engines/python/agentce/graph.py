@@ -1043,6 +1043,90 @@ class _Builder:
                 judged, terminus = False, None
         return met, judged, terminus
 
+    def _conduct_refusals(self, events: list[dict[str, Any]]) -> None:
+        """Materialise CND-06's population and judgment (SPEC §7.7.4; rulings 16 A, 17 B, 18 B of 2026-10-12). An
+        Instruction needs a Refusal when its source_class is absent, not a string or an untrusted Appendix F class; one
+        declaring an authorised class is in scope, unjudged, when the records do not show it: no principal with an id
+        where SPEC §6.2.3 requires one, or not attested (SPEC §7.7.5) for every held call or Decision acting on it, or for
+        itself when nothing acts on it. An enforcement-point (or better) PolicyDecision ``deny`` needs a Refusal of the
+        instruction its request acts on, through refs.instruction or the Decision refs.decision names; it is unjudged
+        when the request, or that Decision, is not held, or is an agent's own record naming no instruction. Each in-scope
+        node gets ``agentce:refusalInScope``, ``agentce:refusalMet`` (no Refusal is missing where one is required) and
+        ``agentce:refusalNeedShown`` (false when unjudged and unrefused)."""
+        from .source_class import SourceClassJudge
+
+        by_iri = {event_iri(str(e["id"])): e for e in events}
+        acting: dict[str, list[str]] = {}
+        for node, event in by_iri.items():
+            instruction = _refs(event).get("instruction")
+            if self._ptype(event) in ("ToolCall", "Decision") and isinstance(
+                instruction, str
+            ):
+                acting.setdefault(instruction, []).append(node)
+        judge: SourceClassJudge | None = None
+
+        def refused(instruction: str) -> bool:
+            return bool(self.store.objects(instruction, "agentce:refusedBy"))
+
+        def mark(node: str, met: bool, shown: bool) -> None:
+            self._literal(node, "agentce:refusalInScope", True)
+            self._literal(node, "agentce:refusalMet", met)
+            self._literal(node, "agentce:refusalNeedShown", shown)
+
+        for node, event in sorted(by_iri.items()):
+            ptype = self._ptype(event)
+            data = _data(event)
+            if ptype == "Instruction":
+                source_class = data.get("source_class")
+                needs_refusal = not _is_one_of(source_class, _TRUSTED_INSTRUCTION)
+                if needs_refusal:
+                    mark(node, refused(node), True)
+                    continue
+                if judge is None:
+                    judge = SourceClassJudge(self.store, by_iri)
+                shown = (
+                    source_class not in _AUTHORISED_INSTRUCTION
+                    or _principal_key(data.get("principal")) != ""
+                ) and all(
+                    judge.attested(focus, node) for focus in acting.get(node, [node])
+                )
+                if not shown:
+                    mark(node, True, refused(node))
+            elif (
+                ptype == "PolicyDecision"
+                and event.get("agentcesourceclass") in _AT_OR_ABOVE_EP
+                and data.get("decision") == "deny"
+            ):
+                instruction = self._denied_instruction(by_iri, _refs(event))
+                if instruction is None:
+                    mark(node, True, False)
+                elif instruction:
+                    mark(node, refused(instruction), True)
+
+    def _denied_instruction(
+        self, by_iri: dict[str, dict[str, Any]], refs: dict[str, Any]
+    ) -> str | None:
+        """The instruction a deny's request acts on: its refs.instruction, or that of the held Decision its refs.decision
+        names (agentce:executes). ``""`` when the request is an enforcement-point record naming no instruction (outside
+        CND-06's deny clause); None when the records cannot show it: the request or that Decision is not held, or the
+        request is an agent's own record naming no instruction."""
+        request = refs.get("request")
+        event = by_iri.get(request) if isinstance(request, str) else None
+        if event is None:
+            return None
+        instruction = _refs(event).get("instruction")
+        if isinstance(instruction, str):
+            return instruction
+        decision = _refs(event).get("decision")
+        if decision is not None:
+            held = by_iri.get(self._held_decision(decision) or "")
+            if held is None:
+                return None
+            instruction = _refs(held).get("instruction")
+            if isinstance(instruction, str):
+                return instruction
+        return "" if event.get("agentcesourceclass") in _AT_OR_ABOVE_EP else None
+
     def _role_authorised(
         self,
         by_iri: dict[str, dict[str, Any]],
@@ -1359,6 +1443,7 @@ class _Builder:
         self._conduct_scope_budget(events)
         self._conduct_gate(events)
         self._conduct_provenance(events)
+        self._conduct_refusals(events)
         self._preceded_by()
 
     @staticmethod

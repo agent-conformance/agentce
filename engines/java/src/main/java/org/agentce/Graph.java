@@ -1158,6 +1158,101 @@ public final class Graph {
          * (SPEC §7.7.4 "for the task type", §7.7.6 {@code authorised_principal_roles}); the Python engine's
          * {@code _role_authorised} documents the reading. Below enforcement_point the role is the agent's word, so
          * each enforcement-point witness of the same principal must record the same role ({@link #witnessRoles}). */
+        /** CND-06's population and judgment (SPEC §7.7.4; rulings 16 A, 17 B, 18 B), as graph.py
+         * {@code _conduct_refusals}: an Instruction needs a Refusal when its source_class is absent, not a string or
+         * untrusted; one declaring an authorised class is in scope, unjudged, when the records do not show it (no
+         * principal id where §6.2.3 requires one, or not attested for every held call or Decision acting on it, or for
+         * itself when nothing acts on it). An enforcement-point (or better) deny needs a Refusal of the instruction its
+         * request acts on; it is unjudged when that cannot be shown. */
+        private void conductRefusals(List<JsonNode> events) {
+            Map<String, JsonNode> byIri = new LinkedHashMap<>();
+            for (JsonNode e : events) {
+                byIri.put(Iri.eventIri(e.get("id").asText()), e);
+            }
+            Map<String, List<String>> acting = new LinkedHashMap<>();
+            for (Map.Entry<String, JsonNode> entry : byIri.entrySet()) {
+                JsonNode instruction = refsOf(entry.getValue()).get("instruction");
+                String ptype = ptype(entry.getValue());
+                if (("ToolCall".equals(ptype) || "Decision".equals(ptype)) && instruction != null
+                        && instruction.isTextual()) {
+                    acting.computeIfAbsent(instruction.asText(), k -> new ArrayList<>()).add(entry.getKey());
+                }
+            }
+            List<String> nodes = new ArrayList<>(byIri.keySet());
+            nodes.sort(Json::byteCompare);
+            SourceClass.Judge judge = null;
+            for (String node : nodes) {
+                JsonNode event = byIri.get(node);
+                String ptype = ptype(event);
+                JsonNode data = dataOf(event);
+                if ("Instruction".equals(ptype)) {
+                    JsonNode sourceClass = data.get("source_class");
+                    if (!isOneOf(sourceClass, TRUSTED_INSTRUCTION)) {
+                        markRefusal(node, refused(node), true);
+                        continue;
+                    }
+                    if (judge == null) {
+                        judge = new SourceClass.Judge(store, byIri);
+                    }
+                    boolean shown = !isOneOf(sourceClass, AUTHORISED_INSTRUCTION)
+                            || !principalKey(data.get("principal")).isEmpty();
+                    for (String focus : acting.getOrDefault(node, List.of(node))) {
+                        shown = shown && judge.attested(focus, node);
+                    }
+                    if (!shown) {
+                        markRefusal(node, true, refused(node));
+                    }
+                } else if ("PolicyDecision".equals(ptype)
+                        && isOneOf(event.get("agentcesourceclass"), AT_OR_ABOVE_EP)
+                        && "deny".equals(str(data.get("decision")))) {
+                    String instruction = deniedInstruction(byIri, refsOf(event));
+                    if (instruction == null) {
+                        markRefusal(node, true, false);
+                    } else if (!instruction.isEmpty()) {
+                        markRefusal(node, refused(instruction), true);
+                    }
+                }
+            }
+        }
+
+        private boolean refused(String instruction) {
+            return !store.objects(instruction, "agentce:refusedBy").isEmpty();
+        }
+
+        private void markRefusal(String node, boolean met, boolean shown) {
+            literal(node, "agentce:refusalInScope", true);
+            literal(node, "agentce:refusalMet", met);
+            literal(node, "agentce:refusalNeedShown", shown);
+        }
+
+        /** The instruction a deny's request acts on: its refs.instruction, or that of the held Decision its
+         * refs.decision names; "" when the request is an enforcement-point record naming none (outside the deny
+         * clause); null when the records cannot show it (graph.py {@code _denied_instruction}). */
+        private String deniedInstruction(Map<String, JsonNode> byIri, JsonNode refs) {
+            JsonNode request = refs.get("request");
+            JsonNode event = request != null && request.isTextual() ? byIri.get(request.asText()) : null;
+            if (event == null) {
+                return null;
+            }
+            JsonNode instruction = refsOf(event).get("instruction");
+            if (instruction != null && instruction.isTextual()) {
+                return instruction.asText();
+            }
+            JsonNode decision = refsOf(event).get("decision");
+            if (!isAbsent(decision)) {
+                String heldIri = heldDecision(decision);
+                JsonNode held = heldIri == null ? null : byIri.get(heldIri);
+                if (held == null) {
+                    return null;
+                }
+                JsonNode named = refsOf(held).get("instruction");
+                if (named != null && named.isTextual()) {
+                    return named.asText();
+                }
+            }
+            return isOneOf(event.get("agentcesourceclass"), AT_OR_ABOVE_EP) ? "" : null;
+        }
+
         private boolean[] roleAuthorised(
                 Map<String, JsonNode> byIri, String node, JsonNode event, List<JsonNode> calls, JsonNode terminus) {
             Set<String> tasks = actionTasks(event);
@@ -1639,6 +1734,7 @@ public final class Graph {
             conductScopeBudget(events);
             conductGate(events);
             conductProvenance(events);
+            conductRefusals(events);
             precededBy();
         }
 

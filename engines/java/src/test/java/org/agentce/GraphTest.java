@@ -1586,4 +1586,146 @@ class GraphTest {
         assertEquals(UNJUDGED, provenance(ProvOpts.DEFAULT.delegation(null)));
         assertEquals(UNJUDGED, provenance(ProvOpts.DEFAULT.delegation("unheld")));
     }
+
+    // --- CND-06: refusals of instructions and of enforcement-point denies (SPEC §7.7.4; 18.173) ---
+
+    private static final List<String> CND06_FAILS = List.of("true", "false", "true");
+    private static final List<String> CND06_MEETS = List.of("true", "true", "true");
+    private static final List<String> CND06_UNJUDGED = List.of("true", "true", "false");
+    private static final List<String> CND06_OUTSIDE = Collections.nCopies(3, null);
+
+    /** CND-06's literals on {@code node}: in scope, Refusal met, and whether the need for one is shown. */
+    private static List<String> refusal(List<JsonNode> events, String node) {
+        GraphStore store = Graph.buildGraph(events, DomainBinding.fromDict(CREDIT_DOMAIN));
+        List<String> out = new ArrayList<>();
+        for (String p : List.of("agentce:refusalInScope", "agentce:refusalMet", "agentce:refusalNeedShown")) {
+            List<String> values = store.literalValues("agentce:event/" + node, p);
+            out.add(values.isEmpty() ? null : values.get(0));
+        }
+        return out;
+    }
+
+    /** The agent's own Refusal of {@code instructionJson} (a self_report Refusal counts, ruling 16 A). */
+    private static JsonNode cnd06Refused(String instructionJson) {
+        return selfReport(event("rf1", "Refusal", "\"refs\": {\"instruction\": " + instructionJson + "}"));
+    }
+
+    private static JsonNode cnd06Refused() {
+        return cnd06Refused("\"agentce:event/i1\"");
+    }
+
+    private static JsonNode cnd06User(String principalJson) {
+        return event("i1", "Instruction", "\"source_class\": \"user\", \"principal\": " + principalJson);
+    }
+
+    private static JsonNode cnd06User() {
+        return cnd06User("{\"kind\": \"human\", \"id\": \"u1\"}");
+    }
+
+    private static JsonNode cnd06Call(String refsJson) {
+        return event("tc1", "ToolCall", "\"refs\": " + refsJson);
+    }
+
+    private static JsonNode cnd06Call() {
+        return cnd06Call("{\"instruction\": \"agentce:event/i1\"}");
+    }
+
+    private static JsonNode cnd06Deny(String refsJson, String word) {
+        return event("pd1", "PolicyDecision", "\"decision\": \"" + word + "\", \"refs\": " + refsJson);
+    }
+
+    private static final String DENY_TC1 = "{\"request\": \"agentce:event/tc1\"}";
+
+    private static List<JsonNode> with(List<JsonNode> events, JsonNode... more) {
+        List<JsonNode> out = new ArrayList<>(events);
+        out.addAll(List.of(more));
+        return out;
+    }
+
+    @Test
+    void cnd06AnInstructionFromAnUntrustedOrUnknownSourceNeedsARefusal() {
+        for (String data : List.of("", "\"source_class\": 7", "\"source_class\": \"tool_output\"")) {
+            List<JsonNode> events = List.of(event("i1", "Instruction", data), cnd06Call());
+            assertEquals(CND06_FAILS, refusal(events, "i1"), data);
+            assertEquals(CND06_MEETS, refusal(with(events, cnd06Refused()), "i1"), data);
+            assertEquals(CND06_FAILS, refusal(with(events, cnd06Refused("7")), "i1"), data);
+        }
+        assertEquals(CND06_FAILS,
+                refusal(List.of(event("i1", "Instruction", "\"source_class\": \"retrieved\"")), "i1"));
+    }
+
+    @Test
+    void cnd06AnAuthorisedClassItsOwnEnforcementPointRecordShowsIsOutside() {
+        assertEquals(CND06_OUTSIDE, refusal(List.of(cnd06User(), cnd06Call()), "i1"));
+        assertEquals(CND06_OUTSIDE, refusal(List.of(cnd06User()), "i1"));
+        JsonNode memory = event("i1", "Instruction", "\"source_class\": \"memory_trusted\"");
+        assertEquals(CND06_OUTSIDE, refusal(List.of(memory, cnd06Call()), "i1"));
+    }
+
+    @Test
+    void cnd06AnAuthorisedClassTheRecordsDoNotShowIsUnjudged() {
+        assertEquals(CND06_UNJUDGED, refusal(List.of(selfReport(cnd06User()), cnd06Call()), "i1"));
+        assertEquals(CND06_UNJUDGED, refusal(List.of(selfReport(cnd06User())), "i1"));
+        assertEquals(CND06_MEETS, refusal(List.of(selfReport(cnd06User()), cnd06Call(), cnd06Refused()), "i1"));
+        for (String principal : List.of("{}", "{\"kind\": \"human\", \"id\": \"\"}", "\"u1\"")) {
+            assertEquals(CND06_UNJUDGED, refusal(List.of(cnd06User(principal), cnd06Call()), "i1"), principal);
+        }
+        JsonNode bare = event("i1", "Instruction", "\"source_class\": \"user\"");
+        assertEquals(CND06_UNJUDGED, refusal(List.of(bare, cnd06Call()), "i1"));
+        JsonNode orphan = event("i1", "Instruction",
+                "\"source_class\": \"user\", \"refs\": {\"parent\": \"agentce:event/gone\"}");
+        assertEquals(CND06_UNJUDGED, refusal(List.of(orphan), "i1"));
+    }
+
+    @Test
+    void cnd06AnEnforcementPointDenyNeedsARefusalOfTheInstructionItBlocked() {
+        List<JsonNode> events = List.of(cnd06User(), cnd06Call(), cnd06Deny(DENY_TC1, "deny"));
+        assertEquals(CND06_FAILS, refusal(events, "pd1"));
+        assertEquals(CND06_MEETS, refusal(with(events, cnd06Refused()), "pd1"));
+        assertEquals(CND06_FAILS, refusal(with(events, cnd06Refused("\"agentce:event/i2\"")), "pd1"));
+        JsonNode independent = cnd06Deny(DENY_TC1, "deny");
+        ((ObjectNode) independent).put("agentcesourceclass", "independent_system");
+        assertEquals(CND06_FAILS, refusal(List.of(cnd06User(), cnd06Call(), independent), "pd1"));
+        for (JsonNode other : List.of(selfReport(cnd06Deny(DENY_TC1, "deny")), cnd06Deny(DENY_TC1, "allow"),
+                cnd06Deny(DENY_TC1, "Deny"))) {
+            assertEquals(CND06_OUTSIDE, refusal(List.of(cnd06User(), cnd06Call(), other), "pd1"));
+        }
+    }
+
+    @Test
+    void cnd06ADenyWhoseRequestCannotShowItsInstructionIsUnjudged() {
+        for (String refs : List.of("{}", "{\"request\": 7}", "{\"request\": \"agentce:event/gone\"}")) {
+            assertEquals(CND06_UNJUDGED, refusal(List.of(cnd06Deny(refs, "deny")), "pd1"), refs);
+        }
+        assertEquals(CND06_OUTSIDE, refusal(List.of(cnd06Call("{}"), cnd06Deny(DENY_TC1, "deny")), "pd1"));
+        assertEquals(CND06_OUTSIDE,
+                refusal(List.of(cnd06Call("{\"instruction\": null}"), cnd06Deny(DENY_TC1, "deny")), "pd1"));
+        assertEquals(CND06_UNJUDGED,
+                refusal(List.of(selfReport(cnd06Call("{}")), cnd06Deny(DENY_TC1, "deny")), "pd1"));
+    }
+
+    @Test
+    void cnd06ADenyOfACallExecutingAnInstructedDecisionNeedsARefusal() {
+        JsonNode instructed = selfReport(decisionWith("d1", "\"refs\": {\"instruction\": \"agentce:event/i1\"}"));
+        JsonNode executes = cnd06Call("{\"decision\": \"agentce:event/d1\"}");
+        List<JsonNode> events = List.of(cnd06User(), instructed, executes, cnd06Deny(DENY_TC1, "deny"));
+        assertEquals(CND06_FAILS, refusal(events, "pd1"));
+        assertEquals(CND06_MEETS, refusal(with(events, cnd06Refused()), "pd1"));
+        assertEquals(CND06_UNJUDGED, refusal(List.of(cnd06User(), executes, cnd06Deny(DENY_TC1, "deny")), "pd1"));
+    }
+
+    @Test
+    void cnd06TheLiteralsAreIndependentOfEventOrder() {
+        List<JsonNode> events = List.of(
+                event("i1", "Instruction", "\"source_class\": \"tool_output\""),
+                cnd06Call(),
+                cnd06Deny(DENY_TC1, "deny"),
+                cnd06Refused(),
+                selfReport(event("i2", "Instruction", "\"source_class\": \"user\"")));
+        List<JsonNode> reversed = new ArrayList<>(events);
+        Collections.reverse(reversed);
+        for (String node : List.of("i1", "pd1", "i2")) {
+            assertEquals(refusal(events, node), refusal(reversed, node), node);
+        }
+    }
 }

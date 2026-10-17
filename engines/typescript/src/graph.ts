@@ -17,6 +17,7 @@ import { DomainBinding, TOKEN_CAP, tokenCount } from "./domain";
 import { pyStrip } from "./failOn";
 import type { UnreadableWrite } from "./ingest";
 import { ZERO_KEY, eventIri, isEventRef, principalIri } from "./iri";
+import { SourceClassJudge } from "./sourceClass";
 import { GraphStore } from "./store";
 import { compareLiterals } from "./structural";
 import { byteCompare } from "./util";
@@ -1112,6 +1113,84 @@ class Builder {
    * be judged (fail closed, HR-5); a role outside a declared list does not meet the control. Below
    * enforcement_point the role is the agent's word, so each enforcement-point witness of the same principal must
    * record the same role (`witnessRoles`; inbox row 358). */
+  /**
+   * CND-06's population and judgment (SPEC §7.7.4; rulings 16 A, 17 B, 18 B), as graph.py `_conduct_refusals`: an
+   * Instruction needs a Refusal when its source_class is absent, not a string or untrusted; one declaring an authorised
+   * class is in scope, unjudged, when the records do not show it (no principal id where §6.2.3 requires one, or not
+   * attested for every held call or Decision acting on it, or for itself when nothing acts on it). An enforcement-point
+   * (or better) deny needs a Refusal of the instruction its request acts on; it is unjudged when that cannot be shown.
+   */
+  private conductRefusals(events: Event[]): void {
+    const byIri = new Map<string, Event>();
+    for (const e of events) byIri.set(eventIri(String(e.id)), e);
+    const acting = new Map<string, string[]>();
+    for (const [node, event] of byIri) {
+      const instruction = refsOf(event).instruction;
+      if (["ToolCall", "Decision"].includes(this.ptype(event)) && typeof instruction === "string") {
+        acting.set(instruction, [...(acting.get(instruction) ?? []), node]);
+      }
+    }
+    let judge: SourceClassJudge | null = null;
+    const refused = (instruction: string): boolean =>
+      this.store.objects(instruction, "agentce:refusedBy").length > 0;
+    const mark = (node: string, met: boolean, shown: boolean): void => {
+      this.literal(node, "agentce:refusalInScope", true);
+      this.literal(node, "agentce:refusalMet", met);
+      this.literal(node, "agentce:refusalNeedShown", shown);
+    };
+    for (const node of [...byIri.keys()].sort(byteCompare)) {
+      const event = byIri.get(node) as Event;
+      const ptype = this.ptype(event);
+      const data = dataOf(event);
+      if (ptype === "Instruction") {
+        const sourceClass = data.source_class;
+        if (!isOneOf(sourceClass, TRUSTED_INSTRUCTION)) {
+          mark(node, refused(node), true);
+          continue;
+        }
+        judge ??= new SourceClassJudge(this.store, byIri);
+        const j = judge;
+        const shown =
+          (!isOneOf(sourceClass, AUTHORISED_INSTRUCTION) ||
+            (isRecord(data.principal) && principalKey(data.principal) !== "")) &&
+          (acting.get(node) ?? [node]).every((focus) => j.attested(focus, node));
+        if (!shown) mark(node, true, refused(node));
+      } else if (
+        ptype === "PolicyDecision" &&
+        isOneOf(event.agentcesourceclass, AT_OR_ABOVE_EP) &&
+        data.decision === "deny"
+      ) {
+        const instruction = this.deniedInstruction(byIri, refsOf(event));
+        if (instruction === null) mark(node, true, false);
+        else if (instruction) mark(node, refused(instruction), true);
+      }
+    }
+  }
+
+  /**
+   * The instruction a deny's request acts on: its refs.instruction, or that of the held Decision its refs.decision
+   * names; "" when the request is an enforcement-point record naming none (outside the deny clause); null when the
+   * records cannot show it (graph.py `_denied_instruction`).
+   */
+  private deniedInstruction(
+    byIri: Map<string, Event>,
+    refs: Record<string, unknown>,
+  ): string | null {
+    const request = refs.request;
+    const event = typeof request === "string" ? byIri.get(request) : undefined;
+    if (event === undefined) return null;
+    const instruction = refsOf(event).instruction;
+    if (typeof instruction === "string") return instruction;
+    const decision = refsOf(event).decision;
+    if (decision !== undefined && decision !== null) {
+      const held = byIri.get(this.heldDecision(decision) ?? "");
+      if (held === undefined) return null;
+      const named = refsOf(held).instruction;
+      if (typeof named === "string") return named;
+    }
+    return isOneOf(event.agentcesourceclass, AT_OR_ABOVE_EP) ? "" : null;
+  }
+
   private roleAuthorised(
     byIri: Map<string, Event>,
     node: string,
@@ -1554,6 +1633,7 @@ class Builder {
     this.conductScopeBudget(events);
     this.conductGate(events);
     this.conductProvenance(events);
+    this.conductRefusals(events);
     this.precededBy();
   }
 

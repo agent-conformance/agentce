@@ -1774,3 +1774,123 @@ test("cnd04: reads the delegation chain", () => {
   assert.deepEqual(provenance(provenanceEvents({ delegation: null })), UNJUDGED);
   assert.deepEqual(provenance(provenanceEvents({ delegation: "unheld" })), UNJUDGED);
 });
+
+// --- CND-06: refusals of instructions and of enforcement-point denies (SPEC §7.7.4; 18.173) ------------------
+
+const CND06_FAILS = ["true", "false", "true"];
+const CND06_MEETS = ["true", "true", "true"];
+const CND06_UNJUDGED = ["true", "true", "false"];
+const CND06_OUTSIDE = [null, null, null];
+
+/** CND-06's literals on `node`: in scope, Refusal met, and whether the need for one is shown. */
+function refusal(events: Record<string, unknown>[], node = "i1"): unknown[] {
+  const store = buildGraph(events, { domain: MINOR_DOMAIN });
+  return ["agentce:refusalInScope", "agentce:refusalMet", "agentce:refusalNeedShown"].map(
+    (p) => store.literalValues(`agentce:event/${node}`, p)[0] ?? null,
+  );
+}
+
+/** The agent's own Refusal of `instruction` (a self_report Refusal counts, ruling 16 A). */
+function refused(instruction: unknown = "agentce:event/i1") {
+  return selfReport(memoryEvent("rf1", "Refusal", { refs: { instruction } }));
+}
+
+function cnd06Instruction(data: Record<string, unknown>, id = "i1") {
+  return memoryEvent(id, "Instruction", data);
+}
+
+function cnd06User(principal: unknown = { kind: "human", id: "u1" }) {
+  return cnd06Instruction({ source_class: "user", principal });
+}
+
+function cnd06Call(refs: Record<string, unknown> = { instruction: "agentce:event/i1" }) {
+  return memoryEvent("tc1", "ToolCall", { refs });
+}
+
+function deny(refs: Record<string, unknown>, word = "deny") {
+  return memoryEvent("pd1", "PolicyDecision", { decision: word, refs });
+}
+
+const DENY_TC1 = { request: "agentce:event/tc1" };
+
+test("cnd06: an instruction from an untrusted or unknown source needs a refusal", () => {
+  for (const data of [{}, { source_class: 7 }, { source_class: "tool_output" }]) {
+    const events = [cnd06Instruction(data), cnd06Call()];
+    assert.deepEqual(refusal(events), CND06_FAILS);
+    assert.deepEqual(refusal([...events, refused()]), CND06_MEETS);
+    assert.deepEqual(refusal([...events, refused(7)]), CND06_FAILS);
+  }
+  assert.deepEqual(refusal([cnd06Instruction({ source_class: "retrieved" })]), CND06_FAILS);
+});
+
+test("cnd06: an authorised class its own enforcement-point record shows is outside", () => {
+  assert.deepEqual(refusal([cnd06User(), cnd06Call()]), CND06_OUTSIDE);
+  assert.deepEqual(refusal([cnd06User()]), CND06_OUTSIDE);
+  const memory = cnd06Instruction({ source_class: "memory_trusted" });
+  assert.deepEqual(refusal([memory, cnd06Call()]), CND06_OUTSIDE);
+});
+
+test("cnd06: an authorised class the records do not show is unjudged", () => {
+  const reported = selfReport(cnd06User());
+  assert.deepEqual(refusal([reported, cnd06Call()]), CND06_UNJUDGED);
+  assert.deepEqual(refusal([reported]), CND06_UNJUDGED);
+  assert.deepEqual(refusal([reported, cnd06Call(), refused()]), CND06_MEETS);
+  for (const principal of [{}, { kind: "human", id: "" }, "u1"]) {
+    assert.deepEqual(refusal([cnd06User(principal), cnd06Call()]), CND06_UNJUDGED);
+  }
+  const bare = cnd06Instruction({ source_class: "user" });
+  assert.deepEqual(refusal([bare, cnd06Call()]), CND06_UNJUDGED);
+  const orphan = cnd06Instruction({ source_class: "user", refs: { parent: "agentce:event/gone" } });
+  assert.deepEqual(refusal([orphan]), CND06_UNJUDGED);
+});
+
+test("cnd06: an enforcement-point deny needs a refusal of the instruction it blocked", () => {
+  const events = [cnd06User(), cnd06Call(), deny(DENY_TC1)];
+  assert.deepEqual(refusal(events, "pd1"), CND06_FAILS);
+  assert.deepEqual(refusal([...events, refused()], "pd1"), CND06_MEETS);
+  assert.deepEqual(refusal([...events, refused("agentce:event/i2")], "pd1"), CND06_FAILS);
+  const independent = { ...deny(DENY_TC1), agentcesourceclass: "independent_system" };
+  assert.deepEqual(refusal([cnd06User(), cnd06Call(), independent], "pd1"), CND06_FAILS);
+  for (const other of [
+    selfReport(deny(DENY_TC1)),
+    deny(DENY_TC1, "allow"),
+    deny(DENY_TC1, "Deny"),
+  ]) {
+    assert.deepEqual(refusal([cnd06User(), cnd06Call(), other], "pd1"), CND06_OUTSIDE);
+  }
+});
+
+test("cnd06: a deny whose request cannot show its instruction is unjudged", () => {
+  for (const refs of [{}, { request: 7 }, { request: "agentce:event/gone" }]) {
+    assert.deepEqual(refusal([deny(refs)], "pd1"), CND06_UNJUDGED);
+  }
+  assert.deepEqual(refusal([cnd06Call({}), deny(DENY_TC1)], "pd1"), CND06_OUTSIDE);
+  assert.deepEqual(
+    refusal([cnd06Call({ instruction: null }), deny(DENY_TC1)], "pd1"),
+    CND06_OUTSIDE,
+  );
+  assert.deepEqual(refusal([selfReport(cnd06Call({})), deny(DENY_TC1)], "pd1"), CND06_UNJUDGED);
+});
+
+test("cnd06: a deny of a call executing an instructed decision needs a refusal", () => {
+  const dec = decisionEvent("d1");
+  const instructed = { ...dec, data: { ...dec.data, refs: { instruction: "agentce:event/i1" } } };
+  const executes = cnd06Call({ decision: "agentce:event/d1" });
+  const events = [cnd06User(), instructed, executes, deny(DENY_TC1)];
+  assert.deepEqual(refusal(events, "pd1"), CND06_FAILS);
+  assert.deepEqual(refusal([...events, refused()], "pd1"), CND06_MEETS);
+  assert.deepEqual(refusal([cnd06User(), executes, deny(DENY_TC1)], "pd1"), CND06_UNJUDGED);
+});
+
+test("cnd06: the literals are independent of event order", () => {
+  const events = [
+    cnd06Instruction({ source_class: "tool_output" }),
+    cnd06Call(),
+    deny(DENY_TC1),
+    refused(),
+    selfReport(cnd06Instruction({ source_class: "user" }, "i2")),
+  ];
+  for (const node of ["i1", "pd1", "i2"]) {
+    assert.deepEqual(refusal(events, node), refusal([...events].reverse(), node));
+  }
+});

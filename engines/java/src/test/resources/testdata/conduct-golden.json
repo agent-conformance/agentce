@@ -169,8 +169,8 @@
       "violations": [
         {
           "focus": "agentce:event/i1",
-          "path": "agentce:refusedBy",
-          "constraint": "sh:minCount",
+          "path": "agentce:refusalMet",
+          "constraint": "sh:hasValue",
           "message_key": "CND-06.S1"
         }
       ]

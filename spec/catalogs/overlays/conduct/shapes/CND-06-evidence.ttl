@@ -1,0 +1,7 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
+
+agentce:CND-06-EvidenceShape a sh:NodeShape ;
+  sh:targetClass agentce:Instruction, agentce:PolicyDecision ;
+  agentce:targetWhere [ agentce:refusalInScope true ] ;
+  sh:property [ sh:path agentce:refusalNeedShown ; sh:hasValue true ; sh:name "E1" ] .
