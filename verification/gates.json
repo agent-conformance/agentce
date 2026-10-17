@@ -3810,25 +3810,43 @@
           "replace": "            if (s.source == null && denominator.source == null) {\n"
         },
         {
-          "description": "Python leaves every denominator source's events out of the observed count, a manifest-bearing or non-independent one included",
+          "description": "Python leaves every denominator source's events out of the observed count, a non-independent one or one that counts nothing included",
           "file": "engines/python/agentce/coverage.py",
-          "search": "            if _self_counting(d, subject)\n",
-          "replace": "            if d.source\n"
+          "search": "            if (str(event.get(\"source\", \"\")), event_type) in yardstick:\n",
+          "replace": "            if any(d.source == str(event.get(\"source\", \"\")) for d in subject.coverage_denominators):\n"
         },
         {
-          "description": "TypeScript leaves every denominator source's events out of the observed count, a manifest-bearing or non-independent one included",
+          "description": "TypeScript leaves every denominator source's events out of the observed count, a non-independent one or one that counts nothing included",
           "file": "engines/typescript/src/coverage.ts",
-          "search": "      subject.coverageDenominators.filter((d) => selfCounting(d, subject)).map((d) => d.source),\n",
-          "replace": "      subject.coverageDenominators.filter((d) => d.source !== \"\").map((d) => d.source),\n"
+          "search": "      if (yardstick.has(`${String(event.source ?? \"\")}\\u0000${type}`)) {\n",
+          "replace": "      if (subject.coverageDenominators.some((d) => d.source === String(event.source ?? \"\"))) {\n"
         },
         {
-          "description": "Java leaves every denominator source's events out of the observed count, a manifest-bearing or non-independent one included",
+          "description": "Java leaves every denominator source's events out of the observed count, a non-independent one or one that counts nothing included",
           "file": "engines/java/src/main/java/org/agentce/Coverage.java",
-          "search": "                if (selfCounting(d, subject)) {\n                    denomIds.add(d.source);\n",
-          "replace": "                if (d.source != null) {\n                    denomIds.add(d.source);\n"
+          "search": "                if (yardstick.contains(source(event) + \"\\u0000\" + type)) {\n",
+          "replace": "                if (subject.coverageDenominators.stream().anyMatch(d -> source(event).equals(d.source))) {\n"
+        },
+        {
+          "description": "Python leaves a denominator source's events in the observed count whenever the denominator reads a manifest, so its own records reconcile it",
+          "file": "engines/python/agentce/coverage.py",
+          "search": "            (d.source, t) for d, counts in counts_by_denominator for t in counts\n",
+          "replace": "            (d.source, t) for d, counts in counts_by_denominator if not d.manifest for t in counts\n"
+        },
+        {
+          "description": "TypeScript leaves a denominator source's events in the observed count whenever the denominator reads a manifest, so its own records reconcile it",
+          "file": "engines/typescript/src/coverage.ts",
+          "search": "    for (const [d, counts] of countsByDenominator) {\n",
+          "replace": "    for (const [d, counts] of countsByDenominator.filter(([den]) => !den.manifest)) {\n"
+        },
+        {
+          "description": "Java leaves a denominator source's events in the observed count whenever the denominator reads a manifest, so its own records reconcile it",
+          "file": "engines/java/src/main/java/org/agentce/Coverage.java",
+          "search": "                for (String t : e.getValue().keySet()) {\n                    yardstick.add(",
+          "replace": "                for (String t : (e.getKey().manifest == null || e.getKey().manifest.isEmpty()) ? e.getValue().keySet() : java.util.Set.<String>of()) {\n                    yardstick.add("
         }
       ],
-      "fix_hint": "Run verification/gates/coverage_unknown.sh; it names the engine, the case, what it gave and what was expected. The rule is the coverage post-pass in each engine's assess (assess.py _coverage_unknown, _uncovered and COVERAGE_FAMILIES; coverageUnknown and uncovered in assess.ts and Assess.java) over compute_coverage's per-subject coverage_status; what counts as an independent denominator, and which events leave the observed count, are coverage.py _independent and _self_counting and their ports in coverage.ts and Coverage.java."
+      "fix_hint": "Run verification/gates/coverage_unknown.sh; it names the engine, the case, what it gave and what was expected. The rule is the coverage post-pass in each engine's assess (assess.py _coverage_unknown, _uncovered and COVERAGE_FAMILIES; coverageUnknown and uncovered in assess.ts and Assess.java) over compute_coverage's per-subject coverage_status; what counts as an independent denominator, and which events leave the observed count, are coverage.py _independent and the yardstick set in compute_coverage (a denominator's own records of each type it counts) and their ports in coverage.ts and Coverage.java."
     },
     {
       "id": "VG-CND04-PROVENANCE",
