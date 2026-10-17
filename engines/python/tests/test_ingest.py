@@ -478,9 +478,9 @@ def test_withheld_keeps_the_raw_facts_of_an_unreadable_write(
 def test_an_unknown_version_of_memory_write_is_withheld_as_unreadable(
     make_bundle: Callable[..., Any],
 ) -> None:
-    # 18.202: an unknown_type record whose envelope type names MemoryWrite at any version, or whose data @type is
-    # MemoryWrite, is withheld as an unreadable write; another unknown type is only quarantined. An empty record_ref
-    # or store reads as absent.
+    # 18.202: an unknown_type record whose envelope type names MemoryWrite at any version or none, or whose data
+    # @type is MemoryWrite, is withheld as an unreadable write; another unknown type is only quarantined. An empty
+    # record_ref or store reads as absent.
     from agentce.graph import UnreadableWrite
 
     def write(event_id: str, type_: str, data: dict[str, Any]) -> dict[str, Any]:
@@ -510,12 +510,17 @@ def test_an_unknown_version_of_memory_write_is_withheld_as_unreadable(
             v2("MemoryWrite"),
             {"@type": "MemoryWrite", "record_ref": "", "store": ""},
         ),
+        write("w6", "org.agent-conformance.evidence.MemoryWrite", read),
+        write("w7", "org.agent-conformance.evidence.MemoryWriteV2", read),
+        write("w8", "org.agent-conformance.evidence.MemoryRead", read),
     ]
     result = _ingest(make_bundle, items)
-    assert [r.reason for r in result.quarantined] == [QuarantineReason.UNKNOWN_TYPE] * 5
+    assert [r.reason for r in result.quarantined] == [QuarantineReason.UNKNOWN_TYPE] * 8
     assert [(w.record.event_id, w.write) for w in result.withheld] == [
         ("w1", UnreadableWrite("mem:r1", "kb")),
         ("w2", UnreadableWrite(None, "kb")),
         ("w3", UnreadableWrite("mem:r1", "kb")),
         ("w5", UnreadableWrite(None, None)),
+        ("w6", UnreadableWrite(None, "kb")),
+        ("w7", UnreadableWrite(None, "kb")),
     ]

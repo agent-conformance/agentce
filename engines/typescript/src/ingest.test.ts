@@ -396,7 +396,7 @@ test("withheld keeps the raw facts of an unreadable write (18.172)", () => {
 });
 
 test("an unknown version of MemoryWrite is withheld as unreadable (18.202)", () => {
-  // An unknown_type record whose envelope type names MemoryWrite at any version, or whose data @type is
+  // An unknown_type record whose envelope type names MemoryWrite at any version or none, or whose data @type is
   // MemoryWrite, is withheld as an unreadable write; another unknown type is only quarantined. An empty record_ref
   // or store reads as absent.
   const v2 = (name: string) => `org.agent-conformance.evidence.${name}.v2`;
@@ -421,6 +421,9 @@ test("an unknown version of MemoryWrite is withheld as unreadable (18.202)", () 
           write("w3", "com.example.Thing.v1"),
           write("w4", v2("MemoryRead"), read),
           write("w5", v2("MemoryWrite"), { "@type": "MemoryWrite", record_ref: "", store: "" }),
+          write("w6", "org.agent-conformance.evidence.MemoryWrite", read),
+          write("w7", "org.agent-conformance.evidence.MemoryWriteV2", read),
+          write("w8", "org.agent-conformance.evidence.MemoryRead", read),
         ],
         ["urn:src:guard"],
       ),
@@ -428,7 +431,7 @@ test("an unknown version of MemoryWrite is withheld as unreadable (18.202)", () 
   );
   assert.deepEqual(
     result.quarantined.map((q) => q.reason),
-    Array(5).fill("unknown_type"),
+    Array(8).fill("unknown_type"),
   );
   assert.deepEqual(
     result.withheld.map((w) => [w.record.eventId, w.write ?? null]),
@@ -437,6 +440,8 @@ test("an unknown version of MemoryWrite is withheld as unreadable (18.202)", () 
       ["w2", { recordRef: null, store: "kb" }],
       ["w3", { recordRef: "mem:r1", store: "kb" }],
       ["w5", { recordRef: null, store: null }],
+      ["w6", { recordRef: null, store: "kb" }],
+      ["w7", { recordRef: null, store: "kb" }],
     ],
   );
 });
