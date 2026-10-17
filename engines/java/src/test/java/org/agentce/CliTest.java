@@ -1574,11 +1574,11 @@ class CliTest {
     }
 
     @Test
-    void signProfileKmsWithKeyEmptyGivesSignKmsKeyMissingFalsyLikeAnOmittedKey(@TempDir Path dir) throws Exception {
+    void signProfileKmsWithKeyEmptyGivesTheAbsentKeyFileKey(@TempDir Path dir) throws Exception {
         Path report = signReportDir(dir);
         JsonNode env = runJson("sign", report.toString(), "--as", "claimant", "--profile", "kms", "--key", "");
         assertEquals(3, env.get("exit_code").asInt());
-        assertEquals("sign.kms_key_missing", env.get("error").get("message_key").asText());
+        assertEquals("input.key_not_a_file", env.get("error").get("message_key").asText());
     }
 
     @Test

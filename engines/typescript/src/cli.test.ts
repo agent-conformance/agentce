@@ -2013,7 +2013,7 @@ test("sign: profile kms with no --key gives sign.kms_key_missing", () => {
   }
 });
 
-test("sign: profile kms with --key '' gives sign.kms_key_missing (falsy, like an omitted --key)", () => {
+test("sign: profile kms with --key '' gives input.key_not_a_file, the key an absent key file gets (18.178)", () => {
   const dir = mkdtempSync(join(tmpdir(), "agentce-cli-sign-"));
   try {
     const report = signReportDir(dir);
@@ -2028,7 +2028,7 @@ test("sign: profile kms with --key '' gives sign.kms_key_missing (falsy, like an
       "",
     ]);
     assert.equal(exitCode, 3);
-    assert.equal((envelope.error as { message_key: string }).message_key, "sign.kms_key_missing");
+    assert.equal((envelope.error as { message_key: string }).message_key, "input.key_not_a_file");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
