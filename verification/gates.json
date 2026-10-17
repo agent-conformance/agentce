@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.110.0",
+  "suite_version": "0.111.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -3687,6 +3687,50 @@
         }
       ],
       "fix_hint": "Run verification/gates/cnd05_chain.sh; it names the engine, the case, the CND-05 outcome and failing events it gave and the ones expected. The rule is actsOnUntrusted in each engine's graph builder: the refs.parent / refs.origin closure over instructions, seeded with tool calls, resource accesses, instructions that declare no trusted source class and ROB-02's two closures (tainted, and never ruled on by the guard); an action also fails when its refs.instruction names no held Instruction event (a key of the builder's instruction-trust map). A decision case that reads conformant points at the PSP parser (psp.py, psp.ts, Psp.java): every sh:targetClass of a shape is read, as a union."
+    },
+    {
+      "id": "VG-CND06-REFUSALS",
+      "title": "CND-06 needs a Refusal for every instruction from an untrusted or unknown source and for every enforcement-point deny of an action an instruction drove, in all three engines: an untrusted or class-less instruction, or an enforcement-point or independent-system deny on a call that acts on an instruction (directly or through the Decision it executes), reads non-conformant without a Refusal naming that instruction and conformant with one, a self_report Refusal included; an authorised class the records do not show (only the agent reports it, no principal id where SPEC §6.2.3 requires one, an origin or parent that is not shown) and a deny whose request the bundle does not hold, or which is the agent's own record naming no instruction, read insufficient_evidence unless refused (18.173)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/cnd06_refusals.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/cnd06_refusals/cases.json (untrusted and class-less instructions, acted on or not, with and without a Refusal; enforcement-point user instructions with and without a principal, with an origin or parent of each kind; self-reported authorised classes, refused, corroborated by an enforcement-point allow or twin, or not; enforcement-point, independent-system and self_report denies on held, unheld, instruction-driven and plain requests, including a call executing an instructed Decision; a Refusal of another instruction; reversed arrival order) gives the expected CND-06 outcome, failing events and assess exit code from the real Python, TypeScript and Java CLIs, with nothing quarantined",
+        "fail": "any case gives another CND-06 outcome, another set of failing events or another exit code in any engine, or quarantines a record"
+      },
+      "faults": [
+        {
+          "description": "Python takes an enforcement-point deny on an instruction-driven call as refused whether or not a Refusal names the instruction",
+          "file": "engines/python/agentce/graph.py",
+          "search": "                    mark(node, refused(instruction), True)\n",
+          "replace": "                    mark(node, True, True)\n"
+        },
+        {
+          "description": "TypeScript takes an enforcement-point deny on an instruction-driven call as refused whether or not a Refusal names the instruction",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "        else if (instruction) mark(node, refused(instruction), true);\n",
+          "replace": "        else if (instruction) mark(node, true, true);\n"
+        },
+        {
+          "description": "Java takes an enforcement-point deny on an instruction-driven call as refused whether or not a Refusal names the instruction",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "                        markRefusal(node, refused(instruction), true);\n",
+          "replace": "                        markRefusal(node, true, true);\n"
+        }
+      ],
+      "fix_hint": "Run verification/gates/cnd06_refusals.sh; it names the engine, the case, the CND-06 outcome and failing events it gave and the ones expected. The rule is the refusal pass in each engine's graph builder (graph.py _conduct_refusals and _denied_instruction, graph.ts conductRefusals and deniedInstruction, Graph.java conductRefusals and deniedInstruction), which writes agentce:refusalInScope, agentce:refusalMet and agentce:refusalNeedShown for CND-06's shape and evidence shape; an authorised class is shown through SourceClassJudge.attested (source_class.py and its ports)."
     },
     {
       "id": "VG-CND04-PROVENANCE",

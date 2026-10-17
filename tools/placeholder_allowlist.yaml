@@ -93,6 +93,12 @@ allow:
     class: legitimate
     justification: "Synthetic all-zero policy_digest on the corroborating PolicyDecision of three VG-CND04-PROVENANCE cases; CND-04 reads no digest."
 
+  - path: verification/gates/fixtures/cnd06_refusals/cases.json
+    pattern: zero-digest
+    count: 21
+    class: legitimate
+    justification: "Synthetic all-zero policy_digest on the PolicyDecision records of VG-CND06-REFUSALS cases; CND-06 reads no digest."
+
   - path: website/src/content/docs/docs/runtime-conformance.md
     pattern: zero-digest
     count: 4

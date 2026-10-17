@@ -1,24 +1,4 @@
 {
-  "c06-acted-EP-missing": {
-    "owner": "18.173",
-    "reason": "GAP at 78bdb0da; closed by 18.173's matrix check",
-    "status": "GAP"
-  },
-  "c06-acted-EP-user": {
-    "owner": "18.173",
-    "reason": "GAP at 78bdb0da; closed by 18.173's matrix check",
-    "status": "GAP"
-  },
-  "c06-ep-deny-no-refusal": {
-    "owner": "18.173",
-    "reason": "GAP at 78bdb0da; closed by 18.173's matrix check",
-    "status": "GAP"
-  },
-  "c06-ep-deny-sr-refusal": {
-    "owner": "18.173",
-    "reason": "MISMATCH at 78bdb0da; closed by 18.173's matrix check",
-    "status": "MISMATCH"
-  },
   "fx-DOC-03-en-pass-uea": {
     "owner": "18.37e",
     "reason": "GAP at 78bdb0da; closed by 18.37e's matrix check",

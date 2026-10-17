@@ -3,6 +3,19 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.111.0
+
+- `VG-CND06-REFUSALS` (18.173, added). CND-06 looked only at instructions that declared an untrusted source. The
+  engines skipped an instruction that declared no source, never checked a policy-engine deny with no Refusal, and took
+  the agent's word when it alone said an instruction came from a user. All three engines now need a Refusal for
+  every instruction from an untrusted or unknown source and for every enforcement-point or independent-system deny of
+  a call that acts on an instruction, directly or through the Decision it executes; a Refusal the agent records counts.
+  An authorised source the records do not show, and a deny whose request the bundle does not hold, read
+  insufficient_evidence unless refused. The gate runs 45 cases through the three real CLIs, with one seeded fault in
+  each engine.
+- `VG-TRUST-MATRIX` (18.173, changed). The four CND-06 cells 18.173 closes leave the open list, and the quick tier now
+  runs the eight CND-06 refusal and deny cells on every pull request.
+
 ## 0.110.0
 
 - `VG-INTEGRITY-CAP` (18.132, added). The engines wrote integrity results to integrity.jsonl and counted them, but no verdict

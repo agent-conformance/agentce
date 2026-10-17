@@ -11,6 +11,14 @@
 family: trust-model
 fixtures: build
 quick:
+  - c06-acted-EP-missing
+  - c06-acted-EP-tool_output
+  - c06-acted-EP-user
+  - c06-ep-deny-no-refusal
+  - c06-ep-deny-sr-refusal
+  - c06-refusal-en
+  - c06-refusal-missing-en
+  - c06-refusal-missing-se
   - c05-twin-both-no-principal
   - c05-twin-other-principal
   - c05-twin-no-principal-instr-present

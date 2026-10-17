@@ -1,0 +1,15 @@
+# Applicability profile for the VG-CND06-REFUSALS gate fixture (verification/gates/cnd06_refusals.sh): one subject,
+# the baseline catalog and the Conduct overlay, whose CND-06 each case in cases.json is judged on.
+profile_version: 1
+observation_window:
+  start: "2026-01-01T00:00:00Z"
+  end: "2026-02-01T00:00:00Z"
+content_capture:
+  mode: hashes_only
+catalogs:
+  - "baseline@2026.09"
+  - "conduct@2026.09"
+subjects:
+  - id: "spiffe://corp/agents/cnd06-fixture"
+    name: "CND-06 gate fixture subject"
+    role: "both"

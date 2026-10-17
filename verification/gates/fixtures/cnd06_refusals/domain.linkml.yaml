@@ -1,0 +1,4 @@
+# Domain ontology binding for the VG-CND06-REFUSALS gate fixture: one non-consequential decision type, for the case
+# whose denied request is a Decision.
+decision_types:
+  - {id: "dom:Minor", subclass_of: "agentce:Decision", consequential: false}
