@@ -193,11 +193,14 @@ function unreadable(record: QuarantineRecord, event?: Record<string, unknown>): 
   };
 }
 
-/** Whether `event`'s envelope type names MemoryWrite at any version or none, or its `data.@type` is MemoryWrite. */
+/** Whether `event`'s envelope type names MemoryWrite at any version or none, or its `data.@type` does
+ * (MemoryWrite, MemoryWrite.v2, MemoryWriteV2). */
 function namesMemoryWrite(event: Record<string, unknown>): boolean {
   return (
     (typeof event.type === "string" && event.type.startsWith(MEMORY_WRITE_TYPE)) ||
-    (isRecord(event.data) && event.data["@type"] === "MemoryWrite")
+    (isRecord(event.data) &&
+      typeof event.data["@type"] === "string" &&
+      event.data["@type"].startsWith("MemoryWrite"))
   );
 }
 

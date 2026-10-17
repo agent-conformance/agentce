@@ -112,13 +112,14 @@ public final class Ingest {
                 event != null ? unreadableWrite(event) : null);
     }
 
-    /** Whether {@code event}'s envelope type names MemoryWrite at any version or none, or its {@code data.@type} is
-     * MemoryWrite. */
+    /** Whether {@code event}'s envelope type names MemoryWrite at any version or none, or its {@code data.@type}
+     * does (MemoryWrite, MemoryWrite.v2, MemoryWriteV2). */
     private static boolean namesMemoryWrite(JsonNode event) {
         String type = opt(event, "type");
         JsonNode data = event.get("data");
+        String declared = data != null && data.isObject() ? opt(data, "@type") : null;
         return (type != null && type.startsWith(MEMORY_WRITE_TYPE))
-                || (data != null && data.isObject() && "MemoryWrite".equals(opt(data, "@type")));
+                || (declared != null && declared.startsWith("MemoryWrite"));
     }
 
     /** The raw MemoryWrite facts of an unreadable {@code event}: a MemoryWrite unless its envelope or data names
