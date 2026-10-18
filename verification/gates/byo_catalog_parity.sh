@@ -2,7 +2,7 @@
 # Build gate helper for VG-BYO-CATALOG-PARITY (`trust`) and VG-BYO-CATALOG-WALK (`walk`): `assess
 # --catalog-dir` treats an operator's own catalog as untrusted input in all three engines (SPEC §8.7).
 # `trust` runs the signature, identity and trust-root scenarios (1 to 11); `walk` runs the scenarios on
-# what the catalog walk and the loaders read (12 to 28). They are two gates so that each one's
+# what the catalog walk and the loaders read (12 to 29). They are two gates so that each one's
 # seeded-fault demo fits one CI demo shard (18.71b). Each engine runs the same scenarios as the
 # Python reference capture for item 18.36 -- an untrusted, unsigned, trusted, rebranded catalog and a
 # missing, malformed or non-object trust root, plus quickstart under AGENTCE_TRUST_ROOT -- and must
@@ -292,6 +292,13 @@ if [ "$folded" != "$work" ] && [ -d "$folded/inside-cat" ]; then
     "${base[@]}" --catalog-dir "$folded/inside-cat" --trust-root "$work/inside-trust-root.json"
 else
   echo "byo-catalog: scenario 28 skipped: the filesystem is case-sensitive" >&2
+fi
+firmlink="/System/Volumes/Data$(cd "$work" && pwd -P)"
+if [ -d "$firmlink/inside-cat" ]; then
+  scenario "29 the same catalog through a second spelling of its folder (a macOS firmlink)" 0 - - -- \
+    "${base[@]}" --catalog-dir "$firmlink/inside-cat" --trust-root "$work/inside-trust-root.json"
+else
+  echo "byo-catalog: scenario 29 skipped: no firmlink spelling of the work folder" >&2
 fi
 fi
 
