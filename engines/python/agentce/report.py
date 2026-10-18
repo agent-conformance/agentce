@@ -3757,8 +3757,6 @@ def _has_entry(path: Path) -> bool:
         os.lstat(path)
     except (FileNotFoundError, NotADirectoryError):
         return False
-    except PermissionError:
-        return True
     return True
 
 
@@ -3788,6 +3786,21 @@ def _read_artifact_text(path: Path) -> str | None:
         return data.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise _CannotRead(str(exc)) from exc
+
+
+_REPORTED = object()  # the read failed and its problem line is already recorded
+
+
+def _read_or_report(
+    out_dir: Path, filename: str, problems: list[str], read=_read_artifact_text
+):
+    """``read`` of one report file; an unreadable one is recorded as a problem and answers
+    `_REPORTED`, so absence (``None``) and a reported failure stay apart."""
+    try:
+        return read(out_dir / filename)
+    except _CannotRead as exc:
+        problems.append(f"{filename}: cannot read ({exc})")
+        return _REPORTED
 
 
 def _validate_xml_wellformed(filename: str, data: bytes) -> list[str]:
@@ -3906,10 +3919,8 @@ def validate_report(out_dir: Path) -> list[str]:
             )
     has_assertions = False
     for filename, schema_name in _ARTIFACT_SCHEMAS.items():
-        try:
-            text = _read_artifact_text(out_dir / filename)
-        except _CannotRead as exc:
-            problems.append(f"{filename}: cannot read ({exc})")
+        text = _read_or_report(out_dir, filename, problems)
+        if text is _REPORTED:
             continue
         if text is None:
             continue  # mandatory absence was already reported above; optional absence is not a problem
@@ -3938,18 +3949,14 @@ def validate_report(out_dir: Path) -> list[str]:
                 for p in validate_sarif_2_1_0(instance)
             ]
     for filename in ("report.md", "report.html"):
-        try:
-            text = _read_artifact_text(out_dir / filename)
-        except _CannotRead as exc:
-            problems.append(f"{filename}: cannot read ({exc})")
+        text = _read_or_report(out_dir, filename, problems)
+        if text is _REPORTED:
             continue
         if text is not None and not text.strip():
             problems.append(f"{filename}: empty")
     for filename in (*_REPORT_DATA_FILES, "claim.json"):
-        try:
-            text = _read_artifact_text(out_dir / filename)
-        except _CannotRead as exc:
-            problems.append(f"{filename}: cannot read ({exc})")
+        text = _read_or_report(out_dir, filename, problems)
+        if text is _REPORTED:
             continue
         if text is None:
             if filename == "claim.json" and has_assertions:
@@ -3967,17 +3974,13 @@ def validate_report(out_dir: Path) -> list[str]:
             problems.append(f"{filename}: invalid JSON ({exc.msg})")
     for filename in _OPTIONAL_ARTIFACTS:
         xml = filename.endswith(".xml")
-        try:
-            content = (_read_artifact if xml else _read_artifact_text)(
-                out_dir / filename
-            )
-        except _CannotRead as exc:
-            problems.append(f"{filename}: cannot read ({exc})")
-            continue
-        if isinstance(content, bytes):
-            problems += _validate_xml_wellformed(filename, content)
-        elif content is None:
+        content = _read_or_report(
+            out_dir, filename, problems, _read_artifact if xml else _read_artifact_text
+        )
+        if content is None or content is _REPORTED:
             continue  # optional: only present, and only validated, when `--emit` requested it
+        if xml:
+            problems += _validate_xml_wellformed(filename, content)
         elif filename == "report.csv":
             problems += _validate_csv(filename, content)
         else:

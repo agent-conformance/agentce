@@ -17,7 +17,7 @@ import anyOfDef from "ajv/dist/vocabularies/applicator/anyOf";
 import oneOfDef from "ajv/dist/vocabularies/applicator/oneOf";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import { MAX_INT_STR_DIGITS, parseJson } from "./json";
-import { byteCompare } from "./util";
+import { byteCompare, decodeUtf8Strict } from "./util";
 
 /** Always written, regardless of `--emit`: the run's structural core. */
 const MANDATORY_ARTIFACT_SCHEMAS: Record<string, string> = {
@@ -287,8 +287,18 @@ function readArtifact(path: string): Buffer | null {
   throw new CannotRead("not a regular file");
 }
 
+/** `readArtifact`, decoded as UTF-8; text that is not UTF-8 throws `CannotRead` too, as Python's
+ * `_read_artifact_text`. */
 function readArtifactText(path: string): string | null {
-  return readArtifact(path)?.toString("utf-8") ?? null;
+  const data = readArtifact(path);
+  if (data === null) {
+    return null;
+  }
+  try {
+    return decodeUtf8Strict(data);
+  } catch (exc) {
+    throw new CannotRead((exc as Error).message);
+  }
 }
 
 function recordedOutputs(outDir: string): Record<string, string> {

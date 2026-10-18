@@ -11,7 +11,6 @@ import com.networknt.schema.ValidationMessage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AccessDeniedException;
@@ -317,7 +316,7 @@ public final class ReportValidate {
             return null;
         }
         try {
-            return StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(data)).toString();
+            return Verify.decodeStrict(data).toString();
         } catch (CharacterCodingException e) {
             throw new CannotRead(e.getMessage());
         }
