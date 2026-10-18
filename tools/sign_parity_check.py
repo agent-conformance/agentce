@@ -187,7 +187,14 @@ def ready_fixture(directory: Path, claim: Any = None) -> Path:
         claim = {"claimant": {"org": "acme"}}
     raw = claim if isinstance(claim, bytes) else json.dumps(claim).encode("utf-8")
     (report / "claim.json").write_bytes(raw)
+    _write_manifest(report)
     return report
+
+
+def _write_manifest(report: Path) -> None:
+    """The manifest.json every report carries and the signature covers; sign refuses a report
+    folder without one (18.166)."""
+    (report / "manifest.json").write_text(json.dumps({"engine": "fixture"}), encoding="utf-8")
 
 
 def not_ready_fixture(directory: Path) -> Path:
@@ -196,6 +203,7 @@ def not_ready_fixture(directory: Path) -> Path:
         directory
     )
     (report / "claim.json").write_text(json.dumps({}), encoding="utf-8")
+    _write_manifest(report)
     return report
 
 
