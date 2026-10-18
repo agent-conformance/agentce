@@ -232,8 +232,9 @@ def _load_evidence_shape(
     is returned with the file's shapes; anything else, including a file outside the catalog directory
     (which its signature would not cover), is refused, so a declared evidence shape can never be skipped
     and read as a pass."""
-    directory = files.root
-    inside = path in files.files and signing.inside_folder(directory, directory / path)
+    inside = path in files.files and signing.inside_folder(
+        files.root, files.root / path
+    )
     loaded = parse_shapes_ttl(files.text(path), path) if inside else {}
     targeted = [iri for iri, shape in loaded.items() if shape.has_target]
     if len(targeted) != 1:

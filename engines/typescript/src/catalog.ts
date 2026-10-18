@@ -188,8 +188,8 @@ function fileInside(directory: string, path: string): string | null {
     return null;
   }
   try {
-    const resolved = realpathSync(join(directory, path));
-    return insideFolder(directory, resolved) && statSync(resolved).isFile() ? resolved : null;
+    const named = join(directory, path);
+    return insideFolder(directory, named) && statSync(named).isFile() ? realpathSync(named) : null;
   } catch {
     return null;
   }
