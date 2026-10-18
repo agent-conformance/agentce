@@ -76,8 +76,8 @@ Every control across the EU AI Act base catalog and its overlays, and the NIST A
 | [`ROB-02`](rob-02.md) | No untrusted content influences consequential decisions | medium | automated | 2 |
 | [`ROB-03`](rob-03.md) | Consequential tool calls carry no dangling references | medium | automated | 2 |
 | [`ROB-04`](rob-04.md) | Consequential tool calls run over a verified delegation chain | high | automated | 2 |
-| [`ROB-05`](rob-05.md) | Adversarial-probe resilience is measured within thresholds | medium | semi-automated | 2 |
-| [`ROB-06`](rob-06.md) | Resource-exhaustion resistance is measured within budgets | medium | semi-automated | 2 |
+| [`ROB-05`](rob-05.md) | Adversarial-probe resilience is measured within thresholds | medium | semi-automated | 3 |
+| [`ROB-06`](rob-06.md) | Resource-exhaustion resistance is measured within budgets | medium | semi-automated | 3 |
 | [`ROB-07`](rob-07.md) | Cyber-incident detection and response are exercised | medium | semi-automated | 2 |
 | [`RSK-01`](rsk-01.md) | Consequential decisions record the authorisation gate they cleared | medium | automated | 2 |
 | [`RSK-02`](rsk-02.md) | Consequential decisions are subject to a risk-review activity | medium | automated | 2 |

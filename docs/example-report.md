@@ -29,25 +29,29 @@ This is the report the vendored quickstart project renders end to end with defau
 - `PolicyDecision (self_report)`: unlocks 3 check(s), needed by 0 more; rung 3 -- a request to platform or security. Adapters that can supply this: mcp-gateway, policy-engines.
 - `MemoryRead (enforcement_point)`: unlocks 1 check(s), needed by 0 more; rung 3 -- a request to platform or security. Adapters that can supply this: no adapter today.
 
+### Checks waiting on an independent count of your agent's calls
+
+- `DOC-03 on spiffe://corp/agents/credit-langgraph (eu-ai-act@2026.09)`: AgentCE can't judge DOC-03 yet. Nothing outside the agent and the enforcement point counts this agent's calls, so a call that went around the records would not show up. To fix it, declare a coverage denominator in the applicability profile, such as a provider usage export, an egress or firewall log, or a system-of-record export.
+
 ## Verdict
 
 **Incomplete — no control failed, but not every applicable control is demonstrated.**
 
 Top gaps:
 
-- insufficient evidence: DAT-01, DAT-02, INC-03, OVS-01, OVS-05 (+9 more gaps)
-- not assessed: DAT-03, DAT-04, DOC-05, OVS-09, RSK-03 (+2 more gaps)
+- insufficient evidence: DAT-01, DAT-02, DOC-03, INC-03, OVS-01 (+10 more gaps)
+- not assessed: DAT-03, DAT-04, DOC-05, OVS-09, ROB-05 (+4 more gaps)
 
 Next step: Supply the missing evidence, or complete the manual checks, for the controls listed under Top gaps, then run the assessment again.
 
 ## Outcome summary
 
-- `conformant`: 26
+- `conformant`: 23
 - `non-conformant`: 0
 - `partial`: 0
 - `not applicable`: 2
-- `not assessed`: 7
-- `insufficient evidence`: 14
+- `not assessed`: 9
+- `insufficient evidence`: 15
 
 ## Assertions
 
@@ -63,7 +67,7 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
   - Evidence: `agentce:event/langgraph-known-pass-inc1`
 - **Incident-linked records carry no dangling references** (`INC-04` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
   - `eu-ai-act Art. 73 (clause reference unverified)`
-  - Evidence: `agentce:event/langgraph-known-pass-tc1`
+  - Evidence: `agentce:event/langgraph-known-pass-inc1`
   - Remediation: inc-evidence-at-source
 - **Consequential tool calls are captured by an enforcement point** (`INT-01` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
   - `eu-ai-act Art. 12 (clause reference unverified)`
@@ -136,7 +140,7 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
   - `eu-ai-act Art. 13 (clause reference unverified)`
   - Evidence: `agentce:event/langgraph-known-pass-dec1`
   - Remediation: doc-evidence-at-source
-- **Declared egress paths match the observed enforcement point** (`DOC-03` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+- **Declared egress paths match the observed enforcement point** (`DOC-03` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
   - `eu-ai-act Art. 11 / Annex IV (clause reference unverified)`
   - Evidence: `agentce:event/langgraph-known-pass-tc1`
   - Remediation: doc-evidence-at-source
@@ -189,13 +193,11 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
   - `eu-ai-act Art. 15 (clause reference unverified)`
   - Evidence: `agentce:event/langgraph-known-pass-tc1`
   - Remediation: rob-evidence-at-source
-- **Adversarial-probe resilience is measured within thresholds** (`ROB-05` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, semi-automated; 0/1 failed)
+- **Adversarial-probe resilience is measured within thresholds** (`ROB-05` @ `spiffe://corp/agents/credit-langgraph`) -> **not assessed** (rung 3, semi-automated; 0/0 failed)
   - `eu-ai-act Art. 15 (clause reference unverified)`
-  - Evidence: `agentce:event/langgraph-known-pass-tc1`
   - Remediation: rob-evidence-at-source
-- **Resource-exhaustion resistance is measured within budgets** (`ROB-06` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, semi-automated; 0/1 failed)
+- **Resource-exhaustion resistance is measured within budgets** (`ROB-06` @ `spiffe://corp/agents/credit-langgraph`) -> **not assessed** (rung 3, semi-automated; 0/0 failed)
   - `eu-ai-act Art. 15 (clause reference unverified)`
-  - Evidence: `agentce:event/langgraph-known-pass-tc1`
   - Remediation: rob-evidence-at-source
 - **Cyber-incident detection and response are exercised** (`ROB-07` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, semi-automated; 0/1 failed)
   - `eu-ai-act Art. 15 (clause reference unverified)`
