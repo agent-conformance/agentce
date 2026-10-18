@@ -701,13 +701,20 @@ export function computeReadiness(
   const reasons: string[] = [];
   const limitations: string[] = [];
 
+  // A stage-4 input every report has: an absent one is a blocking reason, never an empty file, so
+  // deleting the record of a gap or a break cannot clear it (SPEC §13.3.4).
   const reportFile = (name: string): string | undefined => {
+    let text: string | undefined;
     try {
-      return readReportFile(join(reportDir, name));
+      text = readReportFile(join(reportDir, name));
     } catch {
       reasons.push(`cannot read report file ${name}`);
       return undefined;
     }
+    if (text === undefined) {
+      reasons.push(`missing report file ${name}`);
+    }
+    return text;
   };
 
   for (const record of parseJsonl(reportFile("integrity.jsonl"))) {

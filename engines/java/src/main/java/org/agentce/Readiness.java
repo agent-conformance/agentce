@@ -911,13 +911,20 @@ public final class Readiness {
         List<String> reasons = new ArrayList<>();
         List<String> limitations = new ArrayList<>();
 
+        // A stage-4 input every report has: an absent one is a blocking reason, never an empty file,
+        // so deleting the record of a gap or a break cannot clear it (SPEC §13.3.4).
         Function<String, String> reportFile = name -> {
+            String text;
             try {
-                return readReportFile(reportDir.resolve(name));
+                text = readReportFile(reportDir.resolve(name));
             } catch (IOException e) {
                 reasons.add("cannot read report file " + name);
                 return null;
             }
+            if (text == null) {
+                reasons.add("missing report file " + name);
+            }
+            return text;
         };
 
         for (JsonNode record : parseJsonl(reportFile.apply("integrity.jsonl"))) {

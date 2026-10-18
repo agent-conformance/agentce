@@ -133,12 +133,35 @@ for (const name of REPORT_FILES) {
       }
     });
   }
-  test(`an absent ${name} reads as empty`, () => {
+  test(`an absent ${name} is NOT READY and named (18.166)`, () => {
     const dir = report();
     unlinkSync(join(dir, name));
-    assert.equal(computeReadiness(dir, { severities: SEVERITIES }).verdict, READY);
+    const v = computeReadiness(dir, { severities: SEVERITIES });
+    assert.equal(v.verdict, NOT_READY);
+    assert.deepEqual(v.reasons, [`missing report file ${name}`]);
   });
 }
+
+test("an absent report file outweighs a gap recorded as a limitation", () => {
+  const dir = report({
+    assertions: [{ control: "OVS-03", outcome: "insufficient_evidence", subject: "s" }],
+  });
+  unlinkSync(join(dir, "coverage.json"));
+  const v = computeReadiness(dir, { severities: SEVERITIES, gaps: new Set(["OVS-03"]) });
+  assert.equal(v.verdict, NOT_READY);
+  assert.ok(v.reasons.includes("missing report file coverage.json"));
+});
+
+test("every absent report file is named, sorted", () => {
+  const dir = report();
+  for (const name of REPORT_FILES) {
+    unlinkSync(join(dir, name));
+  }
+  assert.deepEqual(
+    computeReadiness(dir, { severities: SEVERITIES }).reasons,
+    [...REPORT_FILES].sort(byteCompare).map((n) => `missing report file ${n}`),
+  );
+});
 
 test("a report folder that can be listed but not entered is NOT READY", { skip: asRoot }, () => {
   const dir = report();

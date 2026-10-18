@@ -133,10 +133,36 @@ def test_unreadable_report_folder_is_not_ready(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("name", _REPORT_FILES)
-def test_absent_report_file_reads_as_empty(tmp_path: Path, name: str) -> None:
+def test_absent_report_file_blocks(tmp_path: Path, name: str) -> None:
+    """Deleting a stage-4 file never clears what it recorded (18.166)."""
     report = _report(tmp_path)
     (report / name).unlink()
-    assert compute_readiness(report, severities=_SEVERITIES)["verdict"] == READY
+    verdict = compute_readiness(report, severities=_SEVERITIES)
+    assert verdict["verdict"] == NOT_READY
+    assert verdict["reasons"] == [f"missing report file {name}"]
+
+
+def test_absent_report_file_outweighs_a_recorded_gap(tmp_path: Path) -> None:
+    report = _report(
+        tmp_path,
+        assertions=[
+            {"control": "OVS-03", "outcome": "insufficient_evidence", "subject": "s"}
+        ],
+    )
+    (report / "coverage.json").unlink()
+    verdict = compute_readiness(report, severities=_SEVERITIES, gaps={"OVS-03"})
+    assert verdict["verdict"] == NOT_READY
+    assert "missing report file coverage.json" in verdict["reasons"]
+
+
+def test_every_absent_report_file_is_named(tmp_path: Path) -> None:
+    report = _report(tmp_path)
+    for name in _REPORT_FILES:
+        (report / name).unlink()
+    verdict = compute_readiness(report, severities=_SEVERITIES)
+    assert verdict["reasons"] == [
+        f"missing report file {n}" for n in sorted(_REPORT_FILES)
+    ]
 
 
 @_not_root

@@ -166,11 +166,16 @@ def compute_readiness(
     limitations: list[str] = []
 
     def report_file(name: str) -> str | None:
+        """A stage-4 input every report has: an absent one is a blocking reason, never an empty
+        file, so deleting the record of a gap or a break cannot clear it (SPEC §13.3.4)."""
         try:
-            return _read_report_file(report_dir / name)
+            text = _read_report_file(report_dir / name)
         except OSError:
             reasons.append(f"cannot read report file {name}")
             return None
+        if text is None:
+            reasons.append(f"missing report file {name}")
+        return text
 
     for record in _jsonl(report_file("integrity.jsonl")):
         if record.get("status") in _BAD_INTEGRITY:

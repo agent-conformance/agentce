@@ -145,10 +145,35 @@ class ReadinessTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"coverage.json", "integrity.jsonl", "applicability.jsonl", "assertions.json"})
-    void absentReportFileReadsAsEmpty(String name, @TempDir Path dir) throws IOException {
+    void absentReportFileIsNotReadyAndNamed(String name, @TempDir Path dir) throws IOException {
         writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
         Files.delete(dir.resolve(name));
-        assertEquals(Readiness.READY, Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).verdict());
+        Readiness.Verdict verdict = Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of());
+        assertEquals(Readiness.NOT_READY, verdict.verdict());
+        assertEquals(List.of("missing report file " + name), verdict.reasons());
+    }
+
+    @Test
+    void anAbsentReportFileOutweighsAGapRecordedAsALimitation(@TempDir Path dir) throws IOException {
+        Path report = reportWithAssertions(
+                dir, Json.nodes().arrayNode().add(assertion("OVS-03", "insufficient_evidence", "s")));
+        Files.delete(report.resolve("coverage.json"));
+        Readiness.Verdict verdict =
+                Readiness.computeReadiness(report, SEVERITIES, List.of(), Set.of("OVS-03"));
+        assertEquals(Readiness.NOT_READY, verdict.verdict());
+        assertTrue(verdict.reasons().contains("missing report file coverage.json"));
+    }
+
+    @Test
+    void everyAbsentReportFileIsNamedSorted(@TempDir Path dir) throws IOException {
+        writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
+        List<String> names = List.of("applicability.jsonl", "assertions.json", "coverage.json", "integrity.jsonl");
+        for (String name : names) {
+            Files.delete(dir.resolve(name));
+        }
+        assertEquals(
+                names.stream().map(n -> "missing report file " + n).toList(),
+                Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).reasons());
     }
 
     @Test
