@@ -133,11 +133,13 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `internal.unexpected` | an unexpected internal error occurred. | re-run with --debug to see the stack trace, then file an issue for an AgentCE maintainer to investigate. |
 | `report.missing_evidence_pointer` | an assertion reached a conformant, non-conformant, or partial outcome with no evidence pointer. | every conformant, non-conformant, or partial outcome must cite evidence (DC-5). |
 | `sign.claim_malformed` | claim.json is not a JSON object whose signatures field, if present, is a list. | re-run the `agentce assess` command that wrote this report, then sign the new report. |
+| `sign.claim_outside_report` | claim.json, the signatures folder or trust-root.json links outside the report directory, so signing would write there. | replace the link with the file itself, inside the report directory. |
 | `sign.key_algorithm` | the signing key is not an Ed25519 private key. | supply an Ed25519 key (the algorithm the engine signs with, SPEC §8.7). |
 | `sign.key_unreadable` | the signing key file could not be parsed as an unencrypted PEM private key. | supply an unencrypted Ed25519 private key PEM (`openssl genpkey -algorithm ed25519 -out key.pem`, or `agentce catalog sign --new-key <path>`). |
 | `sign.keyless_offline` | the profile is keyless and obtains a certificate from a Fulcio instance (network); the engine does not sign it offline. | use --profile kms --key <file> offline, or run keyless signing where the Fulcio and Rekor endpoints are reachable. |
 | `sign.kms_key_missing` | the kms profile signs with an operator-held key. | pass --key <ed25519-private-key.pem>. |
 | `sign.no_claim` | the report directory has no claim.json to sign. | produce the report first: `agentce assess … --out <report-dir>`. |
+| `sign.no_manifest` | the report directory has no readable manifest.json, which the signature covers. | produce the report again: `agentce assess … --out <report-dir>`. |
 | `sign.not_ready` | the report is not ready to sign. | resolve the blocking reasons (agentce readiness <report-dir>) before signing. |
 | `sign.trust_root_requires_kms` | --write-trust-root needs an exportable public key; the sigstore-public profile has none. | pass --profile kms --key <ed25519-private-key.pem> --write-trust-root. |
 | `verify.catalog_digest_mismatch` | the signature covers a different catalog digest than the directory content | a catalog file changed after signing; restore the published files, or re-sign the catalog with `agentce catalog sign`. |
