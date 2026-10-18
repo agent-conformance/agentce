@@ -4,7 +4,20 @@
  */
 
 import assert from "node:assert/strict";
-import { cpSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  chmodSync,
+  cpSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -605,6 +618,124 @@ test("an integer literal of 4300 digits in a JSONL line is valid", () => {
   try {
     writeFileSync(join(out, "runtime_drift.jsonl"), `{"n": -${"9".repeat(4300)}}\n`);
     assert.deepEqual(validateReport(out), []);
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+// --- 18.167: a file that is there but cannot be read is a problem, never an absence. ----------
+
+const NOT_AN_AUDITOR_PACK = '{"not": "an auditor pack"}\n';
+
+const MAKERS: Record<string, (out: string, name: string) => void> = {
+  mode000: (out, name) => {
+    writeFileSync(join(out, name), NOT_AN_AUDITOR_PACK);
+    chmodSync(join(out, name), 0);
+  },
+  unenterable: (out, name) => {
+    mkdirSync(join(out, "lock"));
+    writeFileSync(join(out, "lock", name), NOT_AN_AUDITOR_PACK);
+    rmSync(join(out, name), { force: true });
+    symlinkSync(join(out, "lock", name), join(out, name));
+    chmodSync(join(out, "lock"), 0o600);
+  },
+  fifo: (out, name) => {
+    rmSync(join(out, name), { force: true });
+    execFileSync("mkfifo", [join(out, name)]);
+  },
+  dangling: (out, name) => {
+    rmSync(join(out, name), { force: true });
+    symlinkSync(join(out, "nowhere"), join(out, name));
+  },
+};
+
+function restoreModes(dir: string): void {
+  chmodSync(dir, 0o700);
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name);
+    const stat = lstatSync(path);
+    if (stat.isSymbolicLink()) {
+      continue;
+    }
+    chmodSync(path, 0o700);
+    if (stat.isDirectory()) {
+      restoreModes(path);
+    }
+  }
+}
+
+const UNREADABLE_CASES: [string, string, string][] = [
+  ["auditor.json", "mode000", "permission denied"],
+  ["auditor.json", "unenterable", "permission denied"],
+  ["auditor.json", "fifo", "not a regular file"],
+  ["auditor.json", "dangling", "not a regular file"],
+  ["coverage.json", "fifo", "not a regular file"],
+  ["integrity.jsonl", "mode000", "permission denied"],
+  ["assertions.json", "mode000", "permission denied"],
+  ["manifest.json", "fifo", "not a regular file"],
+  ["claim.json", "dangling", "not a regular file"],
+];
+
+for (const [name, kind, reason] of UNREADABLE_CASES) {
+  test(`18.167: ${name} (${kind}) is reported as unreadable, never skipped`, () => {
+    const out = freshFullReport();
+    try {
+      (MAKERS[kind] as (out: string, name: string) => void)(out, name);
+      let problems: string[];
+      try {
+        problems = validateReport(out);
+      } finally {
+        restoreModes(out);
+      }
+      assert.deepEqual(problems, [`${name}: cannot read (${reason})`]);
+    } finally {
+      rmSync(out, { recursive: true, force: true });
+    }
+  });
+}
+
+test("18.167: claim.json is required when assertions.json holds assertions", () => {
+  const out = freshFullReport();
+  try {
+    unlinkSync(join(out, "claim.json"));
+    assert.deepEqual(validateReport(out), [
+      "claim.json: missing (assertions.json holds assertions, and a run that records any writes claim.json)",
+    ]);
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("18.167: a recorded data file that went missing, and one that does not parse", () => {
+  const out = freshFullReport();
+  try {
+    const manifestPath = join(out, "manifest.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    manifest.outputs["integrity.jsonl"] = `sha256:${"0".repeat(64)}`;
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+    unlinkSync(join(out, "integrity.jsonl"));
+    assert.deepEqual(validateReport(out), [
+      "integrity.jsonl: missing (recorded in manifest.json's outputs but not on disk)",
+    ]);
+    writeFileSync(join(out, "integrity.jsonl"), "{}\nnot json\n");
+    writeFileSync(join(out, "coverage.json"), "{");
+    const problems = validateReport(out).map((p) => p.split(" (")[0]);
+    assert.deepEqual(problems, [
+      "integrity.jsonl: line 2 is not valid JSON",
+      "coverage.json: invalid JSON",
+    ]);
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("18.167: a failed validation names its key, each problem and a fix", () => {
+  const out = mkdtempSync(join(tmpdir(), "agentce-report-validate-"));
+  try {
+    const { exitCode, envelope } = runJson(["report", "--validate", out, "--json"]);
+    assert.equal(exitCode, 3);
+    assert.equal(envelope.message_key, "report.validation_failed");
+    assert.equal(envelope.valid, false);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }

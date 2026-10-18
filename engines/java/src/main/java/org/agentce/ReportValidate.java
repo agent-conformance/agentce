@@ -8,11 +8,19 @@ import com.networknt.schema.JsonNodePath;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -79,6 +87,12 @@ public final class ReportValidate {
      * #ARTIFACT_SCHEMAS}'s entries. */
     private static final List<String> OPTIONAL_ARTIFACTS =
             List.of("report.junit.xml", "oscal-ar.xml", "report.csv", "runtime_drift.jsonl");
+
+    /** The data files every assess run writes and records in manifest.json's outputs, beside the
+     * schema-checked artifacts: required when the manifest recorded them, and parsed when present;
+     * matches Python's {@code _REPORT_DATA_FILES} (18.167). */
+    private static final List<String> REPORT_DATA_FILES =
+            List.of("integrity.jsonl", "coverage.json", "applicability.jsonl", "quarantine.jsonl");
 
     private static final List<String> CSV_COLUMNS =
             List.of("control", "subject", "outcome", "control_version", "rung", "mode");
@@ -250,16 +264,86 @@ public final class ReportValidate {
         return out;
     }
 
-    private static Map<String, String> recordedOutputs(Path outDir) {
-        Path manifestPath = outDir.resolve("manifest.json");
-        if (!Files.isRegularFile(manifestPath)) {
-            return Map.of();
+    /** A report file that is there but cannot be read as a regular file; the message is the reason
+     * {@code report --validate} prints in parentheses, as Python's {@code _CannotRead} (18.167). */
+    private static final class CannotRead extends Exception {
+        private static final long serialVersionUID = 1L;
+
+        CannotRead(String reason) {
+            super(reason);
         }
+    }
+
+    /** Whether the report folder holds an entry by this name at all; a link counts, dangling or not,
+     * and a folder that cannot be entered counts as holding it, as Python's {@code _has_entry}. */
+    private static boolean hasEntry(Path path) {
+        try {
+            Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            return true;
+        } catch (NoSuchFileException e) {
+            return false;
+        } catch (FileSystemException e) {
+            return !"Not a directory".equals(e.getReason());
+        } catch (IOException e) {
+            return true;
+        }
+    }
+
+    /** The bytes of one report file, or {@code null} when the folder has no entry by that name. An
+     * entry that is there but is not a readable regular file (a FIFO, a folder, a dangling link, a
+     * link into a folder that cannot be entered, a file without read permission) throws {@link
+     * CannotRead}: it is reported, never skipped as absent. A FIFO is never opened. Matches Python's
+     * {@code _read_artifact} (18.167). */
+    private static byte[] readArtifact(Path path) throws CannotRead {
+        if (!hasEntry(path)) {
+            return null;
+        }
+        try {
+            if (Files.readAttributes(path, BasicFileAttributes.class).isRegularFile()) {
+                return Files.readAllBytes(path);
+            }
+        } catch (AccessDeniedException e) {
+            throw new CannotRead("permission denied");
+        } catch (IOException e) {
+            // fall through: a dangling link or a link loop is not a regular file
+        }
+        throw new CannotRead("not a regular file");
+    }
+
+    /** {@link #readArtifact}, decoded as UTF-8; text that is not UTF-8 throws {@link CannotRead} too. */
+    private static String readArtifactText(Path path) throws CannotRead {
+        byte[] data = readArtifact(path);
+        if (data == null) {
+            return null;
+        }
+        try {
+            return StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(data)).toString();
+        } catch (CharacterCodingException e) {
+            throw new CannotRead(e.getMessage());
+        }
+    }
+
+    /** Read one report file for {@link #validateReport}: its text, or {@code null} when it is absent
+     * or cannot be read, the second with its problem line added to {@code problems}. */
+    private static String readOrReport(Path outDir, String filename, List<String> problems) {
+        try {
+            return readArtifactText(outDir.resolve(filename));
+        } catch (CannotRead e) {
+            problems.add(filename + ": cannot read (" + e.getMessage() + ")");
+            return null;
+        }
+    }
+
+    private static Map<String, String> recordedOutputs(Path outDir) {
         JsonNode manifest;
         try {
-            manifest = Json.parse(Files.readString(manifestPath, StandardCharsets.UTF_8));
-        } catch (IOException | IllegalArgumentException e) {
-            return Map.of();
+            String text = readArtifactText(outDir.resolve("manifest.json"));
+            if (text == null) {
+                return Map.of();
+            }
+            manifest = Json.parse(text);
+        } catch (CannotRead | IllegalArgumentException e) {
+            return Map.of(); // a manifest that cannot be read records nothing here; the schema check reports it
         }
         JsonNode outputs = manifest.isObject() ? manifest.get("outputs") : null;
         if (outputs == null || !outputs.isObject()) {
@@ -274,10 +358,10 @@ public final class ReportValidate {
         return out;
     }
 
-    private static List<String> validateXmlWellformed(Path path, String filename) {
+    private static List<String> validateXmlWellformed(byte[] data, String filename) {
         XMLInputFactory factory = XMLInputFactory.newInstance();
         factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
-        try (var in = Files.newInputStream(path)) {
+        try (var in = new ByteArrayInputStream(data)) {
             XMLStreamReader reader = factory.createXMLStreamReader(in);
             while (reader.hasNext()) {
                 reader.next();
@@ -288,14 +372,8 @@ public final class ReportValidate {
         }
     }
 
-    private static List<String> validateJsonl(Path path, String filename) {
+    private static List<String> validateJsonl(String text, String filename) {
         List<String> problems = new ArrayList<>();
-        String text;
-        try {
-            text = Files.readString(path, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            return List.of(filename + ": cannot read (" + e.getMessage() + ")");
-        }
         String[] lines = text.split("\r?\n", -1);
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i];
@@ -355,13 +433,7 @@ public final class ReportValidate {
         return fields;
     }
 
-    private static List<String> validateCsv(Path path, String filename) {
-        String text;
-        try {
-            text = Files.readString(path, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            return List.of(filename + ": invalid CSV (" + e.getMessage() + ")");
-        }
+    private static List<String> validateCsv(String text, String filename) {
         String[] rawLines = text.split("\r?\n", -1);
         List<String> lines = new ArrayList<>();
         for (int i = 0; i < rawLines.length; i++) {
@@ -395,11 +467,12 @@ public final class ReportValidate {
     }
 
     /** Schema-validation problems for every artifact in {@code outDir} (empty when it is entirely
-     * valid). */
+     * valid). An entry that is there but cannot be read is a problem, never an absence; claim.json is
+     * required when assertions.json holds an assertion (18.167). */
     public static List<String> validateReport(Path outDir) {
         List<String> problems = new ArrayList<>();
         for (String filename : MANDATORY_ARTIFACT_SCHEMAS.keySet()) {
-            if (!Files.isRegularFile(outDir.resolve(filename))) {
+            if (!hasEntry(outDir.resolve(filename))) {
                 problems.add(filename + ": missing");
             }
         }
@@ -408,27 +481,29 @@ public final class ReportValidate {
         trackedNames.add("report.md");
         trackedNames.add("report.html");
         trackedNames.addAll(OPTIONAL_ARTIFACTS);
+        trackedNames.addAll(REPORT_DATA_FILES);
         for (String filename : trackedNames) {
-            if (recorded.containsKey(filename) && !Files.isRegularFile(outDir.resolve(filename))) {
+            if (recorded.containsKey(filename) && !hasEntry(outDir.resolve(filename))) {
                 problems.add(filename + ": missing (recorded in manifest.json's outputs but not on disk)");
             }
         }
+        boolean hasAssertions = false;
         for (Map.Entry<String, String> entry : ARTIFACT_SCHEMAS.entrySet()) {
             String filename = entry.getKey();
             String schemaName = entry.getValue();
-            Path path = outDir.resolve(filename);
-            if (!Files.isRegularFile(path)) {
+            String text = readOrReport(outDir, filename, problems);
+            if (text == null) {
                 continue; // mandatory absence was already reported above; optional absence is not a problem
             }
             JsonNode instance;
             try {
-                instance = Json.parse(Files.readString(path, StandardCharsets.UTF_8));
-            } catch (IOException e) {
-                problems.add(filename + ": cannot read (" + e.getMessage() + ")");
-                continue;
+                instance = Json.parse(text);
             } catch (IllegalArgumentException e) {
                 problems.add(filename + ": invalid JSON (" + originalMessage(e) + ")");
                 continue;
+            }
+            if (filename.equals("assertions.json")) {
+                hasAssertions = instance.isArray() && !instance.isEmpty();
             }
             Set<ValidationMessage> errors = localValidatorFor(schemaName).validate(instance);
             if (!errors.isEmpty()) {
@@ -443,26 +518,53 @@ public final class ReportValidate {
             }
         }
         for (String filename : List.of("report.md", "report.html")) {
-            Path path = outDir.resolve(filename);
-            try {
-                if (Files.isRegularFile(path) && Files.readString(path, StandardCharsets.UTF_8).strip().isEmpty()) {
-                    problems.add(filename + ": empty");
+            String text = readOrReport(outDir, filename, problems);
+            if (text != null && text.strip().isEmpty()) {
+                problems.add(filename + ": empty");
+            }
+        }
+        List<String> dataFiles = new ArrayList<>(REPORT_DATA_FILES);
+        dataFiles.add("claim.json");
+        for (String filename : dataFiles) {
+            String text = readOrReport(outDir, filename, problems);
+            if (text == null) {
+                if (filename.equals("claim.json") && hasAssertions && !hasEntry(outDir.resolve(filename))) {
+                    problems.add("claim.json: missing (assertions.json holds assertions, and a run that"
+                            + " records any writes claim.json)");
                 }
-            } catch (IOException e) {
-                problems.add(filename + ": cannot read (" + e.getMessage() + ")");
+                continue;
+            }
+            if (filename.endsWith(".jsonl")) {
+                problems.addAll(validateJsonl(text, filename));
+                continue;
+            }
+            try {
+                Json.parse(text);
+            } catch (IllegalArgumentException e) {
+                problems.add(filename + ": invalid JSON (" + originalMessage(e) + ")");
             }
         }
         for (String filename : OPTIONAL_ARTIFACTS) {
             Path path = outDir.resolve(filename);
-            if (!Files.isRegularFile(path)) {
+            if (filename.endsWith(".xml")) {
+                try {
+                    byte[] data = readArtifact(path);
+                    if (data != null) {
+                        problems.addAll(validateXmlWellformed(data, filename));
+                    }
+                } catch (CannotRead e) {
+                    problems.add(filename + ": cannot read (" + e.getMessage() + ")");
+                }
+                continue;
+            }
+            String text = readOrReport(outDir, filename, problems);
+            if (text == null) {
                 continue; // optional: only present, and only validated, when a run actually produced it
             }
             if (filename.equals("report.csv")) {
-                problems.addAll(validateCsv(path, filename));
-            } else if (filename.equals("runtime_drift.jsonl")) {
-                problems.addAll(validateJsonl(path, filename));
+                problems.addAll(validateCsv(text, filename));
             } else {
-                problems.addAll(validateXmlWellformed(path, filename));
+                problems.addAll(validateJsonl(text, filename));
             }
         }
         return problems;

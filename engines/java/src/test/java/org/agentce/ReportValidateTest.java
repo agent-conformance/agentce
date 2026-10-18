@@ -11,9 +11,14 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
@@ -457,5 +462,104 @@ class ReportValidateTest {
                 o -> o.put("state", "bad state"));
         assertEquals(List.of(NIST + ": " + STATUS + "/state", NIST + ": " + STATUS + "/state"), locations(problems, NIST));
         assertTrue(problems.get(0).contains("enumeration") && problems.get(1).contains("regex pattern"), problems.toString());
+    }
+
+    // --- 18.167: a file that is there but cannot be read is a problem, never an absence. ---------
+
+    private static final String NOT_AN_AUDITOR_PACK = "{\"not\": \"an auditor pack\"}\n";
+
+    private static void make(Path out, String name, String kind) throws Exception {
+        Path path = out.resolve(name);
+        switch (kind) {
+            case "mode000" -> {
+                Files.writeString(path, NOT_AN_AUDITOR_PACK);
+                Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("---------"));
+            }
+            case "unenterable" -> {
+                Path lock = Files.createDirectory(out.resolve("lock"));
+                Files.writeString(lock.resolve(name), NOT_AN_AUDITOR_PACK);
+                Files.deleteIfExists(path);
+                Files.createSymbolicLink(path, lock.resolve(name));
+                Files.setPosixFilePermissions(lock, PosixFilePermissions.fromString("rw-------"));
+            }
+            case "fifo" -> {
+                Files.deleteIfExists(path);
+                assertEquals(0, new ProcessBuilder("mkfifo", path.toString()).start().waitFor());
+            }
+            case "dangling" -> {
+                Files.deleteIfExists(path);
+                Files.createSymbolicLink(path, out.resolve("nowhere"));
+            }
+            default -> throw new IllegalArgumentException(kind);
+        }
+    }
+
+    private static void restoreModes(Path out) throws IOException {
+        Path lock = out.resolve("lock");
+        if (Files.exists(lock, LinkOption.NOFOLLOW_LINKS)) {
+            Files.setPosixFilePermissions(lock, PosixFilePermissions.fromString("rwx------"));
+        }
+        try (Stream<Path> paths = Files.walk(out)) {
+            for (Path path : (Iterable<Path>) paths::iterator) {
+                if (!Files.isSymbolicLink(path)) {
+                    Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rwx------"));
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "auditor.json, mode000, permission denied",
+        "auditor.json, unenterable, permission denied",
+        "auditor.json, fifo, not a regular file",
+        "auditor.json, dangling, not a regular file",
+        "coverage.json, fifo, not a regular file",
+        "integrity.jsonl, mode000, permission denied",
+        "assertions.json, mode000, permission denied",
+        "manifest.json, fifo, not a regular file",
+        "claim.json, dangling, not a regular file",
+    })
+    void anUnreadableFileIsReportedNeverSkipped(String name, String kind, String reason, @TempDir Path out)
+            throws Exception {
+        freshFullReport(out);
+        make(out, name, kind);
+        List<String> problems;
+        try {
+            problems = ReportValidate.validateReport(out);
+        } finally {
+            restoreModes(out);
+        }
+        assertEquals(List.of(name + ": cannot read (" + reason + ")"), problems);
+    }
+
+    @Test
+    void claimJsonIsRequiredWhenAssertionsAreRecorded(@TempDir Path out) throws IOException {
+        freshFullReport(out);
+        Files.delete(out.resolve("claim.json"));
+        assertEquals(List.of("claim.json: missing (assertions.json holds assertions, and a run that records any"
+                + " writes claim.json)"), ReportValidate.validateReport(out));
+    }
+
+    @Test
+    void aRecordedDataFileThatWentMissingAndOneThatDoesNotParse(@TempDir Path out) throws IOException {
+        freshFullReport(out);
+        ObjectNode manifest = readObject(out.resolve("manifest.json"));
+        ((ObjectNode) manifest.get("outputs")).put("integrity.jsonl", "sha256:" + "0".repeat(64));
+        Files.writeString(out.resolve("manifest.json"), manifest.toString());
+        Files.delete(out.resolve("integrity.jsonl"));
+        assertEquals(List.of("integrity.jsonl: missing (recorded in manifest.json's outputs but not on disk)"),
+                ReportValidate.validateReport(out));
+        Files.writeString(out.resolve("integrity.jsonl"), "{}\nnot json\n");
+        Files.writeString(out.resolve("coverage.json"), "{");
+        List<String> problems = ReportValidate.validateReport(out).stream().map(p -> p.split(" \\(")[0]).toList();
+        assertEquals(List.of("integrity.jsonl: line 2 is not valid JSON", "coverage.json: invalid JSON"), problems);
+    }
+
+    @Test
+    void aFailedValidationNamesItsKey(@TempDir Path out) {
+        JsonNode envelope = runJson("report", "--validate", out.toString());
+        assertEquals("report.validation_failed", envelope.get("message_key").asText());
+        assertEquals(false, envelope.get("valid").asBoolean());
     }
 }

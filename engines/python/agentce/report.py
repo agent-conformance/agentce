@@ -38,6 +38,7 @@ from . import (
     canonical,
     i18n_format,
     messages,
+    signing,
     templating,
     verdict,
 )
@@ -3741,20 +3742,64 @@ def validate_sarif_2_1_0(document: dict[str, Any]) -> list[str]:
     )
 
 
-def _validate_xml_wellformed(path: Path) -> list[str]:
+class _CannotRead(Exception):
+    """A report file that is there but cannot be read as a regular file. The message is the reason
+    `report --validate` prints in parentheses; "not a regular file" and "permission denied" read the
+    same in all three engines (18.167)."""
+
+
+def _has_entry(path: Path) -> bool:
+    """Whether the report folder holds an entry by this name at all; a link counts, dangling or not.
+    ``os.lstat`` answers the same on every supported Python, where 3.14's ``Path.is_file`` reads an
+    entry it cannot reach as absent (18.167). A folder that cannot be entered counts as holding the
+    entry, so the read that follows reports it."""
     try:
-        ET.parse(path)
+        os.lstat(path)
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _read_artifact(path: Path) -> bytes | None:
+    """The bytes of one report file, or ``None`` when the folder has no entry by that name. An entry
+    that is there but is not a readable regular file (a FIFO, a folder, a dangling link, a link into
+    a folder that can be listed but not entered, a file without read permission) raises
+    `_CannotRead`: it is reported, never skipped as absent (18.167). A FIFO is never opened."""
+    if not _has_entry(path):
+        return None
+    try:
+        if signing.is_regular_file(path):
+            return path.read_bytes()
+    except PermissionError as exc:
+        raise _CannotRead("permission denied") from exc
+    except OSError as exc:
+        raise _CannotRead(exc.strerror or str(exc)) from exc
+    raise _CannotRead("not a regular file")
+
+
+def _read_artifact_text(path: Path) -> str | None:
+    """`_read_artifact`, decoded as UTF-8; text that is not UTF-8 raises `_CannotRead` too."""
+    data = _read_artifact(path)
+    if data is None:
+        return None
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise _CannotRead(str(exc)) from exc
+
+
+def _validate_xml_wellformed(filename: str, data: bytes) -> list[str]:
+    try:
+        ET.fromstring(data)
     except ET.ParseError as exc:
-        return [f"{path.name}: invalid XML ({exc})"]
+        return [f"{filename}: invalid XML ({exc})"]
     return []
 
 
-def _validate_jsonl(path: Path) -> list[str]:
-    """Every non-blank line of ``path`` parses as its own JSON object."""
-    try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as exc:
-        return [f"{path.name}: cannot read ({exc})"]
+def _validate_jsonl(filename: str, text: str) -> list[str]:
+    """Every non-blank line of ``text`` parses as its own JSON object."""
     problems = []
     for i, line in enumerate(text.splitlines(), start=1):
         if not line.strip():
@@ -3762,31 +3807,30 @@ def _validate_jsonl(path: Path) -> list[str]:
         try:
             load_json(line)
         except JSONError as exc:
-            problems.append(f"{path.name}: line {i} is not valid JSON ({exc.msg})")
+            problems.append(f"{filename}: line {i} is not valid JSON ({exc.msg})")
     return problems
 
 
-def _validate_csv(path: Path) -> list[str]:
+def _validate_csv(filename: str, text: str) -> list[str]:
     """A ``report.csv`` is valid iff it parses as CSV, carries every column in
     :data:`CSV_COLUMNS`, and every row has the same field count as the header -- enough to accept a
     genuine run's output and reject garbage (a non-CSV-structured file either fails to parse, is
     missing the required columns, or has ragged rows)."""
     try:
-        with path.open("r", encoding="utf-8", newline="") as handle:
-            rows = list(csv.reader(handle))
-    except (OSError, csv.Error, UnicodeDecodeError) as exc:
-        return [f"{path.name}: invalid CSV ({exc})"]
+        rows = list(csv.reader(io.StringIO(text, newline="")))
+    except csv.Error as exc:
+        return [f"{filename}: invalid CSV ({exc})"]
     if not rows:
-        return [f"{path.name}: empty CSV (no header row)"]
+        return [f"{filename}: empty CSV (no header row)"]
     header = rows[0]
     problems = [
-        f"{path.name}: missing column {column!r}"
+        f"{filename}: missing column {column!r}"
         for column in CSV_COLUMNS
         if column not in header
     ]
     width = len(header)
     problems += [
-        f"{path.name}: row {i} has {len(row)} field(s), expected {width}"
+        f"{filename}: row {i} has {len(row)} field(s), expected {width}"
         for i, row in enumerate(rows[1:], start=2)
         if len(row) != width
     ]
@@ -3802,18 +3846,26 @@ _OPTIONAL_ARTIFACTS = (
     "report.csv",
     "runtime_drift.jsonl",
 )
+#: The data files every assess run writes and records in manifest.json's outputs, beside the
+#: schema-checked artifacts (SPEC §13.3.4 stage 4 reads the first three): required when the manifest
+#: recorded them, and parsed when present (18.167).
+_REPORT_DATA_FILES = (
+    "integrity.jsonl",
+    "coverage.json",
+    "applicability.jsonl",
+    "quarantine.jsonl",
+)
 
 
 def _recorded_outputs(out_dir: Path) -> dict[str, str]:
     """``manifest.json``'s own ``outputs`` map: the filenames *this run* actually wrote, recorded
     by ``write_report`` itself as it wrote them (SPEC §9) -- ground truth for what a narrower
-    ``--emit`` did and did not request, independent of the directory's current contents."""
-    manifest_path = out_dir / "manifest.json"
-    if not manifest_path.is_file():
-        return {}
+    ``--emit`` did and did not request, independent of the directory's current contents. A manifest
+    that cannot be read records nothing here; the schema check reports it."""
     try:
-        manifest = load_json(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, JSONError):
+        text = _read_artifact_text(out_dir / "manifest.json")
+        manifest = load_json(text) if text is not None else None
+    except (_CannotRead, JSONError):
         return {}
     outputs = manifest.get("outputs") if isinstance(manifest, dict) else None
     return outputs if isinstance(outputs, dict) else {}
@@ -3827,37 +3879,47 @@ def validate_report(out_dir: Path) -> list[str]:
     additionally required when `manifest.json`'s own `outputs` map recorded that this run wrote it
     (so a run that emitted `report.html` but somehow lost it before `--validate` runs is still
     caught) and is validated when present regardless -- 'validate every emission' means every
-    artifact the run actually emitted, not every format that exists."""
+    artifact the run actually emitted, not every format that exists. claim.json is required when
+    assertions.json holds an assertion, since the run writes it whenever it records one. An entry
+    that is there but cannot be read is a problem, never an absence (18.167)."""
     problems: list[str] = []
     for filename in _MANDATORY_ARTIFACT_SCHEMAS:
-        if not (out_dir / filename).is_file():
+        if not _has_entry(out_dir / filename):
             problems.append(f"{filename}: missing")
     recorded = _recorded_outputs(out_dir)
     # A declared sequence, not a set: a set's iteration order follows PYTHONHASHSEED, which made
     # this loop's problem order non-deterministic across runs whenever two or more recorded outputs
     # were missing at once (18.61; mirrors TypeScript's `Set` and Java's `LinkedHashSet` over the
-    # same three pieces, in the same order).
+    # same pieces, in the same order).
     for filename in dict.fromkeys(
-        (*_ARTIFACT_SCHEMAS, "report.md", "report.html", *_OPTIONAL_ARTIFACTS)
+        (
+            *_ARTIFACT_SCHEMAS,
+            "report.md",
+            "report.html",
+            *_OPTIONAL_ARTIFACTS,
+            *_REPORT_DATA_FILES,
+        )
     ):
-        if filename in recorded and not (out_dir / filename).is_file():
+        if filename in recorded and not _has_entry(out_dir / filename):
             problems.append(
                 f"{filename}: missing (recorded in manifest.json's outputs but not on disk)"
             )
+    has_assertions = False
     for filename, schema_name in _ARTIFACT_SCHEMAS.items():
-        path = out_dir / filename
-        if not path.is_file():
-            continue  # mandatory absence was already reported above; optional absence is not a problem
         try:
-            text = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError) as exc:
+            text = _read_artifact_text(out_dir / filename)
+        except _CannotRead as exc:
             problems.append(f"{filename}: cannot read ({exc})")
             continue
+        if text is None:
+            continue  # mandatory absence was already reported above; optional absence is not a problem
         try:
             instance = load_json(text)
         except JSONError as exc:
             problems.append(f"{filename}: invalid JSON ({exc.msg})")
             continue
+        if filename == "assertions.json":
+            has_assertions = isinstance(instance, list) and bool(instance)
         local_errors = jsonschema.Draft202012Validator(
             _load_schema(schema_name)
         ).iter_errors(instance)
@@ -3876,24 +3938,48 @@ def validate_report(out_dir: Path) -> list[str]:
                 for p in validate_sarif_2_1_0(instance)
             ]
     for filename in ("report.md", "report.html"):
-        path = out_dir / filename
-        if not path.is_file():
-            continue
         try:
-            empty = not path.read_text(encoding="utf-8").strip()
-        except (OSError, UnicodeDecodeError) as exc:
+            text = _read_artifact_text(out_dir / filename)
+        except _CannotRead as exc:
             problems.append(f"{filename}: cannot read ({exc})")
             continue
-        if empty:
+        if text is not None and not text.strip():
             problems.append(f"{filename}: empty")
+    for filename in (*_REPORT_DATA_FILES, "claim.json"):
+        try:
+            text = _read_artifact_text(out_dir / filename)
+        except _CannotRead as exc:
+            problems.append(f"{filename}: cannot read ({exc})")
+            continue
+        if text is None:
+            if filename == "claim.json" and has_assertions:
+                problems.append(
+                    "claim.json: missing (assertions.json holds assertions, and a run that"
+                    " records any writes claim.json)"
+                )
+            continue
+        if filename.endswith(".jsonl"):
+            problems += _validate_jsonl(filename, text)
+            continue
+        try:
+            load_json(text)
+        except JSONError as exc:
+            problems.append(f"{filename}: invalid JSON ({exc.msg})")
     for filename in _OPTIONAL_ARTIFACTS:
-        path = out_dir / filename
-        if not path.is_file():
+        xml = filename.endswith(".xml")
+        try:
+            content = (_read_artifact if xml else _read_artifact_text)(
+                out_dir / filename
+            )
+        except _CannotRead as exc:
+            problems.append(f"{filename}: cannot read ({exc})")
+            continue
+        if isinstance(content, bytes):
+            problems += _validate_xml_wellformed(filename, content)
+        elif content is None:
             continue  # optional: only present, and only validated, when `--emit` requested it
-        if filename == "report.csv":
-            problems += _validate_csv(path)
-        elif filename == "runtime_drift.jsonl":
-            problems += _validate_jsonl(path)
+        elif filename == "report.csv":
+            problems += _validate_csv(filename, content)
         else:
-            problems += _validate_xml_wellformed(path)
+            problems += _validate_jsonl(filename, content)
     return problems

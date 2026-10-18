@@ -1658,6 +1658,9 @@ const REPORT_GRAMMAR: Grammar = {
     "pass the input with its flag: `agentce report --from <file>` or `--validate <dir>`.",
 };
 
+/** The key `report --validate` answers with when a report folder fails validation. */
+const REPORT_INVALID = "report.validation_failed";
+
 /** The rendering options `report --validate` never reads, in the order the refusal names the first:
  * every value option of the grammar but --validate itself. */
 const REPORT_RENDER_FLAGS = REPORT_GRAMMAR.options
@@ -1704,8 +1707,16 @@ function cmdReport(argv: string[]): CommandResult {
     result.data.valid = problems.length === 0;
     result.data.problems = problems;
     if (problems.length > 0) {
+      // A refusal names its key and a fix, in text and in --json, as an error does (18.167).
+      result.data.message_key = REPORT_INVALID;
       result.addCode(ExitCode.INPUT_ERROR);
-      result.note(`${reportDir}: ${problems.length} artifact(s) failed validation`);
+      result.note(
+        `error [${REPORT_INVALID}]: ${reportDir}: ${problems.length} artifact(s) failed validation`,
+      );
+      for (const problem of problems) {
+        result.note(`  ${problem}`);
+      }
+      result.note(`  fix: ${errorFix(REPORT_INVALID)}`);
     } else {
       result.note(`${reportDir}: all artifacts valid`);
     }

@@ -188,6 +188,7 @@ _KINDS: dict[str, str] = {
     "verify.report_reproduction_mismatch": "error",
     # Further raised refusals (VG-UX-NEXT-STEP checks every literal-key raise is registered).
     "report.missing_evidence_pointer": "error",
+    "report.validation_failed": "error",
     "input.bundle_manifest_path": "error",
     "input.bundle_manifest_files": "error",
     "input.bundle_manifest_entry": "error",

@@ -360,6 +360,26 @@ def test_report_validate_empty_dir_is_invalid(
     assert code == 3
     assert env["valid"] is False
     assert env["problems"]
+    assert env["message_key"] == "report.validation_failed"
+
+
+def test_report_validate_failure_names_its_key_problems_and_fix(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A failed validation reads as an error does: the key, each problem on its own line, then a
+    fix (18.167)."""
+    assert cli.main(["report", "--validate", str(tmp_path)]) == 3
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0] == (
+        f"error [report.validation_failed]: {tmp_path}: 4 artifact(s) failed validation"
+    )
+    assert lines[1:5] == [
+        "  assertions.json: missing",
+        "  manifest.json: missing",
+        "  activity.json: missing",
+        "  blind-spots.json: missing",
+    ]
+    assert lines[5].startswith("  fix: restore the files each problem names")
 
 
 @pytest.mark.parametrize(

@@ -2119,3 +2119,113 @@ def test_audience_view_registry_removing_a_preset_stops_write_report_rendering_i
     assert not (out / "security.json").exists()
     assert not (out / "security.md").exists()
     assert not (out / "security.html").exists()
+
+
+def _valid_report(tmp_path: Path) -> Path:
+    write_report(
+        tmp_path,
+        [_assertion("conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+    )
+    assert validate_report(tmp_path) == []
+    return tmp_path
+
+
+def _unreadable(report: Path, name: str) -> None:
+    (report / name).write_text('{"not": "an auditor pack"}\n', encoding="utf-8")
+    (report / name).chmod(0)
+
+
+def _behind_unenterable(report: Path, name: str) -> None:
+    lock = report / "lock"
+    lock.mkdir()
+    (lock / name).write_text('{"not": "an auditor pack"}\n', encoding="utf-8")
+    (report / name).symlink_to(lock / name)
+    lock.chmod(0o600)
+
+
+def _fifo(report: Path, name: str) -> None:
+    (report / name).unlink(missing_ok=True)
+    os.mkfifo(report / name)
+
+
+def _dangling(report: Path, name: str) -> None:
+    (report / name).unlink(missing_ok=True)
+    (report / name).symlink_to(report / "nowhere")
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads every file")
+@pytest.mark.parametrize(
+    ("name", "make", "reason"),
+    [
+        ("auditor.json", _unreadable, "permission denied"),
+        ("auditor.json", _behind_unenterable, "permission denied"),
+        ("auditor.json", _fifo, "not a regular file"),
+        ("auditor.json", _dangling, "not a regular file"),
+        ("coverage.json", _fifo, "not a regular file"),
+        ("integrity.jsonl", _unreadable, "permission denied"),
+        ("report.csv", _unreadable, "permission denied"),
+        ("report.junit.xml", _behind_unenterable, "permission denied"),
+        ("assertions.json", _unreadable, "permission denied"),
+        ("manifest.json", _fifo, "not a regular file"),
+        ("claim.json", _dangling, "not a regular file"),
+    ],
+)
+def test_validate_report_names_a_file_it_cannot_read_never_skips_it(
+    tmp_path: Path, name: str, make: Any, reason: str
+) -> None:
+    """A file that is there but cannot be read is a problem, never an absence, on every Python and
+    for every kind of report file: optional, data, mandatory, the manifest and the claim (18.167). A
+    mandatory one says `cannot read`, not `missing`; a FIFO is never opened."""
+    report = _valid_report(tmp_path)
+    make(report, name)
+    try:
+        problems = validate_report(report)
+    finally:
+        for path in (report, *report.rglob("*")):
+            if not path.is_symlink():
+                path.chmod(0o700)
+    assert problems == [f"{name}: cannot read ({reason})"]
+
+
+def test_validate_report_requires_claim_json_when_assertions_are_recorded(
+    tmp_path: Path,
+) -> None:
+    report = _valid_report(tmp_path)
+    (report / "claim.json").unlink()
+    assert validate_report(report) == [
+        "claim.json: missing (assertions.json holds assertions, and a run that records any"
+        " writes claim.json)"
+    ]
+
+
+def test_validate_report_needs_no_claim_json_for_a_run_with_no_assertions(
+    tmp_path: Path,
+) -> None:
+    write_report(
+        tmp_path, [], bundle_digest="sha256:" + "a" * 64, catalogs=[_catalog()]
+    )
+    assert not (tmp_path / "claim.json").exists()
+    assert validate_report(tmp_path) == []
+
+
+def test_validate_report_catches_a_recorded_data_file_that_went_missing(
+    tmp_path: Path,
+) -> None:
+    """The data files every assess run writes are required once manifest.json records them, and
+    parsed when present (18.167)."""
+    report = _valid_report(tmp_path)
+    manifest = json.loads((report / "manifest.json").read_text(encoding="utf-8"))
+    manifest["outputs"]["integrity.jsonl"] = "sha256:" + "0" * 64
+    (report / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    assert validate_report(report) == [
+        "integrity.jsonl: missing (recorded in manifest.json's outputs but not on disk)"
+    ]
+    (report / "integrity.jsonl").write_text("{}\nnot json\n", encoding="utf-8")
+    (report / "coverage.json").write_text("{", encoding="utf-8")
+    problems = validate_report(report)
+    assert [p.split(" (")[0] for p in problems] == [
+        "integrity.jsonl: line 2 is not valid JSON",
+        "coverage.json: invalid JSON",
+    ], problems

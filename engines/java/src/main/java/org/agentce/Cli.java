@@ -1728,6 +1728,9 @@ global options:
                 "choose one of: " + String.join(", ", Messages.AVAILABLE_LANGUAGES) + ".");
     }
 
+    /** The key {@code report --validate} answers with when a report folder fails validation. */
+    private static final String REPORT_INVALID = "report.validation_failed";
+
     /** The rendering options {@code --validate} refuses beside it, in the order they are checked. */
     private static final List<String> REPORT_RENDER_FLAGS =
             List.of("--from", "--format", "--role", "--catalog", "--language", "--out");
@@ -1795,8 +1798,15 @@ global options:
             }
             result.data.set("problems", problemsNode);
             if (!problems.isEmpty()) {
+                // A refusal names its key and a fix, in text and in --json, as an error does (18.167).
+                result.data.put("message_key", REPORT_INVALID);
                 result.addCode(ExitCode.INPUT_ERROR.code);
-                result.note(reportDir + ": " + problems.size() + " artifact(s) failed validation");
+                result.note("error [" + REPORT_INVALID + "]: " + reportDir + ": " + problems.size()
+                        + " artifact(s) failed validation");
+                for (String problem : problems) {
+                    result.note("  " + problem);
+                }
+                result.note("  fix: " + ErrorCatalogue.errorFix(REPORT_INVALID));
             } else {
                 result.note(reportDir + ": all artifacts valid");
             }

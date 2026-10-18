@@ -291,6 +291,8 @@
   "errors.warning.stale_component.fix": "update the profile's declared component digests and re-run.",
   "errors.report.missing_evidence_pointer.cause": "an assertion reached a conformant, non-conformant, or partial outcome with no evidence pointer.",
   "errors.report.missing_evidence_pointer.fix": "every conformant, non-conformant, or partial outcome must cite evidence (DC-5).",
+  "errors.report.validation_failed.cause": "a file in the report folder is missing, cannot be read, or does not match its schema.",
+  "errors.report.validation_failed.fix": "restore the files each problem names, or produce the report again: `agentce assess … --out <report-dir>`.",
   "errors.input.bundle_manifest_path.cause": "a bundle manifest entry's path is absolute, contains '..', or escapes the bundle root through a symlink.",
   "errors.input.bundle_manifest_path.fix": "the manifest must list only paths that stay inside the bundle after symlinks resolve.",
   "errors.input.bundle_manifest_files.cause": "manifest.json has no non-empty 'files' array.",

@@ -2193,6 +2193,8 @@ def _scrub_path(path: str | Path) -> str:
     return p.name
 
 
+#: The key `report --validate` answers with when a report folder fails validation.
+_REPORT_INVALID = "report.validation_failed"
 #: The rendering options `report --validate` never reads, in the order the refusal names the first.
 _REPORT_RENDER_FLAGS = (
     ("from_", "--from"),
@@ -2225,8 +2227,17 @@ def cmd_report(ns: argparse.Namespace) -> CommandResult:
             {"report_dir": str(report_dir), "valid": not problems, "problems": problems}
         )
         if problems:
+            # A refusal names its key and a fix, in text and in --json, as an error does (18.167).
+            entry = MESSAGE_KEYS[_REPORT_INVALID]
+            result.data["message_key"] = _REPORT_INVALID
             result.add_code(int(ExitCode.INPUT_ERROR))
-            result.note(f"{report_dir}: {len(problems)} artifact(s) failed validation")
+            result.note(
+                f"error [{_REPORT_INVALID}]: {report_dir}: {len(problems)} artifact(s) failed"
+                " validation"
+            )
+            for problem in problems:
+                result.note(f"  {problem}")
+            result.note(f"  fix: {entry.fix}")
         else:
             result.note(f"{report_dir}: all artifacts valid")
         return result

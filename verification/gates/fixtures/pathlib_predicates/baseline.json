@@ -33,9 +33,6 @@
     "agentce/records/__init__.py::scan::out.exists": 1,
     "agentce/records/__init__.py::scan::stale.is_dir": 2,
     "agentce/records/__init__.py::scan::stale.is_symlink": 1,
-    "agentce/report.py::_recorded_outputs::manifest_path.is_file": 1,
-    "agentce/report.py::validate_report::(out_dir / filename).is_file": 2,
-    "agentce/report.py::validate_report::path.is_file": 3,
     "agentce/signing.py::verify_catalog_directory::sig_path.is_file": 1,
     "agentce/state.py::StateDir.load::state_file.is_file": 1,
     "agentce/tools/validate_profile.py::main::path.is_file": 1

@@ -9,7 +9,7 @@
  * python-reference.md`, cases 6 and 8).
  */
 
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { lstatSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { CodeKeywordDefinition, KeywordCxt } from "ajv";
 import Ajv2020 from "ajv/dist/2020";
@@ -50,6 +50,15 @@ const OPTIONAL_ARTIFACTS = [
   "oscal-ar.xml",
   "report.csv",
   "runtime_drift.jsonl",
+];
+/** The data files every assess run writes and records in manifest.json's outputs, beside the
+ * schema-checked artifacts: required when the manifest recorded them, and parsed when present;
+ * matches Python's `_REPORT_DATA_FILES` (18.167). */
+const REPORT_DATA_FILES = [
+  "integrity.jsonl",
+  "coverage.json",
+  "applicability.jsonl",
+  "quarantine.jsonl",
 ];
 
 const CSV_COLUMNS = ["control", "subject", "outcome", "control_version", "rung", "mode"];
@@ -241,17 +250,55 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function recordedOutputs(outDir: string): Record<string, string> {
-  const manifestPath = join(outDir, "manifest.json");
-  if (!existsSync(manifestPath)) {
-    return {};
+/** A report file that is there but cannot be read as a regular file; the message is the reason
+ * `report --validate` prints in parentheses, as Python's `_CannotRead` (18.167). */
+class CannotRead extends Error {}
+
+/** Whether the report folder holds an entry by this name at all; a link counts, dangling or not, and
+ * a folder that cannot be entered counts as holding it, as Python's `_has_entry` (18.167). */
+function hasEntry(path: string): boolean {
+  try {
+    lstatSync(path);
+    return true;
+  } catch (exc) {
+    const code = (exc as NodeJS.ErrnoException).code;
+    return code !== "ENOENT" && code !== "ENOTDIR";
+  }
+}
+
+/** The bytes of one report file, or `null` when the folder has no entry by that name. An entry that
+ * is there but is not a readable regular file (a FIFO, a folder, a dangling link, a link into a folder
+ * that cannot be entered, a file without read permission) throws `CannotRead`: it is reported, never
+ * skipped as absent. A FIFO is never opened. Matches Python's `_read_artifact` (18.167). */
+function readArtifact(path: string): Buffer | null {
+  if (!hasEntry(path)) {
+    return null;
   }
   try {
-    const manifest = parseJsonText(readFileSync(manifestPath, "utf-8"));
+    if (statSync(path).isFile()) {
+      return readFileSync(path);
+    }
+  } catch (exc) {
+    const code = (exc as NodeJS.ErrnoException).code;
+    if (code === "EACCES" || code === "EPERM") {
+      throw new CannotRead("permission denied");
+    }
+  }
+  throw new CannotRead("not a regular file");
+}
+
+function readArtifactText(path: string): string | null {
+  return readArtifact(path)?.toString("utf-8") ?? null;
+}
+
+function recordedOutputs(outDir: string): Record<string, string> {
+  try {
+    const text = readArtifactText(join(outDir, "manifest.json"));
+    const manifest = text === null ? null : parseJsonText(text);
     const outputs = isRecord(manifest) ? manifest.outputs : undefined;
     return isRecord(outputs) ? (outputs as Record<string, string>) : {};
   } catch {
-    return {};
+    return {}; // a manifest that cannot be read records nothing here; the schema check reports it
   }
 }
 
@@ -335,8 +382,7 @@ function validateXmlSingleRoot(text: string, filename: string): string[] {
   return multiple ? [`${filename}: invalid XML (multiple root elements)`] : [];
 }
 
-function validateXmlWellformed(path: string, filename: string): string[] {
-  const text = readFileSync(path, "utf-8");
+function validateXmlWellformed(text: string, filename: string): string[] {
   const result = XMLValidator.validate(text);
   if (result !== true) {
     return [`${filename}: invalid XML (${result.err.msg})`];
@@ -348,9 +394,9 @@ function validateXmlWellformed(path: string, filename: string): string[] {
   return validateXmlSingleRoot(text, filename);
 }
 
-function validateJsonl(path: string, filename: string): string[] {
+function validateJsonl(text: string, filename: string): string[] {
   const problems: string[] = [];
-  const lines = readFileSync(path, "utf-8").split(/\r?\n/);
+  const lines = text.split(/\r?\n/);
   lines.forEach((line, i) => {
     if (line.trim() === "") {
       return;
@@ -402,13 +448,7 @@ function splitCsvLine(line: string): string[] {
   return fields;
 }
 
-function validateCsv(path: string, filename: string): string[] {
-  let text: string;
-  try {
-    text = readFileSync(path, "utf-8");
-  } catch (exc) {
-    return [`${filename}: invalid CSV (${(exc as Error).message})`];
-  }
+function validateCsv(text: string, filename: string): string[] {
   const lines = text.split(/\r?\n/).filter((_, i, arr) => i < arr.length - 1 || arr[i] !== "");
   if (lines.length === 0) {
     return [`${filename}: empty CSV (no header row)`];
@@ -431,11 +471,31 @@ function validateCsv(path: string, filename: string): string[] {
   return problems;
 }
 
-/** Schema-validation problems for every artifact in `outDir` (empty when it is entirely valid). */
+/** Read one report file for `validateReport`: its text, `null` when absent, or the problem line
+ * pushed onto `problems` (returned as `undefined`) when it is there but cannot be read. */
+function readOrReport(
+  outDir: string,
+  filename: string,
+  problems: string[],
+): string | null | undefined {
+  try {
+    return readArtifactText(join(outDir, filename));
+  } catch (exc) {
+    if (!(exc instanceof CannotRead)) {
+      throw exc;
+    }
+    problems.push(`${filename}: cannot read (${exc.message})`);
+    return undefined;
+  }
+}
+
+/** Schema-validation problems for every artifact in `outDir` (empty when it is entirely valid). An
+ * entry that is there but cannot be read is a problem, never an absence; claim.json is required when
+ * assertions.json holds an assertion (18.167). */
 export function validateReport(outDir: string): string[] {
   const problems: string[] = [];
   for (const filename of Object.keys(MANDATORY_ARTIFACT_SCHEMAS)) {
-    if (!existsSync(join(outDir, filename)) || !statSync(join(outDir, filename)).isFile()) {
+    if (!hasEntry(join(outDir, filename))) {
       problems.push(`${filename}: missing`);
     }
   }
@@ -445,26 +505,28 @@ export function validateReport(outDir: string): string[] {
     "report.md",
     "report.html",
     ...OPTIONAL_ARTIFACTS,
+    ...REPORT_DATA_FILES,
   ]);
   for (const filename of trackedNames) {
-    if (filename in recorded) {
-      const path = join(outDir, filename);
-      if (!existsSync(path) || !statSync(path).isFile()) {
-        problems.push(`${filename}: missing (recorded in manifest.json's outputs but not on disk)`);
-      }
+    if (filename in recorded && !hasEntry(join(outDir, filename))) {
+      problems.push(`${filename}: missing (recorded in manifest.json's outputs but not on disk)`);
     }
   }
+  let hasAssertions = false;
   for (const [filename, schemaName] of Object.entries(ARTIFACT_SCHEMAS)) {
-    const path = join(outDir, filename);
-    if (!existsSync(path) || !statSync(path).isFile()) {
+    const text = readOrReport(outDir, filename, problems);
+    if (text == null) {
       continue; // mandatory absence was already reported above; optional absence is not a problem
     }
     let instance: unknown;
     try {
-      instance = parseJsonText(readFileSync(path, "utf-8"));
+      instance = parseJsonText(text);
     } catch (exc) {
       problems.push(`${filename}: invalid JSON (${(exc as Error).message})`);
       continue;
+    }
+    if (filename === "assertions.json") {
+      hasAssertions = Array.isArray(instance) && instance.length > 0;
     }
     const localValidate = localValidatorFor(schemaName);
     if (!localValidate(instance)) {
@@ -479,22 +541,45 @@ export function validateReport(outDir: string): string[] {
     }
   }
   for (const filename of ["report.md", "report.html"]) {
-    const path = join(outDir, filename);
-    if (existsSync(path) && statSync(path).isFile() && readFileSync(path, "utf-8").trim() === "") {
+    const text = readOrReport(outDir, filename, problems);
+    if (text != null && text.trim() === "") {
       problems.push(`${filename}: empty`);
     }
   }
+  for (const filename of [...REPORT_DATA_FILES, "claim.json"]) {
+    const text = readOrReport(outDir, filename, problems);
+    if (text === undefined) {
+      continue;
+    }
+    if (text === null) {
+      if (filename === "claim.json" && hasAssertions) {
+        problems.push(
+          "claim.json: missing (assertions.json holds assertions, and a run that records any writes claim.json)",
+        );
+      }
+      continue;
+    }
+    if (filename.endsWith(".jsonl")) {
+      problems.push(...validateJsonl(text, filename));
+      continue;
+    }
+    try {
+      parseJsonText(text);
+    } catch (exc) {
+      problems.push(`${filename}: invalid JSON (${(exc as Error).message})`);
+    }
+  }
   for (const filename of OPTIONAL_ARTIFACTS) {
-    const path = join(outDir, filename);
-    if (!existsSync(path) || !statSync(path).isFile()) {
+    const text = readOrReport(outDir, filename, problems);
+    if (text == null) {
       continue; // optional: only present, and only validated, when a run actually produced it
     }
     if (filename === "report.csv") {
-      problems.push(...validateCsv(path, filename));
+      problems.push(...validateCsv(text, filename));
     } else if (filename === "runtime_drift.jsonl") {
-      problems.push(...validateJsonl(path, filename));
+      problems.push(...validateJsonl(text, filename));
     } else {
-      problems.push(...validateXmlWellformed(path, filename));
+      problems.push(...validateXmlWellformed(text, filename));
     }
   }
   return problems;
