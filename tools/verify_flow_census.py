@@ -2086,6 +2086,7 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
         "target-argument",
     ),
     "agentce.signing._identity: folder.stat()": ("catalog-tree",),
+    "agentce.signing._refuse_folder_controls: os.listdir(controls)": ("catalog-tree",),
     "agentce.signing._walk_files: os.listdir(folder)": ("catalog-tree",),
     "agentce.signing._walk_files: walk(path)": ("catalog-tree",),
     "agentce.signing._walk_files: walk(root)": ("catalog-tree",),
