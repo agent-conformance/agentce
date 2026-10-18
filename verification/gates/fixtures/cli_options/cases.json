@@ -38,7 +38,7 @@
     {"id": "quickstart-no-options", "argv": ["quickstart"], "exit": 0, "key": null, "writes": "out"},
     {"id": "quickstart-out", "argv": ["quickstart", "--out", "d"], "exit": 0, "key": null, "writes": "d"},
     {"id": "quickstart-out-equals", "argv": ["quickstart", "--out=d"], "exit": 0, "key": null, "writes": "d"},
-    {"id": "quickstart-out-empty", "argv": ["quickstart", "--out="], "exit": 0, "key": null, "writes": "out"},
+    {"id": "quickstart-out-empty", "argv": ["quickstart", "--out="], "exit": 3, "key": "input.out_dir_unwritable", "writes": null},
     {"id": "quickstart-out-repeated", "argv": ["quickstart", "--out", "a", "--out", "b"], "exit": 0, "key": null, "writes": "b"},
     {"id": "quickstart-quiet", "argv": ["quickstart", "--quiet"], "exit": 0, "key": null, "writes": "out"},
     {"id": "quickstart-debug", "argv": ["quickstart", "--debug"], "exit": 0, "key": null, "writes": "out", "debug_log": "quickstart"},
