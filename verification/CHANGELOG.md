@@ -14,6 +14,8 @@ fails if a gate in `gates.json` is not named in this file.
   Fifteen seeded faults, five per engine: the requirement ignored, a count above the declared one accepted, a security
   ref of the wrong type counted, the reference closure cut to one hop, and the targetWhere filter dropped so DOC-03 and
   INT-03 judge every ToolCall.
+- `VG-FAIL-ON-PARITY` re-pins scenario F10c from 7 matched to 5: on the insufficient-evidence project ROB-05 and
+  ROB-06 now read not_assessed, so `outcome=="non-conformant"` no longer matches them.
 
 ## 0.114.0
 
