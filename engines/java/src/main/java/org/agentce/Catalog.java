@@ -274,10 +274,9 @@ public final class Catalog {
         Map<String, byte[]> files = new LinkedHashMap<>();
         List<String> rels = coveredFiles(root, Set.of(Verify.CATALOG_SIGNATURE_NAME));
         refuseFolderControls(root);
-        Path realRoot = realPath(root);
         Set<String> linksOut = new TreeSet<>(Json::byteCompare);
         for (String rel : rels) {
-            if (linksOutside(root, realRoot, rel)) {
+            if (linksOutside(root, rel)) {
                 linksOut.add(rel);
             }
             byte[] content = first.get(rel);
@@ -317,10 +316,31 @@ public final class Catalog {
         }
     }
 
-    /** Whether {@code rel} is itself a link whose target resolves outside {@code realRoot}, the catalog's real path. */
-    private static boolean linksOutside(Path root, Path realRoot, String rel) {
+    /** Whether {@code rel} is itself a link whose target resolves outside {@code root}. */
+    private static boolean linksOutside(Path root, String rel) {
         Path path = root.resolve(rel);
-        return Files.isSymbolicLink(path) && !realPath(path).startsWith(realRoot);
+        return Files.isSymbolicLink(path) && !insideFolder(root, path);
+    }
+
+    /** Whether {@code path}, after links, lies under {@code root}. Judged by folder identity, never by path
+     * spelling, which a case-insensitive filesystem or a firmlink allows many of (18.181); mirrors Python's
+     * {@code signing.inside_folder}. */
+    static boolean insideFolder(Path root, Path path) {
+        Object rootId = identity(root);
+        for (Path up = realPath(path).getParent(); up != null; up = up.getParent()) {
+            if (identity(up).equals(rootId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Object identity(Path dir) {
+        try {
+            return folderIdentity(dir, Files.readAttributes(dir, BasicFileAttributes.class));
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot read " + dir + ": " + e.getMessage(), e);
+        }
     }
 
     private static Path realPath(Path path) {
@@ -457,12 +477,11 @@ public final class Catalog {
         Map<String, Psp.Shape> loaded = Map.of();
         if (files.files().containsKey(path)) {
             try {
-                Path root = directory.toRealPath();
-                Path resolved = directory.resolve(path).toRealPath();
-                if (resolved.startsWith(root) && Files.isRegularFile(resolved)) {
+                Path named = directory.resolve(path);
+                if (insideFolder(directory, named) && Files.isRegularFile(named)) {
                     loaded = Psp.parseShapesTtl(text(files, path), path);
                 }
-            } catch (IOException | java.nio.file.InvalidPathException e) {
+            } catch (IllegalStateException | java.nio.file.InvalidPathException e) {
                 // A path that does not resolve leaves nothing loaded, which is refused below.
             }
         }

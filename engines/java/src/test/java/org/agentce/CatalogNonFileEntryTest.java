@@ -92,4 +92,30 @@ class CatalogNonFileEntryTest {
         InputError e = assertThrows(InputError.class, () -> Catalog.load(dir));
         assertEquals("catalog.evidence_shape.unresolved", e.key);
     }
+
+    @Test
+    void anAbsoluteInsideLinkReachedThroughAnotherSpellingIsNotOutside(@TempDir Path tmp) throws IOException {
+        Path real = tmp.toRealPath();
+        List<Path> spellings = new java.util.ArrayList<>();
+        Path folded = Path.of(real.toString().toUpperCase(java.util.Locale.ROOT));
+        if (!folded.equals(real) && Files.isDirectory(folded)) {
+            spellings.add(folded);
+        }
+        Path firmlink = Path.of("/System/Volumes/Data" + real);
+        if (Files.isDirectory(firmlink)) {
+            spellings.add(firmlink);
+        }
+        org.junit.jupiter.api.Assumptions.assumeFalse(spellings.isEmpty(), "needs a second spelling of one folder");
+        Path dir = copy(Fixtures.BASE, real);
+        Files.move(dir.resolve("controls/DOC-01.yaml"), dir.resolve("test/DOC-01.yaml.txt"));
+        for (Path other : spellings) {
+            Files.deleteIfExists(dir.resolve("controls/DOC-01.yaml"));
+            Files.createSymbolicLink(
+                    dir.resolve("controls/DOC-01.yaml"), other.resolve("c/test/DOC-01.yaml.txt"));
+            assertEquals(Set.of(), Catalog.readFiles(dir, java.util.Map.of()).linksOut());
+            assertEquals(Set.of(), Catalog.readFiles(other.resolve("c"), java.util.Map.of()).linksOut());
+            assertTrue(Catalog.insideFolder(other.resolve("c"), dir.resolve("controls/DOC-01.yaml")));
+        }
+        assertEquals(false, Catalog.insideFolder(dir.resolve("controls"), dir.resolve("catalog.yaml")));
+    }
 }
