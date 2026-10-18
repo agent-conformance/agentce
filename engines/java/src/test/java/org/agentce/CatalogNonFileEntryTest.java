@@ -1,6 +1,7 @@
 package org.agentce;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -8,8 +9,12 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -96,8 +101,8 @@ class CatalogNonFileEntryTest {
     @Test
     void anAbsoluteInsideLinkReachedThroughAnotherSpellingIsNotOutside(@TempDir Path tmp) throws IOException {
         Path real = tmp.toRealPath();
-        List<Path> spellings = new java.util.ArrayList<>();
-        Path folded = Path.of(real.toString().toUpperCase(java.util.Locale.ROOT));
+        List<Path> spellings = new ArrayList<>();
+        Path folded = Path.of(real.toString().toUpperCase(Locale.ROOT));
         if (!folded.equals(real) && Files.isDirectory(folded)) {
             spellings.add(folded);
         }
@@ -105,17 +110,17 @@ class CatalogNonFileEntryTest {
         if (Files.isDirectory(firmlink)) {
             spellings.add(firmlink);
         }
-        org.junit.jupiter.api.Assumptions.assumeFalse(spellings.isEmpty(), "needs a second spelling of one folder");
+        Assumptions.assumeFalse(spellings.isEmpty(), "needs a second spelling of one folder");
         Path dir = copy(Fixtures.BASE, real);
         Files.move(dir.resolve("controls/DOC-01.yaml"), dir.resolve("test/DOC-01.yaml.txt"));
         for (Path other : spellings) {
             Files.deleteIfExists(dir.resolve("controls/DOC-01.yaml"));
             Files.createSymbolicLink(
                     dir.resolve("controls/DOC-01.yaml"), other.resolve("c/test/DOC-01.yaml.txt"));
-            assertEquals(Set.of(), Catalog.readFiles(dir, java.util.Map.of()).linksOut());
-            assertEquals(Set.of(), Catalog.readFiles(other.resolve("c"), java.util.Map.of()).linksOut());
+            assertEquals(Set.of(), Catalog.readFiles(dir, Map.of()).linksOut());
+            assertEquals(Set.of(), Catalog.readFiles(other.resolve("c"), Map.of()).linksOut());
             assertTrue(Catalog.insideFolder(other.resolve("c"), dir.resolve("controls/DOC-01.yaml")));
         }
-        assertEquals(false, Catalog.insideFolder(dir.resolve("controls"), dir.resolve("catalog.yaml")));
+        assertFalse(Catalog.insideFolder(dir.resolve("controls"), dir.resolve("catalog.yaml")));
     }
 }
