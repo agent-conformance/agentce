@@ -663,10 +663,12 @@ public final class Assess {
                 sources.add(d.source);
             }
         }
-        JsonNode row = coverage == null ? null : coverage.path("subjects").path(subject.id).path("event_types")
-                .path(need.covers());
-        if (row == null || !row.isObject()
-                || !"covered".equals(row.path("status").textValue())
+        if (coverage == null) {
+            return true;
+        }
+        JsonNode row = coverage.path("subjects").path(subject.id).path("event_types").path(need.covers());
+        if (!row.isObject()
+                || !Coverage.STATUS_COVERED.equals(row.path("status").textValue())
                 || !row.path("observed").equals(row.path("expected"))
                 || !row.path("observed").isNumber()) {
             return true;

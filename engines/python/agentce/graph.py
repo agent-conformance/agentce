@@ -386,6 +386,12 @@ def _refs(event: dict[str, Any]) -> dict[str, Any]:
     return refs if isinstance(refs, dict) else {}
 
 
+def _ref_candidates(event: dict[str, Any]) -> list[str]:
+    """The names an event's ``refs.*`` and ``used[]`` carry: what danglingRef and linkedRecordsResolve both read."""
+    names = [v for v in _refs(event).values() if isinstance(v, str)]
+    return names + [v for v in _data(event).get("used", []) or [] if isinstance(v, str)]
+
+
 def _before_every(time: str, actions: Iterable[str]) -> bool:
     """Whether ``time`` is at or before every action time, compared as instants (SPEC §6.7); a time that cannot be
     compared with an action's gates nothing."""
@@ -1602,9 +1608,7 @@ class _Builder:
             node,
             "agentce:securityRefsResolve",
             all(
-                held_types.get(refs[key]) == want
-                if isinstance(refs[key], str)
-                else False
+                isinstance(refs[key], str) and held_types.get(refs[key]) == want
                 for key, want in _SECURITY_REFS
                 if key in refs
             ),
@@ -1619,8 +1623,7 @@ class _Builder:
         for event in events:
             node = event_iri(str(event["id"]))
             data = _data(event)
-            names = [v for v in _refs(event).values() if isinstance(v, str)]
-            names += [v for v in data.get("used", []) or [] if isinstance(v, str)]
+            names = _ref_candidates(event)
             if self._ptype(event) == "Incident" and "related_refs" in data:
                 related = data["related_refs"]
                 for name in related if isinstance(related, list) else [related]:
@@ -1693,11 +1696,7 @@ class _Builder:
         self._literal(node, "agentce:interventionByHuman", by_human)
 
     def _dangling(self, node: str, event: dict[str, Any]) -> None:
-        candidates: list[str] = [v for v in _refs(event).values() if isinstance(v, str)]
-        candidates += [
-            v for v in _data(event).get("used", []) or [] if isinstance(v, str)
-        ]
-        for value in candidates:
+        for value in _ref_candidates(event):
             if is_event_ref(value) and value not in self.event_iris:
                 self.store.add_literal(node, "agentce:danglingRef", value)
                 self.dangling_nodes.add(node)

@@ -340,6 +340,15 @@ export function refsOf(event: Event): Record<string, unknown> {
   return isRecord(refs) ? refs : {};
 }
 
+/** The names an event's `refs.*` and `used[]` carry: what danglingRef and linkedRecordsResolve both read. */
+function refCandidates(event: Event): string[] {
+  const names = Object.values(refsOf(event)).filter((v): v is string => typeof v === "string");
+  const used = dataOf(event).used;
+  return Array.isArray(used)
+    ? names.concat(used.filter((v): v is string => typeof v === "string"))
+    : names;
+}
+
 function closure(subclass: Record<string, string>, classes: Set<string>): Array<[string, string]> {
   const nodes = new Set<string>(classes);
   for (const key of Object.keys(subclass)) {
@@ -1720,10 +1729,7 @@ class Builder {
     for (const event of events) {
       const node = eventIri(String(event.id));
       const data = dataOf(event);
-      const names = Object.values(refsOf(event)).filter((v): v is string => typeof v === "string");
-      if (Array.isArray(data.used)) {
-        names.push(...data.used.filter((v): v is string => typeof v === "string"));
-      }
+      const names = refCandidates(event);
       if (this.ptype(event) === "Incident" && "related_refs" in data) {
         const related = data.related_refs;
         for (const name of Array.isArray(related) ? related : [related]) {
@@ -1931,19 +1937,7 @@ class Builder {
   }
 
   private dangling(node: string, event: Event): void {
-    const candidates: string[] = [];
-    for (const value of Object.values(refsOf(event))) {
-      if (typeof value === "string") {
-        candidates.push(value);
-      }
-    }
-    const used = Array.isArray(dataOf(event).used) ? (dataOf(event).used as unknown[]) : [];
-    for (const value of used) {
-      if (typeof value === "string") {
-        candidates.push(value);
-      }
-    }
-    for (const value of candidates) {
+    for (const value of refCandidates(event)) {
       if (isEventRef(value) && !this.eventIris.has(value)) {
         this.store.addLiteral(node, "agentce:danglingRef", value);
         this.danglingNodes.add(node);

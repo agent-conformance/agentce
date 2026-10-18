@@ -237,7 +237,7 @@ public final class Catalog {
         if (value.isObject() && value.size() == 2 && value.has("kinds") && value.has("covers")) {
             JsonNode kinds = value.get("kinds");
             JsonNode covers = value.get("covers");
-            Set<String> named = new java.util.LinkedHashSet<>();
+            Set<String> named = new HashSet<>();
             boolean known = kinds.isArray() && !kinds.isEmpty();
             for (JsonNode kind : kinds.isArray() ? kinds : Json.nodes().arrayNode()) {
                 known &= kind.isTextual() && DENOMINATOR_KINDS.contains(kind.textValue()) && named.add(kind.textValue());

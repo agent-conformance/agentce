@@ -558,9 +558,7 @@ function denominatorUnshown(
     subject.coverageDenominators.filter((d) => need.kinds.has(d.kind)).map((d) => d.source),
   );
   const field = (value: unknown, key: string): unknown =>
-    typeof value === "object" && value !== null && !Array.isArray(value)
-      ? (value as Record<string, unknown>)[key]
-      : undefined;
+    isRecord(value) ? value[key] : undefined;
   const row = field(field(field(coverage.subjects, subject.id), "event_types"), need.covers);
   const counted = field(row, "denominators");
   return !(

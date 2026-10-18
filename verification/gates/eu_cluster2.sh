@@ -24,11 +24,10 @@ case " $engines " in *" java "*) (cd "$root/engines/java" && ./gradlew --no-daem
 (cd "$root/engines/python" && PYTHONPATH="$root/verification/gates" env -u VIRTUAL_ENV uv run --frozen python - "$fixtures/cases.json" "$work" "$root/spec/catalogs/base/eu-ai-act") <<'PY'
 import hashlib
 import json
-import sys
-from pathlib import Path
-
 import shutil
+import sys
 from collections import Counter
+from pathlib import Path
 
 import yaml
 from fixture_integrity import chain_streams, event_type_of

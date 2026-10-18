@@ -222,6 +222,25 @@ public final class Graph {
         return refs != null && refs.isObject() ? refs : Json.nodes().objectNode();
     }
 
+    /** The names an event's {@code refs.*} and {@code used[]} carry: what danglingRef and linkedRecordsResolve both read. */
+    private static List<String> refCandidates(JsonNode event) {
+        List<String> names = new ArrayList<>();
+        refsOf(event).elements().forEachRemaining(v -> {
+            if (v.isTextual()) {
+                names.add(v.textValue());
+            }
+        });
+        JsonNode used = dataOf(event).get("used");
+        if (used != null && used.isArray()) {
+            for (JsonNode v : used) {
+                if (v.isTextual()) {
+                    names.add(v.textValue());
+                }
+            }
+        }
+        return names;
+    }
+
     /** An Appendix F source class outside the trusted set (CND-05's rule, also ROB-02's). */
     private static boolean untrustedSourceClass(String sourceClass) {
         return sourceClass != null && !TRUSTED_INSTRUCTION.contains(sourceClass);
@@ -1821,20 +1840,7 @@ public final class Graph {
             for (JsonNode event : events) {
                 String node = Iri.eventIri(event.get("id").asText());
                 JsonNode data = dataOf(event);
-                List<String> names = new ArrayList<>();
-                refsOf(event).elements().forEachRemaining(v -> {
-                    if (v.isTextual()) {
-                        names.add(v.textValue());
-                    }
-                });
-                JsonNode used = data.get("used");
-                if (used != null && used.isArray()) {
-                    for (JsonNode v : used) {
-                        if (v.isTextual()) {
-                            names.add(v.textValue());
-                        }
-                    }
-                }
+                List<String> names = refCandidates(event);
                 if ("Incident".equals(ptype(event)) && data.has("related_refs")) {
                     JsonNode related = data.get("related_refs");
                     for (JsonNode name : related.isArray() ? related : List.of(related)) {
@@ -2023,23 +2029,7 @@ public final class Graph {
         }
 
         private void dangling(String node, JsonNode event) {
-            List<String> candidates = new ArrayList<>();
-            var it = refsOf(event).fields();
-            while (it.hasNext()) {
-                JsonNode value = it.next().getValue();
-                if (value.isTextual()) {
-                    candidates.add(value.textValue());
-                }
-            }
-            JsonNode used = dataOf(event).get("used");
-            if (used != null && used.isArray()) {
-                for (JsonNode value : used) {
-                    if (value.isTextual()) {
-                        candidates.add(value.textValue());
-                    }
-                }
-            }
-            for (String value : candidates) {
+            for (String value : refCandidates(event)) {
                 if (Iri.isEventRef(value) && !eventIris.contains(value)) {
                     store.addLiteral(node, "agentce:danglingRef", value);
                     danglingNodes.add(node);
