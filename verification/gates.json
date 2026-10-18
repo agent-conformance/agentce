@@ -2831,8 +2831,8 @@
         {
           "description": "Python reads an empty --adapters as the working directory again",
           "file": "engines/python/agentce/commands/__init__.py",
-          "search": "            what=\"the adapters directory\",\n            empty_is_no_dir=True,\n",
-          "replace": "            what=\"the adapters directory\",\n"
+          "search": "            adapters,\n            key=\"adapters\",\n            what=\"the adapters directory\",\n",
+          "replace": "            adapters or \".\",\n            key=\"adapters\",\n            what=\"the adapters directory\",\n"
         },
         {
           "description": "Java's version grammar takes a positional again, so version extra prints the version",
@@ -3567,8 +3567,8 @@
         {
           "description": "Python collect reads an empty --adapters-root as ./adapters again",
           "file": "engines/python/agentce/commands/__init__.py",
-          "search": "    if raw_adapters_root == \"\":\n",
-          "replace": "    if False:\n"
+          "search": "    _refuse_empty_adapters_root(raw_adapters_root)\n    config = load_config(config_path)\n",
+          "replace": "    config = load_config(config_path)\n"
         }
       ]
     },
@@ -5084,8 +5084,8 @@
         {
           "description": "_require_dir goes back to a bare path.is_dir(), the 18.163 site that crashed with internal.unexpected on Python 3.12 and 3.13 for a --bundle inside a mode-600 folder",
           "file": "engines/python/agentce/commands/__init__.py",
-          "search": "    if (empty_is_no_dir and raw == \"\") or not signing.is_directory(\n        path, unreadable_is_absent=True\n    ):\n",
-          "replace": "    if (empty_is_no_dir and raw == \"\") or not path.is_dir():\n"
+          "search": "    if raw == \"\" or not signing.is_directory(path, unreadable_is_absent=True):\n",
+          "replace": "    if raw == \"\" or not path.is_dir():\n"
         },
         {
           "description": "sign's claim check goes back to a bare claim_path.is_file(), which crashed on 3.12 and 3.13 for a claim.json symlinked into a mode-600 folder",
