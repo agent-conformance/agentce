@@ -1894,3 +1894,69 @@ test("cnd06: the literals are independent of event order", () => {
     assert.deepEqual(refusal(events, node), refusal([...events].reverse(), node));
   }
 });
+
+const refCall = (id: string, refs: Record<string, unknown> = {}) =>
+  memoryEvent(id, "ToolCall", { refs });
+
+test("ROB-03: each security ref names a held event of the type the SPEC gives it", () => {
+  const held = [
+    memoryEvent("p1", "PolicyDecision", { decision: "allow" }),
+    memoryEvent("g1", "DelegationIssued", {}),
+    memoryEvent("i1", "Instruction", {}),
+  ];
+  const good: Record<string, unknown> = {
+    authorization: "agentce:event/p1",
+    delegation: "agentce:event/g1",
+    instruction: "agentce:event/i1",
+  };
+  const resolves = (events: Record<string, unknown>[]) =>
+    lit(events, "c1", "agentce:securityRefsResolve");
+  assert.deepEqual(resolves([...held, refCall("c1", good)]), ["true"]);
+  assert.deepEqual(resolves([refCall("c1")]), ["true"]);
+  for (const key of Object.keys(good)) {
+    const dangling = { ...good, [key]: "agentce:event/missing" };
+    assert.deepEqual(resolves([...held, refCall("c1", dangling)]), ["false"], key);
+    const wrongType = { ...good, [key]: "agentce:event/c0" };
+    assert.deepEqual(resolves([...held, refCall("c0"), refCall("c1", wrongType)]), ["false"], key);
+  }
+  const listed = { ...good, authorization: ["agentce:event/p1"] };
+  assert.deepEqual(resolves([...held, refCall("c1", listed)]), ["false"]);
+});
+
+test("REC-06 and INC-04: a dangling ref anywhere in the closure leaves the event unresolved", () => {
+  const resolves = (events: Record<string, unknown>[], id: string) =>
+    lit(events, id, "agentce:linkedRecordsResolve");
+  const deep = [
+    refCall("c1", { decision: "agentce:event/c2" }),
+    refCall("c2", { decision: "agentce:event/c3" }),
+    refCall("c3", { decision: "agentce:event/missing" }),
+  ];
+  for (const events of [deep, [...deep].reverse()]) {
+    for (const id of ["c1", "c2", "c3"]) {
+      assert.deepEqual(resolves(events, id), ["false"], id);
+    }
+  }
+  assert.deepEqual(
+    resolves([refCall("c1", { decision: "agentce:event/c2" }), refCall("c2")], "c1"),
+    ["true"],
+  );
+  const cycle = [
+    refCall("c1", { decision: "agentce:event/c2" }),
+    refCall("c2", { decision: "agentce:event/c1" }),
+  ];
+  assert.deepEqual(resolves(cycle, "c1"), ["true"]);
+  const used = memoryEvent("c2", "ToolCall", {
+    refs: { decision: "agentce:event/c1" },
+    used: ["agentce:event/c3"],
+  });
+  const broken = [cycle[0], used, refCall("c3", { decision: "agentce:event/missing" })];
+  assert.deepEqual(resolves(broken, "c1"), ["false"]);
+  const held = refCall("c1");
+  const incident = (related: unknown) => memoryEvent("x1", "Incident", { related_refs: related });
+  assert.deepEqual(resolves([held, incident(["agentce:event/c1"])], "x1"), ["true"]);
+  for (const related of [["agentce:event/missing"], [7], "agentce:event/missing"]) {
+    assert.deepEqual(resolves([held, incident(related)], "x1"), ["false"]);
+  }
+  const dangling = refCall("c1", { decision: "agentce:event/missing" });
+  assert.deepEqual(resolves([dangling, incident(["agentce:event/c1"])], "x1"), ["false"]);
+});

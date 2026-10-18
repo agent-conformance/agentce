@@ -14,7 +14,7 @@ import { confineToRoot, safeIsFile } from "./bundle";
 import type { CoverageDenominator, Profile, Subject } from "./profile";
 import { byteCompare } from "./util";
 
-const STATUS_COVERED = "covered";
+export const STATUS_COVERED = "covered";
 const STATUS_BELOW = "below_threshold";
 const STATUS_UNKNOWN = "unknown";
 

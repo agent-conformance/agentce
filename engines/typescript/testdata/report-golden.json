@@ -176,17 +176,15 @@
           "source_class": "enforcement_point"
         }
       ],
-      "evidence_strength": "strong",
       "family": "DOC",
       "mode": "automated",
-      "outcome": "conformant",
+      "outcome": "insufficient_evidence",
       "population": {
         "applicable": 1,
         "failed": 0
       },
       "rung": 2,
       "severity": "medium",
-      "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -342,24 +340,15 @@
           "verified": false
         }
       ],
-      "evidence": [
-        {
-          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
-          "ref": "agentce:event/tc1",
-          "source_class": "enforcement_point"
-        }
-      ],
-      "evidence_strength": "strong",
       "family": "INC",
       "mode": "automated",
-      "outcome": "conformant",
+      "outcome": "not_applicable",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "rung": 2,
       "severity": "high",
-      "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -1112,24 +1101,15 @@
           "verified": false
         }
       ],
-      "evidence": [
-        {
-          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
-          "ref": "agentce:event/tc1",
-          "source_class": "enforcement_point"
-        }
-      ],
-      "evidence_strength": "strong",
       "family": "ROB",
       "mode": "semi-automated",
-      "outcome": "conformant",
+      "outcome": "not_assessed",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
-      "rung": 2,
+      "rung": 3,
       "severity": "medium",
-      "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -1146,24 +1126,15 @@
           "verified": false
         }
       ],
-      "evidence": [
-        {
-          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
-          "ref": "agentce:event/tc1",
-          "source_class": "enforcement_point"
-        }
-      ],
-      "evidence_strength": "strong",
       "family": "ROB",
       "mode": "semi-automated",
-      "outcome": "conformant",
+      "outcome": "not_assessed",
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
-      "rung": 2,
+      "rung": 3,
       "severity": "medium",
-      "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -1464,8 +1435,8 @@
       }
     }
   ],
-  "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>AgentCE conformance report</title><style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}table{page-break-inside:auto}tr{page-break-inside:avoid}}</style></head><body><main><h1>AgentCE conformance report</h1><section aria-labelledby=\"verdict\"><h2 id=\"verdict\">Verdict</h2><p><strong>Non-conformant \u2014 at least one applicable control failed.</strong></p><p>Top gaps:</p><ul><li>non-conformant: OVS-02, OVS-03</li><li>insufficient evidence: DAT-01, DAT-02, DOC-01, OVS-01, OVS-05 (+9 more gaps)</li><li>not assessed: DAT-03, DAT-04, DOC-05, OVS-09, RSK-03 (+2 more gaps)</li></ul><p>Next step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.</p></section><section aria-labelledby=\"summary\"><h2 id=\"summary\">Outcome summary</h2><ul><li>conformant: 21</li><li>non-conformant: 2</li><li>partial: 0</li><li>not applicable: 5</li><li>not assessed: 7</li><li>insufficient evidence: 14</li></ul></section><section aria-labelledby=\"assertions\"><h2 id=\"assertions\">Assertions</h2><table><caption>Assertions</caption><thead><tr><th scope=\"col\">Title</th><th scope=\"col\">Control</th><th scope=\"col\">Subject</th><th scope=\"col\">Severity</th><th scope=\"col\">Outcome</th><th scope=\"col\">Clause</th><th scope=\"col\">Details</th></tr></thead><tbody><tr><td>DAT-01</td><td>DAT-01</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 10 (clause reference unverified)</td><td></td></tr><tr><td>DAT-02</td><td>DAT-02</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 10 (clause reference unverified)</td><td></td></tr><tr><td>DAT-03</td><td>DAT-03</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 10 (clause reference unverified)</td><td></td></tr><tr><td>DAT-04</td><td>DAT-04</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 10 (clause reference unverified)</td><td></td></tr><tr><td>DOC-01</td><td>DOC-01</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 11 / Annex IV (clause reference unverified)</td><td></td></tr><tr><td>DOC-02</td><td>DOC-02</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 13 (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>DOC-03</td><td>DOC-03</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 11 / Annex IV (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>DOC-04</td><td>DOC-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 13 (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>DOC-05</td><td>DOC-05</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 11 / Annex IV (clause reference unverified)</td><td></td></tr><tr><td>INC-01</td><td>INC-01</td><td>spiffe://corp/agents/a</td><td></td><td>not applicable</td><td>eu-ai-act Art. 72 (clause reference unverified)</td><td></td></tr><tr><td>INC-02</td><td>INC-02</td><td>spiffe://corp/agents/a</td><td></td><td>not applicable</td><td>eu-ai-act Art. 73 (clause reference unverified); eu-ai-act Art. 26(5) (clause reference unverified)</td><td></td></tr><tr><td>INC-03</td><td>INC-03</td><td>spiffe://corp/agents/a</td><td></td><td>not applicable</td><td>eu-ai-act Art. 26(5) (clause reference unverified)</td><td></td></tr><tr><td>INC-04</td><td>INC-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 73 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>INT-01</td><td>INT-01</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 12 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>INT-02</td><td>INT-02</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act engine integrity (clause reference unverified)</td><td>Evidence: agentce:event/dl1</td></tr><tr><td>INT-03</td><td>INT-03</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act engine integrity (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>INT-04</td><td>INT-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act engine integrity (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>OVS-01</td><td>OVS-01</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 14(4)(a) (clause reference unverified)</td><td></td></tr><tr><td>OVS-02</td><td>OVS-02</td><td>spiffe://corp/agents/a</td><td></td><td>non-conformant</td><td>eu-ai-act Art. 14(1)-(3) (clause reference unverified)</td><td>Evidence: agentce:event/d1<br>Violations: agentce:event/d1</td></tr><tr><td>OVS-03</td><td>OVS-03</td><td>spiffe://corp/agents/a</td><td></td><td>non-conformant</td><td>eu-ai-act Art. 14 (clause reference unverified); eu-ai-act Art. 26(2) (clause reference unverified)</td><td>Evidence: agentce:event/tc1<br>Violations: agentce:event/tc1</td></tr><tr><td>OVS-04</td><td>OVS-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 14(4)(c)-(d) (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>OVS-05</td><td>OVS-05</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 26(2) (clause reference unverified)</td><td></td></tr><tr><td>OVS-06</td><td>OVS-06</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 14(4)(e) (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>OVS-07</td><td>OVS-07</td><td>spiffe://corp/agents/a</td><td></td><td>not applicable</td><td>eu-ai-act Art. 14(4)(b) (clause reference unverified)</td><td></td></tr><tr><td>OVS-08</td><td>OVS-08</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 14(5) (clause reference unverified)</td><td></td></tr><tr><td>OVS-09</td><td>OVS-09</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 14(1)-(3) (clause reference unverified)</td><td></td></tr><tr><td>REC-01</td><td>REC-01</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 12(1)-(2) (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>REC-02</td><td>REC-02</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 12(1)-(2) (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>REC-03</td><td>REC-03</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 12(2) (clause reference unverified)</td><td></td></tr><tr><td>REC-04</td><td>REC-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 12 (clause reference unverified); eu-ai-act Art. 19 (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>REC-05</td><td>REC-05</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 26(6) (clause reference unverified)</td><td></td></tr><tr><td>REC-06</td><td>REC-06</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 19 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>ROB-01</td><td>ROB-01</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>ROB-02</td><td>ROB-02</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td></td></tr><tr><td>ROB-03</td><td>ROB-03</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>ROB-04</td><td>ROB-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>ROB-05</td><td>ROB-05</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>ROB-06</td><td>ROB-06</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>ROB-07</td><td>ROB-07</td><td>spiffe://corp/agents/a</td><td></td><td>not applicable</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td></td></tr><tr><td>RSK-01</td><td>RSK-01</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 9 (clause reference unverified)</td><td></td></tr><tr><td>RSK-02</td><td>RSK-02</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 9 (clause reference unverified)</td><td></td></tr><tr><td>RSK-03</td><td>RSK-03</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 9 (clause reference unverified)</td><td></td></tr><tr><td>RSK-04</td><td>RSK-04</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 27 (clause reference unverified)</td><td></td></tr><tr><td>RSK-05</td><td>RSK-05</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 49 / 71 (clause reference unverified)</td><td></td></tr><tr><td>TRN-01</td><td>TRN-01</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 26(11) / 86 (clause reference unverified)</td><td></td></tr><tr><td>TRN-02</td><td>TRN-02</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 86 (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>TRN-03</td><td>TRN-03</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 26(11) / 86 (clause reference unverified)</td><td></td></tr><tr><td>TRN-04</td><td>TRN-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 50 (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>TRN-05</td><td>TRN-05</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 50 (clause reference unverified)</td><td></td></tr></tbody></table></section><section aria-labelledby=\"provenance\"><h2 id=\"provenance\">Provenance</h2><ul><li>Engine: agentce-py 0.1.0</li><li>Catalog: (none)</li><li>Lenses available: baseline@2026.09 (default), eu-ai-act@2026.09, nist-ai-rmf@2026.09; choose one with --catalog &lt;id@version&gt;</li><li>Reproduce: <code>agentce quickstart</code></li></ul></section><footer><p>Affected persons may obtain an explanation and raise concerns through the deployer&#x27;s published contact channel (EU AI Act Arts. 26(11), 85, 86).</p></footer></main></body></html>\n",
-  "md": "# AgentCE conformance report\n\n## Verdict\n\n**Non-conformant \u2014 at least one applicable control failed.**\n\nTop gaps:\n\n- non-conformant: OVS-02, OVS-03\n- insufficient evidence: DAT-01, DAT-02, DOC-01, OVS-01, OVS-05 (+9 more gaps)\n- not assessed: DAT-03, DAT-04, DOC-05, OVS-09, RSK-03 (+2 more gaps)\n\nNext step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.\n\n## Outcome summary\n\n- `conformant`: 21\n- `non-conformant`: 2\n- `partial`: 0\n- `not applicable`: 5\n- `not assessed`: 7\n- `insufficient evidence`: 14\n\n## Assertions\n\n### Unrated\n\n- **DAT-01** (`DAT-01` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 10 (clause reference unverified)`\n- **DAT-02** (`DAT-02` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - `eu-ai-act Art. 10 (clause reference unverified)`\n- **DAT-03** (`DAT-03` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, semi-automated; 0/0 failed)\n  - `eu-ai-act Art. 10 (clause reference unverified)`\n- **DAT-04** (`DAT-04` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, manual; 0/0 failed)\n  - `eu-ai-act Art. 10 (clause reference unverified)`\n- **DOC-01** (`DOC-01` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 11 / Annex IV (clause reference unverified)`\n- **DOC-02** (`DOC-02` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 13 (clause reference unverified)`\n  - Evidence: `agentce:event/d1`\n- **DOC-03** (`DOC-03` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 11 / Annex IV (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **DOC-04** (`DOC-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, semi-automated; 0/1 failed)\n  - `eu-ai-act Art. 13 (clause reference unverified)`\n  - Evidence: `agentce:event/d1`\n- **DOC-05** (`DOC-05` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, manual; 0/0 failed)\n  - `eu-ai-act Art. 11 / Annex IV (clause reference unverified)`\n- **INC-01** (`INC-01` @ `spiffe://corp/agents/a`) -> **not applicable** (rung 2, automated; 0/0 failed)\n  - `eu-ai-act Art. 72 (clause reference unverified)`\n- **INC-02** (`INC-02` @ `spiffe://corp/agents/a`) -> **not applicable** (rung 2, automated; 0/0 failed)\n  - `eu-ai-act Art. 73 (clause reference unverified)`\n  - `eu-ai-act Art. 26(5) (clause reference unverified)`\n- **INC-03** (`INC-03` @ `spiffe://corp/agents/a`) -> **not applicable** (rung 2, automated; 0/0 failed)\n  - `eu-ai-act Art. 26(5) (clause reference unverified)`\n- **INC-04** (`INC-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 73 (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **INT-01** (`INT-01` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 12 (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **INT-02** (`INT-02` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act engine integrity (clause reference unverified)`\n  - Evidence: `agentce:event/dl1`\n- **INT-03** (`INT-03` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act engine integrity (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **INT-04** (`INT-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act engine integrity (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **OVS-01** (`OVS-01` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 14(4)(a) (clause reference unverified)`\n- **OVS-02** (`OVS-02` @ `spiffe://corp/agents/a`) -> **non-conformant** (rung 2, automated; 1/1 failed)\n  - `eu-ai-act Art. 14(1)-(3) (clause reference unverified)`\n  - Evidence: `agentce:event/d1`\n  - Violations: `agentce:event/d1`\n- **OVS-03** (`OVS-03` @ `spiffe://corp/agents/a`) -> **non-conformant** (rung 2, automated; 1/1 failed)\n  - `eu-ai-act Art. 14 (clause reference unverified)`\n  - `eu-ai-act Art. 26(2) (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n  - Violations: `agentce:event/tc1`\n- **OVS-04** (`OVS-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 14(4)(c)-(d) (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **OVS-05** (`OVS-05` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 26(2) (clause reference unverified)`\n- **OVS-06** (`OVS-06` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 14(4)(e) (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **OVS-07** (`OVS-07` @ `spiffe://corp/agents/a`) -> **not applicable** (rung 2, semi-automated; 0/0 failed)\n  - `eu-ai-act Art. 14(4)(b) (clause reference unverified)`\n- **OVS-08** (`OVS-08` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - `eu-ai-act Art. 14(5) (clause reference unverified)`\n- **OVS-09** (`OVS-09` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, manual; 0/0 failed)\n  - `eu-ai-act Art. 14(1)-(3) (clause reference unverified)`\n- **REC-01** (`REC-01` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 12(1)-(2) (clause reference unverified)`\n  - Evidence: `agentce:event/d1`\n- **REC-02** (`REC-02` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 12(1)-(2) (clause reference unverified)`\n  - Evidence: `agentce:event/d1`\n- **REC-03** (`REC-03` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 12(2) (clause reference unverified)`\n- **REC-04** (`REC-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 12 (clause reference unverified)`\n  - `eu-ai-act Art. 19 (clause reference unverified)`\n  - Evidence: `agentce:event/d1`\n- **REC-05** (`REC-05` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 26(6) (clause reference unverified)`\n- **REC-06** (`REC-06` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 19 (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **ROB-01** (`ROB-01` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 15 (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **ROB-02** (`ROB-02` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 15 (clause reference unverified)`\n- **ROB-03** (`ROB-03` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 15 (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **ROB-04** (`ROB-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 15 (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **ROB-05** (`ROB-05` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, semi-automated; 0/1 failed)\n  - `eu-ai-act Art. 15 (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **ROB-06** (`ROB-06` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, semi-automated; 0/1 failed)\n  - `eu-ai-act Art. 15 (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **ROB-07** (`ROB-07` @ `spiffe://corp/agents/a`) -> **not applicable** (rung 2, semi-automated; 0/0 failed)\n  - `eu-ai-act Art. 15 (clause reference unverified)`\n- **RSK-01** (`RSK-01` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 9 (clause reference unverified)`\n- **RSK-02** (`RSK-02` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 9 (clause reference unverified)`\n- **RSK-03** (`RSK-03` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, semi-automated; 0/0 failed)\n  - `eu-ai-act Art. 9 (clause reference unverified)`\n- **RSK-04** (`RSK-04` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, manual; 0/0 failed)\n  - `eu-ai-act Art. 27 (clause reference unverified)`\n- **RSK-05** (`RSK-05` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, manual; 0/0 failed)\n  - `eu-ai-act Art. 49 / 71 (clause reference unverified)`\n- **TRN-01** (`TRN-01` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 26(11) / 86 (clause reference unverified)`\n- **TRN-02** (`TRN-02` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 86 (clause reference unverified)`\n  - Evidence: `agentce:event/d1`\n- **TRN-03** (`TRN-03` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - `eu-ai-act Art. 26(11) / 86 (clause reference unverified)`\n- **TRN-04** (`TRN-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 50 (clause reference unverified)`\n  - Evidence: `agentce:event/d1`\n- **TRN-05** (`TRN-05` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - `eu-ai-act Art. 50 (clause reference unverified)`\n\n\n## Provenance\n\n- Engine: agentce-py 0.1.0\n- Catalog: (none)\n- Lenses available: baseline@2026.09 (default), eu-ai-act@2026.09, nist-ai-rmf@2026.09; choose one with --catalog <id@version>\n- Reproduce: `agentce quickstart`\n\n",
+  "html": "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>AgentCE conformance report</title><style>body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}table{page-break-inside:auto}tr{page-break-inside:avoid}}</style></head><body><main><h1>AgentCE conformance report</h1><section aria-labelledby=\"verdict\"><h2 id=\"verdict\">Verdict</h2><p><strong>Non-conformant \u2014 at least one applicable control failed.</strong></p><p>Top gaps:</p><ul><li>non-conformant: OVS-02, OVS-03</li><li>insufficient evidence: DAT-01, DAT-02, DOC-01, DOC-03, OVS-01 (+10 more gaps)</li><li>not assessed: DAT-03, DAT-04, DOC-05, OVS-09, ROB-05 (+4 more gaps)</li></ul><p>Next step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.</p></section><section aria-labelledby=\"summary\"><h2 id=\"summary\">Outcome summary</h2><ul><li>conformant: 17</li><li>non-conformant: 2</li><li>partial: 0</li><li>not applicable: 6</li><li>not assessed: 9</li><li>insufficient evidence: 15</li></ul></section><section aria-labelledby=\"assertions\"><h2 id=\"assertions\">Assertions</h2><table><caption>Assertions</caption><thead><tr><th scope=\"col\">Title</th><th scope=\"col\">Control</th><th scope=\"col\">Subject</th><th scope=\"col\">Severity</th><th scope=\"col\">Outcome</th><th scope=\"col\">Clause</th><th scope=\"col\">Details</th></tr></thead><tbody><tr><td>DAT-01</td><td>DAT-01</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 10 (clause reference unverified)</td><td></td></tr><tr><td>DAT-02</td><td>DAT-02</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 10 (clause reference unverified)</td><td></td></tr><tr><td>DAT-03</td><td>DAT-03</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 10 (clause reference unverified)</td><td></td></tr><tr><td>DAT-04</td><td>DAT-04</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 10 (clause reference unverified)</td><td></td></tr><tr><td>DOC-01</td><td>DOC-01</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 11 / Annex IV (clause reference unverified)</td><td></td></tr><tr><td>DOC-02</td><td>DOC-02</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 13 (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>DOC-03</td><td>DOC-03</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 11 / Annex IV (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>DOC-04</td><td>DOC-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 13 (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>DOC-05</td><td>DOC-05</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 11 / Annex IV (clause reference unverified)</td><td></td></tr><tr><td>INC-01</td><td>INC-01</td><td>spiffe://corp/agents/a</td><td></td><td>not applicable</td><td>eu-ai-act Art. 72 (clause reference unverified)</td><td></td></tr><tr><td>INC-02</td><td>INC-02</td><td>spiffe://corp/agents/a</td><td></td><td>not applicable</td><td>eu-ai-act Art. 73 (clause reference unverified); eu-ai-act Art. 26(5) (clause reference unverified)</td><td></td></tr><tr><td>INC-03</td><td>INC-03</td><td>spiffe://corp/agents/a</td><td></td><td>not applicable</td><td>eu-ai-act Art. 26(5) (clause reference unverified)</td><td></td></tr><tr><td>INC-04</td><td>INC-04</td><td>spiffe://corp/agents/a</td><td></td><td>not applicable</td><td>eu-ai-act Art. 73 (clause reference unverified)</td><td></td></tr><tr><td>INT-01</td><td>INT-01</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 12 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>INT-02</td><td>INT-02</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act engine integrity (clause reference unverified)</td><td>Evidence: agentce:event/dl1</td></tr><tr><td>INT-03</td><td>INT-03</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act engine integrity (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>INT-04</td><td>INT-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act engine integrity (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>OVS-01</td><td>OVS-01</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 14(4)(a) (clause reference unverified)</td><td></td></tr><tr><td>OVS-02</td><td>OVS-02</td><td>spiffe://corp/agents/a</td><td></td><td>non-conformant</td><td>eu-ai-act Art. 14(1)-(3) (clause reference unverified)</td><td>Evidence: agentce:event/d1<br>Violations: agentce:event/d1</td></tr><tr><td>OVS-03</td><td>OVS-03</td><td>spiffe://corp/agents/a</td><td></td><td>non-conformant</td><td>eu-ai-act Art. 14 (clause reference unverified); eu-ai-act Art. 26(2) (clause reference unverified)</td><td>Evidence: agentce:event/tc1<br>Violations: agentce:event/tc1</td></tr><tr><td>OVS-04</td><td>OVS-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 14(4)(c)-(d) (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>OVS-05</td><td>OVS-05</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 26(2) (clause reference unverified)</td><td></td></tr><tr><td>OVS-06</td><td>OVS-06</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 14(4)(e) (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>OVS-07</td><td>OVS-07</td><td>spiffe://corp/agents/a</td><td></td><td>not applicable</td><td>eu-ai-act Art. 14(4)(b) (clause reference unverified)</td><td></td></tr><tr><td>OVS-08</td><td>OVS-08</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 14(5) (clause reference unverified)</td><td></td></tr><tr><td>OVS-09</td><td>OVS-09</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 14(1)-(3) (clause reference unverified)</td><td></td></tr><tr><td>REC-01</td><td>REC-01</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 12(1)-(2) (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>REC-02</td><td>REC-02</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 12(1)-(2) (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>REC-03</td><td>REC-03</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 12(2) (clause reference unverified)</td><td></td></tr><tr><td>REC-04</td><td>REC-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 12 (clause reference unverified); eu-ai-act Art. 19 (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>REC-05</td><td>REC-05</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 26(6) (clause reference unverified)</td><td></td></tr><tr><td>REC-06</td><td>REC-06</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 19 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>ROB-01</td><td>ROB-01</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>ROB-02</td><td>ROB-02</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td></td></tr><tr><td>ROB-03</td><td>ROB-03</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>ROB-04</td><td>ROB-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td>Evidence: agentce:event/tc1</td></tr><tr><td>ROB-05</td><td>ROB-05</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td></td></tr><tr><td>ROB-06</td><td>ROB-06</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td></td></tr><tr><td>ROB-07</td><td>ROB-07</td><td>spiffe://corp/agents/a</td><td></td><td>not applicable</td><td>eu-ai-act Art. 15 (clause reference unverified)</td><td></td></tr><tr><td>RSK-01</td><td>RSK-01</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 9 (clause reference unverified)</td><td></td></tr><tr><td>RSK-02</td><td>RSK-02</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 9 (clause reference unverified)</td><td></td></tr><tr><td>RSK-03</td><td>RSK-03</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 9 (clause reference unverified)</td><td></td></tr><tr><td>RSK-04</td><td>RSK-04</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 27 (clause reference unverified)</td><td></td></tr><tr><td>RSK-05</td><td>RSK-05</td><td>spiffe://corp/agents/a</td><td></td><td>not assessed</td><td>eu-ai-act Art. 49 / 71 (clause reference unverified)</td><td></td></tr><tr><td>TRN-01</td><td>TRN-01</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 26(11) / 86 (clause reference unverified)</td><td></td></tr><tr><td>TRN-02</td><td>TRN-02</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 86 (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>TRN-03</td><td>TRN-03</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 26(11) / 86 (clause reference unverified)</td><td></td></tr><tr><td>TRN-04</td><td>TRN-04</td><td>spiffe://corp/agents/a</td><td></td><td>conformant</td><td>eu-ai-act Art. 50 (clause reference unverified)</td><td>Evidence: agentce:event/d1</td></tr><tr><td>TRN-05</td><td>TRN-05</td><td>spiffe://corp/agents/a</td><td></td><td>insufficient evidence</td><td>eu-ai-act Art. 50 (clause reference unverified)</td><td></td></tr></tbody></table></section><section aria-labelledby=\"provenance\"><h2 id=\"provenance\">Provenance</h2><ul><li>Engine: agentce-py 0.1.0</li><li>Catalog: (none)</li><li>Lenses available: baseline@2026.09 (default), eu-ai-act@2026.09, nist-ai-rmf@2026.09; choose one with --catalog &lt;id@version&gt;</li><li>Reproduce: <code>agentce quickstart</code></li></ul></section><footer><p>Affected persons may obtain an explanation and raise concerns through the deployer&#x27;s published contact channel (EU AI Act Arts. 26(11), 85, 86).</p></footer></main></body></html>\n",
+  "md": "# AgentCE conformance report\n\n## Verdict\n\n**Non-conformant \u2014 at least one applicable control failed.**\n\nTop gaps:\n\n- non-conformant: OVS-02, OVS-03\n- insufficient evidence: DAT-01, DAT-02, DOC-01, DOC-03, OVS-01 (+10 more gaps)\n- not assessed: DAT-03, DAT-04, DOC-05, OVS-09, ROB-05 (+4 more gaps)\n\nNext step: Fix the non-conformant controls listed under Top gaps, then run the assessment again.\n\n## Outcome summary\n\n- `conformant`: 17\n- `non-conformant`: 2\n- `partial`: 0\n- `not applicable`: 6\n- `not assessed`: 9\n- `insufficient evidence`: 15\n\n## Assertions\n\n### Unrated\n\n- **DAT-01** (`DAT-01` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 10 (clause reference unverified)`\n- **DAT-02** (`DAT-02` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - `eu-ai-act Art. 10 (clause reference unverified)`\n- **DAT-03** (`DAT-03` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, semi-automated; 0/0 failed)\n  - `eu-ai-act Art. 10 (clause reference unverified)`\n- **DAT-04** (`DAT-04` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, manual; 0/0 failed)\n  - `eu-ai-act Art. 10 (clause reference unverified)`\n- **DOC-01** (`DOC-01` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 11 / Annex IV (clause reference unverified)`\n- **DOC-02** (`DOC-02` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 13 (clause reference unverified)`\n  - Evidence: `agentce:event/d1`\n- **DOC-03** (`DOC-03` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 11 / Annex IV (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **DOC-04** (`DOC-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, semi-automated; 0/1 failed)\n  - `eu-ai-act Art. 13 (clause reference unverified)`\n  - Evidence: `agentce:event/d1`\n- **DOC-05** (`DOC-05` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, manual; 0/0 failed)\n  - `eu-ai-act Art. 11 / Annex IV (clause reference unverified)`\n- **INC-01** (`INC-01` @ `spiffe://corp/agents/a`) -> **not applicable** (rung 2, automated; 0/0 failed)\n  - `eu-ai-act Art. 72 (clause reference unverified)`\n- **INC-02** (`INC-02` @ `spiffe://corp/agents/a`) -> **not applicable** (rung 2, automated; 0/0 failed)\n  - `eu-ai-act Art. 73 (clause reference unverified)`\n  - `eu-ai-act Art. 26(5) (clause reference unverified)`\n- **INC-03** (`INC-03` @ `spiffe://corp/agents/a`) -> **not applicable** (rung 2, automated; 0/0 failed)\n  - `eu-ai-act Art. 26(5) (clause reference unverified)`\n- **INC-04** (`INC-04` @ `spiffe://corp/agents/a`) -> **not applicable** (rung 2, automated; 0/0 failed)\n  - `eu-ai-act Art. 73 (clause reference unverified)`\n- **INT-01** (`INT-01` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 12 (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **INT-02** (`INT-02` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act engine integrity (clause reference unverified)`\n  - Evidence: `agentce:event/dl1`\n- **INT-03** (`INT-03` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act engine integrity (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **INT-04** (`INT-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act engine integrity (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **OVS-01** (`OVS-01` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 14(4)(a) (clause reference unverified)`\n- **OVS-02** (`OVS-02` @ `spiffe://corp/agents/a`) -> **non-conformant** (rung 2, automated; 1/1 failed)\n  - `eu-ai-act Art. 14(1)-(3) (clause reference unverified)`\n  - Evidence: `agentce:event/d1`\n  - Violations: `agentce:event/d1`\n- **OVS-03** (`OVS-03` @ `spiffe://corp/agents/a`) -> **non-conformant** (rung 2, automated; 1/1 failed)\n  - `eu-ai-act Art. 14 (clause reference unverified)`\n  - `eu-ai-act Art. 26(2) (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n  - Violations: `agentce:event/tc1`\n- **OVS-04** (`OVS-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 14(4)(c)-(d) (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **OVS-05** (`OVS-05` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 26(2) (clause reference unverified)`\n- **OVS-06** (`OVS-06` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 14(4)(e) (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **OVS-07** (`OVS-07` @ `spiffe://corp/agents/a`) -> **not applicable** (rung 2, semi-automated; 0/0 failed)\n  - `eu-ai-act Art. 14(4)(b) (clause reference unverified)`\n- **OVS-08** (`OVS-08` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - `eu-ai-act Art. 14(5) (clause reference unverified)`\n- **OVS-09** (`OVS-09` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, manual; 0/0 failed)\n  - `eu-ai-act Art. 14(1)-(3) (clause reference unverified)`\n- **REC-01** (`REC-01` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 12(1)-(2) (clause reference unverified)`\n  - Evidence: `agentce:event/d1`\n- **REC-02** (`REC-02` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 12(1)-(2) (clause reference unverified)`\n  - Evidence: `agentce:event/d1`\n- **REC-03** (`REC-03` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 12(2) (clause reference unverified)`\n- **REC-04** (`REC-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 12 (clause reference unverified)`\n  - `eu-ai-act Art. 19 (clause reference unverified)`\n  - Evidence: `agentce:event/d1`\n- **REC-05** (`REC-05` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 26(6) (clause reference unverified)`\n- **REC-06** (`REC-06` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 19 (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **ROB-01** (`ROB-01` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 15 (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **ROB-02** (`ROB-02` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 15 (clause reference unverified)`\n- **ROB-03** (`ROB-03` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 15 (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **ROB-04** (`ROB-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 15 (clause reference unverified)`\n  - Evidence: `agentce:event/tc1`\n- **ROB-05** (`ROB-05` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, semi-automated; 0/0 failed)\n  - `eu-ai-act Art. 15 (clause reference unverified)`\n- **ROB-06** (`ROB-06` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, semi-automated; 0/0 failed)\n  - `eu-ai-act Art. 15 (clause reference unverified)`\n- **ROB-07** (`ROB-07` @ `spiffe://corp/agents/a`) -> **not applicable** (rung 2, semi-automated; 0/0 failed)\n  - `eu-ai-act Art. 15 (clause reference unverified)`\n- **RSK-01** (`RSK-01` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 9 (clause reference unverified)`\n- **RSK-02** (`RSK-02` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 9 (clause reference unverified)`\n- **RSK-03** (`RSK-03` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, semi-automated; 0/0 failed)\n  - `eu-ai-act Art. 9 (clause reference unverified)`\n- **RSK-04** (`RSK-04` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, manual; 0/0 failed)\n  - `eu-ai-act Art. 27 (clause reference unverified)`\n- **RSK-05** (`RSK-05` @ `spiffe://corp/agents/a`) -> **not assessed** (rung 3, manual; 0/0 failed)\n  - `eu-ai-act Art. 49 / 71 (clause reference unverified)`\n- **TRN-01** (`TRN-01` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 26(11) / 86 (clause reference unverified)`\n- **TRN-02** (`TRN-02` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 86 (clause reference unverified)`\n  - Evidence: `agentce:event/d1`\n- **TRN-03** (`TRN-03` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - `eu-ai-act Art. 26(11) / 86 (clause reference unverified)`\n- **TRN-04** (`TRN-04` @ `spiffe://corp/agents/a`) -> **conformant** (rung 2, automated; 0/1 failed)\n  - `eu-ai-act Art. 50 (clause reference unverified)`\n  - Evidence: `agentce:event/d1`\n- **TRN-05** (`TRN-05` @ `spiffe://corp/agents/a`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)\n  - `eu-ai-act Art. 50 (clause reference unverified)`\n\n\n## Provenance\n\n- Engine: agentce-py 0.1.0\n- Catalog: (none)\n- Lenses available: baseline@2026.09 (default), eu-ai-act@2026.09, nist-ai-rmf@2026.09; choose one with --catalog <id@version>\n- Reproduce: `agentce quickstart`\n\n",
   "oscal": {
     "assessment-results": {
       "import-ap": {
@@ -1626,7 +1597,7 @@
               "uuid": "1469dab7-0808-5287-b446-7b1e4b249f73"
             },
             {
-              "description": "DOC-03 assessed for spiffe://corp/agents/a: conformant.",
+              "description": "DOC-03 assessed for spiffe://corp/agents/a: insufficient_evidence.",
               "links": [
                 {
                   "href": "urn:agentce:control:DOC-03",
@@ -1640,8 +1611,8 @@
               ],
               "target": {
                 "status": {
-                  "reason": "conformant",
-                  "state": "satisfied"
+                  "reason": "insufficient_evidence",
+                  "state": "not-satisfied"
                 },
                 "target-id": "DOC-03",
                 "type": "objective-id"
@@ -1770,7 +1741,7 @@
               "uuid": "f3d7819b-0c49-5c8a-a246-e6073b95b9ea"
             },
             {
-              "description": "INC-04 assessed for spiffe://corp/agents/a: conformant.",
+              "description": "INC-04 assessed for spiffe://corp/agents/a: not_applicable.",
               "links": [
                 {
                   "href": "urn:agentce:control:INC-04",
@@ -1784,8 +1755,8 @@
               ],
               "target": {
                 "status": {
-                  "reason": "conformant",
-                  "state": "satisfied"
+                  "reason": "not_applicable",
+                  "state": "not-satisfied"
                 },
                 "target-id": "INC-04",
                 "type": "objective-id"
@@ -2346,7 +2317,7 @@
               "uuid": "005836fb-5a1f-53a5-872a-434753691edd"
             },
             {
-              "description": "ROB-05 assessed for spiffe://corp/agents/a: conformant.",
+              "description": "ROB-05 assessed for spiffe://corp/agents/a: not_assessed.",
               "links": [
                 {
                   "href": "urn:agentce:control:ROB-05",
@@ -2360,8 +2331,8 @@
               ],
               "target": {
                 "status": {
-                  "reason": "conformant",
-                  "state": "satisfied"
+                  "reason": "not_assessed",
+                  "state": "not-satisfied"
                 },
                 "target-id": "ROB-05",
                 "type": "objective-id"
@@ -2370,7 +2341,7 @@
               "uuid": "51d42a23-b72d-51cd-8c6a-87d0711e430a"
             },
             {
-              "description": "ROB-06 assessed for spiffe://corp/agents/a: conformant.",
+              "description": "ROB-06 assessed for spiffe://corp/agents/a: not_assessed.",
               "links": [
                 {
                   "href": "urn:agentce:control:ROB-06",
@@ -2384,8 +2355,8 @@
               ],
               "target": {
                 "status": {
-                  "reason": "conformant",
-                  "state": "satisfied"
+                  "reason": "not_assessed",
+                  "state": "not-satisfied"
                 },
                 "target-id": "ROB-06",
                 "type": "objective-id"
@@ -2779,12 +2750,6 @@
               "methods": [
                 "TEST"
               ],
-              "relevant-evidence": [
-                {
-                  "description": "enforcement_point evidence, digest sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
-                  "href": "agentce:event/tc1"
-                }
-              ],
               "uuid": "a821e867-b97d-57d4-aca6-f61d3bc3cd99"
             },
             {
@@ -3067,12 +3032,6 @@
               "methods": [
                 "TEST"
               ],
-              "relevant-evidence": [
-                {
-                  "description": "enforcement_point evidence, digest sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
-                  "href": "agentce:event/tc1"
-                }
-              ],
               "uuid": "b2f15442-2ac0-5985-9f17-1741877f01fe"
             },
             {
@@ -3080,12 +3039,6 @@
               "description": "Assessment activity for ROB-06 on spiffe://corp/agents/a.",
               "methods": [
                 "TEST"
-              ],
-              "relevant-evidence": [
-                {
-                  "description": "enforcement_point evidence, digest sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
-                  "href": "agentce:event/tc1"
-                }
               ],
               "uuid": "f4aa129a-72ab-5be3-9bc8-4344404fd7e7"
             },
@@ -3300,7 +3253,7 @@
           "agentce:event/tc1"
         ],
         "mode": "automated",
-        "outcome": "conformant"
+        "outcome": "insufficient_evidence"
       },
       {
         "control": "DOC-04",
@@ -3383,11 +3336,9 @@
             "verified": false
           }
         ],
-        "evidence": [
-          "agentce:event/tc1"
-        ],
+        "evidence": [],
         "mode": "automated",
-        "outcome": "conformant"
+        "outcome": "not_applicable"
       },
       {
         "control": "INT-01",
@@ -3737,11 +3688,9 @@
             "verified": false
           }
         ],
-        "evidence": [
-          "agentce:event/tc1"
-        ],
+        "evidence": [],
         "mode": "semi-automated",
-        "outcome": "conformant"
+        "outcome": "not_assessed"
       },
       {
         "control": "ROB-06",
@@ -3752,11 +3701,9 @@
             "verified": false
           }
         ],
-        "evidence": [
-          "agentce:event/tc1"
-        ],
+        "evidence": [],
         "mode": "semi-automated",
-        "outcome": "conformant"
+        "outcome": "not_assessed"
       },
       {
         "control": "ROB-07",
@@ -4014,6 +3961,25 @@
             "ruleId": "DOC-01"
           },
           {
+            "level": "warning",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
+            "message": {
+              "text": "DOC-03 on spiffe://corp/agents/a: insufficient_evidence"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "f34b45c1c5b575fa28c28dc1d2c6e759cf51af04a4e4a711e12ff8bbee43baa7"
+            },
+            "ruleId": "DOC-03"
+          },
+          {
             "level": "note",
             "locations": [
               {
@@ -4202,6 +4168,44 @@
               "agentceOutcomeHash/v1": "5af348f3d2213e90495c9c133be0a50aa3493185760cabbb0d61992f29777c12"
             },
             "ruleId": "ROB-02"
+          },
+          {
+            "level": "note",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
+            "message": {
+              "text": "ROB-05 on spiffe://corp/agents/a: not_assessed"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "8f53ec61577b38417abeb87c4ea219a794343ce45452c190c53fe8c580b482fa"
+            },
+            "ruleId": "ROB-05"
+          },
+          {
+            "level": "note",
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": {
+                    "uri": "agentce/subjects/spiffe___corp_agents_a"
+                  }
+                }
+              }
+            ],
+            "message": {
+              "text": "ROB-06 on spiffe://corp/agents/a: not_assessed"
+            },
+            "partialFingerprints": {
+              "agentceOutcomeHash/v1": "6910d2594fe515a19b73461304be7b202903bc37b7fc12fee83212906ea91fd2"
+            },
+            "ruleId": "ROB-06"
           },
           {
             "level": "warning",

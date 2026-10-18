@@ -135,9 +135,10 @@ check_cases() {
     out="$dir/out-$engine"
     code=0
     if [ -d "$dir/catalog" ]; then
+      # Both streams: Python writes a refusal on stderr, the TypeScript CLI on stdout.
       run "$engine" assess --bundle "$dir/bundle" --profile "$fixtures/$(cat "$dir/profile")" \
         --domain "$fixtures/domain.linkml.yaml" --catalog-dir "$dir/catalog" --allow-unverified-catalog --out "$out" \
-        >/dev/null 2>"$dir/err-$engine" || code=$?
+        >"$dir/err-$engine" 2>&1 || code=$?
       if [ "$code" != "$want_exit" ]; then
         echo "eu-cluster2: $engine $name exited $code, expected $want_exit" >&2
         status=1

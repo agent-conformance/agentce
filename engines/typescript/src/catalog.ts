@@ -22,6 +22,23 @@ const EVIDENCE_SHAPE_UNRESOLVED = "catalog.evidence_shape.unresolved";
 const SHAPE_UNRESOLVED = "catalog.shape.unresolved";
 const MIN_SOURCE_CLASS_UNKNOWN = "catalog.control.min_source_class_unknown";
 const SOURCE_CLASS_FROM_UNKNOWN = "catalog.control.source_class_from_unknown";
+const REQUIRES_DENOMINATOR_INVALID = "catalog.control.requires_denominator_invalid";
+
+/** The coverage-denominator kinds a profile may declare (SPEC §6.5). */
+export const DENOMINATOR_KINDS = new Set([
+  "provider_usage_export",
+  "egress_proxy_log",
+  "firewall_log",
+  "system_of_record_export",
+  "admission_attestation",
+]);
+
+/** A control that judges only where the subject declares an independent coverage denominator of one of `kinds`
+ * whose count of `covers` records reconciles with what was captured (SPEC §6.5, §7.3). */
+export interface RequiredDenominator {
+  kinds: Set<string>;
+  covers: string;
+}
 
 export interface ControlSpec {
   id: string;
@@ -40,6 +57,8 @@ export interface ControlSpec {
   raw: Record<string, unknown>;
   /** `evaluation.source_class_from`: the graph links to the records the judged class also rests on. */
   sourceClassFrom: string[];
+  /** `evaluation.requires_denominator`: the declared denominator a verdict needs (18.37e). */
+  requiresDenominator: RequiredDenominator | null;
 }
 
 export interface Catalog {
@@ -77,15 +96,17 @@ function refuseUncovered(key: string, control: ControlSpec, path: string): Input
 }
 
 /** `value` as Python's `json.dumps(value, ensure_ascii=False)` writes a decoded YAML scalar or
- * collection: `", "` and `": "` separators, keys in their own order. */
-function pyJsonDumps(value: unknown): string {
+ * collection: `", "` and `": "` separators, keys in their own order (byte-sorted with `sortKeys`). */
+function pyJsonDumps(value: unknown, sortKeys = false): string {
   if (Array.isArray(value)) {
-    return `[${value.map(pyJsonDumps).join(", ")}]`;
+    return `[${value.map((v) => pyJsonDumps(v, sortKeys)).join(", ")}]`;
   }
   if (isRecord(value)) {
-    const members = Object.entries(value).map(
-      ([k, v]) => `${JSON.stringify(k)}: ${pyJsonDumps(v)}`,
-    );
+    const entries = Object.entries(value);
+    if (sortKeys) {
+      entries.sort(([a], [b]) => byteCompare(a, b));
+    }
+    const members = entries.map(([k, v]) => `${JSON.stringify(k)}: ${pyJsonDumps(v, sortKeys)}`);
     return `{${members.join(", ")}}`;
   }
   return value === undefined ? "null" : JSON.stringify(value);
@@ -132,6 +153,40 @@ function sourceClassFrom(controlId: string, evaluation: Record<string, unknown>)
   );
 }
 
+/** The declared `requires_denominator`. Anything but a non-empty list of known denominator kinds, without repeats,
+ * and an event type name is refused when the catalog loads, never dropped: a dropped requirement would judge
+ * without it. */
+function requiresDenominator(
+  controlId: string,
+  evaluation: Record<string, unknown>,
+): RequiredDenominator | null {
+  if (!("requires_denominator" in evaluation)) {
+    return null;
+  }
+  const value = evaluation.requires_denominator;
+  if (isRecord(value) && Object.keys(value).sort(byteCompare).join(",") === "covers,kinds") {
+    const { kinds, covers } = value;
+    if (
+      Array.isArray(kinds) &&
+      kinds.length > 0 &&
+      kinds.every((k) => typeof k === "string" && DENOMINATOR_KINDS.has(k)) &&
+      new Set(kinds).size === kinds.length &&
+      typeof covers === "string" &&
+      covers !== ""
+    ) {
+      return { kinds: new Set(kinds as string[]), covers };
+    }
+  }
+  throw new InputError(
+    REQUIRES_DENOMINATOR_INVALID,
+    formatTemplate(errorCause(REQUIRES_DENOMINATOR_INVALID), {
+      control: controlId,
+      value: pyJsonDumps(value, true),
+    }),
+    errorFix(REQUIRES_DENOMINATOR_INVALID),
+  );
+}
+
 function controlFromDict(data: Record<string, unknown>): ControlSpec {
   const evaluation = isRecord(data.evaluation) ? data.evaluation : {};
   const applicability = isRecord(data.applicability) ? data.applicability : {};
@@ -172,6 +227,7 @@ function controlFromDict(data: Record<string, unknown>): ControlSpec {
       : [],
     raw: data,
     sourceClassFrom: sourceClassFrom(id, evaluation),
+    requiresDenominator: requiresDenominator(id, evaluation),
   };
 }
 

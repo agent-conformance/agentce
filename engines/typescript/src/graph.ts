@@ -6,8 +6,8 @@
  * `agentce:chainVerified`, `agentce:executesConsequential`, `agentce:oversightModalityMatchesDeclared`,
  * `agentce:danglingRef`, `agentce:precededBy`, `agentce:componentDeclared`,
  * `agentce:declaredComponentsObserved`, `agentce:triggersIncident`, `agentce:oversightCoverageComplete`,
- * `agentce:interventionEffective`, `agentce:interventionByHuman`, `agentce:incidentResponded` and
- * `agentce:riskReviewed`). The
+ * `agentce:interventionEffective`, `agentce:interventionByHuman`, `agentce:incidentResponded`,
+ * `agentce:riskReviewed`, `agentce:securityRefsResolve` and `agentce:linkedRecordsResolve`). The
  * `rdfs:subClassOf*` closure of the class hierarchy
  * (base vocabulary plus the domain binding) is materialised so class membership needs no inference.
  * This is a faithful port of the Python reference; it must build byte-identical graphs.
@@ -167,6 +167,13 @@ function untrustedSourceClass(value: unknown): boolean {
 /** The own classes whose record of an instruction's principal is read as recorded (SPEC §6.4 order, at or above
  * enforcement_point); below them a principal's role needs an enforcement-point witness (CND-04). */
 const AT_OR_ABOVE_EP = new Set(["enforcement_point", "independent_system"]);
+
+/** The ToolCall references ROB-03 resolves, each with the event type the SPEC gives its target (§6.2). */
+const SECURITY_REFS: [string, string][] = [
+  ["authorization", "PolicyDecision"],
+  ["delegation", "DelegationIssued"],
+  ["instruction", "Instruction"],
+];
 
 /** A principal's id, trimmed; "" when absent or blank. */
 function principalKey(principal: Record<string, unknown>): string {
@@ -1589,6 +1596,8 @@ class Builder {
     const policyDecisions = new Set(
       events.filter((e) => this.ptype(e) === "PolicyDecision").map((e) => eventIri(String(e.id))),
     );
+    const heldTypes = new Map(events.map((e) => [eventIri(String(e.id)), this.ptype(e)]));
+    const unresolved = this.unresolvedLinks(events);
     for (const event of events) {
       const node = eventIri(String(event.id));
       const ptype = this.ptype(event);
@@ -1598,6 +1607,10 @@ class Builder {
       }
       if (ptype === "ToolCall") {
         this.executesConsequential(node, refsOf(event));
+        this.securityRefsResolve(node, refsOf(event), heldTypes);
+      }
+      if (ptype === "ToolCall" || ptype === "Incident") {
+        this.literal(node, "agentce:linkedRecordsResolve", !unresolved.has(node));
       }
       if (ptype === "Decision") {
         this.oversightMatches(node, data);
@@ -1678,6 +1691,70 @@ class Builder {
       }
     }
     return out;
+  }
+
+  /** ROB-03 (Art. 15): every `refs.authorization`, `refs.delegation` and `refs.instruction` the call carries names a
+   * held event of the type the SPEC gives it (§6.2); a name of another type, or one that is not a string, is as
+   * unresolved as a dangling one. */
+  private securityRefsResolve(
+    node: string,
+    refs: Record<string, unknown>,
+    heldTypes: Map<string, string>,
+  ): void {
+    this.literal(
+      node,
+      "agentce:securityRefsResolve",
+      SECURITY_REFS.every(([key, want]) => {
+        const ref = refs[key];
+        return !(key in refs) || (typeof ref === "string" && heldTypes.get(ref) === want);
+      }),
+    );
+  }
+
+  /** REC-06 (Art. 19) and INC-04 (Art. 73): the events from which a dangling reference can be reached through
+   * `refs.*`, event refs in `used[]` and an Incident's `related_refs[]`, at any depth, the event itself included. An
+   * Incident's `related_refs` entry that is not a held event's name is dangling too. */
+  private unresolvedLinks(events: Event[]): Set<string> {
+    const broken = new Set(this.danglingNodes);
+    const namedBy = new Map<string, Set<string>>();
+    for (const event of events) {
+      const node = eventIri(String(event.id));
+      const data = dataOf(event);
+      const names = Object.values(refsOf(event)).filter((v): v is string => typeof v === "string");
+      if (Array.isArray(data.used)) {
+        names.push(...data.used.filter((v): v is string => typeof v === "string"));
+      }
+      if (this.ptype(event) === "Incident" && "related_refs" in data) {
+        const related = data.related_refs;
+        for (const name of Array.isArray(related) ? related : [related]) {
+          if (typeof name === "string" && this.eventIris.has(name)) {
+            names.push(name);
+          } else {
+            broken.add(node);
+          }
+        }
+      }
+      for (const name of names) {
+        if (this.eventIris.has(name)) {
+          let referrers = namedBy.get(name);
+          if (referrers === undefined) {
+            referrers = new Set();
+            namedBy.set(name, referrers);
+          }
+          referrers.add(node);
+        }
+      }
+    }
+    const stack = [...broken];
+    while (stack.length > 0) {
+      for (const referrer of namedBy.get(stack.pop() as string) ?? []) {
+        if (!broken.has(referrer)) {
+          broken.add(referrer);
+          stack.push(referrer);
+        }
+      }
+    }
+    return broken;
   }
 
   /** RSK-02 (Art. 9): a review of the decision, or a `refs.authorization` (or `refs.request`) naming a

@@ -39,6 +39,7 @@ function control(
     testCases: [],
     raw: {},
     sourceClassFrom: [],
+    requiresDenominator: null,
   };
 }
 

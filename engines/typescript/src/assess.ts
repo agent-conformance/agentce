@@ -12,6 +12,7 @@
 import { effectiveRoles } from "./applicability";
 import { type Assertion, type EvidencePointer, makeAssertion } from "./assertions";
 import { type Catalog, type ControlSpec, evidenceShapeFor, shapeFor } from "./catalog";
+import { STATUS_COVERED } from "./coverage";
 import type { DomainBinding } from "./domain";
 import { buildGraph, flaggedRecords, unkeyedFlags } from "./graph";
 import { type UnreadableWrite, type Withheld, digestOf } from "./ingest";
@@ -540,10 +541,44 @@ function coverageUnknown(coverage: Record<string, unknown>, subject: string): bo
   );
 }
 
+/** True when `control` declares `requiresDenominator` and the subject's capture of the type it names does not match
+ * a declared independent denominator of one of its kinds (18.37e, DOC-03): no such denominator, another denominator
+ * holds the count, or the captured count differs from it either way (a declared path that saw fewer records than
+ * were captured does not match them either). Fail closed on anything missing. */
+function denominatorUnshown(
+  control: ControlSpec,
+  subject: Subject,
+  coverage: Record<string, unknown>,
+): boolean {
+  const need = control.requiresDenominator;
+  if (need === null) {
+    return false;
+  }
+  const sources = new Set(
+    subject.coverageDenominators.filter((d) => need.kinds.has(d.kind)).map((d) => d.source),
+  );
+  const field = (value: unknown, key: string): unknown =>
+    typeof value === "object" && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)[key]
+      : undefined;
+  const row = field(field(field(coverage.subjects, subject.id), "event_types"), need.covers);
+  const counted = field(row, "denominators");
+  return !(
+    field(row, "status") === STATUS_COVERED &&
+    field(row, "observed") === field(row, "expected") &&
+    Array.isArray(counted) &&
+    counted.some((source) => sources.has(source))
+  );
+}
+
 /** An INT or REC outcome that reads better than insufficient_evidence while coverage is unknown reads
- * insufficient_evidence (SPEC §6.5): a call that bypassed capture would not be in the records. A violation stays. */
-export function uncovered(assertion: Assertion): Assertion {
-  if (!COVERAGE_FAMILIES.has(assertion.family) || !LOWERED_OUTCOMES.has(assertion.outcome)) {
+ * insufficient_evidence (SPEC §6.5): a call that bypassed capture would not be in the records. A violation stays.
+ * `always` lowers a control of any family (a declared `requiresDenominator` the records do not show). */
+export function uncovered(assertion: Assertion, always = false): Assertion {
+  if (
+    (!COVERAGE_FAMILIES.has(assertion.family) && !always) ||
+    !LOWERED_OUTCOMES.has(assertion.outcome)
+  ) {
     return assertion;
   }
   return {
@@ -670,6 +705,9 @@ export function assessSubjects(
         }
         if (isUncovered && applies) {
           assertion = uncovered(assertion);
+        }
+        if (applies && denominatorUnshown(control, subject, coverage)) {
+          assertion = uncovered(assertion, true);
         }
         assertions.push(assertion);
       }

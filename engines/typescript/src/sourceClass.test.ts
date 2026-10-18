@@ -704,3 +704,48 @@ test("CND-02: outcomes through assess", () => {
   assert.equal(assess(cnd02Events([]), "CND-02").outcome, "non-conformant");
   assert.equal(assess(cnd02Events([IS], EP, "deny"), "CND-02").outcome, "non-conformant");
 });
+
+test("a malformed requires_denominator is refused at load (18.37e)", () => {
+  const line =
+    "  requires_denominator: {kinds: [egress_proxy_log, firewall_log], covers: ToolCall}\n";
+  const cases: Array<[string, string]> = [
+    ["not-object", "egress_proxy_log"],
+    ["missing-covers", "{kinds: [egress_proxy_log]}"],
+    ["extra-key", "{kinds: [egress_proxy_log], covers: ToolCall, extra: 1}"],
+    ["empty-kinds", "{kinds: [], covers: ToolCall}"],
+    ["unknown-kind", "{kinds: [egress_log], covers: ToolCall}"],
+    ["repeated-kind", "{kinds: [egress_proxy_log, egress_proxy_log], covers: ToolCall}"],
+    ["empty-covers", "{kinds: [egress_proxy_log], covers: ''}"],
+    ["covers-not-string", "{kinds: [egress_proxy_log], covers: 7}"],
+    ["kind-not-string", "{kinds: [7], covers: ToolCall}"],
+    ["null", "null"],
+  ];
+  const root = mkdtempSync(join(tmpdir(), "agentce-requires-denominator-"));
+  try {
+    const base = join(CATALOGS, "base", "eu-ai-act");
+    const doc03 = loadCatalog(base).controls.find((c) => c.id === "DOC-03");
+    assert.deepEqual(doc03?.requiresDenominator, {
+      kinds: new Set(["egress_proxy_log", "firewall_log"]),
+      covers: "ToolCall",
+    });
+    for (const [name, value] of cases) {
+      const dir = join(root, name);
+      cpSync(base, dir, { recursive: true });
+      const path = join(dir, "controls", "DOC-03.yaml");
+      const text = readFileSync(path, "utf-8");
+      assert.ok(text.includes(line), name);
+      writeFileSync(path, text.replace(line, `  requires_denominator: ${value}\n`));
+      assert.throws(
+        () => loadCatalog(dir),
+        (err: unknown) =>
+          err instanceof InputError &&
+          err.key === "catalog.control.requires_denominator_invalid" &&
+          err.exitCode === 3 &&
+          err.cause.includes("DOC-03"),
+        name,
+      );
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

@@ -345,10 +345,10 @@
       },
       "violations": [
         {
-          "constraint": "sh:maxCount",
-          "focus": "agentce:event/tc1",
+          "constraint": "sh:hasValue",
+          "focus": "agentce:event/in1",
           "message_key": "INC-04.S1",
-          "path": "agentce:danglingRef"
+          "path": "agentce:linkedRecordsResolve"
         }
       ]
     },
@@ -1017,10 +1017,10 @@
       },
       "violations": [
         {
-          "constraint": "sh:maxCount",
+          "constraint": "sh:hasValue",
           "focus": "agentce:event/tc1",
           "message_key": "REC-06.S1",
-          "path": "agentce:danglingRef"
+          "path": "agentce:linkedRecordsResolve"
         }
       ]
     },
@@ -1125,10 +1125,10 @@
       },
       "violations": [
         {
-          "constraint": "sh:maxCount",
+          "constraint": "sh:hasValue",
           "focus": "agentce:event/tc1",
           "message_key": "ROB-03.S1",
-          "path": "agentce:danglingRef"
+          "path": "agentce:securityRefsResolve"
         }
       ]
     },
@@ -1179,78 +1179,6 @@
     },
     "passed": {
       "control": "ROB-04",
-      "outcome": "conformant",
-      "population": {
-        "applicable": 1,
-        "failed": 0
-      },
-      "violations": []
-    }
-  },
-  "ROB-05": {
-    "failed": {
-      "control": "ROB-05",
-      "outcome": "non-conformant",
-      "population": {
-        "applicable": 1,
-        "failed": 1
-      },
-      "violations": [
-        {
-          "constraint": "sh:hasValue",
-          "focus": "agentce:event/tc1",
-          "message_key": "ROB-05.S1",
-          "path": "agentce:sourceClass"
-        }
-      ]
-    },
-    "inapplicable": {
-      "control": "ROB-05",
-      "outcome": "conformant",
-      "population": {
-        "applicable": 0,
-        "failed": 0
-      },
-      "violations": []
-    },
-    "passed": {
-      "control": "ROB-05",
-      "outcome": "conformant",
-      "population": {
-        "applicable": 1,
-        "failed": 0
-      },
-      "violations": []
-    }
-  },
-  "ROB-06": {
-    "failed": {
-      "control": "ROB-06",
-      "outcome": "non-conformant",
-      "population": {
-        "applicable": 1,
-        "failed": 1
-      },
-      "violations": [
-        {
-          "constraint": "sh:hasValue",
-          "focus": "agentce:event/tc1",
-          "message_key": "ROB-06.S1",
-          "path": "agentce:sourceClass"
-        }
-      ]
-    },
-    "inapplicable": {
-      "control": "ROB-06",
-      "outcome": "conformant",
-      "population": {
-        "applicable": 0,
-        "failed": 0
-      },
-      "violations": []
-    },
-    "passed": {
-      "control": "ROB-06",
       "outcome": "conformant",
       "population": {
         "applicable": 1,
