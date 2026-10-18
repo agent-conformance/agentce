@@ -4215,6 +4215,12 @@
           "replace": "                    pass\n"
         },
         {
+          "description": "Python drops a shape's agentce:targetWhere filter, so DOC-03 and INT-03 target every ToolCall, not only consequential ones (red first on doc03-no-consequential)",
+          "file": "engines/python/agentce/structural.py",
+          "search": "    if not shape.target_where:\n",
+          "replace": "    if True:\n"
+        },
+        {
           "description": "TypeScript ignores a control's requires_denominator (doc03-no-denominator)",
           "file": "engines/typescript/src/assess.ts",
           "search": "if (applies && denominatorUnshown(control, subject, coverage)) {",
@@ -4239,6 +4245,12 @@
           "replace": ""
         },
         {
+          "description": "TypeScript drops a shape's agentce:targetWhere filter, so DOC-03 and INT-03 target every ToolCall (red first on doc03-no-consequential)",
+          "file": "engines/typescript/src/structural.ts",
+          "search": "  if (shape.targetWhere.length === 0) {",
+          "replace": "  if (true) {"
+        },
+        {
           "description": "Java ignores a control's requires_denominator (doc03-no-denominator)",
           "file": "engines/java/src/main/java/org/agentce/Assess.java",
           "search": "if (applies && denominatorUnshown(control, subject, coverage)) {",
@@ -4261,6 +4273,12 @@
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "                        stack.push(referrer);\n",
           "replace": ""
+        },
+        {
+          "description": "Java drops a shape's agentce:targetWhere filter, so DOC-03 and INT-03 target every ToolCall (red first on doc03-no-consequential)",
+          "file": "engines/java/src/main/java/org/agentce/Structural.java",
+          "search": "        if (shape.targetWhere.isEmpty()) {",
+          "replace": "        if (true) {"
         }
       ],
       "fix_hint": "Each engine's catalog loader reads evaluation.requires_denominator (catalog.py _requires_denominator, catalog.ts requiresDenominator, Catalog.java requiresDenominator); assess lowers a verdict to insufficient_evidence unless a declared denominator of one of its kinds set the covered row's count and the captured count equals it (_denominator_unshown, denominatorUnshown); the graph builder sets securityRefsResolve and linkedRecordsResolve (graph.py _security_refs_resolve and _unresolved_links, with the same names in graph.ts and Graph.java). Run `ENGINES=python bash verification/gates/eu_cluster2.sh` (or typescript, java) for one engine."

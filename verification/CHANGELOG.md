@@ -11,8 +11,9 @@ fails if a gate in `gates.json` is not named in this file.
   reference. Each now tests what its title says. DOC-03 also needs a declared egress-proxy or firewall denominator whose
   count matches the captured calls (the new catalog field `evaluation.requires_denominator`, refused at load as
   `catalog.control.requires_denominator_invalid` when malformed). ROB-05 and ROB-06 are rung 3 and read not_assessed.
-  Twelve seeded faults, four per engine: the requirement ignored, a count above the declared one accepted, a security
-  ref of the wrong type counted, and the reference closure cut to one hop.
+  Fifteen seeded faults, five per engine: the requirement ignored, a count above the declared one accepted, a security
+  ref of the wrong type counted, the reference closure cut to one hop, and the targetWhere filter dropped so DOC-03 and
+  INT-03 judge every ToolCall.
 
 ## 0.114.0
 
