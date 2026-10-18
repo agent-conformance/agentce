@@ -1,0 +1,4428 @@
+{
+  "cases": {
+    "doc03-egress-covered": {
+      "control": "DOC-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-egress.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "doc03-firewall-covered": {
+      "control": "DOC-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-firewall.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "doc03-egress-beside-sor": {
+      "control": "DOC-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-egress-sor.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "doc03-sor-only": {
+      "control": "DOC-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "doc03-no-denominator": {
+      "control": "DOC-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-none.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "doc03-attestation-only": {
+      "control": "DOC-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-attestation.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "doc03-egress-above": {
+      "control": "DOC-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-egress.yaml",
+      "extra": {
+        "egress_proxy_log": {
+          "ToolCall": 1
+        }
+      },
+      "quarantined": 0,
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "doc03-egress-fewer": {
+      "control": "DOC-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t2",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-egress.yaml",
+      "extra": {
+        "egress_proxy_log": {
+          "ToolCall": -1
+        }
+      },
+      "quarantined": 0,
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "doc03-egress-zero": {
+      "control": "DOC-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-egress.yaml",
+      "extra": {
+        "egress_proxy_log": {
+          "ToolCall": -1
+        }
+      },
+      "quarantined": 0,
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "doc03-sor-holds-count": {
+      "control": "DOC-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-egress-sor.yaml",
+      "extra": {
+        "system_of_record_export": {
+          "ToolCall": 1
+        }
+      },
+      "quarantined": 0,
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "doc03-not-ep-egress": {
+      "control": "DOC-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-egress.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "t1"
+        ],
+        "exit": 2
+      }
+    },
+    "doc03-not-ep-no-denominator": {
+      "control": "DOC-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-none.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "t1"
+        ],
+        "exit": 2
+      }
+    },
+    "doc03-no-consequential": {
+      "control": "DOC-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:Lookup"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-egress.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "not_applicable",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "doc03-no-consequential-sor": {
+      "control": "DOC-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:Lookup"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "ovs06-ep": {
+      "control": "OVS-06",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "ovs06-not-ep": {
+      "control": "OVS-06",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "t1"
+        ],
+        "exit": 2
+      }
+    },
+    "ovs06-no-denominator": {
+      "control": "OVS-06",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-none.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "rob05-rung3": {
+      "control": "ROB-05",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "not_assessed",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "rob05-rung3-not-ep": {
+      "control": "ROB-05",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "not_assessed",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "rob06-rung3": {
+      "control": "ROB-06",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "not_assessed",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "rob06-rung3-not-ep": {
+      "control": "ROB-06",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "not_assessed",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "int03-clean": {
+      "control": "INT-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "p1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision": "allow",
+            "policy_id": "p"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/p1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "int03-dangling": {
+      "control": "INT-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/zz"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "t1"
+        ],
+        "exit": 2
+      }
+    },
+    "int03-used-dangling": {
+      "control": "INT-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            },
+            "used": [
+              "agentce:event/zz"
+            ]
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "t1"
+        ],
+        "exit": 2
+      }
+    },
+    "int03-dangling-not-consequential": {
+      "control": "INT-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "d2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:Lookup"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t2",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d2",
+              "authorization": "agentce:event/zz"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "int03-no-consequential": {
+      "control": "INT-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:Lookup"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t2",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d2"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "not_applicable",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "rob03-all-held": {
+      "control": "ROB-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "p1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision": "allow",
+            "policy_id": "p"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "g1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "token_ref": "jti-1",
+            "issuer": "https://idp.example",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/eu-cluster2",
+                "kind": "agent"
+              }
+            ],
+            "subject_principal": "user:alice",
+            "actor_principal": "spiffe://corp/agents/eu-cluster2",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read"
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "verification": {
+              "status": "verified",
+              "method": "rfc8693"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "n1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Instruction.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Instruction",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "source_class": "user",
+            "principal": {
+              "id": "user:alice",
+              "kind": "human"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/p1",
+              "delegation": "agentce:event/g1",
+              "instruction": "agentce:event/n1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "rob03-none": {
+      "control": "ROB-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "rob03-order-reversed": {
+      "control": "ROB-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/p1"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "p1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision": "allow",
+            "policy_id": "p"
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "rob03-authorization-dangling": {
+      "control": "ROB-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/zz"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "t1"
+        ],
+        "exit": 2
+      }
+    },
+    "rob03-delegation-dangling": {
+      "control": "ROB-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/zz"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "t1"
+        ],
+        "exit": 2
+      }
+    },
+    "rob03-instruction-dangling": {
+      "control": "ROB-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "instruction": "agentce:event/zz"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "t1"
+        ],
+        "exit": 2
+      }
+    },
+    "rob03-authorization-wrong-type": {
+      "control": "ROB-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "t1"
+        ],
+        "exit": 2
+      }
+    },
+    "rob03-delegation-wrong-type": {
+      "control": "ROB-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "p1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision": "allow",
+            "policy_id": "p"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "delegation": "agentce:event/p1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "t1"
+        ],
+        "exit": 2
+      }
+    },
+    "rob03-instruction-wrong-type": {
+      "control": "ROB-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "g1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "token_ref": "jti-1",
+            "issuer": "https://idp.example",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              },
+              {
+                "id": "spiffe://corp/agents/eu-cluster2",
+                "kind": "agent"
+              }
+            ],
+            "subject_principal": "user:alice",
+            "actor_principal": "spiffe://corp/agents/eu-cluster2",
+            "scope_granted": [
+              "credit:read"
+            ],
+            "scope_parent": [
+              "credit:read"
+            ],
+            "expires": "2026-02-01T00:00:00Z",
+            "verification": {
+              "status": "verified",
+              "method": "rfc8693"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "instruction": "agentce:event/g1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "t1"
+        ],
+        "exit": 2
+      }
+    },
+    "rob03-other-ref-dangling": {
+      "control": "ROB-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            },
+            "used": [
+              "agentce:event/zz"
+            ]
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "rob03-not-consequential": {
+      "control": "ROB-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:Lookup"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t2",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d2",
+              "authorization": "agentce:event/zz"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "not_applicable",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "rob03-one-of-two": {
+      "control": "ROB-03",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "p1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision": "allow",
+            "policy_id": "p"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/p1"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t2",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "t2"
+        ],
+        "exit": 2
+      }
+    },
+    "rec06-clean": {
+      "control": "REC-06",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "p1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision": "allow",
+            "policy_id": "p"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/p1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "rec06-own-dangling": {
+      "control": "REC-06",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/zz"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "t1"
+        ],
+        "exit": 2
+      }
+    },
+    "rec06-named-dangling": {
+      "control": "REC-06",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "p1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision": "allow",
+            "policy_id": "p",
+            "refs": {
+              "request": "agentce:event/zz"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/p1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "t1"
+        ],
+        "exit": 2
+      }
+    },
+    "rec06-decision-dangling": {
+      "control": "REC-06",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision",
+            "refs": {
+              "authorization": "agentce:event/zz"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "t1"
+        ],
+        "exit": 2
+      }
+    },
+    "rec06-depth-two": {
+      "control": "REC-06",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "p2",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision": "allow",
+            "policy_id": "p",
+            "refs": {
+              "request": "agentce:event/zz"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "p1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision": "allow",
+            "policy_id": "p",
+            "refs": {
+              "request": "agentce:event/p2"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/p1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "t1"
+        ],
+        "exit": 2
+      }
+    },
+    "rec06-depth-two-clean": {
+      "control": "REC-06",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "p2",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision": "allow",
+            "policy_id": "p"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "p1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision": "allow",
+            "policy_id": "p",
+            "refs": {
+              "request": "agentce:event/p2"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/p1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "rec06-cycle": {
+      "control": "REC-06",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "p1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision": "allow",
+            "policy_id": "p",
+            "refs": {
+              "request": "agentce:event/p2"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "p2",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision": "allow",
+            "policy_id": "p",
+            "refs": {
+              "request": "agentce:event/p1"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/p1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "rec06-cycle-dangling": {
+      "control": "REC-06",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "p1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision": "allow",
+            "policy_id": "p",
+            "refs": {
+              "request": "agentce:event/p2"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "p2",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision": "allow",
+            "policy_id": "p",
+            "refs": {
+              "request": "agentce:event/p1",
+              "decision": "agentce:event/zz"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/p1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "t1"
+        ],
+        "exit": 2
+      }
+    },
+    "rec06-order-reversed": {
+      "control": "REC-06",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/p1"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "p1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision": "allow",
+            "policy_id": "p",
+            "refs": {
+              "request": "agentce:event/zz"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "t1"
+        ],
+        "exit": 2
+      }
+    },
+    "rec06-named-quarantined": {
+      "control": "REC-06",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "p1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision": 7,
+            "policy_id": "p"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/p1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 1,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "t1"
+        ],
+        "exit": 2
+      }
+    },
+    "inc04-named-quarantined": {
+      "control": "INC-04",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "p1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision": 7,
+            "policy_id": "p"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "i1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Incident.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Incident",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "incident_id": "i1",
+            "incident_class": "fundamental_rights",
+            "detected_at": "2026-01-10T00:00:00Z",
+            "related_refs": [
+              "agentce:event/p1"
+            ]
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 1,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "i1"
+        ],
+        "exit": 2
+      }
+    },
+    "rec06-not-consequential": {
+      "control": "REC-06",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d2",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:Lookup"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t2",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d2",
+              "authorization": "agentce:event/zz"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "not_applicable",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "inc04-clean": {
+      "control": "INC-04",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "i1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Incident.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Incident",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "incident_id": "i1",
+            "incident_class": "fundamental_rights",
+            "detected_at": "2026-01-10T00:00:00Z",
+            "related_refs": [
+              "agentce:event/t1"
+            ]
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "inc04-no-related": {
+      "control": "INC-04",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "i1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Incident.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Incident",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "incident_id": "i1",
+            "incident_class": "fundamental_rights",
+            "detected_at": "2026-01-10T00:00:00Z",
+            "related_refs": []
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "conformant",
+        "failing": [],
+        "exit": 1
+      }
+    },
+    "inc04-related-unresolved": {
+      "control": "INC-04",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "i1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Incident.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Incident",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "incident_id": "i1",
+            "incident_class": "fundamental_rights",
+            "detected_at": "2026-01-10T00:00:00Z",
+            "related_refs": [
+              "agentce:event/d1",
+              "agentce:event/zz"
+            ]
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "i1"
+        ],
+        "exit": 1
+      }
+    },
+    "inc04-related-dangling": {
+      "control": "INC-04",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/zz"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "i1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Incident.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Incident",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "incident_id": "i1",
+            "incident_class": "fundamental_rights",
+            "detected_at": "2026-01-10T00:00:00Z",
+            "related_refs": [
+              "agentce:event/t1"
+            ]
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "i1"
+        ],
+        "exit": 2
+      }
+    },
+    "inc04-refs-dangling": {
+      "control": "INC-04",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "i1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Incident.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Incident",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "incident_id": "i1",
+            "incident_class": "fundamental_rights",
+            "detected_at": "2026-01-10T00:00:00Z",
+            "related_refs": [],
+            "refs": {
+              "decision": "agentce:event/zz"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "i1"
+        ],
+        "exit": 1
+      }
+    },
+    "inc04-depth-two": {
+      "control": "INC-04",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "p1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "PolicyDecision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision": "allow",
+            "policy_id": "p",
+            "refs": {
+              "request": "agentce:event/zz"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/p1"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "i1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Incident.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Incident",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "incident_id": "i1",
+            "incident_class": "fundamental_rights",
+            "detected_at": "2026-01-10T00:00:00Z",
+            "related_refs": [
+              "agentce:event/t1"
+            ]
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "i1"
+        ],
+        "exit": 2
+      }
+    },
+    "inc04-order-reversed": {
+      "control": "INC-04",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "i1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Incident.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Incident",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "incident_id": "i1",
+            "incident_class": "fundamental_rights",
+            "detected_at": "2026-01-10T00:00:00Z",
+            "related_refs": [
+              "agentce:event/t1"
+            ]
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1",
+              "authorization": "agentce:event/zz"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "i1"
+        ],
+        "exit": 2
+      }
+    },
+    "inc04-one-of-two": {
+      "control": "INC-04",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "i1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Incident.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Incident",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "incident_id": "i1",
+            "incident_class": "fundamental_rights",
+            "detected_at": "2026-01-10T00:00:00Z",
+            "related_refs": [
+              "agentce:event/d1"
+            ]
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "i2",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Incident.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Incident",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "incident_id": "i2",
+            "incident_class": "fundamental_rights",
+            "detected_at": "2026-01-10T00:00:00Z",
+            "related_refs": [
+              "agentce:event/zz"
+            ]
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "non-conformant",
+        "failing": [
+          "i2"
+        ],
+        "exit": 1
+      }
+    },
+    "inc04-no-incident": {
+      "control": "INC-04",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "outcome": "not_applicable",
+        "failing": [],
+        "exit": 2
+      }
+    },
+    "cat-not-object": {
+      "control": "DOC-03",
+      "catalog_value": "\"egress_proxy_log\"",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-egress.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "key": "catalog.control.requires_denominator_invalid",
+        "exit": 3
+      }
+    },
+    "cat-missing-covers": {
+      "control": "DOC-03",
+      "catalog_value": "{kinds: [egress_proxy_log]}",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-egress.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "key": "catalog.control.requires_denominator_invalid",
+        "exit": 3
+      }
+    },
+    "cat-extra-key": {
+      "control": "DOC-03",
+      "catalog_value": "{kinds: [egress_proxy_log], covers: ToolCall, min: 1}",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-egress.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "key": "catalog.control.requires_denominator_invalid",
+        "exit": 3
+      }
+    },
+    "cat-empty-kinds": {
+      "control": "DOC-03",
+      "catalog_value": "{kinds: [], covers: ToolCall}",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-egress.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "key": "catalog.control.requires_denominator_invalid",
+        "exit": 3
+      }
+    },
+    "cat-unknown-kind": {
+      "control": "DOC-03",
+      "catalog_value": "{kinds: [egress_log], covers: ToolCall}",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-egress.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "key": "catalog.control.requires_denominator_invalid",
+        "exit": 3
+      }
+    },
+    "cat-repeated-kind": {
+      "control": "DOC-03",
+      "catalog_value": "{kinds: [egress_proxy_log, egress_proxy_log], covers: ToolCall}",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-egress.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "key": "catalog.control.requires_denominator_invalid",
+        "exit": 3
+      }
+    },
+    "cat-empty-covers": {
+      "control": "DOC-03",
+      "catalog_value": "{kinds: [egress_proxy_log], covers: ''}",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-egress.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "key": "catalog.control.requires_denominator_invalid",
+        "exit": 3
+      }
+    },
+    "cat-covers-not-string": {
+      "control": "DOC-03",
+      "catalog_value": "{kinds: [egress_proxy_log], covers: [ToolCall]}",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-egress.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "key": "catalog.control.requires_denominator_invalid",
+        "exit": 3
+      }
+    },
+    "cat-kind-not-string": {
+      "control": "DOC-03",
+      "catalog_value": "{kinds: [1], covers: ToolCall}",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "decision_type": "dom:CreditDecision"
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "t1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster2",
+          "type": "org.agent-conformance.evidence.ToolCall.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "ToolCall",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster2"
+            },
+            "tool": {
+              "name": "x"
+            },
+            "refs": {
+              "decision": "agentce:event/d1"
+            }
+          }
+        }
+      ],
+      "profile": "applicability-egress.yaml",
+      "extra": {},
+      "quarantined": 0,
+      "expected": {
+        "key": "catalog.control.requires_denominator_invalid",
+        "exit": 3
+      }
+    }
+  }
+}

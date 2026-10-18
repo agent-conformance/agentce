@@ -1,0 +1,18 @@
+# Applicability profile for the VG-EUAIACT-CLUSTER2 gate fixture (verification/gates/eu_cluster2.sh), a firewall log reconciles coverage.
+# One subject, the eu-ai-act catalog; each case in cases.json names its profile and is one bundle for this subject.
+profile_version: 1
+observation_window:
+  start: "2026-01-01T00:00:00Z"
+  end: "2026-02-01T00:00:00Z"
+content_capture:
+  mode: hashes_only
+catalogs:
+  - "eu-ai-act@2026.09"
+subjects:
+  - id: "spiffe://corp/agents/eu-cluster2"
+    coverage_denominators:
+      - kind: firewall_log
+        source: "urn:agentce:source:firewall-log:corp"
+        manifest: "reference/firewall_log.json"
+    name: "EU AI Act cluster-2 gate fixture subject"
+    role: "both"
