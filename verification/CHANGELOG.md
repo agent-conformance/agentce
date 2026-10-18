@@ -3,6 +3,17 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.115.0
+
+- `VG-EUAIACT-CLUSTER2` (18.37e, new, tier quick) runs 68 cases through the real Python, TypeScript and Java CLIs.
+  Eight eu-ai-act controls shared two rules. DOC-03, OVS-06, ROB-05 and ROB-06 all checked that a consequential call
+  came from an enforcement point; INC-04, INT-03, REC-06 and ROB-03 all checked that no ToolCall had a dangling
+  reference. Each now tests what its title says. DOC-03 also needs a declared egress-proxy or firewall denominator whose
+  count matches the captured calls (the new catalog field `evaluation.requires_denominator`, refused at load as
+  `catalog.control.requires_denominator_invalid` when malformed). ROB-05 and ROB-06 are rung 3 and read not_assessed.
+  Twelve seeded faults, four per engine: the requirement ignored, a count above the declared one accepted, a security
+  ref of the wrong type counted, and the reference closure cut to one hop.
+
 ## 0.114.0
 
 - `VG-BYO-CATALOG-WALK` (18.181, changed). The engines dropped a catalog entry that was there but was not a file.

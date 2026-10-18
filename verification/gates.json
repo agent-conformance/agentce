@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.114.0",
+  "suite_version": "0.115.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -4166,6 +4166,104 @@
         }
       ],
       "fix_hint": "Each engine's graph builder sets triggersIncident, oversightCoverageComplete, interventionEffective, interventionByHuman, incidentResponded and riskReviewed (graph.py _incident_decisions, _oversight_coverage, _intervention and _risk_reviewed, with the same names in graph.ts and Graph.java). An Incident name that leads to no held decision, directly or through the named event's refs.decision, holds every decision to INC-03. OVS-08 counts distinct human actor ids. RSK-02 counts an authorization or request only when it names a PolicyDecision the bundle holds. Run `ENGINES=python bash verification/gates/eu_cluster1.sh` (or typescript, java) for one engine; it stops at the first case that engine gets wrong."
+    },
+    {
+      "id": "VG-EUAIACT-CLUSTER2",
+      "title": "Eight eu-ai-act controls that shared two rules each test what their title says in all three engines (18.37e): DOC-03 a consequential call at an enforcement point whose captured count a declared egress-proxy or firewall denominator matches (evaluation.requires_denominator, refused at load when malformed); OVS-06 the call at an enforcement point; INT-03 a consequential call's own record resolves; ROB-03 its authorization, delegation and instruction name held events of their SPEC type; REC-06 and INC-04 no record reachable from the call or incident carries a dangling reference; ROB-05 and ROB-06 (rung 3) not_assessed",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/eu_cluster2.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/eu_cluster2/cases.json (68: DOC-03 egress or firewall count matching the capture, egress beside a system of record, and the insufficient_evidence cells: no denominator, system of record only, admission attestation only, egress above, fewer or zero, a larger denominator holding the count; OVS-06 at and not at an enforcement point; INT-03 clean, dangling, used-dangling, dangling only on a non-consequential call; ROB-03 all held, each ref dangling or of the wrong type, one of two, order reversed; REC-06 own, named, decision and depth-two dangling refs, a cycle, a quarantined named record; INC-04 related refs unresolved or dangling, depth two, one of two; ROB-05 and ROB-06 not_assessed; nine malformed requires_denominator values refused with catalog.control.requires_denominator_invalid) gives the expected outcome of its control, failing events, quarantine count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "fail": "any case gives another outcome, another set of failing events, another quarantine count or another exit code in any engine, or an engine loads a malformed requires_denominator"
+      },
+      "faults": [
+        {
+          "description": "Python ignores a control's requires_denominator, so DOC-03 reads conformant with no declared egress count (doc03-no-denominator)",
+          "file": "engines/python/agentce/assess.py",
+          "search": "if applies and _denominator_unshown(control, subject, coverage):",
+          "replace": "if False and _denominator_unshown(control, subject, coverage):"
+        },
+        {
+          "description": "Python accepts a covered row whose captured count is above the declared one, so an egress log that saw fewer calls than were captured reconciles DOC-03 (doc03-egress-fewer)",
+          "file": "engines/python/agentce/assess.py",
+          "search": "and row.get(\"observed\") == row.get(\"expected\")",
+          "replace": "and row.get(\"observed\") >= row.get(\"expected\")"
+        },
+        {
+          "description": "Python counts a security ref naming a held event of any type as resolved (rob03-authorization-wrong-type)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "held_types.get(refs[key]) == want",
+          "replace": "refs[key] in held_types"
+        },
+        {
+          "description": "Python follows linkedRecordsResolve one hop only, so a dangling ref two records away leaves the call resolved (rec06-depth-two)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "                    stack.append(referrer)\n",
+          "replace": "                    pass\n"
+        },
+        {
+          "description": "TypeScript ignores a control's requires_denominator (doc03-no-denominator)",
+          "file": "engines/typescript/src/assess.ts",
+          "search": "if (applies && denominatorUnshown(control, subject, coverage)) {",
+          "replace": "if (false && denominatorUnshown(control, subject, coverage)) {"
+        },
+        {
+          "description": "TypeScript accepts a covered row whose captured count is above the declared one (doc03-egress-fewer)",
+          "file": "engines/typescript/src/assess.ts",
+          "search": "field(row, \"observed\") === field(row, \"expected\") &&",
+          "replace": "Number(field(row, \"observed\")) >= Number(field(row, \"expected\")) &&"
+        },
+        {
+          "description": "TypeScript counts a security ref naming a held event of any type as resolved (rob03-authorization-wrong-type)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "heldTypes.get(ref) === want",
+          "replace": "heldTypes.has(ref)"
+        },
+        {
+          "description": "TypeScript follows linkedRecordsResolve one hop only (rec06-depth-two)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "          stack.push(referrer);\n",
+          "replace": ""
+        },
+        {
+          "description": "Java ignores a control's requires_denominator (doc03-no-denominator)",
+          "file": "engines/java/src/main/java/org/agentce/Assess.java",
+          "search": "if (applies && denominatorUnshown(control, subject, coverage)) {",
+          "replace": "if (false && denominatorUnshown(control, subject, coverage)) {"
+        },
+        {
+          "description": "Java accepts a covered row whose captured count is above the declared one (doc03-egress-fewer)",
+          "file": "engines/java/src/main/java/org/agentce/Assess.java",
+          "search": "|| !row.path(\"observed\").equals(row.path(\"expected\"))",
+          "replace": "|| row.path(\"observed\").asInt() < row.path(\"expected\").asInt()"
+        },
+        {
+          "description": "Java counts a security ref naming a held event of any type as resolved (rob03-authorization-wrong-type)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "ref.getValue().equals(heldTypes.get(value.textValue()))",
+          "replace": "heldTypes.containsKey(value.textValue())"
+        },
+        {
+          "description": "Java follows linkedRecordsResolve one hop only (rec06-depth-two)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "                        stack.push(referrer);\n",
+          "replace": ""
+        }
+      ],
+      "fix_hint": "Each engine's catalog loader reads evaluation.requires_denominator (catalog.py _requires_denominator, catalog.ts requiresDenominator, Catalog.java requiresDenominator); assess lowers a verdict to insufficient_evidence unless a declared denominator of one of its kinds set the covered row's count and the captured count equals it (_denominator_unshown, denominatorUnshown); the graph builder sets securityRefsResolve and linkedRecordsResolve (graph.py _security_refs_resolve and _unresolved_links, with the same names in graph.ts and Graph.java). Run `ENGINES=python bash verification/gates/eu_cluster2.sh` (or typescript, java) for one engine."
     },
     {
       "id": "VG-ENGINE-GOLDENS-FRESH",
