@@ -25,7 +25,7 @@ public final class Coverage {
 
     static final String STATUS_COVERED = "covered";
     private static final String STATUS_BELOW = "below_threshold";
-    private static final String STATUS_UNKNOWN = "unknown";
+    static final String STATUS_UNKNOWN = "unknown";
 
     private static String eventType(JsonNode event) {
         JsonNode data = event.get("data");

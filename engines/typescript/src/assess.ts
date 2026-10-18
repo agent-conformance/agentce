@@ -12,7 +12,7 @@
 import { effectiveRoles } from "./applicability";
 import { type Assertion, type EvidencePointer, makeAssertion } from "./assertions";
 import { type Catalog, type ControlSpec, evidenceShapeFor, shapeFor } from "./catalog";
-import { STATUS_COVERED } from "./coverage";
+import { STATUS_COVERED, STATUS_UNKNOWN } from "./coverage";
 import type { DomainBinding } from "./domain";
 import { buildGraph, flaggedRecords, unkeyedFlags } from "./graph";
 import { type UnreadableWrite, type Withheld, digestOf } from "./ingest";
@@ -541,18 +541,19 @@ function coverageUnknown(coverage: Record<string, unknown>, subject: string): bo
   );
 }
 
-/** True when `control` declares `requiresDenominator` and the subject's capture of the type it names does not match
- * a declared independent denominator of one of its kinds (18.37e, DOC-03): no such denominator, another denominator
- * holds the count, or the captured count differs from it either way (a declared path that saw fewer records than
- * were captured does not match them either). Fail closed on anything missing. */
+/** The coverage status of the type `control`'s `requiresDenominator` names (`unknown` when no row exists) when the
+ * subject's capture of it does not match a declared independent denominator of one of its kinds (18.37e, DOC-03): no
+ * such denominator, another denominator holds the count, or the captured count differs from it either way (a declared
+ * path that saw fewer records than were captured does not match them either); null when it matches or the control
+ * declares none. Fail closed on anything missing. */
 function denominatorUnshown(
   control: ControlSpec,
   subject: Subject,
   coverage: Record<string, unknown>,
-): boolean {
+): string | null {
   const need = control.requiresDenominator;
   if (need === null) {
-    return false;
+    return null;
   }
   const sources = new Set(
     subject.coverageDenominators.filter((d) => need.kinds.has(d.kind)).map((d) => d.source),
@@ -560,19 +561,24 @@ function denominatorUnshown(
   const field = (value: unknown, key: string): unknown =>
     isRecord(value) ? value[key] : undefined;
   const row = field(field(field(coverage.subjects, subject.id), "event_types"), need.covers);
-  const counted = field(row, "denominators");
-  return !(
-    field(row, "status") === STATUS_COVERED &&
-    field(row, "observed") === field(row, "expected") &&
+  if (!isRecord(row)) {
+    return STATUS_UNKNOWN;
+  }
+  const counted = row.denominators;
+  return row.status === STATUS_COVERED &&
+    row.observed === row.expected &&
     Array.isArray(counted) &&
     counted.some((source) => sources.has(source))
-  );
+    ? null
+    : String(row.status);
 }
 
 /** An INT or REC outcome that reads better than insufficient_evidence while coverage is unknown reads
  * insufficient_evidence (SPEC §6.5): a call that bypassed capture would not be in the records. A violation stays.
- * `always` lowers a control of any family (a declared `requiresDenominator` the records do not show). */
-export function uncovered(assertion: Assertion, always = false): Assertion {
+ * `always` lowers a control of any family (a declared `requiresDenominator` the records do not show); `unknown` false
+ * keeps it out of the coverage-unknown blind spot when the type's coverage is known (a shortfall, or another
+ * denominator's count). */
+export function uncovered(assertion: Assertion, always = false, unknown = true): Assertion {
   if (
     (!COVERAGE_FAMILIES.has(assertion.family) && !always) ||
     !LOWERED_OUTCOMES.has(assertion.outcome)
@@ -586,7 +592,7 @@ export function uncovered(assertion: Assertion, always = false): Assertion {
     violations: [],
     sourceClassSatisfied: null,
     evidenceStrength: null,
-    coverageUnknown: true,
+    coverageUnknown: unknown,
   };
 }
 
@@ -704,8 +710,9 @@ export function assessSubjects(
         if (isUncovered && applies) {
           assertion = uncovered(assertion);
         }
-        if (applies && denominatorUnshown(control, subject, coverage)) {
-          assertion = uncovered(assertion, true);
+        const status = denominatorUnshown(control, subject, coverage);
+        if (applies && status !== null) {
+          assertion = uncovered(assertion, true, status === STATUS_UNKNOWN);
         }
         assertions.push(assertion);
       }

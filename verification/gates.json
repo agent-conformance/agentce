@@ -4193,8 +4193,8 @@
         {
           "description": "Python ignores a control's requires_denominator, so DOC-03 reads conformant with no declared egress count (doc03-no-denominator)",
           "file": "engines/python/agentce/assess.py",
-          "search": "if applies and _denominator_unshown(control, subject, coverage):",
-          "replace": "if False and _denominator_unshown(control, subject, coverage):"
+          "search": "if applies and status is not None:",
+          "replace": "if False and status is not None:"
         },
         {
           "description": "Python accepts a covered row whose captured count is above the declared one, so an egress log that saw fewer calls than were captured reconciles DOC-03 (doc03-egress-fewer)",
@@ -4223,14 +4223,14 @@
         {
           "description": "TypeScript ignores a control's requires_denominator (doc03-no-denominator)",
           "file": "engines/typescript/src/assess.ts",
-          "search": "if (applies && denominatorUnshown(control, subject, coverage)) {",
-          "replace": "if (false && denominatorUnshown(control, subject, coverage)) {"
+          "search": "if (applies && status !== null) {",
+          "replace": "if (false && status !== null) {"
         },
         {
           "description": "TypeScript accepts a covered row whose captured count is above the declared one (doc03-egress-fewer)",
           "file": "engines/typescript/src/assess.ts",
-          "search": "field(row, \"observed\") === field(row, \"expected\") &&",
-          "replace": "Number(field(row, \"observed\")) >= Number(field(row, \"expected\")) &&"
+          "search": "row.observed === row.expected &&",
+          "replace": "Number(row.observed) >= Number(row.expected) &&"
         },
         {
           "description": "TypeScript counts a security ref naming a held event of any type as resolved (rob03-authorization-wrong-type)",
@@ -4253,8 +4253,8 @@
         {
           "description": "Java ignores a control's requires_denominator (doc03-no-denominator)",
           "file": "engines/java/src/main/java/org/agentce/Assess.java",
-          "search": "if (applies && denominatorUnshown(control, subject, coverage)) {",
-          "replace": "if (false && denominatorUnshown(control, subject, coverage)) {"
+          "search": "if (applies && status != null) {",
+          "replace": "if (false && status != null) {"
         },
         {
           "description": "Java accepts a covered row whose captured count is above the declared one (doc03-egress-fewer)",

@@ -616,8 +616,9 @@ public final class Assess {
                     if (isUncovered && applies) {
                         assertion = uncovered(assertion);
                     }
-                    if (applies && denominatorUnshown(control, subject, coverage)) {
-                        assertion = uncovered(assertion, true);
+                    String status = denominatorUnshown(control, subject, coverage);
+                    if (applies && status != null) {
+                        assertion = uncovered(assertion, true, Coverage.STATUS_UNKNOWN.equals(status));
                     }
                     assertions.add(assertion);
                 }
@@ -647,15 +648,16 @@ public final class Assess {
     }
 
     /**
-     * True when {@code control} declares {@code requiresDenominator} and the subject's capture of the type it names
-     * does not match a declared independent denominator of one of its kinds (18.37e, DOC-03): no such denominator,
-     * another denominator holds the count, or the captured count differs from it either way (a declared path that saw
-     * fewer records than were captured does not match them either). Fail closed on anything missing.
+     * The coverage status of the type {@code control}'s {@code requiresDenominator} names ({@code unknown} when no
+     * row exists) when the subject's capture of it does not match a declared independent denominator of one of its
+     * kinds (18.37e, DOC-03): no such denominator, another denominator holds the count, or the captured count differs
+     * from it either way (a declared path that saw fewer records than were captured does not match them either); null
+     * when it matches or the control declares none. Fail closed on anything missing.
      */
-    static boolean denominatorUnshown(Catalog.ControlSpec control, Profile.Subject subject, JsonNode coverage) {
+    static String denominatorUnshown(Catalog.ControlSpec control, Profile.Subject subject, JsonNode coverage) {
         Catalog.RequiredDenominator need = control.requiresDenominator;
         if (need == null) {
-            return false;
+            return null;
         }
         Set<String> sources = new LinkedHashSet<>();
         for (Profile.CoverageDenominator d : subject.coverageDenominators) {
@@ -664,33 +666,38 @@ public final class Assess {
             }
         }
         if (coverage == null) {
-            return true;
+            return Coverage.STATUS_UNKNOWN;
         }
         JsonNode row = coverage.path("subjects").path(subject.id).path("event_types").path(need.covers());
-        if (!row.isObject()
-                || !Coverage.STATUS_COVERED.equals(row.path("status").textValue())
+        if (!row.isObject()) {
+            return Coverage.STATUS_UNKNOWN;
+        }
+        String status = String.valueOf(row.path("status").textValue());
+        if (!Coverage.STATUS_COVERED.equals(row.path("status").textValue())
                 || !row.path("observed").equals(row.path("expected"))
                 || !row.path("observed").isNumber()) {
-            return true;
+            return status;
         }
         for (JsonNode source : row.path("denominators")) {
             if (source.isTextual() && sources.contains(source.textValue())) {
-                return false;
+                return null;
             }
         }
-        return true;
+        return status;
     }
 
     static Assertions.Assertion uncovered(Assertions.Assertion assertion) {
-        return uncovered(assertion, false);
+        return uncovered(assertion, false, true);
     }
 
     /**
      * An INT or REC outcome that reads better than insufficient_evidence while coverage is unknown reads
      * insufficient_evidence (SPEC §6.5): a call that bypassed capture would not be in the records. A violation stays.
-     * {@code always} lowers a control of any family (a declared {@code requiresDenominator} the records do not show).
+     * {@code always} lowers a control of any family (a declared {@code requiresDenominator} the records do not show);
+     * {@code unknown} false keeps it out of the coverage-unknown blind spot when the type's coverage is known (a
+     * shortfall, or another denominator's count).
      */
-    static Assertions.Assertion uncovered(Assertions.Assertion assertion, boolean always) {
+    static Assertions.Assertion uncovered(Assertions.Assertion assertion, boolean always, boolean unknown) {
         if ((!COVERAGE_FAMILIES.contains(assertion.family) && !always)
                 || !LOWERED_OUTCOMES.contains(assertion.outcome)) {
             return assertion;
@@ -701,7 +708,7 @@ public final class Assess {
         copy.violations = new ArrayList<>();
         copy.sourceClassSatisfied = null;
         copy.evidenceStrength = null;
-        copy.coverageUnknown = true;
+        copy.coverageUnknown = unknown;
         return copy;
     }
 

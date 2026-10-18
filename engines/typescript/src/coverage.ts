@@ -16,7 +16,7 @@ import { byteCompare } from "./util";
 
 export const STATUS_COVERED = "covered";
 const STATUS_BELOW = "below_threshold";
-const STATUS_UNKNOWN = "unknown";
+export const STATUS_UNKNOWN = "unknown";
 
 type Event = Record<string, unknown>;
 
