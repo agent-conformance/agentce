@@ -312,7 +312,8 @@ def _argv_vectors(directory: Path) -> list[tuple[str, list[str], int]]:
     code Python's `readiness` subparser gives). Over scenario 3's report (a high-severity control with
     insufficient evidence), a gaps file naming it gives READY WITH LIMITATIONS (0) and an empty one
     NOT READY (1), so a repeated flag shows which value an engine kept. Exit 3 is a refusal: the
-    keyed `input.readiness_unrecognized_flag` in every engine, its key and text compared."""
+    keyed `input.readiness_unrecognized_flag` in every engine, or `input.gaps_not_a_file` for an empty
+    gaps value (18.178), its key and text compared."""
     directory = directory / "argv"
     directory.mkdir()
     report, _ = _scenario_3_no_gaps(directory)
@@ -333,7 +334,8 @@ def _argv_vectors(directory: Path) -> list[tuple[str, list[str], int]]:
             1,
         ),
         ("equals-joined-value", [r, f"--gaps={g}", f"--catalog-dir={c}"], 0),
-        ("empty-value-ignored", [r, "--gaps", "", "--catalog-dir", c], 1),
+        ("empty-value-refused", [r, "--gaps", "", "--catalog-dir", c], 3),
+        ("equals-empty-value-refused", [r, "--gaps=", "--catalog-dir", c], 3),
         ("options-end-marker", ["--gaps", g, "--catalog-dir", c, "--", r], 0),
         ("abbreviated-flag", [r, "--gap", g, "--catalog-dir", c], 3),
         ("abbreviated-global-flag", [r, "--gaps", g, "--catalog-dir", c, "--js"], 3),
