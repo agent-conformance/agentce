@@ -14,6 +14,7 @@
  */
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   copyFileSync,
@@ -22,6 +23,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -309,4 +311,85 @@ test("read once: loadCatalog keeps the bytes it read, and a later edit on disk c
     digestFiles(catalog.files.files, new Set(["catalog.sig.json"])),
     digestTree(BASE, new Set(["catalog.sig.json"])),
   );
+});
+
+// --- 18.181: entries that are not files, folders named like controls, and links out of the catalog. ---
+
+function catalogCopy(source: string = BASE): { tmp: string; dir: string } {
+  const tmp = mkdtempSync(join(tmpdir(), "agentce-18181-"));
+  const dir = join(tmp, "c");
+  cpSync(source, dir, { recursive: true });
+  rmSync(join(dir, "catalog.sig.json"), { force: true });
+  return { tmp, dir };
+}
+
+function refusedKey(fn: () => unknown): [string, string] {
+  try {
+    fn();
+  } catch (err) {
+    const e = err as { key?: string; cause?: string };
+    return [String(e.key), String(e.cause)];
+  }
+  return ["", ""];
+}
+
+for (const kind of ["fifo", "dangling", "loop", "folder"] as const) {
+  test(`18.181: a control that is a ${kind} is refused as unreadable, naming it`, () => {
+    const { tmp, dir } = catalogCopy();
+    const control = join(dir, "controls", "DOC-01.yaml");
+    rmSync(control);
+    if (kind === "fifo") {
+      execFileSync("mkfifo", [control]);
+    } else if (kind === "dangling") {
+      symlinkSync(join(tmp, "nowhere"), control);
+    } else if (kind === "loop") {
+      symlinkSync(control, control);
+    } else {
+      mkdirSync(control);
+    }
+    const [key, cause] = refusedKey(() => loadCatalog(dir));
+    assert.equal(key, "input.catalog_unreadable");
+    assert.ok(cause.endsWith("cannot be read: controls/DOC-01.yaml."), cause);
+    rmSync(tmp, { recursive: true, force: true });
+  });
+}
+
+test("18.181: a non-file entry under a dot folder, __pycache__, or named catalog.sig.json is not covered", () => {
+  const { tmp, dir } = catalogCopy();
+  mkdirSync(join(dir, ".git"));
+  mkdirSync(join(dir, "__pycache__"));
+  execFileSync("mkfifo", [join(dir, ".git", "x"), join(dir, "__pycache__", "y")]);
+  execFileSync("mkfifo", [join(dir, "catalog.sig.json")]);
+  assert.ok(coveredFiles(dir, new Set(["catalog.sig.json"])).includes("controls/DOC-01.yaml"));
+  rmSync(tmp, { recursive: true, force: true });
+});
+
+test("18.181: a catalog.yaml that is a FIFO is refused unopened", () => {
+  const { tmp, dir } = catalogCopy();
+  rmSync(join(dir, "catalog.yaml"));
+  execFileSync("mkfifo", [join(dir, "catalog.yaml")]);
+  const [key, cause] = refusedKey(() => loadCatalog(dir));
+  assert.equal(key, "input.catalog_unreadable");
+  assert.ok(cause.endsWith("cannot be read: catalog.yaml."), cause);
+  rmSync(tmp, { recursive: true, force: true });
+});
+
+test("18.181: links out of the catalog are listed; a link inside is not", () => {
+  const { tmp, dir } = catalogCopy();
+  renameSync(join(dir, "controls", "DOC-01.yaml"), join(tmp, "moved.yaml"));
+  symlinkSync(join(tmp, "moved.yaml"), join(dir, "controls", "DOC-01.yaml"));
+  renameSync(join(dir, "shapes", "DOC-01.ttl"), join(dir, "test", "DOC-01.ttl.txt"));
+  symlinkSync("../test/DOC-01.ttl.txt", join(dir, "shapes", "DOC-01.ttl"));
+  const catalog = loadCatalog(dir);
+  assert.deepEqual([...(catalog.files?.linksOut ?? [])], ["controls/DOC-01.yaml"]);
+  rmSync(tmp, { recursive: true, force: true });
+});
+
+test("18.181: an evidence_shape file linked outside is refused by the load", () => {
+  const { tmp, dir } = catalogCopy(CONDUCT);
+  renameSync(join(dir, "shapes", "CND-02-evidence.ttl"), join(tmp, "moved.ttl"));
+  symlinkSync(join(tmp, "moved.ttl"), join(dir, "shapes", "CND-02-evidence.ttl"));
+  const [key] = refusedKey(() => loadCatalog(dir));
+  assert.equal(key, "catalog.evidence_shape.unresolved");
+  rmSync(tmp, { recursive: true, force: true });
 });

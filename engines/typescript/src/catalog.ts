@@ -7,7 +7,7 @@
  * the evaluator) is not needed by the conformance pipeline and is not ported here.
  */
 
-import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { lstatSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { join, sep } from "node:path";
 import { load } from "js-yaml";
 import { errorCause, errorFix } from "./errorCatalogue";
@@ -233,10 +233,34 @@ export function loadCatalog(directory: string): Catalog {
   }
 }
 
+/** Whether `path` is there (a link counts, even a dangling one) but is not a regular file once links
+ * are followed: a FIFO, a folder, a dangling link or a link loop. */
+function isPresentButNotAFile(path: string): boolean {
+  try {
+    lstatSync(path);
+  } catch {
+    return false;
+  }
+  try {
+    return !statSync(path).isFile();
+  } catch {
+    return true;
+  }
+}
+
 function loadCovered(directory: string): Catalog {
-  // catalog.yaml first, as before: a folder without one is refused naming it. Every covered file is
-  // then read once (18.171) and kept as `files`, which the signature check and provenance digest read.
-  const metaBytes = readFileSync(join(directory, "catalog.yaml"));
+  // catalog.yaml first, as before: a folder without one is refused naming it, and one that is there
+  // but is not a regular file (a FIFO would block the read) is refused unopened (18.181). Every covered
+  // file is then read once (18.171) and kept as `files`, which the signature check and provenance
+  // digest read.
+  const metaPath = join(directory, "catalog.yaml");
+  if (isPresentButNotAFile(metaPath)) {
+    throw Object.assign(new Error("not a regular file: catalog.yaml"), {
+      code: "EINVAL",
+      path: metaPath,
+    });
+  }
+  const metaBytes = readFileSync(metaPath);
   const meta = load(metaBytes.toString("utf-8"));
   const metaRecord = isRecord(meta) ? meta : {};
   const controls: ControlSpec[] = [];

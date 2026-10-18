@@ -10,8 +10,8 @@
  */
 
 import { type KeyObject, createHash, createPublicKey, verify as cryptoVerify } from "node:crypto";
-import { readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { lstatSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { isAbsolute, join, relative } from "node:path";
 import { confineToRoot } from "./bundle";
 import { CanonicalizationError, canonicalize, sha256Hex } from "./canonical";
 import { errorCause } from "./errorCatalogue";
@@ -25,9 +25,9 @@ import {
 } from "./errors";
 import { NonCanonicalNumber, parseJson } from "./json";
 import { pyTruthy } from "./readiness";
-import { coveredFiles, digestFiles } from "./report";
+import { coveredFiles, digestFiles, skippedPart } from "./report";
 import { dssePae, keyidFor } from "./sign";
-import { b64dStrict, decodeUtf8Strict, formatTemplate, pyRepr } from "./util";
+import { b64dStrict, byteCompare, decodeUtf8Strict, formatTemplate, pyRepr } from "./util";
 
 /** The detached signature a signed catalog (or corpus) directory carries (SPEC §8.7). */
 export const CATALOG_SIGNATURE_NAME = "catalog.sig.json";
@@ -38,19 +38,61 @@ export const CATALOG_SIGNATURE_NAME = "catalog.sig.json";
 export interface CatalogFiles {
   root: string;
   files: ReadonlyMap<string, Buffer>;
+  /** The covered files that are links to a file outside the catalog folder (18.181): a signed load,
+   * `catalog sign` and `catalog lint --require-provenance` refuse them; other reads follow them. */
+  linksOut: ReadonlySet<string>;
+}
+
+/** A folder named like a control file (`controls/<name>.yaml`) is where the loader reads a control:
+ * the walk would enter it and the control would vanish, so it throws naming it (18.181). */
+function refuseFolderControls(root: string): void {
+  const controls = join(root, "controls");
+  if (!isDirectory(controls)) {
+    return;
+  }
+  for (const name of readdirSync(controls).sort(byteCompare)) {
+    if (name.endsWith(".yaml") && !skippedPart(name) && isDirectory(join(controls, name))) {
+      throw Object.assign(new Error(`a folder, not a file: ${name}`), {
+        code: "EISDIR",
+        path: join(controls, name),
+      });
+    }
+  }
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/** Whether `rel` is itself a link whose target resolves outside `realRoot`. */
+function linksOutside(root: string, realRoot: string, rel: string): boolean {
+  const path = join(root, rel);
+  if (!lstatSync(path).isSymbolicLink()) {
+    return false;
+  }
+  const inside = relative(realRoot, realpathSync(path));
+  return inside === "" || inside.startsWith("..") || isAbsolute(inside);
 }
 
 /** Read every file the catalog digest covers under `root` (`coveredFiles`, less the signature) once.
  * `first` holds files the caller has already read (the loader reads `catalog.yaml` first, so a missing
- * one is refused as before); those bytes are kept, never read a second time. */
+ * one is refused as before); those bytes are kept, never read a second time. Each file that is itself a
+ * link resolving outside `root` is listed in `linksOut` (18.181). */
 export function readCatalogFiles(
   root: string,
   first: ReadonlyMap<string, Buffer> = new Map(),
 ): CatalogFiles {
   const rels = coveredFiles(root, new Set([CATALOG_SIGNATURE_NAME]));
+  refuseFolderControls(root);
+  const realRoot = realpathSync(root);
   return {
     root,
     files: new Map(rels.map((rel) => [rel, first.get(rel) ?? readFileSync(join(root, rel))])),
+    linksOut: new Set(rels.filter((rel) => linksOutside(root, realRoot, rel))),
   };
 }
 
@@ -572,10 +614,12 @@ export function verifyCatalog(
 ): CatalogVerifyResult {
   const given = typeof source === "string" ? null : source;
   const dir = given?.root ?? (source as string);
+  let files: CatalogFiles;
   let digest: string;
   try {
     // One read (18.171): the digest checked is the digest of the bytes given, or of one read of `dir`.
-    digest = digestFiles((given ?? readCatalogFiles(dir)).files);
+    files = given ?? readCatalogFiles(dir);
+    digest = digestFiles(files.files);
   } catch (err) {
     throw catalogUnreadable(dir, err);
   }
@@ -593,6 +637,12 @@ export function verifyCatalog(
   }
   if (!sigIsFile) {
     return fail(refusal("verify.catalog_unsigned"));
+  }
+  if (files.linksOut.size > 0) {
+    // A signed catalog is one folder of files (18.181): bytes behind a link do not travel with it.
+    return fail(
+      refusal("catalog.link_outside", { path: [...files.linksOut].sort(byteCompare)[0] }),
+    );
   }
   const sigDenied = readPermissionError(sigPath);
   if (sigDenied) {

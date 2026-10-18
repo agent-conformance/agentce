@@ -73,10 +73,12 @@ function isDirFollowingLinks(path: string): boolean {
 }
 
 /** Every file's POSIX relpath under `dir`, unsorted. As Python's `signing._walk_files`: a symlinked
- * folder is descended like a real one and a symlinked file is followed (18.164), a broken link is
- * skipped, and a folder entered a second time (a cycle, or two names for one folder) throws ELOOP
- * naming the second name, so each folder is entered once. */
-function walkFiles(dir: string, base: string, entered: Set<string>): string[] {
+ * folder is descended like a real one and a symlinked file is followed (18.164), and a folder entered
+ * a second time (a cycle, or two names for one folder) throws ELOOP naming the second name, so each
+ * folder is entered once. Every entry that is neither a folder nor a regular file after following
+ * links (a FIFO, a socket, a dangling link, a link loop) goes into `odd`, which `coveredFiles`
+ * refuses (18.181). */
+function walkFiles(dir: string, base: string, entered: Set<string>, odd: string[]): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir).sort(byteCompare)) {
     const full = join(dir, name);
@@ -90,9 +92,11 @@ function walkFiles(dir: string, base: string, entered: Set<string>): string[] {
         });
       }
       entered.add(identity);
-      out.push(...walkFiles(full, rel, entered));
+      out.push(...walkFiles(full, rel, entered, odd));
     } else if (isFileFollowingLinks(full)) {
       out.push(rel);
+    } else {
+      odd.push(rel);
     }
   }
   return out;
@@ -106,11 +110,21 @@ export function skippedPart(part: string): boolean {
 /** The POSIX relpaths `digestTree` hashes, sorted (code-point/byte order): every file `walkFiles`
  * reaches, less any path with a `skippedPart` and any name in `exclude`. As Python's
  * `signing.covered_files`: the catalog loaders read only these, by exact name (18.168), so nothing a
- * loader reads can change without changing the digest. */
+ * loader reads can change without changing the digest. An entry that would be covered but is not a
+ * regular file (a FIFO, a dangling link, a link loop) throws naming it, so it is refused as
+ * unreadable, never dropped from the digest or opened (18.181). */
 export function coveredFiles(dir: string, exclude: ReadonlySet<string> = new Set()): string[] {
-  return walkFiles(dir, "", new Set([folderIdentity(dir)]))
-    .sort(byteCompare)
-    .filter((rel) => !exclude.has(rel) && !rel.split("/").some(skippedPart));
+  const covered = (rel: string): boolean => !exclude.has(rel) && !rel.split("/").some(skippedPart);
+  const odd: string[] = [];
+  const found = walkFiles(dir, "", new Set([folderIdentity(dir)]), odd);
+  const refused = odd.sort(byteCompare).find(covered);
+  if (refused !== undefined) {
+    throw Object.assign(new Error(`not a regular file or folder: ${refused}`), {
+      code: "EINVAL",
+      path: join(dir, refused),
+    });
+  }
+  return found.sort(byteCompare).filter(covered);
 }
 
 /** Content-address a directory: `sha256:` over the sorted `<relpath>\0<filehash>` lines. Ports

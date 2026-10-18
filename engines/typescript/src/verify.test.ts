@@ -1191,3 +1191,20 @@ test("read once: verifyCatalog over given files decides on those bytes, whatever
   writeFileSync(file, signed);
   assert.equal(verifyCatalog(edited, vendoredTrust()).verified, false);
 });
+
+test("18.181: verifyCatalog refuses a signed catalog whose file links outside it", () => {
+  const fixture = kmsFixture();
+  const outside = mkdtempSync(join(tmpdir(), "agentce-outside-"));
+  writeFileSync(join(outside, "rule.yaml"), "x: 1\n");
+  const dir = catalogDirWith({ "catalog.sig.json": "{}" });
+  symlinkSync(join(outside, "rule.yaml"), join(dir, "rule.yaml"));
+  try {
+    const result = verifyCatalog(dir, fixture.trust);
+    assert.equal(result.verified, false);
+    assert.deepEqual(result.reason_keys, ["catalog.link_outside"]);
+    assert.ok(result.reason?.startsWith("the catalog file rule.yaml is a link to a file outside"));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});

@@ -646,11 +646,14 @@ test("digestTree covers a symlinked folder as the loader reads it (18.164)", () 
     assert.equal(before, digestTree(join(tmp, "real")));
     writeFileSync(join(tmp, "target", "DOC-01.yaml"), "id: EDITED\n");
     assert.notEqual(digestTree(join(tmp, "linked")), before);
-    // A dangling folder link and a link to itself are skipped, as at base.
-    const unlinked = digestTree(join(tmp, "real"));
+    // A dangling folder link and a link to itself are refused naming the first, never skipped (18.181).
     symlinkSync(join(tmp, "nowhere"), join(tmp, "real", "gone"), "dir");
     symlinkSync("self", join(tmp, "real", "self"));
-    assert.equal(digestTree(join(tmp, "real")), unlinked);
+    assert.throws(
+      () => digestTree(join(tmp, "real")),
+      (err: NodeJS.ErrnoException) =>
+        err.code === "EINVAL" && err.path === join(tmp, "real", "gone"),
+    );
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
