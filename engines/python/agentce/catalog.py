@@ -12,7 +12,9 @@ cites fewer than N distinct standards.
 
 from __future__ import annotations
 
+import errno
 import json
+import os
 from dataclasses import dataclass, field
 from fractions import Fraction
 from importlib import resources
@@ -214,6 +216,14 @@ def _refuse_uncovered(key: str, control_id: str, path: str) -> InputError:
     )
 
 
+def link_outside(files: signing.CatalogFiles, rel: str) -> InputError:
+    """catalog.link_outside for ``rel``, a covered file that links outside the catalog folder (18.181)."""
+    entry = MESSAGE_KEYS["catalog.link_outside"]
+    return InputError(
+        "catalog.link_outside", format_message(entry.cause, path=rel), entry.fix
+    )
+
+
 def _load_evidence_shape(
     files: signing.CatalogFiles, control_id: str, path: str
 ) -> tuple[str, dict[str, Shape]]:
@@ -256,8 +266,12 @@ def load_catalog(directory: Path) -> Catalog:
 
 
 def _load_catalog(directory: Path) -> Catalog:
-    # catalog.yaml first, as before: a folder without one is refused naming it.
-    meta_bytes = (directory / "catalog.yaml").read_bytes()
+    # catalog.yaml first, as before: a folder without one is refused naming it, and one that is there
+    # but is not a regular file (a FIFO would block the read) is refused unopened (18.181).
+    meta_path = directory / "catalog.yaml"
+    if not signing.is_regular_file(meta_path) and os.path.lexists(meta_path):
+        raise OSError(errno.EINVAL, "not a regular file", str(meta_path))
+    meta_bytes = meta_path.read_bytes()
     meta = yaml.safe_load(meta_bytes.decode("utf-8")) or {}
     files = signing.read_catalog_files(directory, first={"catalog.yaml": meta_bytes})
     controls: list[ControlSpec] = []
@@ -534,7 +548,8 @@ def load_and_lint(
 ) -> tuple[Catalog | None, list[str]]:
     """`lint_catalog`, also returning the catalog it loaded (None when it could not load one), so a
     caller that acts on a clean lint (``catalog sign``) uses the bytes that were linted (18.171)."""
-    if not signing.is_regular_file(directory / "catalog.yaml"):
+    if not os.path.lexists(directory / "catalog.yaml"):
+        # One that is there but is not a file is refused by the load as unreadable, never read as absent.
         return None, [f"{directory}: no catalog.yaml"]
     try:
         catalog = load_catalog(directory)
@@ -561,6 +576,12 @@ def _lint_loaded(
     assert files is not None
     meta = yaml.safe_load(files.text("catalog.yaml")) or {}
     if require_provenance:
+        # A catalog published with provenance is the folder handed over: a file linked from outside
+        # it would not travel with it (18.181).
+        problems.extend(
+            f"{exc.key}: {exc.cause}"
+            for exc in (link_outside(files, rel) for rel in sorted(files.links_out))
+        )
         problems.extend(_provenance_problems(files, meta))
     floor = meta.get("min_crosswalk_frameworks", 0)
     if not isinstance(floor, int) or isinstance(floor, bool) or floor < 0:

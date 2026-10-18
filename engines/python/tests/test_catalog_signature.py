@@ -15,6 +15,7 @@ order the tests run in, on the clock, or on a network.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 from pathlib import Path
@@ -24,12 +25,14 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from agentce import cli, signing
-from agentce.catalog import catalog_provenance_digest
+from agentce.catalog import catalog_provenance_digest, load_catalog
+from agentce.errors import InputError
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _QUICKSTART = _REPO_ROOT / "corpus" / "quickstart"
 _EU_DIR = _REPO_ROOT / "spec" / "catalogs" / "base" / "eu-ai-act"
 _EU_LABEL = "eu-ai-act@2026.09"
+_CONDUCT_DIR = _REPO_ROOT / "spec" / "catalogs" / "overlays" / "conduct"
 
 
 def _copy_catalog(dest: Path) -> Path:
@@ -642,3 +645,227 @@ def test_a_guided_catalog_without_a_trust_root_is_refused(
     assert code == 3
     assert envelope["error"]["key"] == "input.catalog_unverified"
     assert not out.exists()
+
+
+def _link_out(catalog: Path, rel: str, outside: Path) -> None:
+    """Move ``rel`` out of ``catalog`` and link it back: the same bytes, now kept elsewhere."""
+    (catalog / rel).rename(outside)
+    (catalog / rel).symlink_to(outside)
+
+
+@pytest.mark.parametrize("rel", ["controls/DOC-01.yaml", "shapes/DOC-01.ttl"])
+def test_a_signed_catalog_file_linked_outside_is_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], rel: str
+) -> None:
+    """18.181 (R4, R5): a signed catalog is one folder of files. A covered control or shape moved out
+    and linked back after signing has the same digest, and is still refused; the override assesses it
+    and records why, as for any catalog that does not verify."""
+    key = Ed25519PrivateKey.generate()
+    catalog = _copy_catalog(tmp_path / "testcat")
+    _sign_catalog(catalog, key)
+    _link_out(catalog, rel, tmp_path / "moved")
+    trust = _trust_root_file(tmp_path / "tr.json", key)
+    with pytest.raises(signing.VerificationError) as raised:
+        signing.verify_catalog_directory(catalog, signing.load_trust_root(trust))
+    assert raised.value.keys == ("catalog.link_outside",)
+    code, envelope = _assess(
+        capsys,
+        tmp_path / "out",
+        "--catalog-dir",
+        str(catalog),
+        "--trust-root",
+        str(trust),
+    )
+    assert code == 3
+    assert envelope["error"]["key"] == "input.catalog_unverified"
+    assert (
+        f"the catalog file {rel} is a link to a file outside"
+        in envelope["error"]["cause"]
+    )
+    code, envelope = _assess(
+        capsys,
+        tmp_path / "out2",
+        "--catalog-dir",
+        str(catalog),
+        "--trust-root",
+        str(trust),
+        "--allow-unverified-catalog",
+    )
+    assert code == 0
+    assert any("link to a file outside" in item for item in envelope["limitations"])
+
+
+def test_a_signed_catalog_file_linked_inside_is_followed(tmp_path: Path) -> None:
+    """18.181: a link to another file in the same catalog leaves nothing outside it, so it verifies."""
+    key = Ed25519PrivateKey.generate()
+    catalog = _copy_catalog(tmp_path / "testcat")
+    (catalog / "controls" / "DOC-01.yaml").rename(catalog / "test" / "DOC-01.yaml.txt")
+    (catalog / "controls" / "DOC-01.yaml").symlink_to("../test/DOC-01.yaml.txt")
+    _sign_catalog(catalog, key)
+    trust = signing.load_trust_root(_trust_root_file(tmp_path / "tr.json", key))
+    signing.verify_catalog_directory(catalog, trust)
+
+
+def test_catalog_sign_and_provenance_lint_refuse_a_control_linked_outside(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """18.181 (R6): `catalog sign` and `catalog lint --require-provenance` refuse a control that
+    links outside the catalog; plain lint and an unsigned assess follow the link, as before."""
+    catalog = _copy_catalog(tmp_path / "testcat")
+    _link_out(catalog, "controls/DOC-01.yaml", tmp_path / "moved.yaml")
+    code = cli.main(
+        [
+            "catalog",
+            "sign",
+            str(catalog),
+            "--new-key",
+            str(tmp_path / "k.pem"),
+            "--json",
+        ]
+    )
+    envelope = json.loads(capsys.readouterr().out)
+    assert (code, envelope["error"]["key"]) == (3, "catalog.link_outside")
+    assert not (catalog / signing.CATALOG_SIGNATURE_NAME).exists()
+    assert not (tmp_path / "k.pem").exists()
+    code = cli.main(["catalog", "lint", str(catalog), "--require-provenance", "--json"])
+    envelope = json.loads(capsys.readouterr().out)
+    assert code == 1
+    assert envelope["problems"] == [
+        "catalog.link_outside: the catalog file controls/DOC-01.yaml is a link to a file outside"
+        " the catalog folder. A signed catalog must hold its own files, because a file kept"
+        " elsewhere is not handed over with the catalog."
+    ]
+    assert cli.main(["catalog", "lint", str(catalog), "--json"]) == 0
+    capsys.readouterr()
+    code, _ = _assess(
+        capsys,
+        tmp_path / "out",
+        "--catalog-dir",
+        str(catalog),
+        "--allow-unverified-catalog",
+    )
+    assert code == 0
+
+
+@pytest.mark.parametrize("command", ["assess", "lint", "sign"])
+def test_a_catalog_whose_control_is_a_fifo_is_refused_unopened(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], command: str
+) -> None:
+    """18.181: a control file that is a FIFO is refused naming it, never dropped (the run would
+    assess, lint pass and sign sign the catalog without that control) and never opened."""
+    catalog = _copy_catalog(tmp_path / "testcat")
+    (catalog / "controls" / "DOC-01.yaml").unlink()
+    os.mkfifo(catalog / "controls" / "DOC-01.yaml")
+    if command == "assess":
+        code, envelope = _assess(
+            capsys,
+            tmp_path / "out",
+            "--catalog-dir",
+            str(catalog),
+            "--allow-unverified-catalog",
+        )
+        assert (code, envelope["error"]["key"]) == (3, "input.catalog_unreadable")
+        assert envelope["error"]["cause"].endswith(
+            "cannot be read: controls/DOC-01.yaml."
+        )
+    elif command == "lint":
+        assert cli.main(["catalog", "lint", str(catalog), "--json"]) == 1
+        problems = json.loads(capsys.readouterr().out)["problems"]
+        assert problems[0].startswith("input.catalog_unreadable: ")
+    else:
+        code = cli.main(
+            [
+                "catalog",
+                "sign",
+                str(catalog),
+                "--new-key",
+                str(tmp_path / "k.pem"),
+                "--json",
+            ]
+        )
+        envelope = json.loads(capsys.readouterr().out)
+        assert (code, envelope["error"]["key"]) == (3, "catalog.sign_lint_failed")
+        assert not (catalog / signing.CATALOG_SIGNATURE_NAME).exists()
+
+
+def test_a_catalog_yaml_that_is_a_fifo_is_refused_unopened(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """18.181: a FIFO named catalog.yaml is refused as unreadable instead of blocking the read."""
+    catalog = _copy_catalog(tmp_path / "testcat")
+    (catalog / "catalog.yaml").unlink()
+    os.mkfifo(catalog / "catalog.yaml")
+    code, envelope = _assess(capsys, tmp_path / "out", "--catalog-dir", str(catalog))
+    assert (code, envelope["error"]["key"]) == (3, "input.catalog_unreadable")
+    assert envelope["error"]["cause"].endswith("cannot be read: catalog.yaml.")
+
+
+def test_a_signed_evidence_shape_linked_outside_is_refused(tmp_path: Path) -> None:
+    """18.181 (R5): a control's evaluation.evidence_shape file, moved out of a signed catalog and
+    linked back, is refused: the load by its own containment check (as at base), and the catalog
+    verification with catalog.link_outside, as for control and shape files."""
+    key = Ed25519PrivateKey.generate()
+    catalog = tmp_path / "conduct"
+    shutil.copytree(_CONDUCT_DIR, catalog)
+    _sign_catalog(catalog, key)
+    _link_out(catalog, "shapes/CND-02-evidence.ttl", tmp_path / "moved.ttl")
+    trust = signing.load_trust_root(_trust_root_file(tmp_path / "tr.json", key))
+    with pytest.raises(InputError) as refused:
+        load_catalog(catalog)
+    assert refused.value.key == "catalog.evidence_shape.unresolved"
+    with pytest.raises(signing.VerificationError) as raised:
+        signing.verify_catalog_directory(catalog, trust)
+    assert raised.value.keys == ("catalog.link_outside",)
+
+
+@pytest.mark.parametrize("command", ["assess", "lint", "sign"])
+def test_a_folder_named_like_a_control_file_is_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], command: str
+) -> None:
+    """18.181 (critic r1 B1): a folder where the loader reads a control (controls/<name>.yaml) is
+    refused naming it; the walk would enter it and the control would vanish."""
+    catalog = _copy_catalog(tmp_path / "testcat")
+    (catalog / "controls" / "DOC-01.yaml").unlink()
+    (catalog / "controls" / "DOC-01.yaml").mkdir()
+    if command == "assess":
+        code, envelope = _assess(
+            capsys,
+            tmp_path / "out",
+            "--catalog-dir",
+            str(catalog),
+            "--allow-unverified-catalog",
+        )
+        assert (code, envelope["error"]["key"]) == (3, "input.catalog_unreadable")
+        assert envelope["error"]["cause"].endswith(
+            "cannot be read: controls/DOC-01.yaml."
+        )
+    elif command == "lint":
+        assert cli.main(["catalog", "lint", str(catalog), "--json"]) == 1
+        problems = json.loads(capsys.readouterr().out)["problems"]
+        assert problems[0].startswith("input.catalog_unreadable: ")
+    else:
+        argv = ["catalog", "sign", str(catalog), "--new-key", str(tmp_path / "k.pem")]
+        assert cli.main([*argv, "--json"]) == 3
+        envelope = json.loads(capsys.readouterr().out)
+        assert envelope["error"]["key"] == "catalog.sign_lint_failed"
+        assert not (catalog / signing.CATALOG_SIGNATURE_NAME).exists()
+
+
+@pytest.mark.parametrize("kind", ["fifo", "folder"])
+def test_catalog_lint_reads_a_non_file_catalog_yaml_as_unreadable(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], kind: str
+) -> None:
+    """18.181 (critic r1 D4): a catalog.yaml that is there but is not a file is unreadable, never
+    reported as absent."""
+    catalog = _copy_catalog(tmp_path / "testcat")
+    (catalog / "catalog.yaml").unlink()
+    if kind == "fifo":
+        os.mkfifo(catalog / "catalog.yaml")
+    else:
+        (catalog / "catalog.yaml").mkdir()
+    assert cli.main(["catalog", "lint", str(catalog), "--json"]) == 1
+    problems = json.loads(capsys.readouterr().out)["problems"]
+    assert problems == [
+        f"input.catalog_unreadable: the catalog directory {catalog} holds a file or folder"
+        " that cannot be read: catalog.yaml."
+    ]

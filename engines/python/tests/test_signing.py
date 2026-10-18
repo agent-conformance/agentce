@@ -235,11 +235,36 @@ def test_digest_tree_covers_a_symlinked_folder_as_the_loader_reads_it(
         tmp_path / "more", target_is_directory=True
     )
     assert signing.digest_tree(linked) != signing.digest_tree(real)
-    # A dangling folder link and a link to itself are skipped, as at base.
-    unlinked = signing.digest_tree(real)
-    (real / "gone").symlink_to(tmp_path / "nowhere", target_is_directory=True)
-    (real / "self").symlink_to("self")
-    assert signing.digest_tree(real) == unlinked
+
+
+@pytest.mark.parametrize("kind", ["dangling", "loop", "fifo"])
+def test_covered_files_refuses_an_entry_that_is_not_a_file_or_folder(
+    tmp_path: Path, kind: str
+) -> None:
+    # 18.181: a dangling link, a link loop or a FIFO is refused naming it, never dropped from the
+    # digest; the same entry under a dot-named folder or as an excluded name is never covered.
+    root = tmp_path / "c"
+    (root / "controls").mkdir(parents=True)
+    (root / "controls" / "A.yaml").write_text("id: A\n", encoding="utf-8")
+    for odd in (
+        root / ".git" / "x",
+        root / "catalog.sig.json",
+        root / "controls" / "B.yaml",
+    ):
+        odd.parent.mkdir(exist_ok=True)
+        if kind == "dangling":
+            odd.symlink_to(tmp_path / "nowhere")
+        elif kind == "loop":
+            odd.symlink_to(odd.name)
+        else:
+            os.mkfifo(odd)
+    with pytest.raises(OSError) as raised:
+        signing.covered_files(root, exclude=frozenset({"catalog.sig.json"}))
+    assert raised.value.filename == str(root / "controls" / "B.yaml")
+    (root / "controls" / "B.yaml").unlink()
+    assert signing.covered_files(root, exclude=frozenset({"catalog.sig.json"})) == [
+        "controls/A.yaml"
+    ]
 
 
 @pytest.mark.parametrize("shape", ["ancestor", "diamond", "fan-out", "case-variant"])

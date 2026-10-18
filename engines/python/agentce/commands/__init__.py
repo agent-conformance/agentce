@@ -57,7 +57,13 @@ from ..assess import (
 from ..blind_spots import catalog_support_view, compute_blind_spots
 from ..bundle import confine_to_root, copy_bundle, load_bundle
 from ..canonical import CanonicalizationError, canonical_string, canonicalize
-from ..catalog import Catalog, lint_catalog, load_and_lint, load_catalog
+from ..catalog import (
+    Catalog,
+    link_outside,
+    lint_catalog,
+    load_and_lint,
+    load_catalog,
+)
 from ..collect import EnvSecretManager, SourceSpec, load_config, run_collect
 from ..config import resolve as resolve_config
 from ..conformance import run_ecs
@@ -2633,7 +2639,7 @@ def cmd_catalog(ns: argparse.Namespace) -> CommandResult:
     )
     # Lint the catalog at `directory`, or every catalog beneath it (so `catalog lint spec/catalogs`
     # lints the whole tree, not just a directory that itself holds a catalog.yaml).
-    if (directory / "catalog.yaml").is_file():
+    if os.path.lexists(directory / "catalog.yaml"):
         catalog_dirs = [directory]
     else:
         catalog_dirs = sorted({p.parent for p in directory.rglob("catalog.yaml")})
@@ -3451,7 +3457,7 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
         fix="pass the catalog directory: `agentce catalog sign <dir>`.",
     )
     catalog_dir = directory.resolve()
-    if not (directory / "catalog.yaml").is_file():
+    if not os.path.lexists(directory / "catalog.yaml"):
         raise InputError(
             "catalog.sign_not_a_catalog",
             f"{directory} has no catalog.yaml.",
@@ -3465,6 +3471,10 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
             f"{directory} fails `catalog lint`: {'; '.join(lint_problems)}.",
             "fix the lint problems (`agentce catalog lint <dir>`) before signing.",
         )
+    assert linted.files is not None
+    if linted.files.links_out:
+        # The catalog signed is the folder handed over (18.181): never sign bytes kept elsewhere.
+        raise link_outside(linted.files, min(linted.files.links_out))
     sig_path = directory / signing.CATALOG_SIGNATURE_NAME
     if sig_path.exists() and not _flag(ns, "force"):
         raise InputError(

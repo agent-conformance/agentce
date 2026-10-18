@@ -319,16 +319,19 @@ def _mode_matches(
 # --- Statements and certificates. ---
 
 
-def _walk_files(root: Path) -> list[Path]:
+def _walk_files(root: Path) -> tuple[list[Path], list[Path]]:
     """Every regular file under ``root``, reached the way a loader opening paths by name reaches it:
     a symlinked folder is descended like a real one (18.164), so a signature covers the files behind
     it. Each folder is listed with ``os.listdir``, so one that cannot be listed raises the OSError
     naming it (18.68). A folder entered a second time (a cycle, or two names for one folder) raises
     ELOOP naming the second name, so the walk enters each folder once; identity is device and inode,
-    never a path string, which case-insensitive filesystems spell many ways."""
+    never a path string, which case-insensitive filesystems spell many ways. Also returns every entry
+    that is neither a folder nor a regular file after following links (a FIFO, a socket, a dangling
+    link, a link loop), which `covered_files` refuses (18.181)."""
     files: list[Path] = []
+    odd: list[Path] = []
     if not is_directory(root):
-        return files
+        return files, odd
     entered = {_identity(root)}
 
     def walk(folder: Path) -> None:
@@ -342,9 +345,11 @@ def _walk_files(root: Path) -> list[Path]:
                 walk(path)
             elif is_regular_file(path):
                 files.append(path)
+            else:
+                odd.append(path)
 
     walk(root)
-    return files
+    return files, odd
 
 
 def _identity(folder: Path) -> tuple[int, int]:
@@ -360,13 +365,21 @@ def skipped_part(part: str) -> bool:
 def covered_files(root: Path, *, exclude: frozenset[str] = frozenset()) -> list[str]:
     """The POSIX relative paths ``digest_tree`` hashes, sorted: every file `_walk_files` reaches, less any
     path with a `skipped_part` and any name in ``exclude``. The catalog loaders read only these, by exact
-    name (18.168), so nothing a loader reads can change without changing the digest."""
-    rels = sorted(path.relative_to(root).as_posix() for path in _walk_files(root))
-    return [
-        rel
-        for rel in rels
-        if rel not in exclude and not any(skipped_part(part) for part in rel.split("/"))
-    ]
+    name (18.168), so nothing a loader reads can change without changing the digest. An entry that would
+    be covered but is not a regular file (a FIFO, a dangling link, a link loop) raises the OSError naming
+    it, so it is refused as unreadable, never dropped from the digest or opened (18.181)."""
+    found, odd = _walk_files(root)
+
+    def covered(path: Path) -> str | None:
+        rel = path.relative_to(root).as_posix()
+        if rel in exclude or any(skipped_part(part) for part in rel.split("/")):
+            return None
+        return rel
+
+    for path in sorted(odd, key=lambda p: p.relative_to(root).as_posix()):
+        if covered(path) is not None:
+            raise OSError(errno.EINVAL, "not a regular file or folder", str(path))
+    return sorted(rel for path in found if (rel := covered(path)) is not None)
 
 
 def digest_tree(root: Path, *, exclude: frozenset[str] = frozenset()) -> str:
@@ -403,6 +416,9 @@ class CatalogFiles:
 
     root: Path
     files: Mapping[str, bytes]
+    #: The covered files that are links to a file outside the catalog folder (18.181): a signed load,
+    #: ``catalog sign`` and ``catalog lint --require-provenance`` refuse them; other reads follow them.
+    links_out: frozenset[str] = frozenset()
 
     def digest(self, *, exclude: frozenset[str] = frozenset()) -> str:
         return digest_files(self.files, exclude=exclude)
@@ -411,20 +427,44 @@ class CatalogFiles:
         return self.files[rel].decode("utf-8")
 
 
+def _refuse_folder_controls(root: Path) -> None:
+    """A folder named like a control file (``controls/<name>.yaml``) is where the loader reads a control:
+    the walk would enter it and the control would vanish, so it raises the OSError naming it (18.181)."""
+    controls = root / "controls"
+    if not is_directory(controls):
+        return
+    for name in sorted(os.listdir(controls)):
+        if (
+            name.endswith(".yaml")
+            and not skipped_part(name)
+            and is_directory(controls / name)
+        ):
+            raise OSError(errno.EISDIR, "a folder, not a file", str(controls / name))
+
+
 def read_catalog_files(
     root: Path, *, first: Mapping[str, bytes] | None = None
 ) -> CatalogFiles:
     """Read every file the catalog digest covers under ``root`` (`covered_files`, less the signature)
     once. ``first`` holds files the caller has already read (the loader reads ``catalog.yaml`` first,
-    so a missing one is refused as before); those bytes are kept, never read a second time."""
+    so a missing one is refused as before); those bytes are kept, never read a second time. Each file
+    that is itself a link resolving outside ``root`` is listed in ``links_out`` (18.181)."""
     given = first or {}
     rels = covered_files(root, exclude=frozenset({CATALOG_SIGNATURE_NAME}))
+    _refuse_folder_controls(root)
+    real_root = root.resolve()
     return CatalogFiles(
         root,
         {
             rel: given[rel] if rel in given else (root / rel).read_bytes()
             for rel in rels
         },
+        frozenset(
+            rel
+            for rel in rels
+            if (root / rel).is_symlink()
+            and not (root / rel).resolve().is_relative_to(real_root)
+        ),
     )
 
 
@@ -827,6 +867,11 @@ def verify_catalog_directory(source: Path | CatalogFiles, trust: TrustRoot) -> V
     sig_path = directory / CATALOG_SIGNATURE_NAME
     if not sig_path.is_file():
         raise UnsignedError.refusal("verify.catalog_unsigned")
+    if files.links_out:
+        # A signed catalog is one folder of files (18.181): bytes behind a link do not travel with it.
+        raise VerificationError.refusal(
+            "catalog.link_outside", path=min(files.links_out)
+        )
     # A PermissionError is the caller's input.catalog_unreadable, not a bad signature.
     envelope = read_verify_input(
         sig_path, "verify.catalog_signature_unreadable", CATALOG_SIGNATURE_NAME
