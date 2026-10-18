@@ -12,8 +12,11 @@ fails if a gate in `gates.json` is not named in this file.
   refuse a signed catalog holding a file linked outside it as `catalog.link_outside`. The gate adds eight scenarios
   (19 to 26) and three seeded faults per engine: the walk keeps a non-file entry, a folder named like a control is
   entered, and catalog verification accepts a file linked outside. The Java symlinked-folder fault's search text
-  follows the walk's new `else if`; the fault is unchanged. The gate's demo estimate rises to 1360 seconds and the
+  follows the walk's new `else if`; the fault is unchanged. The Java unenterable-folder fault now skips the entries of a
+  folder Java cannot enter, as the Python one does, because an entry Java cannot stat is now refused on its own. The gate's demo estimate rises to 1360 seconds and the
   `demo-fault` job gains two lanes (38) so every shard stays under its bound.
+- `VG-PATHLIB-PREDICATES` (18.181, changed). Its baseline drops the two `catalog.yaml` `is_file` calls that `catalog lint`
+  and `catalog sign` no longer make.
 
 ## 0.113.0
 

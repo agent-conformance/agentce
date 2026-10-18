@@ -2224,10 +2224,10 @@
           "replace": "    const rel = base === \"\" ? name : `${base}/${name}`;\n    try {\n      statSync(full);\n    } catch {\n      continue;\n    }\n    if (isDirFollowingLinks(full)) {"
         },
         {
-          "description": "Java's catalog walk reads an entry it is denied as absent, so a signed catalog that gains a folder it cannot enter is assessed",
+          "description": "Java's catalog walk skips the entries of a folder it cannot enter, so a signed catalog that gains such a folder is assessed",
           "file": "engines/java/src/main/java/org/agentce/Catalog.java",
-          "search": "        } catch (AccessDeniedException e) {\n            throw new IllegalStateException(",
-          "replace": "        } catch (AccessDeniedException e) {\n            if (path != null) {\n                return null;\n            }\n            throw new IllegalStateException("
+          "search": "            BasicFileAttributes attrs = statFollowing(full);\n            if (attrs == null) {",
+          "replace": "            if (!Files.isExecutable(dir)) {\n                continue;\n            }\n            BasicFileAttributes attrs = statFollowing(full);\n            if (attrs == null) {"
         },
         {
           "description": "Python's catalog walk no longer refuses an entry that is not a file, so a control that is a FIFO or a dangling link is dropped from the catalog and the run exits 0",
