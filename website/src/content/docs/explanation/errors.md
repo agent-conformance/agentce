@@ -132,6 +132,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.write_trust_root_unwritable` | catalog sign was given an empty --write-trust-root, which names no file. | pass --write-trust-root <file> with a writable path outside the catalog directory. |
 | `internal.unexpected` | an unexpected internal error occurred. | re-run with --debug to see the stack trace, then file an issue for an AgentCE maintainer to investigate. |
 | `report.missing_evidence_pointer` | an assertion reached a conformant, non-conformant, or partial outcome with no evidence pointer. | every conformant, non-conformant, or partial outcome must cite evidence (DC-5). |
+| `report.validation_failed` | a file in the report folder is missing, cannot be read, or does not match its schema. | restore the files each problem names, or produce the report again: `agentce assess … --out <report-dir>`. |
 | `sign.claim_malformed` | claim.json is not a JSON object whose signatures field, if present, is a list. | re-run the `agentce assess` command that wrote this report, then sign the new report. |
 | `sign.claim_outside_report` | claim.json, the signatures folder or trust-root.json links outside the report directory, so signing would write there. | replace the link with the file itself, inside the report directory. |
 | `sign.key_algorithm` | the signing key is not an Ed25519 private key. | supply an Ed25519 key (the algorithm the engine signs with, SPEC §8.7). |
