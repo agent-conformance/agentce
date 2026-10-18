@@ -2,7 +2,7 @@
 # Build gate helper for VG-BYO-CATALOG-PARITY (`trust`) and VG-BYO-CATALOG-WALK (`walk`): `assess
 # --catalog-dir` treats an operator's own catalog as untrusted input in all three engines (SPEC §8.7).
 # `trust` runs the signature, identity and trust-root scenarios (1 to 11); `walk` runs the scenarios on
-# what the catalog walk and the loaders read (12 to 26). They are two gates so that each one's
+# what the catalog walk and the loaders read (12 to 28). They are two gates so that each one's
 # seeded-fault demo fits one CI demo shard (18.71b). Each engine runs the same scenarios as the
 # Python reference capture for item 18.36 -- an untrusted, unsigned, trusted, rebranded catalog and a
 # missing, malformed or non-object trust root, plus quickstart under AGENTCE_TRUST_ROOT -- and must
@@ -128,6 +128,13 @@ cp -R "$work/trusted-cat" "$work/shape-out-cat"
 link_out "$work/shape-out-cat" shapes/DOC-01.ttl
 cp -R "$work/unsigned-cat" "$work/unsigned-out-cat"
 link_out "$work/unsigned-out-cat" controls/DOC-01.yaml
+# A control that is an absolute link to a file inside the catalog: containment is judged by folder
+# identity, so the catalog path spelled in another case (a case-insensitive filesystem) changes nothing.
+cp -R "$work/unsigned-cat" "$work/inside-cat"
+mkdir -p "$work/inside-cat/checklists"
+mv "$work/inside-cat/controls/DOC-01.yaml" "$work/inside-cat/checklists/DOC-01.yaml.real"
+ln -s "$work/inside-cat/checklists/DOC-01.yaml.real" "$work/inside-cat/controls/DOC-01.yaml"
+sign_catalog "$work/inside-cat" inside "$work/inside-trust-root.json"
 fi
 printf '{not json' > "$work/bad-root.json"
 printf '[]' > "$work/array-root.json"
@@ -277,6 +284,15 @@ scenario "25 unsigned catalog whose control links outside it, with the override"
   "${base[@]}" --catalog-dir "$work/unsigned-out-cat" --allow-unverified-catalog
 scenario "26 folder named controls/DOC-01.yaml, with the override" 3 input.catalog_unreadable - -- \
   "${base[@]}" --catalog-dir "$work/folder-control-cat" --allow-unverified-catalog
+scenario "27 signed catalog whose control is an absolute link to a file inside it" 0 - - -- \
+  "${base[@]}" --catalog-dir "$work/inside-cat" --trust-root "$work/inside-trust-root.json"
+folded="$(printf '%s' "$work" | tr '[:lower:]' '[:upper:]')"
+if [ "$folded" != "$work" ] && [ -d "$folded/inside-cat" ]; then
+  scenario "28 the same catalog through its path in another case" 0 - - -- \
+    "${base[@]}" --catalog-dir "$folded/inside-cat" --trust-root "$work/inside-trust-root.json"
+else
+  echo "byo-catalog: scenario 28 skipped: the filesystem is case-sensitive" >&2
+fi
 fi
 
 [ "$status" -eq 0 ] && echo "byo-catalog ($part): all three engines verify --catalog-dir signatures identically across $((n / 3)) scenarios"
