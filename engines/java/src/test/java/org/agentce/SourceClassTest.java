@@ -661,4 +661,44 @@ class SourceClassTest {
         assertEquals("non-conformant", assess(cnd02Events(List.of()), "CND-02").outcome);
         assertEquals("non-conformant", assess(cnd02Events(List.of(IS), EP, "deny"), "CND-02").outcome);
     }
+
+    static Stream<Arguments> malformedRequiresDenominator() {
+        return Stream.of(
+                Arguments.of("not-object", "egress_proxy_log"),
+                Arguments.of("missing-covers", "{kinds: [egress_proxy_log]}"),
+                Arguments.of("extra-key", "{kinds: [egress_proxy_log], covers: ToolCall, extra: 1}"),
+                Arguments.of("empty-kinds", "{kinds: [], covers: ToolCall}"),
+                Arguments.of("unknown-kind", "{kinds: [egress_log], covers: ToolCall}"),
+                Arguments.of("repeated-kind", "{kinds: [egress_proxy_log, egress_proxy_log], covers: ToolCall}"),
+                Arguments.of("empty-covers", "{kinds: [egress_proxy_log], covers: ''}"),
+                Arguments.of("covers-not-string", "{kinds: [egress_proxy_log], covers: 7}"),
+                Arguments.of("kind-not-string", "{kinds: [7], covers: ToolCall}"),
+                Arguments.of("null", "null"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("malformedRequiresDenominator")
+    void aMalformedRequiresDenominatorIsRefusedAtLoad(String name, String value, @TempDir Path tmp)
+            throws IOException {
+        Path catalogDir = tmp.resolve("eu-ai-act");
+        copyTree(CATALOGS.resolve("base/eu-ai-act"), catalogDir);
+        Path control = catalogDir.resolve("controls/DOC-03.yaml");
+        String text = Files.readString(control, StandardCharsets.UTF_8);
+        String line = "  requires_denominator: {kinds: [egress_proxy_log, firewall_log], covers: ToolCall}\n";
+        String changed = text.replace(line, "  requires_denominator: " + value + "\n");
+        assertFalse(changed.equals(text));
+        Files.writeString(control, changed, StandardCharsets.UTF_8);
+        InputError error = assertThrows(InputError.class, () -> Catalog.load(catalogDir));
+        assertEquals("catalog.control.requires_denominator_invalid", error.key);
+        assertEquals(3, error.exitCode);
+        assertTrue(error.reason.startsWith("control DOC-03 declares requires_denominator "), error.reason);
+    }
+
+    @Test
+    void doc03LoadsItsDeclaredDenominator() throws IOException {
+        Catalog.ControlSpec doc03 = Catalog.load(CATALOGS.resolve("base/eu-ai-act")).controls.stream()
+                .filter(c -> "DOC-03".equals(c.id)).findFirst().orElseThrow();
+        assertEquals(new Catalog.RequiredDenominator(java.util.Set.of("egress_proxy_log", "firewall_log"), "ToolCall"),
+                doc03.requiresDenominator);
+    }
 }

@@ -155,8 +155,10 @@ L	agentce:event/tc-1	agentce:componentDeclared	false	xsd:boolean
 L	agentce:event/tc-1	agentce:executesConsequential	true	xsd:boolean
 L	agentce:event/tc-1	agentce:gateJudged	true	xsd:boolean
 L	agentce:event/tc-1	agentce:gateMet	false	xsd:boolean
+L	agentce:event/tc-1	agentce:linkedRecordsResolve	false	xsd:boolean
 L	agentce:event/tc-1	agentce:provenanceJudged	true	xsd:boolean
 L	agentce:event/tc-1	agentce:provenanceMet	false	xsd:boolean
+L	agentce:event/tc-1	agentce:securityRefsResolve	true	xsd:boolean
 L	agentce:event/tc-1	agentce:withinBudget	true	xsd:boolean
 L	agentce:event/tc-1	agentce:withinScope	true	xsd:boolean
 L	agentce:event/tc-1	prov:atTime	2026-06-01T09:05:00.000Z	xsd:dateTime

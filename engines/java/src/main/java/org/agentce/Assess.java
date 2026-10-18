@@ -616,6 +616,9 @@ public final class Assess {
                     if (isUncovered && applies) {
                         assertion = uncovered(assertion);
                     }
+                    if (applies && denominatorUnshown(control, subject, coverage)) {
+                        assertion = uncovered(assertion, true);
+                    }
                     assertions.add(assertion);
                 }
             }
@@ -644,11 +647,49 @@ public final class Assess {
     }
 
     /**
+     * True when {@code control} declares {@code requiresDenominator} and the subject's capture of the type it names
+     * does not match a declared independent denominator of one of its kinds (18.37e, DOC-03): no such denominator,
+     * another denominator holds the count, or the captured count differs from it either way (a declared path that saw
+     * fewer records than were captured does not match them either). Fail closed on anything missing.
+     */
+    static boolean denominatorUnshown(Catalog.ControlSpec control, Profile.Subject subject, JsonNode coverage) {
+        Catalog.RequiredDenominator need = control.requiresDenominator;
+        if (need == null) {
+            return false;
+        }
+        Set<String> sources = new LinkedHashSet<>();
+        for (Profile.CoverageDenominator d : subject.coverageDenominators) {
+            if (need.kinds().contains(d.kind)) {
+                sources.add(d.source);
+            }
+        }
+        JsonNode row = coverage == null ? null : coverage.path("subjects").path(subject.id).path("event_types")
+                .path(need.covers());
+        if (row == null || !row.isObject()
+                || !"covered".equals(row.path("status").textValue())
+                || !row.path("observed").equals(row.path("expected"))
+                || !row.path("observed").isNumber()) {
+            return true;
+        }
+        for (JsonNode source : row.path("denominators")) {
+            if (source.isTextual() && sources.contains(source.textValue())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static Assertions.Assertion uncovered(Assertions.Assertion assertion) {
+        return uncovered(assertion, false);
+    }
+
+    /**
      * An INT or REC outcome that reads better than insufficient_evidence while coverage is unknown reads
      * insufficient_evidence (SPEC §6.5): a call that bypassed capture would not be in the records. A violation stays.
+     * {@code always} lowers a control of any family (a declared {@code requiresDenominator} the records do not show).
      */
-    static Assertions.Assertion uncovered(Assertions.Assertion assertion) {
-        if (!COVERAGE_FAMILIES.contains(assertion.family)
+    static Assertions.Assertion uncovered(Assertions.Assertion assertion, boolean always) {
+        if ((!COVERAGE_FAMILIES.contains(assertion.family) && !always)
                 || !LOWERED_OUTCOMES.contains(assertion.outcome)) {
             return assertion;
         }

@@ -63,6 +63,19 @@ public final class Catalog {
     private static final String SHAPE_UNRESOLVED = "catalog.shape.unresolved";
     private static final String MIN_SOURCE_CLASS_UNKNOWN = "catalog.control.min_source_class_unknown";
     private static final String SOURCE_CLASS_FROM_UNKNOWN = "catalog.control.source_class_from_unknown";
+    private static final String REQUIRES_DENOMINATOR_INVALID = "catalog.control.requires_denominator_invalid";
+
+    /** The coverage-denominator kinds a profile may declare (SPEC §6.5). */
+    static final Set<String> DENOMINATOR_KINDS = Set.of(
+            "provider_usage_export",
+            "egress_proxy_log",
+            "firewall_log",
+            "system_of_record_export",
+            "admission_attestation");
+
+    /** A control that judges only where the subject declares an independent coverage denominator of one of
+     * {@code kinds} whose count of {@code covers} records reconciles with what was captured (SPEC §6.5, §7.3). */
+    public record RequiredDenominator(Set<String> kinds, String covers) {}
 
     private Catalog(
             String id,
@@ -92,6 +105,8 @@ public final class Catalog {
         public String minSourceClass;
         /** {@code evaluation.source_class_from}: the graph links to the records the judged class also rests on. */
         public List<String> sourceClassFrom = new ArrayList<>();
+        /** {@code evaluation.requires_denominator}: the declared denominator a verdict needs (18.37e). */
+        public RequiredDenominator requiresDenominator;
         public List<JsonNode> minimumEvidence = new ArrayList<>();
         public String shapePath;
         public String evidenceShapePath;
@@ -211,6 +226,52 @@ public final class Catalog {
                 ErrorCatalogue.errorFix(SOURCE_CLASS_FROM_UNKNOWN));
     }
 
+    /** The declared {@code requires_denominator}. Anything but a non-empty list of known denominator kinds,
+     * without repeats, and an event type name is refused when the catalog loads, never dropped: a dropped
+     * requirement would judge without it. */
+    private static RequiredDenominator requiresDenominator(String controlId, JsonNode evaluation) {
+        if (!evaluation.has("requires_denominator")) {
+            return null;
+        }
+        JsonNode value = evaluation.get("requires_denominator");
+        if (value.isObject() && value.size() == 2 && value.has("kinds") && value.has("covers")) {
+            JsonNode kinds = value.get("kinds");
+            JsonNode covers = value.get("covers");
+            Set<String> named = new java.util.LinkedHashSet<>();
+            boolean known = kinds.isArray() && !kinds.isEmpty();
+            for (JsonNode kind : kinds.isArray() ? kinds : Json.nodes().arrayNode()) {
+                known &= kind.isTextual() && DENOMINATOR_KINDS.contains(kind.textValue()) && named.add(kind.textValue());
+            }
+            if (known && covers.isTextual() && !covers.textValue().isEmpty()) {
+                return new RequiredDenominator(Set.copyOf(named), covers.textValue());
+            }
+        }
+        throw new InputError(
+                REQUIRES_DENOMINATOR_INVALID,
+                ErrorCatalogue.errorCause(REQUIRES_DENOMINATOR_INVALID)
+                        .replace("{control}", controlId)
+                        .replace("{value}", pyDumps(sortedKeys(value))),
+                ErrorCatalogue.errorFix(REQUIRES_DENOMINATOR_INVALID));
+    }
+
+    /** {@code value} with every object's keys byte-sorted, as Python's {@code json.dumps(sort_keys=True)} writes it. */
+    private static JsonNode sortedKeys(JsonNode value) {
+        if (value.isArray()) {
+            var out = Json.nodes().arrayNode();
+            value.forEach(v -> out.add(sortedKeys(v)));
+            return out;
+        }
+        if (value.isObject()) {
+            var out = Json.nodes().objectNode();
+            List<String> keys = new ArrayList<>();
+            value.fieldNames().forEachRemaining(keys::add);
+            keys.sort(Json::byteCompare);
+            keys.forEach(k -> out.set(k, sortedKeys(value.get(k))));
+            return out;
+        }
+        return value;
+    }
+
     private static ControlSpec controlFromDict(JsonNode data) {
         JsonNode evaluation = data.get("evaluation");
         if (evaluation == null || !evaluation.isObject()) {
@@ -236,6 +297,7 @@ public final class Catalog {
         control.severity = text(data, "severity", "");
         control.minSourceClass = minSourceClass;
         control.sourceClassFrom = sourceClassFrom(text(data, "id", ""), evaluation);
+        control.requiresDenominator = requiresDenominator(text(data, "id", ""), evaluation);
         JsonNode minEvidence = evaluation.get("minimum_evidence");
         if (minEvidence != null && minEvidence.isArray()) {
             minEvidence.forEach(control.minimumEvidence::add);

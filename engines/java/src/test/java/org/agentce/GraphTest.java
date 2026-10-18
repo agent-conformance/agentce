@@ -1728,4 +1728,66 @@ class GraphTest {
             assertEquals(refusal(events, node), refusal(reversed, node), node);
         }
     }
+
+    private static JsonNode refCall(String id, String refs) {
+        return event(id, "ToolCall", "\"refs\": {" + refs + "}");
+    }
+
+    @Test
+    void rob03EachSecurityRefNamesAHeldEventOfItsSpecType() {
+        List<JsonNode> held = List.of(event("p1", "PolicyDecision", "\"decision\": \"allow\""),
+                event("g1", "DelegationIssued", ""), event("i1", "Instruction", ""));
+        java.util.Map<String, String> good = new java.util.LinkedHashMap<>();
+        good.put("authorization", "\"agentce:event/p1\"");
+        good.put("delegation", "\"agentce:event/g1\"");
+        good.put("instruction", "\"agentce:event/i1\"");
+        java.util.function.Function<java.util.Map<String, String>, String> refs = m -> String.join(", ",
+                m.entrySet().stream().map(e -> "\"" + e.getKey() + "\": " + e.getValue()).toList());
+        List<JsonNode> all = new ArrayList<>(held);
+        all.add(refCall("c1", refs.apply(good)));
+        assertEquals(List.of("true"), flag(all, "c1", "securityRefsResolve"));
+        assertEquals(List.of("true"), flag(List.of(refCall("c1", "")), "c1", "securityRefsResolve"));
+        for (String key : good.keySet()) {
+            for (String bad : List.of("\"agentce:event/missing\"", "\"agentce:event/c0\"", "[\"agentce:event/p1\"]")) {
+                java.util.Map<String, String> changed = new java.util.LinkedHashMap<>(good);
+                changed.put(key, bad);
+                List<JsonNode> events = new ArrayList<>(held);
+                events.add(refCall("c0", ""));
+                events.add(refCall("c1", refs.apply(changed)));
+                assertEquals(List.of("false"), flag(events, "c1", "securityRefsResolve"), key + " " + bad);
+            }
+        }
+    }
+
+    @Test
+    void rec06AndInc04ADanglingRefAnywhereInTheClosureLeavesTheEventUnresolved() {
+        List<JsonNode> deep = List.of(refCall("c1", "\"decision\": \"agentce:event/c2\""),
+                refCall("c2", "\"decision\": \"agentce:event/c3\""),
+                refCall("c3", "\"decision\": \"agentce:event/missing\""));
+        List<JsonNode> reversed = new ArrayList<>(deep);
+        java.util.Collections.reverse(reversed);
+        for (List<JsonNode> events : List.of(deep, reversed)) {
+            for (String id : List.of("c1", "c2", "c3")) {
+                assertEquals(List.of("false"), flag(events, id, "linkedRecordsResolve"), id);
+            }
+        }
+        assertEquals(List.of("true"), flag(List.of(refCall("c1", "\"decision\": \"agentce:event/c2\""),
+                refCall("c2", "")), "c1", "linkedRecordsResolve"));
+        JsonNode c1 = refCall("c1", "\"decision\": \"agentce:event/c2\"");
+        assertEquals(List.of("true"), flag(List.of(c1, refCall("c2", "\"decision\": \"agentce:event/c1\"")),
+                "c1", "linkedRecordsResolve"));
+        JsonNode usesBroken = event("c2", "ToolCall",
+                "\"refs\": {\"decision\": \"agentce:event/c1\"}, \"used\": [\"agentce:event/c3\"]");
+        assertEquals(List.of("false"), flag(List.of(c1, usesBroken,
+                refCall("c3", "\"decision\": \"agentce:event/missing\"")), "c1", "linkedRecordsResolve"));
+        JsonNode held = refCall("c1", "");
+        assertEquals(List.of("true"), flag(List.of(held,
+                event("x1", "Incident", "\"related_refs\": [\"agentce:event/c1\"]")), "x1", "linkedRecordsResolve"));
+        for (String related : List.of("[\"agentce:event/missing\"]", "[7]", "\"agentce:event/missing\"")) {
+            assertEquals(List.of("false"), flag(List.of(held,
+                    event("x1", "Incident", "\"related_refs\": " + related)), "x1", "linkedRecordsResolve"), related);
+        }
+        assertEquals(List.of("false"), flag(List.of(refCall("c1", "\"decision\": \"agentce:event/missing\""),
+                event("x1", "Incident", "\"related_refs\": [\"agentce:event/c1\"]")), "x1", "linkedRecordsResolve"));
+    }
 }

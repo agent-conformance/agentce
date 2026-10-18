@@ -1,7 +1,10 @@
 package org.agentce;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -21,7 +24,8 @@ import java.util.stream.Stream;
  * {@code agentce:precededBy}, {@code agentce:componentDeclared}, {@code agentce:declaredComponentsObserved},
  * {@code agentce:triggersIncident}, {@code agentce:oversightCoverageComplete},
  * {@code agentce:interventionEffective}, {@code agentce:interventionByHuman},
- * {@code agentce:incidentResponded} and {@code agentce:riskReviewed}). The {@code rdfs:subClassOf*} closure is materialised so class membership
+ * {@code agentce:incidentResponded}, {@code agentce:riskReviewed}, {@code agentce:securityRefsResolve} and
+ * {@code agentce:linkedRecordsResolve}). The {@code rdfs:subClassOf*} closure is materialised so class membership
  * needs no inference. This is a faithful port of the reference; it must build byte-identical graphs.
  */
 public final class Graph {
@@ -93,6 +97,12 @@ public final class Graph {
     /** The own classes whose record of an instruction's principal is read as recorded (SPEC §6.4 order, at or above
      * enforcement_point); below them a principal's role needs an enforcement-point witness (CND-04). */
     private static final Set<String> AT_OR_ABOVE_EP = Set.of("enforcement_point", "independent_system");
+
+    /** The ToolCall references ROB-03 resolves, each with the event type the SPEC gives its target (§6.2). */
+    private static final List<Map.Entry<String, String>> SECURITY_REFS = List.of(
+            Map.entry("authorization", "PolicyDecision"),
+            Map.entry("delegation", "DelegationIssued"),
+            Map.entry("instruction", "Instruction"));
 
     /** A memory record's trust, or a read's {@code trust_min}, that ROB-02 treats as untrusted, and
      * the memory guard verdicts that mark a record untrusted whatever its trust field says (SPEC §7.4). */
@@ -1693,6 +1703,11 @@ public final class Graph {
                     policyDecisions.add(Iri.eventIri(event.get("id").asText()));
                 }
             }
+            Map<String, String> heldTypes = new HashMap<>();
+            for (JsonNode event : events) {
+                heldTypes.put(Iri.eventIri(event.get("id").asText()), ptype(event));
+            }
+            Set<String> unresolved = unresolvedLinks(events);
             for (JsonNode event : events) {
                 String node = Iri.eventIri(event.get("id").asText());
                 String ptype = ptype(event);
@@ -1702,6 +1717,10 @@ public final class Graph {
                 }
                 if ("ToolCall".equals(ptype)) {
                     executesConsequential(node, refsOf(event));
+                    securityRefsResolve(node, refsOf(event), heldTypes);
+                }
+                if ("ToolCall".equals(ptype) || "Incident".equals(ptype)) {
+                    literal(node, "agentce:linkedRecordsResolve", !unresolved.contains(node));
                 }
                 if ("Decision".equals(ptype)) {
                     oversightMatches(node, data);
@@ -1776,6 +1795,71 @@ public final class Graph {
                 }
             }
             return out;
+        }
+
+        /** ROB-03 (Art. 15): every {@code refs.authorization}, {@code refs.delegation} and {@code refs.instruction}
+         * the call carries names a held event of the type the SPEC gives it (§6.2); a name of another type, or one
+         * that is not a string, is as unresolved as a dangling one. */
+        private void securityRefsResolve(String node, JsonNode refs, Map<String, String> heldTypes) {
+            boolean resolves = true;
+            for (Map.Entry<String, String> ref : SECURITY_REFS) {
+                if (refs.has(ref.getKey())) {
+                    JsonNode value = refs.get(ref.getKey());
+                    resolves &= value.isTextual() && ref.getValue().equals(heldTypes.get(value.textValue()));
+                }
+            }
+            literal(node, "agentce:securityRefsResolve", resolves);
+        }
+
+        /** REC-06 (Art. 19) and INC-04 (Art. 73): the events from which a dangling reference can be reached through
+         * {@code refs.*}, event refs in {@code used[]} and an Incident's {@code related_refs[]}, at any depth, the
+         * event itself included. An Incident's {@code related_refs} entry that is not a held event's name is
+         * dangling too. */
+        private Set<String> unresolvedLinks(List<JsonNode> events) {
+            Set<String> broken = new HashSet<>(danglingNodes);
+            Map<String, Set<String>> namedBy = new HashMap<>();
+            for (JsonNode event : events) {
+                String node = Iri.eventIri(event.get("id").asText());
+                JsonNode data = dataOf(event);
+                List<String> names = new ArrayList<>();
+                refsOf(event).elements().forEachRemaining(v -> {
+                    if (v.isTextual()) {
+                        names.add(v.textValue());
+                    }
+                });
+                JsonNode used = data.get("used");
+                if (used != null && used.isArray()) {
+                    for (JsonNode v : used) {
+                        if (v.isTextual()) {
+                            names.add(v.textValue());
+                        }
+                    }
+                }
+                if ("Incident".equals(ptype(event)) && data.has("related_refs")) {
+                    JsonNode related = data.get("related_refs");
+                    for (JsonNode name : related.isArray() ? related : List.of(related)) {
+                        if (name.isTextual() && eventIris.contains(name.textValue())) {
+                            names.add(name.textValue());
+                        } else {
+                            broken.add(node);
+                        }
+                    }
+                }
+                for (String name : names) {
+                    if (eventIris.contains(name)) {
+                        namedBy.computeIfAbsent(name, k -> new HashSet<>()).add(node);
+                    }
+                }
+            }
+            Deque<String> stack = new ArrayDeque<>(broken);
+            while (!stack.isEmpty()) {
+                for (String referrer : namedBy.getOrDefault(stack.pop(), Set.of())) {
+                    if (broken.add(referrer)) {
+                        stack.push(referrer);
+                    }
+                }
+            }
+            return broken;
         }
 
         /** RSK-02 (Art. 9): a review of the decision, or a {@code refs.authorization} (or

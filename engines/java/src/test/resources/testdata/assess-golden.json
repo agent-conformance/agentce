@@ -163,7 +163,7 @@
       "control": "DOC-03",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
+      "outcome": "insufficient_evidence",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -183,8 +183,6 @@
           "source_class": "enforcement_point"
         }
       ],
-      "source_class_satisfied": true,
-      "evidence_strength": "strong",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -336,7 +334,7 @@
       "control": "INC-04",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
+      "outcome": "not_applicable",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -344,20 +342,11 @@
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "high",
       "family": "INC",
-      "evidence": [
-        {
-          "ref": "agentce:event/tc1",
-          "digest": "sha256:fae347a9e72202695945c16b507d0d23cc41477cf230fa5f98cad5b6447809f2",
-          "source_class": "enforcement_point"
-        }
-      ],
-      "source_class_satisfied": true,
-      "evidence_strength": "strong",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1090,28 +1079,19 @@
       "control": "ROB-05",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "2026-01-01T00:00:00Z",
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
       "family": "ROB",
-      "evidence": [
-        {
-          "ref": "agentce:event/tc1",
-          "digest": "sha256:fae347a9e72202695945c16b507d0d23cc41477cf230fa5f98cad5b6447809f2",
-          "source_class": "enforcement_point"
-        }
-      ],
-      "source_class_satisfied": true,
-      "evidence_strength": "strong",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1124,28 +1104,19 @@
       "control": "ROB-06",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "2026-01-01T00:00:00Z",
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
       "family": "ROB",
-      "evidence": [
-        {
-          "ref": "agentce:event/tc1",
-          "digest": "sha256:fae347a9e72202695945c16b507d0d23cc41477cf230fa5f98cad5b6447809f2",
-          "source_class": "enforcement_point"
-        }
-      ],
-      "source_class_satisfied": true,
-      "evidence_strength": "strong",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1612,7 +1583,7 @@
       "control": "DOC-03",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
+      "outcome": "insufficient_evidence",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -1632,8 +1603,6 @@
           "source_class": "enforcement_point"
         }
       ],
-      "source_class_satisfied": true,
-      "evidence_strength": "strong",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1785,7 +1754,7 @@
       "control": "INC-04",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
+      "outcome": "not_applicable",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -1793,20 +1762,11 @@
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "high",
       "family": "INC",
-      "evidence": [
-        {
-          "ref": "agentce:event/tc1",
-          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
-          "source_class": "enforcement_point"
-        }
-      ],
-      "source_class_satisfied": true,
-      "evidence_strength": "strong",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2555,28 +2515,19 @@
       "control": "ROB-05",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "2026-01-01T00:00:00Z",
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
       "family": "ROB",
-      "evidence": [
-        {
-          "ref": "agentce:event/tc1",
-          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
-          "source_class": "enforcement_point"
-        }
-      ],
-      "source_class_satisfied": true,
-      "evidence_strength": "strong",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -2589,28 +2540,19 @@
       "control": "ROB-06",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "2026-01-01T00:00:00Z",
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
       "family": "ROB",
-      "evidence": [
-        {
-          "ref": "agentce:event/tc1",
-          "digest": "sha256:0930939f358d41b222fa8725536b22ba3911b2a61cce415ae5d7644a1b7e3a9b",
-          "source_class": "enforcement_point"
-        }
-      ],
-      "source_class_satisfied": true,
-      "evidence_strength": "strong",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -3077,7 +3019,7 @@
       "control": "DOC-03",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "not_applicable",
+      "outcome": "insufficient_evidence",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -3895,8 +3837,8 @@
       "control": "ROB-05",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "not_applicable",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "2026-01-01T00:00:00Z",
@@ -3920,8 +3862,8 @@
       "control": "ROB-06",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "not_applicable",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "2026-01-01T00:00:00Z",
@@ -4390,7 +4332,7 @@
       "control": "DOC-03",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "not_applicable",
+      "outcome": "insufficient_evidence",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -5155,8 +5097,8 @@
       "control": "ROB-05",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "not_applicable",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "1970-01-01T00:00:00Z",
@@ -5180,8 +5122,8 @@
       "control": "ROB-06",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "not_applicable",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "1970-01-01T00:00:00Z",
