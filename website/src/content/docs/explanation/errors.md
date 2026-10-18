@@ -13,6 +13,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `catalog.control.source_class_from_unknown` | control {control} declares source_class_from {value}, which is not a list of graph links: each entry must be exactly actsOn, approvedBy, delegatedVia or releasedBy (SPEC §7.1), so the engine could not tell which records the judgment rests on. | set evaluation.source_class_from to a list of actsOn, approvedBy, delegatedVia or releasedBy, written as here, or remove it when the judgment rests on the focus record alone. |
 | `catalog.evidence_shape.passed_case_unjudged` | control {control}'s test case {case} expects passed, but its evidence shape targets nothing in that fixture or finds a record it cannot judge, so assess would never read it conformant. | check the evidence shape's target (a misspelt class targets nothing) and give the passed fixture the records the evidence shape asks for. |
 | `catalog.evidence_shape.unresolved` | control {control} names '{path}' as its evidence shape, but that is not a file inside the catalog folder holding exactly one node shape with a target, so the control could not tell which records it can judge. | name a file inside the catalog folder that holds exactly one node shape with a target (sh:targetClass, sh:targetNode or agentce:targetWhere), or remove evaluation.evidence_shape from the control. |
+| `catalog.init_dir_unwritable` | catalog init was given an empty directory, which names no directory. | pass the directory to scaffold the catalog in, or drop it to use the working directory. |
 | `catalog.init_exists` | catalog init would overwrite a scaffolded file that already exists. | pass --force to overwrite, or a different <dir>. |
 | `catalog.init_family_collision` | the control family named by --id is already used by a vendored base or overlay catalog. | pass a different --id. |
 | `catalog.init_family_invalid` | the --id given to catalog init is not 2-4 uppercase letters. | pass --id as 2-4 uppercase letters, e.g. --id ACM. |
@@ -36,7 +37,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `environment.python_unsupported` | the running Python is older than the interpreter the engine supports. | run the engine under Python 3.12 or newer (`uv python install 3.12`). |
 | `input.adapter_missing` | ingest needs an adapter. | pass --adapter, e.g. --adapter otel-genai. |
 | `input.adapter_not_found` | no adapter directory exists at the given adapters-root and adapter name. | pass --adapters-root pointing at the adapters checkout, or check the adapter name. |
-| `input.adapters_root_not_a_directory` | collect was given an empty --adapters-root, which names no adapters checkout. | pass --adapters-root <dir> (an adapters checkout), or drop it to use ./adapters. |
+| `input.adapters_root_not_a_directory` | collect or ingest was given an empty --adapters-root, which names no adapters checkout. | pass --adapters-root <dir> (an adapters checkout), or drop it to use ./adapters. |
 | `input.allow_unverified_requires_catalog_dir` | --allow-unverified-catalog was given without --catalog-dir, so there is no catalog for it to apply to. | add --catalog-dir <dir>, or drop --allow-unverified-catalog. |
 | `input.assess_flag_needs_value` | argument --deviations: expected one argument | pass --deviations <file>. |
 | `input.assess_unrecognized_flag` | assess was given a flag it does not recognize, or more than one records folder. | run `agentce assess --help` for the flags assess takes, or drop the flag. |
@@ -90,6 +91,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.init_value_empty` | init was given an empty --subject or --framework. | pass a value with the flag, or drop it to use the default. |
 | `input.nothing_evaluated` | no control reached conformant, non-conformant, or insufficient_evidence, so the run judged nothing. | emit under the subject and source the profile declares (agentce-emit reads AGENTCE_EMIT_SUBJECT and AGENTCE_EMIT_SOURCE), and record the evidence the catalog's controls apply to. |
 | `input.out_dir_unwritable` | the --out directory of assess, quickstart, validate, conformance, collect or init could not be created or written to, or --out was empty. | choose a writable --out directory. |
+| `input.out_file_unwritable` | report was given an empty --out, which names no file. | pass --out <file> with a writable path. |
 | `input.out_missing` | the command needs an output bundle path. | pass --out <bundle>. |
 | `input.package_path_overlap` | --out overlaps --bundle, --profile, --domain, or a --catalog-dir: packaging would read from or write into the tree it is producing. | point --out somewhere outside every input path, then re-run. |
 | `input.package_requires_bundle` | --package-for-sharing works only with --bundle/--profile; a records-folder run cannot be reproduced from a --bundle re-run. | pass --bundle and --profile instead of a records folder, or drop --package-for-sharing. |
@@ -117,8 +119,9 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.sign_profile` | unknown signing profile. | choose one of: sigstore-public, sigstore-private, kms. |
 | `input.sign_role` | --as must be `claimant` or `assessor`. | pass --as claimant|assessor. |
 | `input.sign_unrecognized_flag` | sign was given a flag it does not recognize. | pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag. |
-| `input.state_dir_unwritable` | the --state directory could not be created or written to. | choose a writable --state directory. |
+| `input.state_dir_unwritable` | the --state directory could not be created or written to, or --state was empty. | choose a writable --state directory. |
 | `input.state_version_incompatible` | the state directory was written by an incompatible state_version. | there is no migration command: move or delete the state directory and re-run with --state pointing at a fresh, empty directory (this discards the prior bundle/outcome history recorded there, so late-arriving evidence and drift are tracked only from that point forward). |
+| `input.support_matrix_unwritable` | catalog lint was given an empty --support-matrix, which names no file. | pass --support-matrix <file> with a writable path outside the catalog directory. |
 | `input.trust_root_invalid` | the trust root supplied by --trust-root or AGENTCE_TRUST_ROOT could not be loaded. | pass --trust-root <file> pointing at a trust root in the form of the engine's vendored data/trust/dev-root.json. |
 | `input.unknown_command` | agentce was given a command or a global flag it does not recognize. | run `agentce --help` for the commands and global flags agentce takes. |
 | `input.validate_unrecognized_flag` | validate was given a flag it does not recognize, or an argument it does not take. | run `agentce validate --help` for the flags validate takes, or drop the flag. |
@@ -126,6 +129,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.verify_unrecognized_flag` | verify was given a flag it does not recognize. | pass --bundle, --catalog, --release, or --report (with --signer-trust-root or --expect-keyid for --report), or drop the flag. |
 | `input.version_unrecognized_flag` | version was given a flag it does not recognize, or an argument it does not take. | run `agentce version --help` for the flags version takes, or drop the flag. |
 | `input.write_errors_unwritable` | doctor --write-errors was empty, named a directory, or could not be written to. | pass --write-errors <file> with a writable path, e.g. docs/errors.md. |
+| `input.write_trust_root_unwritable` | catalog sign was given an empty --write-trust-root, which names no file. | pass --write-trust-root <file> with a writable path outside the catalog directory. |
 | `internal.unexpected` | an unexpected internal error occurred. | re-run with --debug to see the stack trace, then file an issue for an AgentCE maintainer to investigate. |
 | `report.missing_evidence_pointer` | an assertion reached a conformant, non-conformant, or partial outcome with no evidence pointer. | every conformant, non-conformant, or partial outcome must cite evidence (DC-5). |
 | `sign.claim_malformed` | claim.json is not a JSON object whose signatures field, if present, is a list. | re-run the `agentce assess` command that wrote this report, then sign the new report. |
