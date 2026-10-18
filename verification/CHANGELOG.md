@@ -3,6 +3,17 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.113.0
+
+- `VG-REPORT-VALIDATE` (18.167, changed). `report --validate` skipped an optional artifact it could not read, as if it
+  were absent, so an unreadable auditor.json left the report valid on Python 3.14, TypeScript and Java. All three
+  engines now report a file that is there but cannot be read (no read permission, behind a folder that cannot be
+  entered, a FIFO, a dangling link) as `cannot read`, check the data files every run writes and claim.json, and answer
+  a failed validation with the key `report.validation_failed`. The gate adds a report whose auditor.json cannot be
+  read, expecting exit 3, the key and the one problem line in each engine, with a seeded fault that reads it as absent.
+- `VG-JSON-INTEGER-LIMIT` (18.167, changed). The runtime_drift.jsonl fault's search text follows the line check's new
+  argument name; the fault is unchanged.
+
 ## 0.112.0
 
 - `VG-COVERAGE-UNKNOWN` (18.134, added). The engines worked out whether an independent count of an agent's calls

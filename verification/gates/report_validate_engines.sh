@@ -11,7 +11,7 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+trap 'chmod -R u+rwx "$work" 2>/dev/null; rm -rf "$work"' EXIT
 
 fixture_json="$work/fixture.json"
 (cd "$root/tools" && env -u VIRTUAL_ENV uv run --frozen python - "$work" > "$fixture_json" <<'PY'
@@ -27,11 +27,15 @@ corrupted = work / "oscal-nist"
 import shutil
 shutil.copytree(base, corrupted)
 rvpc.seed_oscal_nist_fault(corrupted)
-print(json.dumps({"base": str(base), "corrupted": str(corrupted)}))
+unreadable = work / "unreadable"
+shutil.copytree(base, unreadable)
+rvpc._mutate_optional_mode000(unreadable)
+print(json.dumps({"base": str(base), "corrupted": str(corrupted), "unreadable": str(unreadable)}))
 PY
 )
 base="$(jq -r .base "$fixture_json")"
 corrupted="$(jq -r .corrupted "$fixture_json")"
+unreadable="$(jq -r .unreadable "$fixture_json")"
 missing="$work/does-not-exist"
 
 (cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist)
@@ -75,6 +79,17 @@ for engine in python typescript java; do
   fi
 done
 
+# An optional artifact that is there but cannot be read is a problem, never an absence (18.167).
+for engine in python typescript java; do
+  out="$(run_validate "$engine" "$unreadable")" && code=0 || code=$?
+  got="$(printf '%s' "$out" | jq -c '[.valid, .message_key, .problems]' 2>/dev/null || echo none)"
+  want='[false,"report.validation_failed",["auditor.json: cannot read (permission denied)"]]'
+  if [ "$code" -ne 3 ] || [ "$got" != "$want" ]; then
+    echo "report-validate: $engine did not refuse an unreadable auditor.json (exit $code, got $got, expected exit 3 and $want)" >&2
+    status=1
+  fi
+done
+
 for engine in python typescript java; do
   out="$(run_validate "$engine" "$missing")" && code=0 || code=$?
   key_got="$(printf '%s' "$out" | jq -r '.error.key // .error.message_key // empty')"
@@ -84,5 +99,5 @@ for engine in python typescript java; do
   fi
 done
 
-[ "$status" -eq 0 ] && echo "report-validate: all three engines validate the clean report, catch the real-schema-only OSCAL violation, and refuse a missing report directory"
+[ "$status" -eq 0 ] && echo "report-validate: all three engines validate the clean report, catch the real-schema-only OSCAL violation, refuse an unreadable auditor.json, and refuse a missing report directory"
 exit "$status"

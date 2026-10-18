@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -513,6 +514,126 @@ CASES: list[tuple[str, Callable[[Path], None], int]] = [
     ("case31-sarif-oneof-two-passing", _mutate_sarif_oneof_two_passing, 3),
     ("case32-recorded-missing-multi", _mutate_recorded_missing_multi, 3),
 ]
+
+
+def _mutate_optional_mode000(report_dir: Path) -> None:
+    (report_dir / "auditor.json").write_text(
+        '{"not": "an auditor pack"}\n', encoding="utf-8"
+    )
+    (report_dir / "auditor.json").chmod(0)
+
+
+def _mutate_optional_unenterable(report_dir: Path) -> None:
+    """auditor.json behind a link into a folder that can be listed but not entered (18.167)."""
+    lock = report_dir / "lock"
+    lock.mkdir()
+    (lock / "auditor.json").write_text('{"not": "an auditor pack"}\n', encoding="utf-8")
+    (report_dir / "auditor.json").symlink_to(lock / "auditor.json")
+    lock.chmod(0o600)
+
+
+def _mutate_data_fifo(report_dir: Path) -> None:
+    (report_dir / "coverage.json").unlink()
+    os.mkfifo(report_dir / "coverage.json")
+
+
+def _mutate_manifest_fifo(report_dir: Path) -> None:
+    (report_dir / "manifest.json").unlink()
+    os.mkfifo(report_dir / "manifest.json")
+
+
+def _mutate_claim_absent(report_dir: Path) -> None:
+    (report_dir / "claim.json").unlink()
+
+
+def _mutate_data_recorded_absent(report_dir: Path) -> None:
+    (report_dir / "integrity.jsonl").unlink()
+
+
+def _mutate_data_dangling(report_dir: Path) -> None:
+    (report_dir / "quarantine.jsonl").unlink()
+    (report_dir / "quarantine.jsonl").symlink_to(report_dir / "nowhere")
+
+
+def _restore_modes(report_dir: Path) -> None:
+    """Give back what the unreadable cases took, so the temporary folder can be removed."""
+    for path in (report_dir, *report_dir.rglob("*")):
+        if not path.is_symlink():
+            path.chmod(0o700)
+
+
+#: The cases where a file is there but cannot be read, or a file every run writes is gone (18.167):
+#: each must give the same exit 3, the key report.validation_failed and the same problem lines, word
+#: for word, in all three engines. An unreadable entry is never read as absent.
+READ_CASES: list[tuple[str, Callable[[Path], None], list[str]]] = [
+    (
+        "case33-optional-mode000",
+        _mutate_optional_mode000,
+        ["auditor.json: cannot read (permission denied)"],
+    ),
+    (
+        "case34-optional-unenterable",
+        _mutate_optional_unenterable,
+        ["auditor.json: cannot read (permission denied)"],
+    ),
+    (
+        "case35-data-fifo",
+        _mutate_data_fifo,
+        ["coverage.json: cannot read (not a regular file)"],
+    ),
+    (
+        "case36-manifest-fifo",
+        _mutate_manifest_fifo,
+        ["manifest.json: cannot read (not a regular file)"],
+    ),
+    (
+        "case37-claim-absent",
+        _mutate_claim_absent,
+        [
+            "claim.json: missing (assertions.json holds assertions, and a run that records any"
+            " writes claim.json)"
+        ],
+    ),
+    (
+        "case38-data-recorded-absent",
+        _mutate_data_recorded_absent,
+        [
+            "integrity.jsonl: missing (recorded in manifest.json's outputs but not on disk)"
+        ],
+    ),
+    (
+        "case39-data-dangling-link",
+        _mutate_data_dangling,
+        ["quarantine.jsonl: cannot read (not a regular file)"],
+    ),
+]
+
+REPORT_INVALID = "report.validation_failed"
+
+
+def run_read_cases(tmp: Path, base: Path, failures: list[str]) -> int:
+    for case, mutate, expected in READ_CASES:
+        case_dir = tmp / case
+        shutil.copytree(base, case_dir)
+        mutate(case_dir)
+        try:
+            runs = {
+                "python": python_validate(case_dir),
+                "typescript": typescript_validate(case_dir),
+                "java": java_validate(case_dir),
+            }
+        finally:
+            _restore_modes(case_dir)
+        for engine_name, (out, code) in runs.items():
+            env = json.loads(out) if code == 3 else {}
+            got = (code, env.get("message_key"), env.get("problems"))
+            if got != (3, REPORT_INVALID, expected):
+                failures.append(
+                    f"{case}: {engine_name} answered exit {code}, key {got[1]!r}, problems "
+                    f"{got[2]!r}; expected exit 3, {REPORT_INVALID!r}, {expected!r}"
+                )
+    return len(READ_CASES)
+
 
 #: Cases that must additionally prove the real third-party schema ran, not only the local profile
 #: (python reference, cases 6 and 8): at least one problem label names the standard in parens.
@@ -1050,6 +1171,11 @@ def run_real_check() -> int:
                 json.loads(ts_out),
                 json.loads(java_out),
             )
+            keys = [env.get("message_key") for env in (py_env, ts_env, java_env)]
+            if keys != [REPORT_INVALID if expect_exit else None] * 3:
+                failures.append(
+                    f"{case}: message_key (python, typescript, java) was {keys}"
+                )
             if not (py_env["valid"] == ts_env["valid"] == java_env["valid"]):
                 failures.append(
                     f"{case}: 'valid' disagrees "
@@ -1075,6 +1201,7 @@ def run_real_check() -> int:
                         )
 
         census_count = run_census_cases(tmp, base, failures)
+        read_count = run_read_cases(tmp, base, failures)
 
         # Case 16: a path that is not a directory refuses before any artifact is opened. Each
         # engine's own error-envelope field name differs (`error.key` in Python, `error.message_key`
@@ -1104,7 +1231,7 @@ def run_real_check() -> int:
     if failures:
         return 1
     print(
-        f"MATCH: {len(CASES) + 1 + census_count} invocations agree across python, typescript, java "
+        f"MATCH: {len(CASES) + 1 + read_count + census_count} invocations agree across python, typescript, java "
         f"({census_count} cover every census (schema, keyword) pair)"
     )
     return 0

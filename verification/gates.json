@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.112.0",
+  "suite_version": "0.113.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -543,8 +543,8 @@
       "timeout_s": 900,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
-        "pass": "each engine validates a clean, fully-emitted report directory (exit 0, valid=true); each engine catches a copy whose oscal-ar.json satisfies AgentCE's own bounded local profile but violates the real vendored NIST OSCAL 1.1.2 standard (exit 3, valid=false, a problem naming 'oscal-ar.json (NIST OSCAL 1.1.2)'); each engine refuses a report directory that does not exist (exit 3, keyed input.validate_not_a_directory) before opening any artifact",
-        "fail": "any engine fails the clean report, accepts the real-schema-only OSCAL violation as valid or without naming the real standard, or accepts a missing report directory"
+        "pass": "each engine validates a clean, fully-emitted report directory (exit 0, valid=true); each engine catches a copy whose oscal-ar.json satisfies AgentCE's own bounded local profile but violates the real vendored NIST OSCAL 1.1.2 standard (exit 3, valid=false, a problem naming 'oscal-ar.json (NIST OSCAL 1.1.2)'); each engine refuses a report directory that does not exist (exit 3, keyed input.validate_not_a_directory) before opening any artifact; each engine refuses a report whose optional auditor.json cannot be read (exit 3, keyed report.validation_failed, the one problem 'auditor.json: cannot read (permission denied)')",
+        "fail": "any engine fails the clean report, accepts the real-schema-only OSCAL violation as valid or without naming the real standard, accepts a missing report directory, or reads an unreadable artifact as absent"
       },
       "faults": [
         {
@@ -552,6 +552,12 @@
           "file": "engines/python/agentce/report.py",
           "search": "        if filename == \"oscal-ar.json\":\n            problems += [\n                f\"oscal-ar.json (NIST OSCAL 1.1.2): {p}\"\n                for p in validate_oscal_ar_nist(instance)\n            ]",
           "replace": "        if False and filename == \"oscal-ar.json\":\n            problems += [\n                f\"oscal-ar.json (NIST OSCAL 1.1.2): {p}\"\n                for p in validate_oscal_ar_nist(instance)\n            ]"
+        },
+        {
+          "description": "Python reads a report file it cannot read as absent again, so an unreadable optional auditor.json is skipped and report --validate answers valid (18.167)",
+          "file": "engines/python/agentce/report.py",
+          "search": "    except PermissionError as exc:\n        raise _CannotRead(\"permission denied\") from exc\n",
+          "replace": "    except PermissionError:\n        return None\n"
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/report.py's validate_report, ported field-for-field in engines/typescript/src/reportValidate.ts and engines/java/src/main/java/org/agentce/ReportValidate.java."
@@ -2557,7 +2563,7 @@
         {
           "description": "Python's runtime_drift.jsonl line check goes back to json.loads, which raises a bare ValueError the JSONError handler does not catch",
           "file": "engines/python/agentce/report.py",
-          "search": "            load_json(line)\n        except JSONError as exc:\n            problems.append(f\"{path.name}: line {i}",
+          "search": "            load_json(line)\n        except JSONError as exc:\n            problems.append(f\"{filename}: line {i}",
           "replace": "            json.loads(line)\n        except JSONError as exc:\n            problems.append(f\"{path.name}: line {i}"
         },
         {
