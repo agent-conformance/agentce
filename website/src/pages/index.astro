@@ -171,9 +171,9 @@ quickstart complete: 49 assertions; report in ./out
 - `PolicyDecision (self_report)`: unlocks 3 check(s), needed by 0 more; rung 3 -- a request to platform or security. Adapters that can supply this: mcp-gateway, policy-engines.
 - `MemoryRead (enforcement_point)`: unlocks 1 check(s), needed by 0 more; rung 3 -- a request to platform or security. Adapters that can supply this: no adapter today.
 
-### Checks waiting on an independent count of your agent's calls
+### Records that don't show enough, with no single fix
 
-- `DOC-03 on spiffe://corp/agents/credit-langgraph (eu-ai-act@2026.09)`: AgentCE can't judge DOC-03 yet. Nothing outside the agent and the enforcement point counts this agent's calls, so a call that went around the records would not show up. To fix it, declare a coverage denominator in the applicability profile, such as a provider usage export, an egress or firewall log, or a system-of-record export.
+- `DOC-03 on spiffe://corp/agents/credit-langgraph (eu-ai-act@2026.09)`: The records show every kind of evidence DOC-03 asks for, but not enough of it in the shape the control expects -- a --domain binding may be needed to identify the relevant decisions; see the control's documentation for what it needs.
 
 ## Verdict
 
