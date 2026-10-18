@@ -153,6 +153,14 @@ def _untrusted_source_class(value: Any) -> bool:
 _AT_OR_ABOVE_EP = frozenset({"enforcement_point", "independent_system"})
 
 
+#: The ToolCall references ROB-03 resolves, each with the event type the SPEC gives its target (§6.2).
+_SECURITY_REFS = (
+    ("authorization", "PolicyDecision"),
+    ("delegation", "DelegationIssued"),
+    ("instruction", "Instruction"),
+)
+
+
 def _is_one_of(value: Any, values: frozenset[str]) -> bool:
     return isinstance(value, str) and value in values
 
@@ -1405,6 +1413,8 @@ class _Builder:
             for event in events
             if self._ptype(event) == "PolicyDecision"
         )
+        held_types = {event_iri(str(e["id"])): self._ptype(e) for e in events}
+        unresolved = self._unresolved_links(events)
         for event in events:
             node = event_iri(str(event["id"]))
             ptype = self._ptype(event)
@@ -1413,6 +1423,11 @@ class _Builder:
                 self._chain_verified(node, data)
             if ptype == "ToolCall":
                 self._executes_consequential(node, _refs(event))
+                self._security_refs_resolve(node, _refs(event), held_types)
+            if ptype in ("ToolCall", "Incident"):
+                self._literal(
+                    node, "agentce:linkedRecordsResolve", node not in unresolved
+                )
             if ptype == "Decision":
                 self._oversight_matches(node, data)
                 self._explanation_reconstructable(node)
@@ -1576,6 +1591,53 @@ class _Builder:
                     return None
                 out.add(named)
         return out
+
+    def _security_refs_resolve(
+        self, node: str, refs: dict[str, Any], held_types: dict[str, str]
+    ) -> None:
+        """ROB-03 (Art. 15): every ``refs.authorization``, ``refs.delegation`` and ``refs.instruction`` the call
+        carries names a held event of the type the SPEC gives it (§6.2); a name of another type, or one that is not a
+        string, is as unresolved as a dangling one."""
+        self._literal(
+            node,
+            "agentce:securityRefsResolve",
+            all(
+                held_types.get(refs[key]) == want
+                if isinstance(refs[key], str)
+                else False
+                for key, want in _SECURITY_REFS
+                if key in refs
+            ),
+        )
+
+    def _unresolved_links(self, events: list[dict[str, Any]]) -> set[str]:
+        """REC-06 (Art. 19) and INC-04 (Art. 73): the events from which a dangling reference can be reached through
+        ``refs.*``, event refs in ``used[]`` and an Incident's ``related_refs[]``, at any depth, the event itself
+        included. An Incident's ``related_refs`` entry that is not a held event's name is dangling too."""
+        broken = set(self.dangling_nodes)
+        named_by: dict[str, set[str]] = {}
+        for event in events:
+            node = event_iri(str(event["id"]))
+            data = _data(event)
+            names = [v for v in _refs(event).values() if isinstance(v, str)]
+            names += [v for v in data.get("used", []) or [] if isinstance(v, str)]
+            if self._ptype(event) == "Incident" and "related_refs" in data:
+                related = data["related_refs"]
+                for name in related if isinstance(related, list) else [related]:
+                    if isinstance(name, str) and name in self.event_iris:
+                        names.append(name)
+                    else:
+                        broken.add(node)
+            for name in names:
+                if name in self.event_iris:
+                    named_by.setdefault(name, set()).add(node)
+        stack = list(broken)
+        while stack:
+            for referrer in named_by.get(stack.pop(), ()):
+                if referrer not in broken:
+                    broken.add(referrer)
+                    stack.append(referrer)
+        return broken
 
     def _risk_reviewed(
         self, node: str, refs: dict[str, Any], policy_decisions: frozenset[str]

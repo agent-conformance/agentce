@@ -139,6 +139,7 @@ _KINDS: dict[str, str] = {
     "catalog.link_outside": "error",
     "catalog.control.min_source_class_unknown": "error",
     "catalog.control.source_class_from_unknown": "error",
+    "catalog.control.requires_denominator_invalid": "error",
     "catalog.evidence_shape.passed_case_unjudged": "error",
     "verify.certificate_algorithm": "error",
     "verify.certificate_validity_malformed": "error",

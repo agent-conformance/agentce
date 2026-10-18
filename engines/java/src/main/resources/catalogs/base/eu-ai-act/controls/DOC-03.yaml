@@ -13,6 +13,7 @@ evaluation:
     - {event: ToolCall, class: any}
     - {event: Decision, class: self_report}
   shape: shapes/DOC-03.ttl
+  requires_denominator: {kinds: [egress_proxy_log, firewall_log], covers: ToolCall}
 expectations:
   - {id: S1, text: "Declared egress paths match the observed enforcement point."}
 severity: medium

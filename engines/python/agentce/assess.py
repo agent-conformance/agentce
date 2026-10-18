@@ -18,7 +18,7 @@ from typing import Any
 from .applicability import effective_roles
 from .assertions import Assertion, EvidencePointer
 from .catalog import Catalog, ControlSpec
-from .coverage import STATUS_UNKNOWN
+from .coverage import STATUS_COVERED, STATUS_UNKNOWN
 from .domain import DomainBinding
 from .graph import UnreadableWrite, build_graph, flagged_records, unkeyed_flags
 from .ingest import Withheld, record_digest
@@ -504,10 +504,35 @@ def _coverage_unknown(coverage: dict[str, Any], subject: str) -> bool:
     return not isinstance(entry, dict) or entry.get("coverage_status") == STATUS_UNKNOWN
 
 
-def _uncovered(assertion: Assertion) -> Assertion:
+def _denominator_unshown(
+    control: ControlSpec, subject: Subject, coverage: dict[str, Any]
+) -> bool:
+    """True when ``control`` declares ``requires_denominator`` and the subject's capture of the type it names does not
+    match a declared independent denominator of one of its kinds (18.37e, DOC-03): no such denominator, another
+    denominator holds the count, or the captured count differs from it either way (a declared path that saw fewer
+    records than were captured does not match them either). Fail closed on anything missing."""
+    need = control.requires_denominator
+    if need is None:
+        return False
+    sources = {d.source for d in subject.coverage_denominators if d.kind in need.kinds}
+    entry = (coverage.get("subjects") or {}).get(subject.id)
+    by_type = entry.get("event_types") if isinstance(entry, dict) else None
+    row = by_type.get(need.covers) if isinstance(by_type, dict) else None
+    return not (
+        isinstance(row, dict)
+        and row.get("status") == STATUS_COVERED
+        and row.get("observed") == row.get("expected")
+        and sources & set(row.get("denominators") or ())
+    )
+
+
+def _uncovered(assertion: Assertion, *, always: bool = False) -> Assertion:
     """An INT or REC outcome that reads better than insufficient_evidence while coverage is unknown reads
-    insufficient_evidence (SPEC §6.5): a call that bypassed capture would not be in the records. A violation stays."""
-    if assertion.family not in COVERAGE_FAMILIES or assertion.outcome not in (
+    insufficient_evidence (SPEC §6.5): a call that bypassed capture would not be in the records. A violation stays.
+    ``always`` lowers a control of any family (a declared ``requires_denominator`` the records do not show)."""
+    if (
+        assertion.family not in COVERAGE_FAMILIES and not always
+    ) or assertion.outcome not in (
         "conformant",
         "partial",
         "not_applicable",
@@ -649,6 +674,8 @@ def assess_subjects(
                         )
                 if uncovered and applies:
                     assertion = _uncovered(assertion)
+                if applies and _denominator_unshown(control, subject, coverage):
+                    assertion = _uncovered(assertion, always=True)
                 assertions.append(assertion)
     return assertions
 

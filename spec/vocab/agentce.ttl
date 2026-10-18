@@ -136,6 +136,12 @@ agentce:incidentResponded a owl:DatatypeProperty ; rdfs:label "incident responde
 agentce:riskReviewed a owl:DatatypeProperty ; rdfs:label "risk reviewed" ;
   rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
   rdfs:comment "Whether the decision was reviewed, or its authorization names a PolicyDecision the bundle holds." .
+agentce:securityRefsResolve a owl:DatatypeProperty ; rdfs:label "security references resolve" ;
+  rdfs:domain agentce:ToolCall ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether every authorization, delegation and instruction reference the call carries names a held PolicyDecision, DelegationIssued and Instruction respectively." .
+agentce:linkedRecordsResolve a owl:DatatypeProperty ; rdfs:label "linked records resolve" ;
+  rdfs:domain prov:Activity ; rdfs:range xsd:boolean ;
+  rdfs:comment "On a ToolCall or Incident: whether the record has no dangling reference and neither has any held record it names (refs, used event references and an Incident's related_refs)." .
 agentce:robustToUntrustedContent a owl:DatatypeProperty ; rdfs:label "robust to untrusted content" ;
   rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
   rdfs:comment "On a Decision: whether everything it used was trusted, through any number of hops -- no record it used was written untrusted, quarantined or blocked by the memory guard, or written with no trust or verdict from an untrusted provenance_origin_class; no read it used has trust_min untrusted or quarantined; and no instruction it acts on comes from an untrusted source class." .

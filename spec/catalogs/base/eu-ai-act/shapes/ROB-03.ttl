@@ -4,4 +4,5 @@
 
 agentce:ROB-03-Shape a sh:NodeShape ;
   sh:targetClass agentce:ToolCall ;
-  sh:property [ sh:path agentce:danglingRef ; sh:maxCount 0 ; sh:name "S1" ] .
+  agentce:targetWhere [ agentce:executesConsequential true ] ;
+  sh:property [ sh:path agentce:securityRefsResolve ; sh:hasValue true ; sh:name "S1" ] .

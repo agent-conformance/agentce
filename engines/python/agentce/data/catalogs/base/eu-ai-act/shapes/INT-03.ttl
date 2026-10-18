@@ -4,4 +4,5 @@
 
 agentce:INT-03-Shape a sh:NodeShape ;
   sh:targetClass agentce:ToolCall ;
+  agentce:targetWhere [ agentce:executesConsequential true ] ;
   sh:property [ sh:path agentce:danglingRef ; sh:maxCount 0 ; sh:name "S1" ] .

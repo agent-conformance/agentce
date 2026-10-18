@@ -119,6 +119,21 @@
           "type": "string",
           "minLength": 1,
           "description": "Path to a shape file holding exactly one node shape with a target: every focus it targets must meet it for the control to judge that focus. The outcome is insufficient_evidence when minimum evidence is missing, then non-conformant when the shape at `shape` finds failures beyond tolerance, then insufficient_evidence (never conformant) when any focus violates this shape. A file that is missing or does not hold exactly one targeted node shape is refused when the catalog loads (catalog.evidence_shape.unresolved)."
+        },
+        "requires_denominator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kinds", "covers"],
+          "properties": {
+            "kinds": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {"type": "string", "enum": ["provider_usage_export", "egress_proxy_log", "firewall_log", "system_of_record_export", "admission_attestation"]}
+            },
+            "covers": {"type": "string", "minLength": 1}
+          },
+          "description": "A verdict needs the subject's records of the `covers` event type reconciled against a declared, independent coverage denominator of one of `kinds` (SPEC §6.5): that type's coverage reads covered and such a denominator holds its count. Otherwise a conformant, partial or not_applicable outcome reads insufficient_evidence; a failure stays non-conformant. Anything else is refused when the catalog loads (catalog.control.requires_denominator_invalid)."
         }
       }
     },

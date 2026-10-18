@@ -2366,3 +2366,78 @@ def test_cnd06_is_independent_of_event_order() -> None:
     ]
     for node in ("i1", "pd1", "i2"):
         assert _refusal(events, node) == _refusal(events[::-1], node), node
+
+
+def _ref_call(event_id: str, **refs: Any) -> dict[str, Any]:
+    return _event(event_id, "ToolCall", {"refs": refs})
+
+
+def test_security_refs_resolve_needs_each_ref_to_name_a_held_event_of_its_type() -> (
+    None
+):
+    """18.37e, ROB-03: refs.authorization, refs.delegation and refs.instruction each name a held PolicyDecision,
+    DelegationIssued and Instruction (SPEC §6.2); a call carrying none of them has nothing to leave unresolved."""
+    held = [
+        _event("p1", "PolicyDecision", {"decision": "allow"}),
+        _event("g1", "DelegationIssued", {}),
+        _event("i1", "Instruction", {}),
+    ]
+    good = {
+        "authorization": event_iri("p1"),
+        "delegation": event_iri("g1"),
+        "instruction": event_iri("i1"),
+    }
+    assert _flag([*held, _ref_call("c1", **good)], "c1", "securityRefsResolve") == [
+        "true"
+    ]
+    assert _flag([_ref_call("c1")], "c1", "securityRefsResolve") == ["true"]
+    for key in good:
+        dangling = {**good, key: event_iri("missing")}
+        assert _flag(
+            [*held, _ref_call("c1", **dangling)], "c1", "securityRefsResolve"
+        ) == ["false"], key
+        wrong_type = {**good, key: event_iri("c0")}
+        events = [*held, _ref_call("c0"), _ref_call("c1", **wrong_type)]
+        assert _flag(events, "c1", "securityRefsResolve") == ["false"], key
+    events = [*held, _ref_call("c1", **{**good, "authorization": [event_iri("p1")]})]
+    assert _flag(events, "c1", "securityRefsResolve") == ["false"]
+
+
+def test_linked_records_resolve_follows_the_whole_closure_and_survives_a_cycle() -> (
+    None
+):
+    """18.37e, REC-06 and INC-04: a dangling reference reachable through refs, used[] or related_refs at any depth
+    leaves the event unresolved; a cycle with nothing dangling resolves, and arrival order does not matter."""
+    deep = [
+        _ref_call("c1", decision=event_iri("c2")),
+        _ref_call("c2", decision=event_iri("c3")),
+        _ref_call("c3", decision=event_iri("missing")),
+    ]
+    for events in (deep, deep[::-1]):
+        for node in ("c1", "c2", "c3"):
+            assert _flag(events, node, "linkedRecordsResolve") == ["false"], node
+    clean = [_ref_call("c1", decision=event_iri("c2")), _ref_call("c2")]
+    assert _flag(clean, "c1", "linkedRecordsResolve") == ["true"]
+    cycle = [
+        _ref_call("c1", decision=event_iri("c2")),
+        _ref_call("c2", decision=event_iri("c1")),
+    ]
+    assert _flag(cycle, "c1", "linkedRecordsResolve") == ["true"]
+    cycle.append(_ref_call("c3", decision=event_iri("missing")))
+    cycle[1]["data"]["used"] = [event_iri("c3")]
+    assert _flag(cycle, "c1", "linkedRecordsResolve") == ["false"]
+
+
+def test_linked_records_resolve_reads_an_incidents_related_refs() -> None:
+    held = _ref_call("c1")
+    assert _flag(
+        [held, _incident("x1", [event_iri("c1")])], "x1", "linkedRecordsResolve"
+    ) == ["true"]
+    for related in ([event_iri("missing")], [7], event_iri("missing")):
+        incident = _incident("x1")
+        incident["data"]["related_refs"] = related
+        assert _flag([held, incident], "x1", "linkedRecordsResolve") == ["false"]
+    broken = _ref_call("c1", decision=event_iri("missing"))
+    assert _flag(
+        [broken, _incident("x1", [event_iri("c1")])], "x1", "linkedRecordsResolve"
+    ) == ["false"]

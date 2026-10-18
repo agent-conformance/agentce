@@ -3,5 +3,5 @@
 @prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .
 
 agentce:INC-04-Shape a sh:NodeShape ;
-  sh:targetClass agentce:ToolCall ;
-  sh:property [ sh:path agentce:danglingRef ; sh:maxCount 0 ; sh:name "S1" ] .
+  sh:targetClass agentce:Incident ;
+  sh:property [ sh:path agentce:linkedRecordsResolve ; sh:hasValue true ; sh:name "S1" ] .

@@ -10,8 +10,7 @@ evaluation:
   rung: 2
   min_source_class: self_report
   minimum_evidence:
-    - {event: ToolCall, class: any}
-    - {event: Decision, class: self_report}
+    - {event: Incident, class: any}
   shape: shapes/INC-04.ttl
 expectations:
   - {id: S1, text: "Incident-linked records carry no dangling references."}

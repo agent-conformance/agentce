@@ -9,7 +9,7 @@ Resource-exhaustion resistance is measured within budgets.
 |---|---|
 | Severity | medium |
 | Mode | semi-automated |
-| Rung | 2 |
+| Rung | 3 |
 | Catalog | EU AI Act base catalog (base) |
 
 Crosswalked to clause(s) Art. 15. Clause numbers only are cited; standard text is never reproduced.

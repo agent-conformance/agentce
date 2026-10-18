@@ -41,6 +41,18 @@ _SHAPE_UNRESOLVED = "catalog.shape.unresolved"
 _EVIDENCE_SHAPE_PASSED_CASE = "catalog.evidence_shape.passed_case_unjudged"
 _MIN_SOURCE_CLASS_UNKNOWN = "catalog.control.min_source_class_unknown"
 _SOURCE_CLASS_FROM_UNKNOWN = "catalog.control.source_class_from_unknown"
+_REQUIRES_DENOMINATOR_INVALID = "catalog.control.requires_denominator_invalid"
+
+#: The coverage-denominator kinds a profile may declare (SPEC §6.5).
+DENOMINATOR_KINDS = frozenset(
+    {
+        "provider_usage_export",
+        "egress_proxy_log",
+        "firewall_log",
+        "system_of_record_export",
+        "admission_attestation",
+    }
+)
 
 #: Files left out of the provenance digest: the detached signature and ``catalog.yaml`` itself (which
 #: carries the provenance block), so the digest covers the catalog's rules and is non-circular.
@@ -101,6 +113,17 @@ class ControlSpec:
     evidence_shape_path: str | None = None
     #: ``evaluation.source_class_from``: the graph links to the records the judged class also rests on.
     source_class_from: list[str] = field(default_factory=list)
+    #: ``evaluation.requires_denominator``: the declared denominator a verdict needs (18.37e).
+    requires_denominator: RequiredDenominator | None = None
+
+
+@dataclass(frozen=True)
+class RequiredDenominator:
+    """A control that judges only where the subject declares an independent coverage denominator of one of
+    ``kinds`` whose count of ``covers`` records reconciles with what was captured (SPEC §6.5, §7.3)."""
+
+    kinds: frozenset[str]
+    covers: str
 
 
 @dataclass
@@ -206,6 +229,38 @@ def _control_from_dict(data: dict[str, Any]) -> ControlSpec:
             else None
         ),
         source_class_from=_source_class_from(control_id, evaluation),
+        requires_denominator=_requires_denominator(control_id, evaluation),
+    )
+
+
+def _requires_denominator(
+    control_id: str, evaluation: dict[str, Any]
+) -> RequiredDenominator | None:
+    """The declared ``requires_denominator``. Anything but a non-empty list of known denominator kinds and an event
+    type name is refused when the catalog loads, never dropped: a dropped requirement would judge without it."""
+    if "requires_denominator" not in evaluation:
+        return None
+    value = evaluation["requires_denominator"]
+    if isinstance(value, dict) and set(value) == {"kinds", "covers"}:
+        kinds, covers = value["kinds"], value["covers"]
+        if (
+            isinstance(kinds, list)
+            and kinds
+            and all(isinstance(k, str) and k in DENOMINATOR_KINDS for k in kinds)
+            and len(set(kinds)) == len(kinds)
+            and isinstance(covers, str)
+            and covers
+        ):
+            return RequiredDenominator(frozenset(kinds), covers)
+    entry = MESSAGE_KEYS[_REQUIRES_DENOMINATOR_INVALID]
+    raise InputError(
+        _REQUIRES_DENOMINATOR_INVALID,
+        format_message(
+            entry.cause,
+            control=control_id,
+            value=json.dumps(value, ensure_ascii=False, sort_keys=True),
+        ),
+        entry.fix,
     )
 
 
@@ -402,9 +457,12 @@ def _rule_uniqueness_pairs(catalog: Catalog) -> list[tuple[str, str]]:
         shape = catalog.shape_for(control)
         if shape is None:
             continue
+        # A declared denominator is part of the rule: the same shape judged only where a declared count
+        # reconciles tests something else (18.37e, DOC-03 beside OVS-06).
         key = (
             _shape_fingerprint(shape),
             _fixture_fingerprint(catalog.directory, control),
+            control.requires_denominator,
         )
         earlier = seen.get(key)
         if earlier is not None:

@@ -303,6 +303,30 @@
       }
     },
     {
+      "@id": "agentce:securityRefsResolve",
+      "@type": "owl:DatatypeProperty",
+      "rdfs:comment": "Whether every authorization, delegation and instruction reference the call carries names a held PolicyDecision, DelegationIssued and Instruction respectively.",
+      "rdfs:domain": {
+        "@id": "agentce:ToolCall"
+      },
+      "rdfs:label": "security references resolve",
+      "rdfs:range": {
+        "@id": "xsd:boolean"
+      }
+    },
+    {
+      "@id": "agentce:linkedRecordsResolve",
+      "@type": "owl:DatatypeProperty",
+      "rdfs:comment": "On a ToolCall or Incident: whether the record has no dangling reference and neither has any held record it names (refs, used event references and an Incident's related_refs).",
+      "rdfs:domain": {
+        "@id": "prov:Activity"
+      },
+      "rdfs:label": "linked records resolve",
+      "rdfs:range": {
+        "@id": "xsd:boolean"
+      }
+    },
+    {
       "@id": "agentce:interventionEffective",
       "@type": "owl:DatatypeProperty",
       "rdfs:comment": "On an Override: whether it names a recorded decision and records its replacement. On an Interrupt: whether a named mechanism halted or paused the agent.",
