@@ -16,6 +16,8 @@ fails if a gate in `gates.json` is not named in this file.
   INT-03 judge every ToolCall.
 - `VG-FAIL-ON-PARITY` re-pins scenario F10c from 7 matched to 5: on the insufficient-evidence project ROB-05 and
   ROB-06 now read not_assessed, so `outcome=="non-conformant"` no longer matches them.
+- The CI `demo-fault` job runs on 40 lanes (was 38): with VG-EUAIACT-CLUSTER2's fifteen faults the heaviest of 38
+  shards was estimated at 12.5 minutes, over the 12.0 lane bound; at 40 it is 11.2.
 
 ## 0.114.0
 
