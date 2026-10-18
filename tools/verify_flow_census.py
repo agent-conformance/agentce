@@ -2092,6 +2092,7 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.signing._walk_files: walk(root)": ("catalog-tree",),
     "agentce.signing.digest_tree: (root / rel).read_bytes()": ("catalog-tree",),
     "agentce.signing.read_catalog_files: (root / rel).read_bytes()": ("catalog-tree",),
+    "agentce.signing.read_catalog_files: os.path.islink(root / rel)": ("catalog-tree",),
     "agentce.signing.load_trust_root: parse_untrusted_json(path.read_bytes())": (
         "report-trust-root",
         "signer-trust-root",
