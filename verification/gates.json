@@ -1829,6 +1829,12 @@
           "file": "engines/java/src/main/java/org/agentce/Readiness.java",
           "search": "!limitations.isEmpty() ? READY_WITH_LIMITATIONS : READY;",
           "replace": "false ? READY_WITH_LIMITATIONS : READY;"
+        },
+        {
+          "description": "python readiness reads an absent report file as empty",
+          "file": "engines/python/agentce/readiness.py",
+          "search": "reasons.append(f\"missing report file {name}\")",
+          "replace": "pass"
         }
       ],
       "fix_hint": "Run verification/gates/diff_readiness_parity.sh and read the MISMATCH lines; the checks are tools/diff_parity_check.py and tools/readiness_parity_check.py, and the reference is engines/python/agentce/commands/__init__.py's cmd_diff and engines/python/agentce/readiness.py, ported in engines/typescript/src/diff.ts and readiness.ts and engines/java/src/main/java/org/agentce/Diff.java and Readiness.java"

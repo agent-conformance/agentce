@@ -307,6 +307,23 @@ def _float_vectors(directory: Path) -> list[tuple[str, list[str]]]:
     ]
 
 
+#: The stage-4 files readiness reads; each is deleted in turn from an otherwise clean report (18.166).
+REPORT_FILES = ("integrity.jsonl", "coverage.json", "applicability.jsonl", "assertions.json")
+
+
+def _absent_vectors(directory: Path) -> list[tuple[str, list[str]]]:
+    """Scenario 1's READY report with one stage-4 file deleted: an absent file is a blocking reason,
+    never an empty file, so every engine must answer NOT READY with the same reasons (18.166)."""
+    vectors = []
+    for name in REPORT_FILES:
+        parent = directory / f"absent-{name}"
+        parent.mkdir()
+        report, _ = _scenario_1_clean(parent)
+        (report / name).unlink()
+        vectors.append((name, [str(report), "--catalog-dir", str(CATALOG_DIR)]))
+    return vectors
+
+
 def _argv_vectors(directory: Path) -> list[tuple[str, list[str], int]]:
     """Argv shapes argparse reads in a particular way (18.25 round 3): each is (name, argv, the exit
     code Python's `readiness` subparser gives). Over scenario 3's report (a high-severity control with
@@ -612,12 +629,28 @@ def run_real_check() -> int:
                         f"expected exit 1, {NOT_READY!r}"
                     )
 
+        absent = _absent_vectors(tmp)
+        for name, argv in absent:
+            runs = _run_engines(argv)
+            codes = {engine: code for engine, (_, code) in runs}
+            if set(codes.values()) != {1}:
+                failures.append(f"absent:{name}: expected exit 1 in all three engines, got {codes}")
+                continue
+            envs = [json.loads(out) for _, (out, _) in runs]
+            if f"missing report file {name}" not in envs[0].get("reasons", []):
+                failures.append(f"absent:{name}: python does not name the missing file")
+            for key in ("verdict", "reasons", "limitations"):
+                compare_ports(
+                    f"absent:{name}:{key}", [json.dumps(env.get(key)) for env in envs], failures
+                )
+
     for failure in failures:
         print(f"MISMATCH: {failure}", file=sys.stderr)
     if failures:
         return 1
     print(
-        f"MATCH: {len(SCENARIOS)} scenarios byte-identical, {len(vectors)} argv shapes read alike "
+        f"MATCH: {len(SCENARIOS)} scenarios byte-identical, {len(vectors)} argv shapes read alike, "
+        f"{len(absent)} absent report files refused alike "
         f"and {len(floats)} float dates refused alike "
         "across python, typescript, java"
     )
