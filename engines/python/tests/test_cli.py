@@ -1196,7 +1196,8 @@ def test_diff_json_envelope_wins_over_format(
 
 
 def test_sign_ok(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    (tmp_path / "claim.json").write_text("{}", encoding="utf-8")
+    (_stage4_files(tmp_path) / "claim.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "manifest.json").write_text("{}", encoding="utf-8")
     code, env = run(
         ["sign", str(tmp_path), "--as", "claimant", "--dry-run", "--json"], capsys
     )
@@ -1206,10 +1207,25 @@ def test_sign_ok(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert env["profile"] == "sigstore-public"
 
 
+def _stage4_files(report: Path) -> Path:
+    """The four files readiness reads, empty, so a hand-built report folder gets past readiness
+    (an absent one is NOT READY since 18.166) and the test reaches the claim."""
+    report.mkdir(exist_ok=True)
+    for name, text in (
+        ("integrity.jsonl", ""),
+        ("coverage.json", "{}"),
+        ("applicability.jsonl", ""),
+        ("assertions.json", "[]"),
+    ):
+        (report / name).write_text(text, encoding="utf-8")
+    return report
+
+
 def test_sign_dry_run_without_a_claim_is_no_claim(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """A dry run answers as the real sign would: no claim.json, nothing to sign (18.53)."""
+    _stage4_files(tmp_path)
     code, env = run(
         ["sign", str(tmp_path), "--as", "claimant", "--dry-run", "--json"], capsys
     )
@@ -1235,7 +1251,7 @@ def test_sign_malformed_claim_is_claim_malformed(
 ) -> None:
     """A damaged claim.json is refused with a keyed error before the key is read and before a dry
     run would say "would sign" (18.53)."""
-    (tmp_path / "claim.json").write_bytes(raw)
+    (_stage4_files(tmp_path) / "claim.json").write_bytes(raw)
     for extra in (["--key", str(tmp_path / "missing.pem")], ["--dry-run"]):
         code, env = run(
             [
@@ -1254,6 +1270,110 @@ def test_sign_malformed_claim_is_claim_malformed(
         assert env["error"]["key"] == "sign.claim_malformed"
         assert env["error"]["cause"] == cause
     assert (tmp_path / "claim.json").read_bytes() == raw
+
+
+def _sign_dry(
+    report: Path, capsys: pytest.CaptureFixture[str], *extra: str
+) -> tuple[int, dict[str, Any]]:
+    return run(
+        [
+            "sign",
+            str(report),
+            "--as",
+            "claimant",
+            "--profile",
+            "kms",
+            "--dry-run",
+            *extra,
+            "--json",
+        ],
+        capsys,
+    )
+
+
+@pytest.mark.parametrize("kind", ["absent", "folder", "dangling", "mode000"])
+def test_sign_without_a_readable_manifest_is_no_manifest(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], kind: str
+) -> None:
+    """The signature covers manifest.json: one that is absent or cannot be read is refused, never
+    signed without (18.166)."""
+    if kind == "mode000" and os.geteuid() == 0:
+        pytest.skip("root reads a mode-000 file")
+    report = _stage4_files(tmp_path / "report")
+    (report / "claim.json").write_text("{}", encoding="utf-8")
+    manifest = report / "manifest.json"
+    if kind == "folder":
+        manifest.mkdir()
+    elif kind == "dangling":
+        manifest.symlink_to(tmp_path / "gone.json")
+    elif kind == "mode000":
+        manifest.write_text("{}", encoding="utf-8")
+        manifest.chmod(0)
+    try:
+        code, env = _sign_dry(report, capsys)
+    finally:
+        if kind == "mode000":
+            manifest.chmod(0o600)
+    assert code == 3
+    assert env["error"]["key"] == "sign.no_manifest"
+
+
+@pytest.mark.parametrize(
+    ("target", "extra"),
+    [
+        ("claim.json", ()),
+        ("signatures", ()),
+        ("trust-root.json", ("--write-trust-root",)),
+    ],
+)
+def test_sign_refuses_a_write_target_linked_outside(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    target: str,
+    extra: tuple[str, ...],
+) -> None:
+    """Every path sign writes stays inside the report folder: a link out of it is refused before
+    anything is written, in a dry run as in a real sign, and the outside file is untouched (18.166,
+    ruling R7)."""
+    report = _stage4_files(tmp_path / "report")
+    (report / "manifest.json").write_text("{}", encoding="utf-8")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "claim.json").write_text("{}", encoding="utf-8")
+    if target != "claim.json":
+        (report / "claim.json").write_text("{}", encoding="utf-8")
+    link_to = outside if target == "signatures" else outside / "claim.json"
+    (report / target).symlink_to(link_to)
+    for args in (("--dry-run",), ("--key", str(tmp_path / "missing.pem"))):
+        code, env = run(
+            [
+                "sign",
+                str(report),
+                "--as",
+                "claimant",
+                "--profile",
+                "kms",
+                *args,
+                *extra,
+                "--json",
+            ],
+            capsys,
+        )
+        assert code == 3
+        assert env["error"]["key"] == "sign.claim_outside_report"
+    assert (outside / "claim.json").read_text(encoding="utf-8") == "{}"
+    assert sorted(p.name for p in outside.iterdir()) == ["claim.json"]
+
+
+def test_sign_accepts_a_claim_linked_inside(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    report = _stage4_files(tmp_path / "report")
+    (report / "manifest.json").write_text("{}", encoding="utf-8")
+    (report / "real-claim.json").write_text("{}", encoding="utf-8")
+    (report / "claim.json").symlink_to("real-claim.json")
+    code, env = _sign_dry(report, capsys)
+    assert code == 0, env
 
 
 def test_sign_missing_dir(capsys: pytest.CaptureFixture[str]) -> None:
@@ -1685,6 +1805,7 @@ def test_sign_claim_behind_unsearchable_folder_is_no_claim(
     (locked / "claim.json").write_text("{}", encoding="utf-8")
     report = tmp_path / "r"
     report.mkdir()
+    _stage4_files(report)
     (report / "claim.json").symlink_to(locked / "claim.json")
     with _unsearchable(locked):
         code, env = run(

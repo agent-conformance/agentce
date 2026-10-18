@@ -322,29 +322,26 @@ class SignTest {
     }
 
     @Test
-    void signSubjectsHashesTheClaimBodyMinusSignaturesAndWhenPresentTheManifestsRawBytes(@TempDir Path dir)
-            throws Exception {
+    void signSubjectsHashesTheClaimBodyMinusSignaturesAndTheManifestsRawBytes() {
         ObjectNode claim = Json.nodes().objectNode();
         claim.putObject("claimant").put("org", "acme");
         ArrayNode sigs = claim.putArray("signatures");
         sigs.addObject().put("keyid", "x").put("sig", "y");
+        byte[] manifest = "{\"k\":\"v\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
-        ArrayNode subjectsNoManifest = Sign.signSubjects(dir, claim);
-        assertEquals(1, subjectsNoManifest.size());
-        assertEquals("claim.json", subjectsNoManifest.get(0).get("name").asText());
-
-        Files.writeString(dir.resolve("manifest.json"), "{\"k\":\"v\"}");
-        ArrayNode subjectsWithManifest = Sign.signSubjects(dir, claim);
-        assertEquals(2, subjectsWithManifest.size());
-        assertEquals("manifest.json", subjectsWithManifest.get(1).get("name").asText());
+        ArrayNode subjects = Sign.signSubjects(claim, manifest);
+        assertEquals(2, subjects.size());
+        assertEquals("claim.json", subjects.get(0).get("name").asText());
+        assertEquals("manifest.json", subjects.get(1).get("name").asText());
+        assertEquals(Canonical.sha256Hex(manifest), subjects.get(1).get("digest").get("sha256").asText());
 
         // The claim.json digest is identical whether or not `signatures` is present, since it is
         // always excluded from the hashed body.
         ObjectNode claimNoSignatures = Json.nodes().objectNode();
         claimNoSignatures.putObject("claimant").put("org", "acme");
-        ArrayNode subjectsNoSig = Sign.signSubjects(dir, claimNoSignatures);
+        ArrayNode subjectsNoSig = Sign.signSubjects(claimNoSignatures, manifest);
         assertEquals(
-                subjectsWithManifest.get(0).get("digest").get("sha256").asText(),
+                subjects.get(0).get("digest").get("sha256").asText(),
                 subjectsNoSig.get(0).get("digest").get("sha256").asText());
     }
 }

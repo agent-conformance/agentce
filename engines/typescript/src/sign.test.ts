@@ -5,6 +5,7 @@
 
 import assert from "node:assert/strict";
 import { createPublicKey, verify as cryptoVerify, generateKeyPairSync } from "node:crypto";
+import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -156,24 +157,17 @@ test("signStatement canonicalizes the statement, signs its PAE, and base64-encod
   }
 });
 
-test("signSubjects hashes the claim body (minus signatures) and, when present, the manifest's raw bytes", () => {
-  const dir = mkdtempSync(join(tmpdir(), "agentce-sign-"));
-  try {
-    const claim = { claimant: { org: "acme" }, signatures: [{ keyid: "x", sig: "y" }] };
-    const subjectsNoManifest = signSubjects(dir, claim);
-    assert.equal(subjectsNoManifest.length, 1);
-    assert.equal(subjectsNoManifest[0]?.name, "claim.json");
-
-    writeFileSync(join(dir, "manifest.json"), '{"k":"v"}');
-    const subjectsWithManifest = signSubjects(dir, claim);
-    assert.equal(subjectsWithManifest.length, 2);
-    assert.equal(subjectsWithManifest[1]?.name, "manifest.json");
-    // The claim.json digest is identical whether or not `signatures` is present, since it is always
-    // excluded from the hashed body.
-    const claimNoSignatures = { claimant: { org: "acme" } };
-    const subjectsNoSig = signSubjects(dir, claimNoSignatures);
-    assert.equal(subjectsNoSig[0]?.digest.sha256, subjectsWithManifest[0]?.digest.sha256);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
+test("signSubjects hashes the claim body (minus signatures) and the manifest's raw bytes", () => {
+  const claim = { claimant: { org: "acme" }, signatures: [{ keyid: "x", sig: "y" }] };
+  const manifest = Buffer.from('{"k":"v"}');
+  const subjects = signSubjects(claim, manifest);
+  assert.deepEqual(
+    subjects.map((s) => s.name),
+    ["claim.json", "manifest.json"],
+  );
+  assert.equal(subjects[1]?.digest.sha256, createHash("sha256").update(manifest).digest("hex"));
+  // The claim.json digest is identical whether or not `signatures` is present, since it is always
+  // excluded from the hashed body.
+  const subjectsNoSig = signSubjects({ claimant: { org: "acme" } }, manifest);
+  assert.equal(subjectsNoSig[0]?.digest.sha256, subjects[0]?.digest.sha256);
 });

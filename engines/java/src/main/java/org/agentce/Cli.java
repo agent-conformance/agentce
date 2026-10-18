@@ -2277,6 +2277,45 @@ global options:
         return defaultValue;
     }
 
+    /** Every path {@code sign} writes resolves inside the report folder: a claim.json, signatures/ or
+     * trust-root.json that links out of it is refused before anything is written (ruling R7); matches
+     * {@code _refuse_sign_targets_outside}. */
+    static void refuseSignTargetsOutside(Path reportDir, String role, String profile, boolean writeTrustRoot) {
+        String root = Bundle.resolveLoose(reportDir);
+        List<String> targets =
+                new ArrayList<>(List.of("claim.json", "signatures/" + role + "-" + profile + ".dsse.json"));
+        if (writeTrustRoot) {
+            targets.add("trust-root.json");
+        }
+        for (String target : targets) {
+            String resolved = Bundle.resolveLoose(reportDir.resolve(target));
+            String prefix = root == null || root.endsWith("/") ? root : root + "/";
+            if (root == null || resolved == null || !(resolved.equals(root) || resolved.startsWith(prefix))) {
+                throw new InputError(
+                        "sign.claim_outside_report",
+                        target + " links outside the report directory.",
+                        "replace the link with the file itself, inside the report directory.");
+            }
+        }
+    }
+
+    /** manifest.json's bytes, which the signature covers: absent, not a regular file or unreadable
+     * (mode 000, behind a folder that cannot be entered) is refused, never signed without; matches
+     * {@code _read_sign_manifest}. */
+    static byte[] readSignManifest(Path manifestPath) {
+        try {
+            if (Files.isRegularFile(manifestPath)) {
+                return Files.readAllBytes(manifestPath);
+            }
+        } catch (IOException | SecurityException e) {
+            // fall through to the refusal
+        }
+        throw new InputError(
+                "sign.no_manifest",
+                "the report directory has no readable manifest.json, which the signature covers.",
+                "produce the report again: `agentce assess … --out <report-dir>`.");
+    }
+
     /** claim.json as {@code sign} appends to it, as Python's {@code _read_sign_claim}: an object whose
      * {@code signatures}, when present, is a list. Read through verify's own strict reader, with
      * verify's wording. */
@@ -2379,7 +2418,9 @@ global options:
                     "the report directory has no claim.json to sign.",
                     "produce the report first: `agentce assess … --out <report-dir>`.");
         }
+        refuseSignTargetsOutside(reportDir, role, profile, writeTrustRoot);
         ObjectNode claim = readSignClaim(claimPath);
+        byte[] manifest = readSignManifest(reportDir.resolve("manifest.json"));
 
         if (dryRun) {
             result.note("dry run: would sign the claim as " + role + " (" + profile + ")");
@@ -2387,7 +2428,7 @@ global options:
         }
 
         Sign.Signer signer = signSigner(parsed.key(), profile);
-        ArrayNode subjects = Sign.signSubjects(reportDir, claim);
+        ArrayNode subjects = Sign.signSubjects(claim, manifest);
         ObjectNode statement = Json.nodes().objectNode();
         statement.put("_type", Sign.INTOTO_STATEMENT_TYPE);
         statement.set("subject", subjects);

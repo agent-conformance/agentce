@@ -21,6 +21,7 @@ import {
   readdirSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1526,13 +1527,14 @@ function edKeyFile(dir: string, name = "key.pem"): { path: string; rawPublicKey:
 }
 
 /** A READY report directory (reusing {@link readinessReport}'s clean shape) with a `claim.json` to
- * sign, the minimal shape `_sign_subjects`/`cmd_sign` need. */
+ * sign and the `manifest.json` it covers, the minimal shape `_sign_subjects`/`cmd_sign` need. */
 function signReportDir(
   dir: string,
   claim: Record<string, unknown> = { claimant: { org: "acme" } },
 ): string {
   const reportDir = readinessReport(dir);
   writeFileSync(join(reportDir, "claim.json"), JSON.stringify(claim));
+  writeFileSync(join(reportDir, "manifest.json"), '{"engine":"test"}');
   return reportDir;
 }
 
@@ -1910,6 +1912,113 @@ test("sign: --write-trust-root without profile kms gives sign.trust_root_require
       error.fix,
       "pass --profile kms --key <ed25519-private-key.pem> --write-trust-root.",
     );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+for (const kind of ["absent", "folder", "dangling", "mode000"] as const) {
+  test(
+    `sign: a manifest.json that is ${kind} gives sign.no_manifest (18.166)`,
+    {
+      skip: kind === "mode000" && process.getuid?.() === 0,
+    },
+    () => {
+      const dir = mkdtempSync(join(tmpdir(), "agentce-cli-sign-"));
+      const report = signReportDir(dir);
+      const manifest = join(report, "manifest.json");
+      rmSync(manifest);
+      if (kind === "folder") {
+        mkdirSync(manifest);
+      } else if (kind === "dangling") {
+        symlinkSync(join(dir, "gone.json"), manifest);
+      } else if (kind === "mode000") {
+        writeFileSync(manifest, "{}");
+        chmodSync(manifest, 0);
+      }
+      try {
+        const { exitCode, envelope } = runJson([
+          "sign",
+          report,
+          "--as",
+          "claimant",
+          "--profile",
+          "kms",
+          "--dry-run",
+        ]);
+        assert.equal(exitCode, 3);
+        assert.equal((envelope.error as { message_key: string }).message_key, "sign.no_manifest");
+      } finally {
+        if (kind === "mode000") {
+          chmodSync(manifest, 0o600);
+        }
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  );
+}
+
+for (const [target, extra] of [
+  ["claim.json", []],
+  ["signatures", []],
+  ["trust-root.json", ["--write-trust-root"]],
+] as const) {
+  test(`sign: ${target} linked outside the report folder gives sign.claim_outside_report (18.166)`, () => {
+    const dir = mkdtempSync(join(tmpdir(), "agentce-cli-sign-"));
+    try {
+      const report = signReportDir(dir);
+      const outside = join(dir, "outside");
+      mkdirSync(outside);
+      writeFileSync(join(outside, "claim.json"), "{}");
+      if (target === "claim.json") {
+        rmSync(join(report, "claim.json"));
+      }
+      symlinkSync(
+        target === "signatures" ? outside : join(outside, "claim.json"),
+        join(report, target),
+      );
+      for (const args of [["--dry-run"], ["--key", join(dir, "missing.pem")]]) {
+        const { exitCode, envelope } = runJson([
+          "sign",
+          report,
+          "--as",
+          "claimant",
+          "--profile",
+          "kms",
+          ...args,
+          ...extra,
+        ]);
+        assert.equal(exitCode, 3);
+        assert.equal(
+          (envelope.error as { message_key: string }).message_key,
+          "sign.claim_outside_report",
+        );
+      }
+      assert.equal(readFileSync(join(outside, "claim.json"), "utf-8"), "{}");
+      assert.deepEqual(readdirSync(outside), ["claim.json"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
+test("sign: a claim.json linked inside the report folder is accepted", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-sign-"));
+  try {
+    const report = signReportDir(dir);
+    rmSync(join(report, "claim.json"));
+    writeFileSync(join(report, "real-claim.json"), "{}");
+    symlinkSync("real-claim.json", join(report, "claim.json"));
+    const { exitCode } = runJson([
+      "sign",
+      report,
+      "--as",
+      "claimant",
+      "--profile",
+      "kms",
+      "--dry-run",
+    ]);
+    assert.equal(exitCode, 0);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

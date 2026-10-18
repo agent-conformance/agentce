@@ -109,6 +109,8 @@ _KINDS: dict[str, str] = {
     "sign.key_unreadable": "error",
     "sign.not_ready": "error",
     "sign.no_claim": "error",
+    "sign.no_manifest": "error",
+    "sign.claim_outside_report": "error",
     "sign.claim_malformed": "error",
     "sign.kms_key_missing": "error",
     "sign.key_algorithm": "error",

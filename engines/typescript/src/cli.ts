@@ -21,7 +21,7 @@ import {
   evaluatedNothing,
 } from "./assess";
 import { computeBlindSpots } from "./blindSpots";
-import { listedPaths, loadBundle } from "./bundle";
+import { listedPaths, loadBundle, resolveLoose } from "./bundle";
 import { DEFAULT_LENS, catalogsDir as bundledCatalogsDir, quickstartDir } from "./bundled";
 import { type Catalog, loadCatalog } from "./catalog";
 import { runEcs } from "./conformance";
@@ -2185,10 +2185,54 @@ function signSigner(keyPath: string | undefined, profile: string): Signer {
   );
 }
 
-/** `agentce sign` (SPEC §8.7, §9.1, item 18.26): the Ed25519/DSSE/in-toto signing flow, `kms` profile,
- * matching the Python reference's `cmd_sign` byte for byte (see `sign.ts`). Refuses to sign unless the
- * report's readiness verdict is not `NOT READY` (`agentce readiness`'s own gate, computed the same
- * way). */
+/** Every path `sign` writes resolves inside the report folder: a claim.json, signatures/ or
+ * trust-root.json that links out of it is refused before anything is written (ruling R7); matches
+ * `_refuse_sign_targets_outside`. */
+function refuseSignTargetsOutside(
+  reportDir: string,
+  role: string,
+  profile: string,
+  writeTrustRoot: boolean,
+): void {
+  const root = resolveLoose(reportDir);
+  const targets = ["claim.json", join("signatures", `${role}-${profile}.dsse.json`)];
+  if (writeTrustRoot) {
+    targets.push("trust-root.json");
+  }
+  for (const target of targets) {
+    const resolved = resolveLoose(join(reportDir, target));
+    if (
+      root === null ||
+      resolved === null ||
+      (resolved !== root && !resolved.startsWith(root + sep))
+    ) {
+      throw new InputError(
+        "sign.claim_outside_report",
+        `${target} links outside the report directory.`,
+        "replace the link with the file itself, inside the report directory.",
+      );
+    }
+  }
+}
+
+/** manifest.json's bytes, which the signature covers: absent, not a regular file or unreadable (mode
+ * 000, behind a folder that cannot be entered) is refused, never signed without; matches
+ * `_read_sign_manifest`. */
+function readSignManifest(manifestPath: string): Buffer {
+  try {
+    if (statSync(manifestPath).isFile()) {
+      return readFileSync(manifestPath);
+    }
+  } catch {
+    // fall through to the refusal
+  }
+  throw new InputError(
+    "sign.no_manifest",
+    "the report directory has no readable manifest.json, which the signature covers.",
+    "produce the report again: `agentce assess … --out <report-dir>`.",
+  );
+}
+
 /** claim.json as `sign` appends to it, as Python's `_read_sign_claim`: an object whose `signatures`,
  * when present, is a list. Read through verify's own strict reader, with verify's wording. */
 function readSignClaim(claimPath: string): Record<string, unknown> {
@@ -2213,6 +2257,10 @@ function readSignClaim(claimPath: string): Record<string, unknown> {
   return claim;
 }
 
+/** `agentce sign` (SPEC §8.7, §9.1, item 18.26): the Ed25519/DSSE/in-toto signing flow, `kms` profile,
+ * matching the Python reference's `cmd_sign` byte for byte (see `sign.ts`). Refuses to sign unless the
+ * report's readiness verdict is not `NOT READY` (`agentce readiness`'s own gate, computed the same
+ * way). */
 function cmdSign(argv: string[]): CommandResult {
   const result = new CommandResult("sign");
   const args = parseSignArgv(argv);
@@ -2275,7 +2323,9 @@ function cmdSign(argv: string[]): CommandResult {
       "produce the report first: `agentce assess … --out <report-dir>`.",
     );
   }
+  refuseSignTargetsOutside(reportDir, role, profile, writeTrustRoot);
   const claim = readSignClaim(claimPath);
+  const manifest = readSignManifest(join(reportDir, "manifest.json"));
 
   if (dryRun) {
     result.note(`dry run: would sign the claim as ${role} (${profile})`);
@@ -2283,7 +2333,7 @@ function cmdSign(argv: string[]): CommandResult {
   }
 
   const signer = signSigner(args.key, profile);
-  const subjects = signSubjects(reportDir, claim);
+  const subjects = signSubjects(claim, manifest);
   const statement = {
     _type: INTOTO_STATEMENT_TYPE,
     subject: subjects,

@@ -26,8 +26,11 @@ import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * The CLI verbs {@code validate}, {@code assess}, {@code report}, and {@code quickstart} on the
@@ -1260,10 +1263,12 @@ class CliTest {
     }
 
     /** A READY report directory (reusing {@link #readinessReport(Path)}'s clean shape) with a
-     * {@code claim.json} to sign, the minimal shape {@code signSubjects}/{@code cmdSign} need. */
+     * {@code claim.json} to sign and the {@code manifest.json} it covers, the minimal shape {@code
+     * signSubjects}/{@code cmdSign} need. */
     private static Path signReportDir(Path dir, String claimJson) throws IOException {
         Path reportDir = readinessReport(dir);
         Files.writeString(reportDir.resolve("claim.json"), claimJson);
+        Files.writeString(reportDir.resolve("manifest.json"), "{\"engine\":\"test\"}");
         return reportDir;
     }
 
@@ -1309,6 +1314,74 @@ class CliTest {
         JsonNode env = runJson("sign", report.toString(), "--as", "claimant", "--dry-run");
         assertEquals(3, env.get("exit_code").asInt());
         assertEquals("sign.no_claim", env.get("error").get("message_key").asText());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"absent", "folder", "dangling", "mode000"})
+    void signWithoutAReadableManifestGivesNoManifest(String kind, @TempDir Path dir) throws Exception {
+        Assumptions.assumeFalse(
+                "mode000".equals(kind) && "root".equals(System.getProperty("user.name")), "root reads mode 000");
+        Path report = signReportDir(dir);
+        Path manifest = report.resolve("manifest.json");
+        Files.delete(manifest);
+        switch (kind) {
+            case "folder" -> Files.createDirectory(manifest);
+            case "dangling" -> Files.createSymbolicLink(manifest, dir.resolve("gone.json"));
+            case "mode000" -> {
+                Files.writeString(manifest, "{}");
+                Files.setPosixFilePermissions(manifest, Set.of());
+            }
+            default -> { }
+        }
+        try {
+            JsonNode env = runJson("sign", report.toString(), "--as", "claimant", "--profile", "kms", "--dry-run");
+            assertEquals(3, env.get("exit_code").asInt());
+            assertEquals("sign.no_manifest", env.get("error").get("message_key").asText());
+        } finally {
+            if ("mode000".equals(kind)) {
+                Files.setPosixFilePermissions(
+                        manifest, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"claim.json", "signatures", "trust-root.json"})
+    void signRefusesAWriteTargetLinkedOutside(String target, @TempDir Path dir) throws Exception {
+        Path report = signReportDir(dir);
+        Path outside = Files.createDirectory(dir.resolve("outside"));
+        Files.writeString(outside.resolve("claim.json"), "{}");
+        if ("claim.json".equals(target)) {
+            Files.delete(report.resolve("claim.json"));
+        }
+        Files.createSymbolicLink(
+                report.resolve(target), "signatures".equals(target) ? outside : outside.resolve("claim.json"));
+        String missingKey = dir.resolve("missing.pem").toString();
+        for (String[] args : List.of(new String[] {"--dry-run"}, new String[] {"--key", missingKey})) {
+            List<String> argv =
+                    new ArrayList<>(List.of("sign", report.toString(), "--as", "claimant", "--profile", "kms"));
+            argv.addAll(Arrays.asList(args));
+            if ("trust-root.json".equals(target)) {
+                argv.add("--write-trust-root");
+            }
+            JsonNode env = runJson(argv.toArray(String[]::new));
+            assertEquals(3, env.get("exit_code").asInt());
+            assertEquals("sign.claim_outside_report", env.get("error").get("message_key").asText());
+        }
+        assertEquals("{}", Files.readString(outside.resolve("claim.json")));
+        try (Stream<Path> listed = Files.list(outside)) {
+            assertEquals(List.of("claim.json"), listed.map(p -> p.getFileName().toString()).toList());
+        }
+    }
+
+    @Test
+    void signAcceptsAClaimLinkedInside(@TempDir Path dir) throws Exception {
+        Path report = signReportDir(dir);
+        Files.delete(report.resolve("claim.json"));
+        Files.writeString(report.resolve("real-claim.json"), "{}");
+        Files.createSymbolicLink(report.resolve("claim.json"), Path.of("real-claim.json"));
+        JsonNode env = runJson("sign", report.toString(), "--as", "claimant", "--profile", "kms", "--dry-run");
+        assertEquals(0, env.get("exit_code").asInt());
     }
 
     @Test

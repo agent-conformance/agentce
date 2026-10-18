@@ -134,29 +134,24 @@ export interface SignSubject {
 }
 
 /** The in-toto subjects a claim signature covers: the claim body and the manifest, by digest --
- * matches `_sign_subjects` (`commands/__init__.py:2577-2596`) exactly. The claim body is every
- * top-level key except `signatures`, built by omission (never a JSON round trip that could reorder or
- * coerce values); the manifest, when present, is hashed over its raw file bytes (never
- * re-encoded/normalized). */
-export function signSubjects(reportDir: string, claim: Record<string, unknown>): SignSubject[] {
+ * matches `_sign_subjects` exactly. The claim body is every top-level key except `signatures`, built
+ * by omission (never a JSON round trip that could reorder or coerce values); the manifest is hashed
+ * over its raw file bytes (never re-encoded/normalized), which `sign` has already read. */
+export function signSubjects(claim: Record<string, unknown>, manifest: Buffer): SignSubject[] {
   const body: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(claim)) {
     if (key !== "signatures") {
       body[key] = value;
     }
   }
-  const subjects: SignSubject[] = [
+  return [
     {
       name: "claim.json",
       digest: { sha256: createHash("sha256").update(canonicalize(body)).digest("hex") },
     },
-  ];
-  const manifestPath = join(reportDir, "manifest.json");
-  if (existsSync(manifestPath) && statSync(manifestPath).isFile()) {
-    subjects.push({
+    {
       name: "manifest.json",
-      digest: { sha256: createHash("sha256").update(readFileSync(manifestPath)).digest("hex") },
-    });
-  }
-  return subjects;
+      digest: { sha256: createHash("sha256").update(manifest).digest("hex") },
+    },
+  ];
 }

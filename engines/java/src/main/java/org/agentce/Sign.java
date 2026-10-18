@@ -457,11 +457,11 @@ public final class Sign {
     }
 
     /** The in-toto subjects a claim signature covers: the claim body and the manifest, by digest --
-     * matches {@code _sign_subjects} (`commands/__init__.py:2577-2596`) exactly. The claim body is
-     * every top-level key except {@code signatures} (built by omission, never a JSON round trip that
-     * could reorder or coerce values); the manifest, when present, is hashed over its raw file bytes
-     * (never re-encoded/normalized). */
-    public static ArrayNode signSubjects(Path reportDir, JsonNode claim) {
+     * matches {@code _sign_subjects} exactly. The claim body is every top-level key except {@code
+     * signatures} (built by omission, never a JSON round trip that could reorder or coerce values);
+     * the manifest is hashed over its raw file bytes (never re-encoded/normalized), which {@code sign}
+     * has already read. */
+    public static ArrayNode signSubjects(JsonNode claim, byte[] manifest) {
         ObjectNode body = Json.nodes().objectNode();
         var fields = claim.fields();
         while (fields.hasNext()) {
@@ -474,17 +474,9 @@ public final class Sign {
         ObjectNode claimSubject = subjects.addObject();
         claimSubject.put("name", "claim.json");
         claimSubject.putObject("digest").put("sha256", Canonical.sha256Hex(body));
-        Path manifestPath = reportDir.resolve("manifest.json");
-        if (Files.isRegularFile(manifestPath)) {
-            try {
-                byte[] manifestBytes = Files.readAllBytes(manifestPath);
-                ObjectNode manifestSubject = subjects.addObject();
-                manifestSubject.put("name", "manifest.json");
-                manifestSubject.putObject("digest").put("sha256", Canonical.sha256Hex(manifestBytes));
-            } catch (IOException e) {
-                throw new IllegalStateException("cannot read " + manifestPath + ": " + e.getMessage(), e);
-            }
-        }
+        ObjectNode manifestSubject = subjects.addObject();
+        manifestSubject.put("name", "manifest.json");
+        manifestSubject.putObject("digest").put("sha256", Canonical.sha256Hex(manifest));
         return subjects;
     }
 }

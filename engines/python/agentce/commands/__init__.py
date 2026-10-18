@@ -3217,14 +3217,16 @@ def cmd_sign(ns: argparse.Namespace) -> CommandResult:
             "the report directory has no claim.json to sign.",
             "produce the report first: `agentce assess … --out <report-dir>`.",
         )
+    _refuse_sign_targets_outside(report_dir, role, profile, write_trust_root)
     claim = _read_sign_claim(claim_path)
+    manifest = _read_sign_manifest(report_dir / "manifest.json")
 
     if dry_run:
         result.note(f"dry run: would sign the claim as {role} ({profile})")
         return result
 
     signer = _sign_signer(ns, profile)
-    subjects = _sign_subjects(report_dir, claim)
+    subjects = _sign_subjects(claim, manifest)
     statement = {
         "_type": signing.INTOTO_STATEMENT_TYPE,
         "subject": subjects,
@@ -3282,6 +3284,49 @@ def cmd_sign(ns: argparse.Namespace) -> CommandResult:
     return result
 
 
+def _refuse_sign_targets_outside(
+    report_dir: Path, role: str, profile: str, write_trust_root: bool
+) -> None:
+    """Every path sign writes resolves inside the report directory: a claim.json, signatures/ or
+    trust-root.json that links out of it is refused before anything is written (ruling R7)."""
+    root = report_dir.resolve()
+    targets = [
+        report_dir / "claim.json",
+        report_dir / "signatures" / f"{role}-{profile}.dsse.json",
+    ]
+    if write_trust_root:
+        targets.append(report_dir / "trust-root.json")
+    for target in targets:
+        try:
+            inside = target.resolve().is_relative_to(root)
+        except (
+            OSError,
+            RuntimeError,
+        ):  # a link loop: 3.12 raises RuntimeError, 3.13+ OSError
+            inside = False
+        if not inside:
+            raise InputError(
+                "sign.claim_outside_report",
+                f"{target.relative_to(report_dir)} links outside the report directory.",
+                "replace the link with the file itself, inside the report directory.",
+            )
+
+
+def _read_sign_manifest(manifest_path: Path) -> bytes:
+    """manifest.json's bytes, which the signature covers: absent, not a regular file or unreadable
+    (mode 000, behind a folder that cannot be entered) is refused, never signed without."""
+    try:
+        if signing.is_regular_file(manifest_path, unreadable_is_absent=True):
+            return manifest_path.read_bytes()
+    except OSError:
+        pass
+    raise InputError(
+        "sign.no_manifest",
+        "the report directory has no readable manifest.json, which the signature covers.",
+        "produce the report again: `agentce assess … --out <report-dir>`.",
+    )
+
+
 def _read_sign_claim(claim_path: Path) -> dict[str, Any]:
     """claim.json as `sign` appends to it: an object whose `signatures`, when present, is a list.
     The causes are verify's own wording; a null `signatures` is refused, never read as none."""
@@ -3302,26 +3347,19 @@ def _read_sign_claim(claim_path: Path) -> dict[str, Any]:
     return claim
 
 
-def _sign_subjects(report_dir: Path, claim: dict[str, Any]) -> list[dict[str, Any]]:
+def _sign_subjects(claim: dict[str, Any], manifest: bytes) -> list[dict[str, Any]]:
     """The in-toto subjects a claim signature covers: the claim body and the manifest, by digest."""
     body = {k: v for k, v in claim.items() if k != "signatures"}
-    subjects = [
+    return [
         {
             "name": "claim.json",
             "digest": {"sha256": hashlib.sha256(canonicalize(body)).hexdigest()},
-        }
+        },
+        {
+            "name": "manifest.json",
+            "digest": {"sha256": hashlib.sha256(manifest).hexdigest()},
+        },
     ]
-    manifest_path = report_dir / "manifest.json"
-    if manifest_path.is_file():
-        subjects.append(
-            {
-                "name": "manifest.json",
-                "digest": {
-                    "sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest()
-                },
-            }
-        )
-    return subjects
 
 
 def _sign_signer(ns: argparse.Namespace, profile: str) -> signing.Signer:

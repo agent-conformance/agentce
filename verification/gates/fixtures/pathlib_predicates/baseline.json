@@ -13,7 +13,6 @@
     "agentce/commands/__init__.py::_cmd_catalog_sign::sig_path.exists": 1,
     "agentce/commands/__init__.py::_declaration_path::(project / name).is_file": 1,
     "agentce/commands/__init__.py::_declaration_path::nested.is_file": 1,
-    "agentce/commands/__init__.py::_sign_subjects::manifest_path.is_file": 1,
     "agentce/commands/__init__.py::_verify_release::release_path.is_file": 1,
     "agentce/commands/__init__.py::_verify_report::produced.is_file": 1,
     "agentce/commands/__init__.py::cmd_catalog::(directory / 'catalog.yaml').is_file": 1,
