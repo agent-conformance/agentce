@@ -274,9 +274,10 @@ public final class Catalog {
         Map<String, byte[]> files = new LinkedHashMap<>();
         List<String> rels = coveredFiles(root, Set.of(Verify.CATALOG_SIGNATURE_NAME));
         refuseFolderControls(root);
+        Path realRoot = realPath(root);
         Set<String> linksOut = new TreeSet<>(Json::byteCompare);
         for (String rel : rels) {
-            if (linksOutside(root, rel)) {
+            if (linksOutside(root, realRoot, rel)) {
                 linksOut.add(rel);
             }
             byte[] content = first.get(rel);
@@ -316,14 +317,15 @@ public final class Catalog {
         }
     }
 
-    /** Whether {@code rel} is itself a link whose target resolves outside {@code root}'s real path. */
-    private static boolean linksOutside(Path root, String rel) {
+    /** Whether {@code rel} is itself a link whose target resolves outside {@code realRoot}, the catalog's real path. */
+    private static boolean linksOutside(Path root, Path realRoot, String rel) {
         Path path = root.resolve(rel);
-        if (!Files.isSymbolicLink(path)) {
-            return false;
-        }
+        return Files.isSymbolicLink(path) && !realPath(path).startsWith(realRoot);
+    }
+
+    private static Path realPath(Path path) {
         try {
-            return !path.toRealPath().startsWith(root.toRealPath());
+            return path.toRealPath();
         } catch (IOException e) {
             throw new IllegalStateException("cannot read " + path + ": " + e.getMessage(), e);
         }

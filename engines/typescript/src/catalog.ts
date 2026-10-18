@@ -13,6 +13,7 @@ import { load } from "js-yaml";
 import { errorCause, errorFix } from "./errorCatalogue";
 import { AgentceError, InputError, catalogUnreadable } from "./errors";
 import { type Shape, parseShapesTtl } from "./psp";
+import { isFileFollowingLinks } from "./report";
 import { SOURCE_CLASS_FROM, SOURCE_CLASS_RANK } from "./sourceClass";
 import { byteCompare, formatTemplate } from "./util";
 import { type CatalogFiles, readCatalogFiles } from "./verify";
@@ -241,11 +242,7 @@ function isPresentButNotAFile(path: string): boolean {
   } catch {
     return false;
   }
-  try {
-    return !statSync(path).isFile();
-  } catch {
-    return true;
-  }
+  return !isFileFollowingLinks(path);
 }
 
 function loadCovered(directory: string): Catalog {

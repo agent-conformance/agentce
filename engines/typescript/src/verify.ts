@@ -25,7 +25,7 @@ import {
 } from "./errors";
 import { NonCanonicalNumber, parseJson } from "./json";
 import { pyTruthy } from "./readiness";
-import { coveredFiles, digestFiles, skippedPart } from "./report";
+import { coveredFiles, digestFiles, isDirFollowingLinks, skippedPart } from "./report";
 import { dssePae, keyidFor } from "./sign";
 import { b64dStrict, byteCompare, decodeUtf8Strict, formatTemplate, pyRepr } from "./util";
 
@@ -47,24 +47,16 @@ export interface CatalogFiles {
  * the walk would enter it and the control would vanish, so it throws naming it (18.181). */
 function refuseFolderControls(root: string): void {
   const controls = join(root, "controls");
-  if (!isDirectory(controls)) {
+  if (!isDirFollowingLinks(controls)) {
     return;
   }
   for (const name of readdirSync(controls).sort(byteCompare)) {
-    if (name.endsWith(".yaml") && !skippedPart(name) && isDirectory(join(controls, name))) {
+    if (name.endsWith(".yaml") && !skippedPart(name) && isDirFollowingLinks(join(controls, name))) {
       throw Object.assign(new Error(`a folder, not a file: ${name}`), {
         code: "EISDIR",
         path: join(controls, name),
       });
     }
-  }
-}
-
-function isDirectory(path: string): boolean {
-  try {
-    return statSync(path).isDirectory();
-  } catch {
-    return false;
   }
 }
 

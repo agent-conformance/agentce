@@ -3474,7 +3474,7 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
     assert linted.files is not None
     if linted.files.links_out:
         # The catalog signed is the folder handed over (18.181): never sign bytes kept elsewhere.
-        raise link_outside(linted.files, min(linted.files.links_out))
+        raise link_outside(min(linted.files.links_out))
     sig_path = directory / signing.CATALOG_SIGNATURE_NAME
     if sig_path.exists() and not _flag(ns, "force"):
         raise InputError(

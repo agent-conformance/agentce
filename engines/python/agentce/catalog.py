@@ -216,7 +216,7 @@ def _refuse_uncovered(key: str, control_id: str, path: str) -> InputError:
     )
 
 
-def link_outside(files: signing.CatalogFiles, rel: str) -> InputError:
+def link_outside(rel: str) -> InputError:
     """catalog.link_outside for ``rel``, a covered file that links outside the catalog folder (18.181)."""
     entry = MESSAGE_KEYS["catalog.link_outside"]
     return InputError(
@@ -579,8 +579,8 @@ def _lint_loaded(
         # A catalog published with provenance is the folder handed over: a file linked from outside
         # it would not travel with it (18.181).
         problems.extend(
-            f"{exc.key}: {exc.cause}"
-            for exc in (link_outside(files, rel) for rel in sorted(files.links_out))
+            f"catalog.link_outside: {link_outside(rel).cause}"
+            for rel in sorted(files.links_out)
         )
         problems.extend(_provenance_problems(files, meta))
     floor = meta.get("min_crosswalk_frameworks", 0)

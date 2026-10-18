@@ -43,7 +43,7 @@ const NAMESPACE_URL = "6ba7b811-9dad-11d1-80b4-00c04fd430c8";
 const PROVENANCE_EXCLUDE = new Set(["catalog.sig.json", "catalog.yaml"]);
 
 /** Python's `Path.is_file()`: follows a symlink, and an unresolvable one is not a file. */
-function isFileFollowingLinks(path: string): boolean {
+export function isFileFollowingLinks(path: string): boolean {
   try {
     return statSync(path).isFile();
   } catch {
@@ -60,7 +60,7 @@ function folderIdentity(path: string): string {
 
 /** Whether `path`, following links, is a folder: a missing target or a link loop is not, and any
  * other error (a parent that cannot be entered) propagates, as Python's `signing.is_directory`. */
-function isDirFollowingLinks(path: string): boolean {
+export function isDirFollowingLinks(path: string): boolean {
   try {
     return statSync(path).isDirectory();
   } catch (err) {
