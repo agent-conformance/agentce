@@ -136,6 +136,7 @@ _KINDS: dict[str, str] = {
     "catalog.shape.parse_error": "error",
     "catalog.evidence_shape.unresolved": "error",
     "catalog.shape.unresolved": "error",
+    "catalog.link_outside": "error",
     "catalog.control.min_source_class_unknown": "error",
     "catalog.control.source_class_from_unknown": "error",
     "catalog.evidence_shape.passed_case_unjudged": "error",
