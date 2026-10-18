@@ -80,13 +80,12 @@ class CatalogUnreadableWalkTest {
     }
 
     @Test
-    void aDanglingOrLoopingLinkIsSkipped(@TempDir Path tmp) throws IOException {
+    void aDanglingOrLoopingLinkIsRefusedNamingTheFirst(@TempDir Path tmp) throws IOException {
+        // Never skipped (18.181): a covered entry that is not a file is unreadable, named in byte order.
         Path root = treeWithOneFile(tmp);
-        List<String> before = Catalog.coveredFiles(root, SIG);
-        String digest = Catalog.digestTree(root, SIG);
         Files.createSymbolicLink(root.resolve("a/gone.ttl"), tmp.resolve("no-such-file"));
         Files.createSymbolicLink(root.resolve("a/loop"), root.resolve("a/loop"));
-        assertEquals(before, Catalog.coveredFiles(root, SIG));
-        assertEquals(digest, Catalog.digestTree(root, SIG));
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> Catalog.coveredFiles(root, SIG));
+        assertEquals("a/gone.ttl", InputError.unreadableRel(root, e));
     }
 }

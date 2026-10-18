@@ -110,11 +110,10 @@ class CatalogTest {
         assertEquals(Catalog.digestTree(real, Set.of()), before);
         Files.writeString(target.resolve("DOC-01.yaml"), "id: EDITED\n");
         assertNotEquals(before, Catalog.digestTree(linked, Set.of()));
-        // A dangling folder link and a link to itself are skipped, as at base.
-        String unlinked = Catalog.digestTree(real, Set.of());
+        // A dangling folder link and a link to itself are refused, never skipped (18.181).
         Files.createSymbolicLink(real.resolve("gone"), tmp.resolve("nowhere"));
         Files.createSymbolicLink(real.resolve("self"), Path.of("self"));
-        assertEquals(unlinked, Catalog.digestTree(real, Set.of()));
+        assertThrows(IllegalStateException.class, () -> Catalog.digestTree(real, Set.of()));
     }
 
     @Test

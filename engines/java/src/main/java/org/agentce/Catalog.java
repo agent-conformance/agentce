@@ -7,8 +7,10 @@ import java.io.IOException;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AccessDeniedException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.FileSystemLoopException;
+import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -20,7 +22,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /**
@@ -43,7 +47,9 @@ public final class Catalog {
     /** One read of a catalog folder (18.171): every file the catalog digest covers, by POSIX relpath,
      * read once. The signature check and the loader both read these bytes, never the folder again, so a
      * file changed on disk during a run cannot be loaded unverified or verified unloaded. */
-    public record CatalogFiles(Path root, Map<String, byte[]> files) {
+    /** {@code linksOut}: the covered files that are links to a file outside the catalog folder (18.181): a
+     * signed load refuses them; other reads follow them. */
+    public record CatalogFiles(Path root, Map<String, byte[]> files, Set<String> linksOut) {
         public String digest(Set<String> exclude) {
             return digestFiles(files, exclude);
         }
@@ -266,7 +272,13 @@ public final class Catalog {
      * second time. A file that cannot be read throws IllegalStateException, as {@link #digestTree}. */
     public static CatalogFiles readFiles(Path root, Map<String, byte[]> first) {
         Map<String, byte[]> files = new LinkedHashMap<>();
-        for (String rel : coveredFiles(root, Set.of(Verify.CATALOG_SIGNATURE_NAME))) {
+        List<String> rels = coveredFiles(root, Set.of(Verify.CATALOG_SIGNATURE_NAME));
+        refuseFolderControls(root);
+        Set<String> linksOut = new TreeSet<>(Json::byteCompare);
+        for (String rel : rels) {
+            if (linksOutside(root, rel)) {
+                linksOut.add(rel);
+            }
             byte[] content = first.get(rel);
             if (content == null) {
                 Path path = root.resolve(rel);
@@ -278,7 +290,49 @@ public final class Catalog {
             }
             files.put(rel, content);
         }
-        return new CatalogFiles(root, Collections.unmodifiableMap(files));
+        return new CatalogFiles(
+                root, Collections.unmodifiableMap(files), Collections.unmodifiableSet(linksOut));
+    }
+
+    /** A folder named like a control file ({@code controls/<name>.yaml}) is where the loader reads a
+     * control: the walk would enter it and the control would vanish, so it is refused naming it (18.181). */
+    private static void refuseFolderControls(Path root) {
+        Path controls = root.resolve("controls");
+        if (!Files.isDirectory(controls)) {
+            return;
+        }
+        List<String> names = new ArrayList<>();
+        try (Stream<Path> stream = Files.list(controls)) {
+            stream.map(p -> p.getFileName().toString()).forEach(names::add);
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot list " + controls + ": " + e.getMessage(), e);
+        }
+        names.sort(Json::byteCompare);
+        for (String name : names) {
+            Path path = controls.resolve(name);
+            if (name.endsWith(".yaml") && !skippedPart(name) && Files.isDirectory(path)) {
+                throw notAFile(path, "a folder, not a file");
+            }
+        }
+    }
+
+    /** Whether {@code rel} is itself a link whose target resolves outside {@code root}'s real path. */
+    private static boolean linksOutside(Path root, String rel) {
+        Path path = root.resolve(rel);
+        if (!Files.isSymbolicLink(path)) {
+            return false;
+        }
+        try {
+            return !path.toRealPath().startsWith(root.toRealPath());
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot read " + path + ": " + e.getMessage(), e);
+        }
+    }
+
+    /** The refusal for an entry that is there but cannot be read as a file; it names {@code path}. */
+    private static IllegalStateException notAFile(Path path, String why) {
+        return new IllegalStateException(
+                why + ": " + path, new FileSystemException(path.toString(), null, why));
     }
 
     private static byte[] readBytes(Path path) {
@@ -331,9 +385,14 @@ public final class Catalog {
     public static Catalog load(Path directory) {
         // catalog.yaml first, as before: a folder without one is refused naming it. Every covered file is
         // then read once (18.171) and kept as files, which the signature check and provenance digest read.
+        // One that is there but is not a regular file (a FIFO would block the read) is refused unopened (18.181).
+        Path metaPath = directory.resolve("catalog.yaml");
+        if (!Files.isRegularFile(metaPath) && Files.exists(metaPath, LinkOption.NOFOLLOW_LINKS)) {
+            throw Verify.catalogUnreadable(directory, notAFile(metaPath, "not a regular file"));
+        }
         byte[] metaBytes;
         try {
-            metaBytes = Files.readAllBytes(directory.resolve("catalog.yaml"));
+            metaBytes = Files.readAllBytes(metaPath);
         } catch (IOException e) {
             throw Verify.catalogUnreadable(directory, e);
         }
@@ -477,7 +536,8 @@ public final class Catalog {
      * or looping link is skipped, an entry it cannot stat is refused ({@link #statFollowing}), and a
      * folder entered a second time (a cycle, or two names for one folder) is refused naming the second
      * name, so each folder is entered once. */
-    private static void collectFiles(Path dir, String base, List<String> out, Set<Object> entered) {
+    private static void collectFiles(
+            Path dir, String base, List<String> out, List<String> odd, Set<Object> entered) {
         List<String> names = new ArrayList<>();
         try (Stream<Path> stream = Files.list(dir)) {
             stream.map(p -> p.getFileName().toString()).forEach(names::add);
@@ -490,17 +550,18 @@ public final class Catalog {
             String rel = base.isEmpty() ? name : base + "/" + name;
             BasicFileAttributes attrs = statFollowing(full);
             if (attrs == null) {
-                continue;
-            }
-            if (attrs.isDirectory()) {
+                odd.add(rel);
+            } else if (attrs.isDirectory()) {
                 if (!entered.add(folderIdentity(full, attrs))) {
                     throw new IllegalStateException(
                             "folder reached twice: " + full,
                             new FileSystemLoopException(full.toString()));
                 }
-                collectFiles(full, rel, out, entered);
+                collectFiles(full, rel, out, odd, entered);
             } else if (attrs.isRegularFile()) {
                 out.add(rel);
+            } else {
+                odd.add(rel);
             }
         }
     }
@@ -516,15 +577,24 @@ public final class Catalog {
      * a loader reads can change without changing the digest. */
     public static List<String> coveredFiles(Path dir, Set<String> exclude) {
         List<String> rels = new ArrayList<>();
+        List<String> odd = new ArrayList<>();
         BasicFileAttributes attrs = statFollowing(dir);
         if (attrs != null && attrs.isDirectory()) {
             Set<Object> entered = new HashSet<>();
             entered.add(folderIdentity(dir, attrs));
-            collectFiles(dir, "", rels, entered);
+            collectFiles(dir, "", rels, odd, entered);
+        }
+        Predicate<String> uncovered = rel -> exclude.contains(rel)
+                || Arrays.stream(rel.split("/")).anyMatch(Catalog::skippedPart);
+        odd.sort(Json::byteCompare);
+        for (String rel : odd) {
+            if (!uncovered.test(rel)) {
+                // Refused as unreadable, never dropped from the digest or opened (18.181).
+                throw notAFile(dir.resolve(rel), "not a regular file or folder");
+            }
         }
         rels.sort(Json::byteCompare);
-        rels.removeIf(rel -> exclude.contains(rel)
-                || Arrays.stream(rel.split("/")).anyMatch(Catalog::skippedPart));
+        rels.removeIf(uncovered);
         return rels;
     }
 

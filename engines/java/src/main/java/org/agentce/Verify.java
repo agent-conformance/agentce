@@ -702,6 +702,11 @@ public final class Verify {
         if (!Files.isRegularFile(sigPath)) {
             return catalogSoftFail(digest, refusal("verify.catalog_unsigned"));
         }
+        if (!files.linksOut().isEmpty()) {
+            // A signed catalog is one folder of files (18.181): bytes behind a link do not travel with it.
+            return catalogSoftFail(
+                    digest, refusal("catalog.link_outside", "path", files.linksOut().iterator().next()));
+        }
         if (Bundle.cannotOpen(sigPath)) {
             throw catalogUnreadable(dir, CATALOG_SIGNATURE_NAME);
         }
