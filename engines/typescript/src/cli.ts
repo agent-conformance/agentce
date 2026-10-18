@@ -21,7 +21,7 @@ import {
   evaluatedNothing,
 } from "./assess";
 import { computeBlindSpots } from "./blindSpots";
-import { listedPaths, loadBundle, resolveLoose } from "./bundle";
+import { confineToRoot, listedPaths, loadBundle } from "./bundle";
 import { DEFAULT_LENS, catalogsDir as bundledCatalogsDir, quickstartDir } from "./bundled";
 import { type Catalog, loadCatalog } from "./catalog";
 import { runEcs } from "./conformance";
@@ -2194,21 +2194,15 @@ function refuseSignTargetsOutside(
   profile: string,
   writeTrustRoot: boolean,
 ): void {
-  const root = resolveLoose(reportDir);
-  const targets = ["claim.json", join("signatures", `${role}-${profile}.dsse.json`)];
+  const names = ["claim.json", `signatures/${role}-${profile}.dsse.json`];
   if (writeTrustRoot) {
-    targets.push("trust-root.json");
+    names.push("trust-root.json");
   }
-  for (const target of targets) {
-    const resolved = resolveLoose(join(reportDir, target));
-    if (
-      root === null ||
-      resolved === null ||
-      (resolved !== root && !resolved.startsWith(root + sep))
-    ) {
+  for (const name of names) {
+    if (confineToRoot(reportDir, name) === null) {
       throw new InputError(
         "sign.claim_outside_report",
-        `${target} links outside the report directory.`,
+        `${name} links outside the report directory.`,
         "replace the link with the file itself, inside the report directory.",
       );
     }

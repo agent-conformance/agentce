@@ -3289,25 +3289,14 @@ def _refuse_sign_targets_outside(
 ) -> None:
     """Every path sign writes resolves inside the report directory: a claim.json, signatures/ or
     trust-root.json that links out of it is refused before anything is written (ruling R7)."""
-    root = report_dir.resolve()
-    targets = [
-        report_dir / "claim.json",
-        report_dir / "signatures" / f"{role}-{profile}.dsse.json",
-    ]
+    names = ["claim.json", f"signatures/{role}-{profile}.dsse.json"]
     if write_trust_root:
-        targets.append(report_dir / "trust-root.json")
-    for target in targets:
-        try:
-            inside = target.resolve().is_relative_to(root)
-        except (
-            OSError,
-            RuntimeError,
-        ):  # a link loop: 3.12 raises RuntimeError, 3.13+ OSError
-            inside = False
-        if not inside:
+        names.append("trust-root.json")
+    for name in names:
+        if confine_to_root(report_dir, name) is None:
             raise InputError(
                 "sign.claim_outside_report",
-                f"{target.relative_to(report_dir)} links outside the report directory.",
+                f"{name} links outside the report directory.",
                 "replace the link with the file itself, inside the report directory.",
             )
 
@@ -3316,7 +3305,7 @@ def _read_sign_manifest(manifest_path: Path) -> bytes:
     """manifest.json's bytes, which the signature covers: absent, not a regular file or unreadable
     (mode 000, behind a folder that cannot be entered) is refused, never signed without."""
     try:
-        if signing.is_regular_file(manifest_path, unreadable_is_absent=True):
+        if signing.is_regular_file(manifest_path):
             return manifest_path.read_bytes()
     except OSError:
         pass

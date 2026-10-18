@@ -14,8 +14,7 @@ import {
   createPublicKey,
   sign as cryptoSign,
 } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { canonicalize } from "./canonical";
 import { InputError } from "./errors";
 
