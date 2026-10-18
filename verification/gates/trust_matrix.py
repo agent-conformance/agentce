@@ -67,16 +67,10 @@ TIER_ENV, ONLY_ENV, OUT_ENV = (
     "AGENTCE_TRUST_MATRIX_OUT",
 )
 #: SHA-256 of fixtures/trust_matrix/matrix.yaml: a matrix edit is deliberate.
-DIGEST = "4e3021466165c9236055d062727f6e010f40b81110701eee64cfccba5c7714a4"
+DIGEST = "183580c52fb189e145b7729766fa4ba357f90f8e9d4e4896ebac55f2c94289be"
 #: The cell ids open.json may hold. Closing a cell removes it here and from open.json in one commit; nothing is added.
 OPEN_PINNED: frozenset[str] = frozenset(
     {
-        "fx-DOC-03-en-pass-uea",
-        "fx-DOC-03-en-pass-uep",
-        "fx-ROB-05-en-pass-uea",
-        "fx-ROB-05-en-pass-uep",
-        "fx-ROB-06-en-pass-uea",
-        "fx-ROB-06-en-pass-uep",
         "r02-grid-none-ep_untrusted",
         "r02-grid-sr_trusted-ep_untrusted",
         "r02-grid-unmarked_trusted_origin-ep_untrusted",

@@ -1,34 +1,4 @@
 {
-  "fx-DOC-03-en-pass-uea": {
-    "owner": "18.37e",
-    "reason": "GAP at 78bdb0da; closed by 18.37e's matrix check",
-    "status": "GAP"
-  },
-  "fx-DOC-03-en-pass-uep": {
-    "owner": "18.37e",
-    "reason": "GAP at 78bdb0da; closed by 18.37e's matrix check",
-    "status": "GAP"
-  },
-  "fx-ROB-05-en-pass-uea": {
-    "owner": "18.37e",
-    "reason": "GAP at 78bdb0da; closed by 18.37e's matrix check",
-    "status": "GAP"
-  },
-  "fx-ROB-05-en-pass-uep": {
-    "owner": "18.37e",
-    "reason": "GAP at 78bdb0da; closed by 18.37e's matrix check",
-    "status": "GAP"
-  },
-  "fx-ROB-06-en-pass-uea": {
-    "owner": "18.37e",
-    "reason": "GAP at 78bdb0da; closed by 18.37e's matrix check",
-    "status": "GAP"
-  },
-  "fx-ROB-06-en-pass-uep": {
-    "owner": "18.37e",
-    "reason": "GAP at 78bdb0da; closed by 18.37e's matrix check",
-    "status": "GAP"
-  },
   "r02-grid-none-ep_untrusted": {
     "owner": "18.172",
     "reason": "GAP at 78bdb0da; closed by 18.172's matrix check",

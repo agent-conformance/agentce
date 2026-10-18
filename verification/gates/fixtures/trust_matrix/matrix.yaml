@@ -11,14 +11,6 @@
 family: trust-model
 fixtures: build
 quick:
-  - c06-acted-EP-missing
-  - c06-acted-EP-tool_output
-  - c06-acted-EP-user
-  - c06-ep-deny-no-refusal
-  - c06-ep-deny-sr-refusal
-  - c06-refusal-en
-  - c06-refusal-missing-en
-  - c06-refusal-missing-se
   - c05-twin-both-no-principal
   - c05-twin-other-principal
   - c05-twin-no-principal-instr-present
@@ -124,6 +116,14 @@ quick:
   - c05-origin-se-tool_output-modelcall
   - c05-origin-se-memory_trusted-modelcall
   - c05-origin-se-memory_untrusted-modelcall
+  - c06-acted-EP-missing
+  - c06-acted-EP-tool_output
+  - c06-acted-EP-user
+  - c06-ep-deny-no-refusal
+  - c06-ep-deny-sr-refusal
+  - c06-refusal-en
+  - c06-refusal-missing-en
+  - c06-refusal-missing-se
 dimensions:
   - name: instruction_class   # the acted-on Instruction's own agentcesourceclass (SPEC §6.2.1, §6.4)
     values: ["enforcement_point", "self_report", "independent_system"]
@@ -3376,7 +3376,7 @@ cells:
     controls: ["CND-04"]
     dims: {instruction_class: "enforcement_point", source_class: "user", principal: "present", acted_on: "both", delegation: "ep_verified", integrity: "weak_chained", integrity_stream: "policy"}
     fixture: "instruction_chain"
-    expected: "conformant"
+    expected: "partial"
     spec_ref: "SPEC §7.7.4 CND-04 (every ToolCall and consequential Decision acts on an Instruction whose derivedFrom chain terminates in an authorised principal, delegation chain verified); SPEC §7.7.5 (evidence classes: high-severity controls require EP PolicyDecision corroboration, principal and decision; ingress attestation lifts CND-04/05 from partial single_source to conformant; relabelling is CND.instruction_relabelled); SPEC §6.6 (EP streams must be source_signed or export_anchored to verify; export_chained EP stream is verified_weak and every rung-2 outcome depending on it is capped at partial, weak_integrity)"
     note: "the verified twin's streams weak or broken (policy carries the delegation record)"
   - id: c04-integ-failed-ingress
@@ -3397,7 +3397,7 @@ cells:
     controls: ["CND-04"]
     dims: {instruction_class: "enforcement_point", source_class: "user", principal: "present", acted_on: "both", delegation: "ep_verified", integrity: "failed", integrity_stream: "policy"}
     fixture: "instruction_chain"
-    expected: "conformant"
+    expected: "insufficient_evidence"
     spec_ref: "SPEC §7.7.4 CND-04 (every ToolCall and consequential Decision acts on an Instruction whose derivedFrom chain terminates in an authorised principal, delegation chain verified); SPEC §7.7.5 (evidence classes: high-severity controls require EP PolicyDecision corroboration, principal and decision; ingress attestation lifts CND-04/05 from partial single_source to conformant; relabelling is CND.instruction_relabelled); SPEC §6.6 (EP streams must be source_signed or export_anchored to verify; export_chained EP stream is verified_weak and every rung-2 outcome depending on it is capped at partial, weak_integrity)"
     note: "the verified twin's streams weak or broken (policy carries the delegation record)"
   - id: c04-integ-missing-ingress
@@ -3418,7 +3418,7 @@ cells:
     controls: ["CND-04"]
     dims: {instruction_class: "enforcement_point", source_class: "user", principal: "present", acted_on: "both", delegation: "ep_verified", integrity: "missing", integrity_stream: "policy"}
     fixture: "instruction_chain"
-    expected: "conformant"
+    expected: "insufficient_evidence"
     spec_ref: "SPEC §7.7.4 CND-04 (every ToolCall and consequential Decision acts on an Instruction whose derivedFrom chain terminates in an authorised principal, delegation chain verified); SPEC §7.7.5 (evidence classes: high-severity controls require EP PolicyDecision corroboration, principal and decision; ingress attestation lifts CND-04/05 from partial single_source to conformant; relabelling is CND.instruction_relabelled); SPEC §6.6 (EP streams must be source_signed or export_anchored to verify; export_chained EP stream is verified_weak and every rung-2 outcome depending on it is capped at partial, weak_integrity)"
     note: "the verified twin's streams weak or broken (policy carries the delegation record)"
   - id: c04-role-en-unverified-not_declared
@@ -5105,7 +5105,7 @@ cells:
     fixture_args: {scenario: "consequential_toolcall", catalogs: ["eu-ai-act@2026.09"]}
     expected: ["not_assessed", "insufficient_evidence"]
     spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met)"
-    note: "semi-automated: 'ROB-05 measured within thresholds' needs probe results; none exist, so the control cannot be evaluated (shape is only the call's class). Shape-content, outside the trust axis"
+    note: "rung 3: 'ROB-05 measured within thresholds' needs probe results; none exist and no engine evaluates probe results, so the control is not evaluated whatever the call's class (18.37e)"
   - id: fx-ROB-05-en-pass-uep
     controls: ["ROB-05"]
     dims: {focus_class: "enforcement_point", shape_verdict: "pass", unrelated_ep: "present"}
@@ -5113,55 +5113,55 @@ cells:
     fixture_args: {scenario: "consequential_toolcall", catalogs: ["eu-ai-act@2026.09"]}
     expected: ["not_assessed", "insufficient_evidence"]
     spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met)"
-    note: "semi-automated: 'ROB-05 measured within thresholds' needs probe results; none exist, so the control cannot be evaluated (shape is only the call's class). Shape-content, outside the trust axis"
+    note: "rung 3: 'ROB-05 measured within thresholds' needs probe results; none exist and no engine evaluates probe results, so the control is not evaluated whatever the call's class (18.37e)"
   - id: fx-ROB-05-en-fail-uea
     controls: ["ROB-05"]
     dims: {focus_class: "enforcement_point", shape_verdict: "fail", unrelated_ep: "absent"}
     fixture: "focus_case"
     fixture_args: {scenario: "consequential_toolcall", catalogs: ["eu-ai-act@2026.09"]}
-    expected: "not_conformant"
-    spec_ref: "SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met); SPEC §6.4 (controls declare min_source_class; source_class_satisfied per assertion)"
-    note: "consequential call of the focus class (shape hasValue EP); unrelated EP call absent"
+    expected: "not_assessed"
+    spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met)"
+    note: "rung 3: 'ROB-05 measured within thresholds' needs probe results; none exist and no engine evaluates probe results, so the control is not evaluated whatever the call's class (18.37e)"
   - id: fx-ROB-05-en-fail-uep
     controls: ["ROB-05"]
     dims: {focus_class: "enforcement_point", shape_verdict: "fail", unrelated_ep: "present"}
     fixture: "focus_case"
     fixture_args: {scenario: "consequential_toolcall", catalogs: ["eu-ai-act@2026.09"]}
-    expected: "not_conformant"
-    spec_ref: "SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met); SPEC §6.4 (controls declare min_source_class; source_class_satisfied per assertion)"
-    note: "consequential call of the focus class (shape hasValue EP); unrelated EP call present"
+    expected: "not_assessed"
+    spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met)"
+    note: "rung 3: 'ROB-05 measured within thresholds' needs probe results; none exist and no engine evaluates probe results, so the control is not evaluated whatever the call's class (18.37e)"
   - id: fx-ROB-05-in-pass-uea
     controls: ["ROB-05"]
     dims: {focus_class: "independent_system", shape_verdict: "pass", unrelated_ep: "absent"}
     fixture: "focus_case"
     fixture_args: {scenario: "consequential_toolcall", catalogs: ["eu-ai-act@2026.09"]}
-    expected: "non_conformant"
-    spec_ref: "SPEC §6.4 (controls declare min_source_class; source_class_satisfied per assertion)"
-    note: "consequential call of the focus class (shape hasValue EP); unrelated EP call absent"
+    expected: "not_assessed"
+    spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met)"
+    note: "rung 3: 'ROB-05 measured within thresholds' needs probe results; none exist and no engine evaluates probe results, so the control is not evaluated whatever the call's class (18.37e)"
   - id: fx-ROB-05-in-pass-uep
     controls: ["ROB-05"]
     dims: {focus_class: "independent_system", shape_verdict: "pass", unrelated_ep: "present"}
     fixture: "focus_case"
     fixture_args: {scenario: "consequential_toolcall", catalogs: ["eu-ai-act@2026.09"]}
-    expected: "non_conformant"
-    spec_ref: "SPEC §6.4 (controls declare min_source_class; source_class_satisfied per assertion)"
-    note: "consequential call of the focus class (shape hasValue EP); unrelated EP call present"
+    expected: "not_assessed"
+    spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met)"
+    note: "rung 3: 'ROB-05 measured within thresholds' needs probe results; none exist and no engine evaluates probe results, so the control is not evaluated whatever the call's class (18.37e)"
   - id: fx-ROB-05-se-pass-uea
     controls: ["ROB-05"]
     dims: {focus_class: "self_report", shape_verdict: "pass", unrelated_ep: "absent"}
     fixture: "focus_case"
     fixture_args: {scenario: "consequential_toolcall", catalogs: ["eu-ai-act@2026.09"]}
-    expected: "not_conformant"
-    spec_ref: "SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met); SPEC §6.4 (controls declare min_source_class; source_class_satisfied per assertion)"
-    note: "consequential call of the focus class (shape hasValue EP); unrelated EP call absent"
+    expected: "not_assessed"
+    spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met)"
+    note: "rung 3: 'ROB-05 measured within thresholds' needs probe results; none exist and no engine evaluates probe results, so the control is not evaluated whatever the call's class (18.37e)"
   - id: fx-ROB-05-se-pass-uep
     controls: ["ROB-05"]
     dims: {focus_class: "self_report", shape_verdict: "pass", unrelated_ep: "present"}
     fixture: "focus_case"
     fixture_args: {scenario: "consequential_toolcall", catalogs: ["eu-ai-act@2026.09"]}
-    expected: "not_conformant"
-    spec_ref: "SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met); SPEC §6.4 (controls declare min_source_class; source_class_satisfied per assertion)"
-    note: "consequential call of the focus class (shape hasValue EP); unrelated EP call present"
+    expected: "not_assessed"
+    spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met)"
+    note: "rung 3: 'ROB-05 measured within thresholds' needs probe results; none exist and no engine evaluates probe results, so the control is not evaluated whatever the call's class (18.37e)"
   - id: fx-ROB-06-en-pass-uea
     controls: ["ROB-06"]
     dims: {focus_class: "enforcement_point", shape_verdict: "pass", unrelated_ep: "absent"}
@@ -5169,7 +5169,7 @@ cells:
     fixture_args: {scenario: "consequential_toolcall", catalogs: ["eu-ai-act@2026.09"]}
     expected: ["not_assessed", "insufficient_evidence"]
     spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met)"
-    note: "semi-automated: 'ROB-06 measured within thresholds' needs declared budgets and exhaustion probes; none exist, so the control cannot be evaluated (shape is only the call's class). Shape-content, outside the trust axis"
+    note: "rung 3: 'ROB-06 measured within thresholds' needs declared budgets and exhaustion probes; none exist and no engine evaluates probe results, so the control is not evaluated whatever the call's class (18.37e)"
   - id: fx-ROB-06-en-pass-uep
     controls: ["ROB-06"]
     dims: {focus_class: "enforcement_point", shape_verdict: "pass", unrelated_ep: "present"}
@@ -5177,55 +5177,55 @@ cells:
     fixture_args: {scenario: "consequential_toolcall", catalogs: ["eu-ai-act@2026.09"]}
     expected: ["not_assessed", "insufficient_evidence"]
     spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met)"
-    note: "semi-automated: 'ROB-06 measured within thresholds' needs declared budgets and exhaustion probes; none exist, so the control cannot be evaluated (shape is only the call's class). Shape-content, outside the trust axis"
+    note: "rung 3: 'ROB-06 measured within thresholds' needs declared budgets and exhaustion probes; none exist and no engine evaluates probe results, so the control is not evaluated whatever the call's class (18.37e)"
   - id: fx-ROB-06-en-fail-uea
     controls: ["ROB-06"]
     dims: {focus_class: "enforcement_point", shape_verdict: "fail", unrelated_ep: "absent"}
     fixture: "focus_case"
     fixture_args: {scenario: "consequential_toolcall", catalogs: ["eu-ai-act@2026.09"]}
-    expected: "not_conformant"
-    spec_ref: "SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met); SPEC §6.4 (controls declare min_source_class; source_class_satisfied per assertion)"
-    note: "consequential call of the focus class (shape hasValue EP); unrelated EP call absent"
+    expected: "not_assessed"
+    spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met)"
+    note: "rung 3: 'ROB-06 measured within thresholds' needs declared budgets and exhaustion probes; none exist and no engine evaluates probe results, so the control is not evaluated whatever the call's class (18.37e)"
   - id: fx-ROB-06-en-fail-uep
     controls: ["ROB-06"]
     dims: {focus_class: "enforcement_point", shape_verdict: "fail", unrelated_ep: "present"}
     fixture: "focus_case"
     fixture_args: {scenario: "consequential_toolcall", catalogs: ["eu-ai-act@2026.09"]}
-    expected: "not_conformant"
-    spec_ref: "SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met); SPEC §6.4 (controls declare min_source_class; source_class_satisfied per assertion)"
-    note: "consequential call of the focus class (shape hasValue EP); unrelated EP call present"
+    expected: "not_assessed"
+    spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met)"
+    note: "rung 3: 'ROB-06 measured within thresholds' needs declared budgets and exhaustion probes; none exist and no engine evaluates probe results, so the control is not evaluated whatever the call's class (18.37e)"
   - id: fx-ROB-06-in-pass-uea
     controls: ["ROB-06"]
     dims: {focus_class: "independent_system", shape_verdict: "pass", unrelated_ep: "absent"}
     fixture: "focus_case"
     fixture_args: {scenario: "consequential_toolcall", catalogs: ["eu-ai-act@2026.09"]}
-    expected: "non_conformant"
-    spec_ref: "SPEC §6.4 (controls declare min_source_class; source_class_satisfied per assertion)"
-    note: "consequential call of the focus class (shape hasValue EP); unrelated EP call absent"
+    expected: "not_assessed"
+    spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met)"
+    note: "rung 3: 'ROB-06 measured within thresholds' needs declared budgets and exhaustion probes; none exist and no engine evaluates probe results, so the control is not evaluated whatever the call's class (18.37e)"
   - id: fx-ROB-06-in-pass-uep
     controls: ["ROB-06"]
     dims: {focus_class: "independent_system", shape_verdict: "pass", unrelated_ep: "present"}
     fixture: "focus_case"
     fixture_args: {scenario: "consequential_toolcall", catalogs: ["eu-ai-act@2026.09"]}
-    expected: "non_conformant"
-    spec_ref: "SPEC §6.4 (controls declare min_source_class; source_class_satisfied per assertion)"
-    note: "consequential call of the focus class (shape hasValue EP); unrelated EP call present"
+    expected: "not_assessed"
+    spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met)"
+    note: "rung 3: 'ROB-06 measured within thresholds' needs declared budgets and exhaustion probes; none exist and no engine evaluates probe results, so the control is not evaluated whatever the call's class (18.37e)"
   - id: fx-ROB-06-se-pass-uea
     controls: ["ROB-06"]
     dims: {focus_class: "self_report", shape_verdict: "pass", unrelated_ep: "absent"}
     fixture: "focus_case"
     fixture_args: {scenario: "consequential_toolcall", catalogs: ["eu-ai-act@2026.09"]}
-    expected: "not_conformant"
-    spec_ref: "SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met); SPEC §6.4 (controls declare min_source_class; source_class_satisfied per assertion)"
-    note: "consequential call of the focus class (shape hasValue EP); unrelated EP call absent"
+    expected: "not_assessed"
+    spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met)"
+    note: "rung 3: 'ROB-06 measured within thresholds' needs declared budgets and exhaustion probes; none exist and no engine evaluates probe results, so the control is not evaluated whatever the call's class (18.37e)"
   - id: fx-ROB-06-se-pass-uep
     controls: ["ROB-06"]
     dims: {focus_class: "self_report", shape_verdict: "pass", unrelated_ep: "present"}
     fixture: "focus_case"
     fixture_args: {scenario: "consequential_toolcall", catalogs: ["eu-ai-act@2026.09"]}
-    expected: "not_conformant"
-    spec_ref: "SPEC HR-5 (report insufficient_evidence rather than conformant when the class is not met); SPEC §6.4 (controls declare min_source_class; source_class_satisfied per assertion)"
-    note: "consequential call of the focus class (shape hasValue EP); unrelated EP call present"
+    expected: "not_assessed"
+    spec_ref: "SPEC §9.2 (not_assessed: applicable but not evaluated; insufficient_evidence: source class not met)"
+    note: "rung 3: 'ROB-06 measured within thresholds' needs declared budgets and exhaustion probes; none exist and no engine evaluates probe results, so the control is not evaluated whatever the call's class (18.37e)"
   - id: fx-DOC-03-en-pass-uea
     controls: ["DOC-03"]
     dims: {focus_class: "enforcement_point", shape_verdict: "pass", unrelated_ep: "absent"}
