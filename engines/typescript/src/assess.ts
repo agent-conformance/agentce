@@ -537,12 +537,12 @@ function coverageUnknown(coverage: Record<string, unknown>, subject: string): bo
     typeof entry !== "object" ||
     entry === null ||
     Array.isArray(entry) ||
-    (entry as Record<string, unknown>).coverage_status === "unknown"
+    (entry as Record<string, unknown>).coverage_status === STATUS_UNKNOWN
   );
 }
 
-/** The coverage status of the type `control`'s `requiresDenominator` names (`unknown` when no row exists) when the
- * subject's capture of it does not match a declared independent denominator of one of its kinds (18.37e, DOC-03): no
+/** Whether the coverage of the type `control`'s `requiresDenominator` names is unknown (true when no row exists) when
+ * the subject's capture of it does not match a declared independent denominator of one of its kinds (18.37e, DOC-03): no
  * such denominator, another denominator holds the count, or the captured count differs from it either way (a declared
  * path that saw fewer records than were captured does not match them either); null when it matches or the control
  * declares none. Fail closed on anything missing. */
@@ -550,7 +550,7 @@ function denominatorUnshown(
   control: ControlSpec,
   subject: Subject,
   coverage: Record<string, unknown>,
-): string | null {
+): boolean | null {
   const need = control.requiresDenominator;
   if (need === null) {
     return null;
@@ -562,7 +562,7 @@ function denominatorUnshown(
     isRecord(value) ? value[key] : undefined;
   const row = field(field(field(coverage.subjects, subject.id), "event_types"), need.covers);
   if (!isRecord(row)) {
-    return STATUS_UNKNOWN;
+    return true;
   }
   const counted = row.denominators;
   return row.status === STATUS_COVERED &&
@@ -570,7 +570,7 @@ function denominatorUnshown(
     Array.isArray(counted) &&
     counted.some((source) => sources.has(source))
     ? null
-    : String(row.status);
+    : row.status === STATUS_UNKNOWN;
 }
 
 /** An INT or REC outcome that reads better than insufficient_evidence while coverage is unknown reads
@@ -710,9 +710,9 @@ export function assessSubjects(
         if (isUncovered && applies) {
           assertion = uncovered(assertion);
         }
-        const status = denominatorUnshown(control, subject, coverage);
-        if (applies && status !== null) {
-          assertion = uncovered(assertion, true, status === STATUS_UNKNOWN);
+        const unknown = applies ? denominatorUnshown(control, subject, coverage) : null;
+        if (unknown !== null) {
+          assertion = uncovered(assertion, true, unknown);
         }
         assertions.push(assertion);
       }

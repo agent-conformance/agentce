@@ -348,7 +348,7 @@ SUCCESSES = {
     "F9b": (0, ["ok"], 0), "F9c": (1, ["findings"], 1),
     "F10": (2, ["findings", "insufficient_evidence"], None),
     "F10b": (2, ["insufficient_evidence"], 0),
-    # F10c: 5 since 18.37e (ROB-05 and ROB-06 read not_assessed at rung 3; python-reference.md said 7).
+    # F10c: ROB-05 and ROB-06 read not_assessed (rung 3), so they are not among the matches.
     "F10c": (2, ["findings", "insufficient_evidence"], 5),
     "F12": (1, ["findings"], 2), "F14": (0, ["ok"], 0), "D2": (1, ["findings"], 1),
     "V7": (1, ["findings"], 2), "V8": (0, ["ok"], 0),

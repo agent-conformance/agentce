@@ -616,9 +616,9 @@ public final class Assess {
                     if (isUncovered && applies) {
                         assertion = uncovered(assertion);
                     }
-                    String status = denominatorUnshown(control, subject, coverage);
-                    if (applies && status != null) {
-                        assertion = uncovered(assertion, true, Coverage.STATUS_UNKNOWN.equals(status));
+                    Boolean unknown = applies ? denominatorUnshown(control, subject, coverage) : null;
+                    if (unknown != null) {
+                        assertion = uncovered(assertion, true, unknown);
                     }
                     assertions.add(assertion);
                 }
@@ -644,17 +644,17 @@ public final class Assess {
             return true;
         }
         JsonNode status = entry.get("coverage_status");
-        return status != null && "unknown".equals(status.asText());
+        return status != null && Coverage.STATUS_UNKNOWN.equals(status.asText());
     }
 
     /**
-     * The coverage status of the type {@code control}'s {@code requiresDenominator} names ({@code unknown} when no
+     * Whether the coverage of the type {@code control}'s {@code requiresDenominator} names is unknown (true when no
      * row exists) when the subject's capture of it does not match a declared independent denominator of one of its
      * kinds (18.37e, DOC-03): no such denominator, another denominator holds the count, or the captured count differs
      * from it either way (a declared path that saw fewer records than were captured does not match them either); null
      * when it matches or the control declares none. Fail closed on anything missing.
      */
-    static String denominatorUnshown(Catalog.ControlSpec control, Profile.Subject subject, JsonNode coverage) {
+    static Boolean denominatorUnshown(Catalog.ControlSpec control, Profile.Subject subject, JsonNode coverage) {
         Catalog.RequiredDenominator need = control.requiresDenominator;
         if (need == null) {
             return null;
@@ -666,24 +666,25 @@ public final class Assess {
             }
         }
         if (coverage == null) {
-            return Coverage.STATUS_UNKNOWN;
+            return true;
         }
         JsonNode row = coverage.path("subjects").path(subject.id).path("event_types").path(need.covers());
         if (!row.isObject()) {
-            return Coverage.STATUS_UNKNOWN;
+            return true;
         }
-        String status = String.valueOf(row.path("status").textValue());
-        if (!Coverage.STATUS_COVERED.equals(row.path("status").textValue())
+        String status = row.path("status").textValue();
+        boolean unknown = Coverage.STATUS_UNKNOWN.equals(status);
+        if (!Coverage.STATUS_COVERED.equals(status)
                 || !row.path("observed").equals(row.path("expected"))
                 || !row.path("observed").isNumber()) {
-            return status;
+            return unknown;
         }
         for (JsonNode source : row.path("denominators")) {
             if (source.isTextual() && sources.contains(source.textValue())) {
                 return null;
             }
         }
-        return status;
+        return unknown;
     }
 
     static Assertions.Assertion uncovered(Assertions.Assertion assertion) {

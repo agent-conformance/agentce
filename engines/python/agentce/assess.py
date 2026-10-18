@@ -506,9 +506,9 @@ def _coverage_unknown(coverage: dict[str, Any], subject: str) -> bool:
 
 def _denominator_unshown(
     control: ControlSpec, subject: Subject, coverage: dict[str, Any]
-) -> str | None:
-    """The coverage status of the type ``control``'s ``requires_denominator`` names (``unknown`` when no row exists)
-    when the subject's capture of it does not match a declared independent denominator of one of its kinds (18.37e,
+) -> bool | None:
+    """Whether the coverage of the type ``control``'s ``requires_denominator`` names is unknown (True when no row
+    exists) when the subject's capture of it does not match a declared independent denominator of one of its kinds (18.37e,
     DOC-03): no such denominator, another denominator holds the count, or the captured count differs from it either way
     (a declared path that saw fewer records than were captured does not match them either); None when it matches or
     the control declares none. Fail closed on anything missing."""
@@ -520,14 +520,14 @@ def _denominator_unshown(
     by_type = entry.get("event_types") if isinstance(entry, dict) else None
     row = by_type.get(need.covers) if isinstance(by_type, dict) else None
     if not isinstance(row, dict):
-        return STATUS_UNKNOWN
+        return True
     if (
         row.get("status") == STATUS_COVERED
         and row.get("observed") == row.get("expected")
         and sources & set(row.get("denominators") or ())
     ):
         return None
-    return str(row.get("status"))
+    return row.get("status") == STATUS_UNKNOWN
 
 
 def _uncovered(
@@ -682,11 +682,13 @@ def assess_subjects(
                         )
                 if uncovered and applies:
                     assertion = _uncovered(assertion)
-                status = _denominator_unshown(control, subject, coverage)
-                if applies and status is not None:
-                    assertion = _uncovered(
-                        assertion, always=True, unknown=status == STATUS_UNKNOWN
-                    )
+                unknown = (
+                    _denominator_unshown(control, subject, coverage)
+                    if applies
+                    else None
+                )
+                if unknown is not None:
+                    assertion = _uncovered(assertion, always=True, unknown=unknown)
                 assertions.append(assertion)
     return assertions
 

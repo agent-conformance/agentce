@@ -95,7 +95,7 @@ def test_the_verdict_needs_a_declared_denominator_whose_count_matches_the_captur
     control = _control("DOC-03")
     egress = "urn:src:egress_proxy_log"
     shown = _coverage(status="covered", observed=2, expected=2, denominators=[egress])
-    assert not _denominator_unshown(control, _subject("egress_proxy_log"), shown)
+    assert _denominator_unshown(control, _subject("egress_proxy_log"), shown) is None
     for subject, coverage in (
         (_subject(), shown),
         (_subject("system_of_record_export"), shown),
@@ -119,5 +119,7 @@ def test_the_verdict_needs_a_declared_denominator_whose_count_matches_the_captur
             ),
         ),
     ):
-        assert _denominator_unshown(control, subject, coverage)
-    assert not _denominator_unshown(_control("OVS-06"), _subject(), {"subjects": {}})
+        assert _denominator_unshown(control, subject, coverage) is not None
+    assert (
+        _denominator_unshown(_control("OVS-06"), _subject(), {"subjects": {}}) is None
+    )
