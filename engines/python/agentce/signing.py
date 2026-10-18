@@ -462,7 +462,7 @@ def read_catalog_files(
         frozenset(
             rel
             for rel in rels
-            if (root / rel).is_symlink()
+            if os.path.islink(root / rel)
             and not (root / rel).resolve().is_relative_to(real_root)
         ),
     )
