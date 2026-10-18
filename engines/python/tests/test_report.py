@@ -2189,6 +2189,22 @@ def test_validate_report_names_a_file_it_cannot_read_never_skips_it(
     assert problems == [f"{name}: cannot read ({reason})"]
 
 
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads every file")
+def test_validate_report_in_a_folder_it_cannot_enter_reports_every_file(
+    tmp_path: Path,
+) -> None:
+    """A report folder that cannot be entered gives one `cannot read` line per file, as TypeScript
+    and Java do, never an internal error: `lstat` inside it raises PermissionError (18.167)."""
+    report = _valid_report(tmp_path)
+    report.chmod(0o000)
+    try:
+        problems = validate_report(report)
+    finally:
+        report.chmod(0o700)
+    assert problems
+    assert all(p.endswith(": cannot read (permission denied)") for p in problems)
+
+
 def test_validate_report_requires_claim_json_when_assertions_are_recorded(
     tmp_path: Path,
 ) -> None:

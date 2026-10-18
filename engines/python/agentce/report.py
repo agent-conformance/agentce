@@ -3757,6 +3757,8 @@ def _has_entry(path: Path) -> bool:
         os.lstat(path)
     except (FileNotFoundError, NotADirectoryError):
         return False
+    except PermissionError:
+        return True  # the folder cannot be entered: the read that follows reports it
     return True
 
 
