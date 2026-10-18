@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.113.0",
+  "suite_version": "0.114.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -2136,7 +2136,7 @@
     },
     {
       "id": "VG-BYO-CATALOG-WALK",
-      "title": "An operator's own --catalog-dir is read the same way in all three engines: refused when edited behind a symlinked folder, looping back to an ancestor folder, naming a shape its signature does not cover or holding a folder no engine can enter, and never reading a dot-named control file, with Python's exit code, error key, cause and fix",
+      "title": "An operator's own --catalog-dir is read the same way in all three engines: refused when edited behind a symlinked folder, looping back to an ancestor folder, naming a shape its signature does not cover, holding a folder no engine can enter, holding an entry that is not a file (a FIFO, a dangling link, a folder named like a control, a FIFO named catalog.yaml) or a file linked outside a signed catalog, and never reading a dot-named control file, with Python's exit code, error key, cause and fix",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -2153,8 +2153,8 @@
       "timeout_s": 900,
       "invariant": "An attestation is reported as verified only after its signature verifies against a trusted key.",
       "rubric": {
-        "pass": "for each of 7 scenarios (a catalog signed with controls/ symlinked, the same catalog edited behind the link, a catalog with a link back to an ancestor folder, a signed catalog given a dot-named control file after signing, which assesses because no engine reads it, a control whose shape is a dot-named file or sits under __PYCACHE__, refused as catalog.shape.unresolved, and a trusted signed catalog that gains a folder that can be listed but not entered, refused as input.catalog_unreadable; that one is skipped, with a line saying so, when the gate runs as root) Python gives the expected exit code and key, and TypeScript and Java give the same exit code, error key, cause, fix, envelope limitations and manifest.json limitations",
-        "fail": "any engine assesses a catalog Python refuses, refuses one Python assesses, walks past a folder it cannot enter, or differs from Python in exit code, error key, cause or fix"
+        "pass": "for each of 15 scenarios (a catalog signed with controls/ symlinked, the same catalog edited behind the link, a catalog with a link back to an ancestor folder, a signed catalog given a dot-named control file after signing, which assesses because no engine reads it, a control whose shape is a dot-named file or sits under __PYCACHE__, refused as catalog.shape.unresolved, and a trusted signed catalog that gains a folder that can be listed but not entered, refused as input.catalog_unreadable; that one is skipped, with a line saying so, when the gate runs as root; a control that is a FIFO, a dangling link or a folder, and a catalog.yaml that is a FIFO, each refused unopened as input.catalog_unreadable under --allow-unverified-catalog; a signed catalog whose control or shape links to a file outside it, refused as input.catalog_unverified, and assessed with the limitation under the override; an unsigned catalog whose control links outside, assessed under the override) Python gives the expected exit code and key, and TypeScript and Java give the same exit code, error key, cause, fix, envelope limitations and manifest.json limitations",
+        "fail": "any engine assesses a catalog Python refuses, refuses one Python assesses, walks past a folder it cannot enter, drops or opens an entry that is not a file, verifies a signed catalog holding a file linked outside it, or differs from Python in exit code, error key, cause or fix"
       },
       "faults": [
         {
@@ -2172,8 +2172,8 @@
         {
           "description": "Java's catalog walk no longer descends a symlinked folder, so its digest leaves out the files behind the link",
           "file": "engines/java/src/main/java/org/agentce/Catalog.java",
-          "search": "            if (attrs.isDirectory()) {\n                if (!entered.add(folderIdentity(full, attrs))) {",
-          "replace": "            if (attrs.isDirectory() && !Files.isSymbolicLink(full)) {\n                if (!entered.add(folderIdentity(full, attrs))) {"
+          "search": "            } else if (attrs.isDirectory()) {\n                if (!entered.add(folderIdentity(full, attrs))) {",
+          "replace": "            } else if (attrs.isDirectory() && !Files.isSymbolicLink(full)) {\n                if (!entered.add(folderIdentity(full, attrs))) {"
         },
         {
           "description": "Python's loader lists the controls folder instead of the files the digest covers, so a dot-named control file added after signing is read",
@@ -2228,6 +2228,60 @@
           "file": "engines/java/src/main/java/org/agentce/Catalog.java",
           "search": "        } catch (AccessDeniedException e) {\n            throw new IllegalStateException(",
           "replace": "        } catch (AccessDeniedException e) {\n            if (path != null) {\n                return null;\n            }\n            throw new IllegalStateException("
+        },
+        {
+          "description": "Python's catalog walk no longer refuses an entry that is not a file, so a control that is a FIFO or a dangling link is dropped from the catalog and the run exits 0",
+          "file": "engines/python/agentce/signing.py",
+          "search": "        if covered(path) is not None:\n            raise OSError(errno.EINVAL, \"not a regular file or folder\", str(path))",
+          "replace": "        if covered(path) is not None:\n            pass"
+        },
+        {
+          "description": "Python no longer refuses a folder named like a control file, so the walk enters it and the control vanishes",
+          "file": "engines/python/agentce/signing.py",
+          "search": "            name.endswith(\".yaml\")\n            and not skipped_part(name)",
+          "replace": "            False\n            and not skipped_part(name)"
+        },
+        {
+          "description": "Python's catalog verification no longer refuses a covered file linked outside the catalog, so a signed catalog verifies with bytes that do not travel with it",
+          "file": "engines/python/agentce/signing.py",
+          "search": "    if files.links_out:\n        # A signed catalog",
+          "replace": "    if False:\n        # A signed catalog"
+        },
+        {
+          "description": "TypeScript's catalog walk no longer refuses an entry that is not a file, so a control that is a FIFO or a dangling link is dropped",
+          "file": "engines/typescript/src/report.ts",
+          "search": "  const refused = odd.sort(byteCompare).find(covered);",
+          "replace": "  const refused = odd.sort(byteCompare).find(() => false);"
+        },
+        {
+          "description": "TypeScript no longer refuses a folder named like a control file, so the walk enters it and the control vanishes",
+          "file": "engines/typescript/src/verify.ts",
+          "search": "    if (name.endsWith(\".yaml\") && !skippedPart(name) && isDirectory(join(controls, name))) {",
+          "replace": "    if (false && name.endsWith(\".yaml\") && !skippedPart(name) && isDirectory(join(controls, name))) {"
+        },
+        {
+          "description": "TypeScript's catalog verification no longer refuses a covered file linked outside the catalog",
+          "file": "engines/typescript/src/verify.ts",
+          "search": "  if (files.linksOut.size > 0) {",
+          "replace": "  if (files.linksOut.size < 0) {"
+        },
+        {
+          "description": "Java's catalog walk no longer refuses an entry that is not a file, so a control that is a FIFO or a dangling link is dropped",
+          "file": "engines/java/src/main/java/org/agentce/Catalog.java",
+          "search": "            if (!uncovered.test(rel)) {\n                // Refused as unreadable",
+          "replace": "            if (rel == null) {\n                // Refused as unreadable"
+        },
+        {
+          "description": "Java no longer refuses a folder named like a control file, so the walk enters it and the control vanishes",
+          "file": "engines/java/src/main/java/org/agentce/Catalog.java",
+          "search": "            if (name.endsWith(\".yaml\") && !skippedPart(name) && Files.isDirectory(path)) {",
+          "replace": "            if (name == null && !skippedPart(name) && Files.isDirectory(path)) {"
+        },
+        {
+          "description": "Java's catalog verification no longer refuses a covered file linked outside the catalog",
+          "file": "engines/java/src/main/java/org/agentce/Verify.java",
+          "search": "        if (!files.linksOut().isEmpty()) {",
+          "replace": "        if (files.linksOut().size() < 0) {"
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/signing.py's catalog walk and engines/python/agentce/catalog.py's loader, ported in engines/typescript/src/report.ts + catalog.ts and engines/java/src/main/java/org/agentce/Catalog.java."

@@ -3,6 +3,18 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.114.0
+
+- `VG-BYO-CATALOG-WALK` (18.181, changed). The engines dropped a catalog entry that was there but was not a file.
+  With --allow-unverified-catalog, a control that was a FIFO, a dangling link or a folder vanished and the run exited
+  0, and a FIFO named catalog.yaml hung every engine. A signed catalog still verified after someone moved its control
+  or shape file out and linked it back. All three engines now refuse such an entry unopened as `input.catalog_unreadable`, and
+  refuse a signed catalog holding a file linked outside it as `catalog.link_outside`. The gate adds eight scenarios
+  (19 to 26) and three seeded faults per engine: the walk keeps a non-file entry, a folder named like a control is
+  entered, and catalog verification accepts a file linked outside. The Java symlinked-folder fault's search text
+  follows the walk's new `else if`; the fault is unchanged. The gate's demo estimate rises to 1360 seconds and the
+  `demo-fault` job gains two lanes (38) so every shard stays under its bound.
+
 ## 0.113.0
 
 - `VG-REPORT-VALIDATE` (18.167, changed). `report --validate` skipped an optional artifact it could not read, as if it

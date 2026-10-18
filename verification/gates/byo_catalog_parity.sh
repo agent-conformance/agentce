@@ -2,7 +2,7 @@
 # Build gate helper for VG-BYO-CATALOG-PARITY (`trust`) and VG-BYO-CATALOG-WALK (`walk`): `assess
 # --catalog-dir` treats an operator's own catalog as untrusted input in all three engines (SPEC §8.7).
 # `trust` runs the signature, identity and trust-root scenarios (1 to 11); `walk` runs the scenarios on
-# what the catalog walk and the loaders read (12 to 18). They are two gates so that each one's
+# what the catalog walk and the loaders read (12 to 26). They are two gates so that each one's
 # seeded-fault demo fits one CI demo shard (18.71b). Each engine runs the same scenarios as the
 # Python reference capture for item 18.36 -- an untrusted, unsigned, trusted, rebranded catalog and a
 # missing, malformed or non-object trust root, plus quickstart under AGENTCE_TRUST_ROOT -- and must
@@ -100,6 +100,34 @@ cp -R "$work/trusted-cat" "$work/unenterable-cat"
 mkdir "$work/unenterable-cat/controls/extra"
 printf 'x' > "$work/unenterable-cat/controls/extra/x.txt"
 chmod 400 "$work/unenterable-cat/controls/extra"
+# 18.181: entries that are there but are not files (a FIFO, a dangling link, a folder named like a
+# control, a FIFO named catalog.yaml), and covered files linked to a file outside the catalog folder.
+mkdir "$work/outside"
+cp -R "$work/unsigned-cat" "$work/fifo-cat"
+rm "$work/fifo-cat/controls/DOC-01.yaml"
+mkfifo "$work/fifo-cat/controls/DOC-01.yaml"
+cp -R "$work/unsigned-cat" "$work/dangling-cat"
+rm "$work/dangling-cat/controls/DOC-01.yaml"
+ln -s "$work/absent.yaml" "$work/dangling-cat/controls/DOC-01.yaml"
+cp -R "$work/unsigned-cat" "$work/fifo-meta-cat"
+rm "$work/fifo-meta-cat/catalog.yaml"
+mkfifo "$work/fifo-meta-cat/catalog.yaml"
+cp -R "$work/unsigned-cat" "$work/folder-control-cat"
+rm "$work/folder-control-cat/controls/DOC-01.yaml"
+mkdir "$work/folder-control-cat/controls/DOC-01.yaml"
+link_out() {
+  # link_out <catalog dir> <covered file>: move the file out of the catalog and link it back.
+  local moved
+  moved="$work/outside/$(basename "$1")-$(basename "$2")"
+  mv "$1/$2" "$moved"
+  ln -s "$moved" "$1/$2"
+}
+cp -R "$work/trusted-cat" "$work/control-out-cat"
+link_out "$work/control-out-cat" controls/DOC-01.yaml
+cp -R "$work/trusted-cat" "$work/shape-out-cat"
+link_out "$work/shape-out-cat" shapes/DOC-01.ttl
+cp -R "$work/unsigned-cat" "$work/unsigned-out-cat"
+link_out "$work/unsigned-out-cat" controls/DOC-01.yaml
 fi
 printf '{not json' > "$work/bad-root.json"
 printf '[]' > "$work/array-root.json"
@@ -232,6 +260,23 @@ if [ "$(id -u)" -ne 0 ]; then
 else
   echo "byo-catalog: scenario 18 skipped: running as root, which enters any folder" >&2
 fi
+scenario "19 control that is a FIFO, with the override" 3 input.catalog_unreadable - -- \
+  "${base[@]}" --catalog-dir "$work/fifo-cat" --allow-unverified-catalog
+scenario "20 control that is a dangling link, with the override" 3 input.catalog_unreadable - -- \
+  "${base[@]}" --catalog-dir "$work/dangling-cat" --allow-unverified-catalog
+scenario "21 catalog.yaml that is a FIFO, refused unopened" 3 input.catalog_unreadable - -- \
+  "${base[@]}" --catalog-dir "$work/fifo-meta-cat" --allow-unverified-catalog
+scenario "22 signed catalog whose control links outside it" 3 input.catalog_unverified - -- \
+  "${base[@]}" --catalog-dir "$work/control-out-cat" --trust-root "$work/trust-root.json"
+scenario "23 signed catalog whose shape links outside it" 3 input.catalog_unverified - -- \
+  "${base[@]}" --catalog-dir "$work/shape-out-cat" --trust-root "$work/trust-root.json"
+scenario "24 signed catalog whose shape links outside it, with the override" 0 - - -- \
+  "${base[@]}" --catalog-dir "$work/shape-out-cat" --trust-root "$work/trust-root.json" \
+  --allow-unverified-catalog
+scenario "25 unsigned catalog whose control links outside it, with the override" 0 - - -- \
+  "${base[@]}" --catalog-dir "$work/unsigned-out-cat" --allow-unverified-catalog
+scenario "26 folder named controls/DOC-01.yaml, with the override" 3 input.catalog_unreadable - -- \
+  "${base[@]}" --catalog-dir "$work/folder-control-cat" --allow-unverified-catalog
 fi
 
 [ "$status" -eq 0 ] && echo "byo-catalog ($part): all three engines verify --catalog-dir signatures identically across $((n / 3)) scenarios"
