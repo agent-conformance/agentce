@@ -706,6 +706,30 @@ def test_a_signed_catalog_file_linked_inside_is_followed(tmp_path: Path) -> None
     signing.verify_catalog_directory(catalog, trust)
 
 
+def test_an_absolute_inside_link_through_another_spelling_is_followed(
+    tmp_path: Path,
+) -> None:
+    """18.181 (verifier r1): containment is judged by folder identity, not spelling. On a
+    case-insensitive filesystem, a control that is an absolute link to a file inside the catalog,
+    reached through the catalog path in another case, still verifies, and its evidence shape too."""
+    folded = Path(str(tmp_path).upper())
+    if not folded.exists() or folded == tmp_path:
+        pytest.skip("needs a case-insensitive filesystem")
+    key = Ed25519PrivateKey.generate()
+    catalog = _copy_catalog(tmp_path / "testcat")
+    inside = catalog / "test" / "DOC-01.yaml.txt"
+    (catalog / "controls" / "DOC-01.yaml").rename(inside)
+    (catalog / "controls" / "DOC-01.yaml").symlink_to(Path(str(inside).upper()))
+    _sign_catalog(catalog, key)
+    trust = signing.load_trust_root(_trust_root_file(tmp_path / "tr.json", key))
+    for spelled in (catalog, Path(str(catalog).upper())):
+        files = signing.read_catalog_files(spelled)
+        assert files.links_out == frozenset()
+        signing.verify_catalog_directory(spelled, trust)
+    assert signing.inside_folder(catalog, Path(str(inside).upper()))
+    assert not signing.inside_folder(catalog / "controls", inside)
+
+
 def test_catalog_sign_and_provenance_lint_refuse_a_control_linked_outside(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

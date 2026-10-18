@@ -8,12 +8,12 @@
  */
 
 import { lstatSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
-import { join, sep } from "node:path";
+import { join } from "node:path";
 import { load } from "js-yaml";
 import { errorCause, errorFix } from "./errorCatalogue";
 import { AgentceError, InputError, catalogUnreadable } from "./errors";
 import { type Shape, parseShapesTtl } from "./psp";
-import { isFileFollowingLinks } from "./report";
+import { insideFolder, isFileFollowingLinks } from "./report";
 import { SOURCE_CLASS_FROM, SOURCE_CLASS_RANK } from "./sourceClass";
 import { byteCompare, formatTemplate } from "./util";
 import { type CatalogFiles, readCatalogFiles } from "./verify";
@@ -188,9 +188,8 @@ function fileInside(directory: string, path: string): string | null {
     return null;
   }
   try {
-    const root = realpathSync(directory);
     const resolved = realpathSync(join(directory, path));
-    return resolved.startsWith(root + sep) && statSync(resolved).isFile() ? resolved : null;
+    return insideFolder(directory, resolved) && statSync(resolved).isFile() ? resolved : null;
   } catch {
     return null;
   }

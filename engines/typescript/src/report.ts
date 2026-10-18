@@ -10,7 +10,14 @@
  */
 
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { arch, platform } from "node:os";
 import { dirname, join } from "node:path";
 import type { Activity } from "./activity";
@@ -56,6 +63,18 @@ export function isFileFollowingLinks(path: string): boolean {
 function folderIdentity(path: string): string {
   const st = statSync(path, { bigint: true });
   return `${st.dev}:${st.ino}`;
+}
+
+/** Whether `path`, after links, lies under `root`. Judged by folder identity, never by path spelling,
+ * which a case-insensitive filesystem allows many of (18.181); mirrors Python's `signing.inside_folder`. */
+export function insideFolder(root: string, path: string): boolean {
+  const rootId = folderIdentity(root);
+  for (let at = realpathSync(path), up = dirname(at); up !== at; at = up, up = dirname(at)) {
+    if (folderIdentity(up) === rootId) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /** Whether `path`, following links, is a folder: a missing target or a link loop is not, and any

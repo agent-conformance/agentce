@@ -357,6 +357,13 @@ def _identity(folder: Path) -> tuple[int, int]:
     return st.st_dev, st.st_ino
 
 
+def inside_folder(root: Path, path: Path) -> bool:
+    """Whether ``path``, after links, lies under ``root``. Judged by folder identity, never by path
+    spelling, which a case-insensitive filesystem allows many of (18.181)."""
+    root_id = _identity(root)
+    return any(_identity(parent) == root_id for parent in path.resolve().parents)
+
+
 def skipped_part(part: str) -> bool:
     """A path part the catalog digest never hashes below: a dot-named file or folder, or ``__pycache__``."""
     return part.startswith(".") or part == "__pycache__"
@@ -452,7 +459,6 @@ def read_catalog_files(
     given = first or {}
     rels = covered_files(root, exclude=frozenset({CATALOG_SIGNATURE_NAME}))
     _refuse_folder_controls(root)
-    real_root = root.resolve()
     return CatalogFiles(
         root,
         {
@@ -462,8 +468,7 @@ def read_catalog_files(
         frozenset(
             rel
             for rel in rels
-            if os.path.islink(root / rel)
-            and not (root / rel).resolve().is_relative_to(real_root)
+            if os.path.islink(root / rel) and not inside_folder(root, root / rel)
         ),
     )
 

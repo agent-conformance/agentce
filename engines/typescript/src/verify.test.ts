@@ -8,6 +8,7 @@ import { sign as cryptoSign, verify as cryptoVerify, generateKeyPairSync } from 
 import {
   chmodSync,
   cpSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -22,7 +23,7 @@ import { loadBundle } from "./bundle";
 import { canonicalize, sha256Hex } from "./canonical";
 import { errorCause } from "./errorCatalogue";
 import { InputError } from "./errors";
-import { digestTree } from "./report";
+import { digestTree, insideFolder } from "./report";
 import { dssePae, keyidFor, signStatement } from "./sign";
 import {
   type ReleaseResult,
@@ -1206,5 +1207,24 @@ test("18.181: verifyCatalog refuses a signed catalog whose file links outside it
   } finally {
     rmSync(dir, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("18.181: an absolute link to a file inside, reached through another spelling, is not outside", (t) => {
+  const dir = catalogDirWith({ "rule.yaml": "x: 1\n" });
+  try {
+    if (!existsSync(dir.toUpperCase()) || dir.toUpperCase() === dir) {
+      t.skip("needs a case-insensitive filesystem");
+      return;
+    }
+    symlinkSync(join(dir, "rule.yaml").toUpperCase(), join(dir, "copy.yaml"));
+    for (const spelled of [dir, dir.toUpperCase()]) {
+      assert.deepEqual([...readCatalogFiles(spelled).linksOut], []);
+    }
+    assert.equal(insideFolder(dir, join(dir, "copy.yaml")), true);
+    mkdirSync(join(dir, "sub"));
+    assert.equal(insideFolder(join(dir, "sub"), join(dir, "rule.yaml")), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });

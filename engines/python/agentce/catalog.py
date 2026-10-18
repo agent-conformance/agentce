@@ -233,8 +233,7 @@ def _load_evidence_shape(
     (which its signature would not cover), is refused, so a declared evidence shape can never be skipped
     and read as a pass."""
     directory = files.root
-    resolved = (directory / path).resolve()
-    inside = path in files.files and resolved.is_relative_to(directory.resolve())
+    inside = path in files.files and signing.inside_folder(directory, directory / path)
     loaded = parse_shapes_ttl(files.text(path), path) if inside else {}
     targeted = [iri for iri, shape in loaded.items() if shape.has_target]
     if len(targeted) != 1:

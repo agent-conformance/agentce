@@ -10,8 +10,8 @@
  */
 
 import { type KeyObject, createHash, createPublicKey, verify as cryptoVerify } from "node:crypto";
-import { lstatSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
-import { isAbsolute, join, relative } from "node:path";
+import { lstatSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { confineToRoot } from "./bundle";
 import { CanonicalizationError, canonicalize, sha256Hex } from "./canonical";
 import { errorCause } from "./errorCatalogue";
@@ -25,7 +25,13 @@ import {
 } from "./errors";
 import { NonCanonicalNumber, parseJson } from "./json";
 import { pyTruthy } from "./readiness";
-import { coveredFiles, digestFiles, isDirFollowingLinks, skippedPart } from "./report";
+import {
+  coveredFiles,
+  digestFiles,
+  insideFolder,
+  isDirFollowingLinks,
+  skippedPart,
+} from "./report";
 import { dssePae, keyidFor } from "./sign";
 import { b64dStrict, byteCompare, decodeUtf8Strict, formatTemplate, pyRepr } from "./util";
 
@@ -60,14 +66,10 @@ function refuseFolderControls(root: string): void {
   }
 }
 
-/** Whether `rel` is itself a link whose target resolves outside `realRoot`. */
-function linksOutside(root: string, realRoot: string, rel: string): boolean {
+/** Whether `rel` is itself a link whose target resolves outside `root`. */
+function linksOutside(root: string, rel: string): boolean {
   const path = join(root, rel);
-  if (!lstatSync(path).isSymbolicLink()) {
-    return false;
-  }
-  const inside = relative(realRoot, realpathSync(path));
-  return inside === "" || inside.startsWith("..") || isAbsolute(inside);
+  return lstatSync(path).isSymbolicLink() && !insideFolder(root, path);
 }
 
 /** Read every file the catalog digest covers under `root` (`coveredFiles`, less the signature) once.
@@ -80,11 +82,10 @@ export function readCatalogFiles(
 ): CatalogFiles {
   const rels = coveredFiles(root, new Set([CATALOG_SIGNATURE_NAME]));
   refuseFolderControls(root);
-  const realRoot = realpathSync(root);
   return {
     root,
     files: new Map(rels.map((rel) => [rel, first.get(rel) ?? readFileSync(join(root, rel))])),
-    linksOut: new Set(rels.filter((rel) => linksOutside(root, realRoot, rel))),
+    linksOut: new Set(rels.filter((rel) => linksOutside(root, rel))),
   };
 }
 
