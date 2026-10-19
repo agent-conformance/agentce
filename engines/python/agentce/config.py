@@ -16,6 +16,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from . import signing
+from .errors import InputError
+
 
 @dataclass(frozen=True)
 class ConfigKey:
@@ -65,8 +68,9 @@ def _env_name(key: str) -> str:
 
 
 def _load_file(path: Path) -> dict[str, Any]:
-    """Read an ``agentce.toml``'s ``[config]`` table (or its top level); missing file → no values."""
-    if not path.is_file():
+    """Read an ``agentce.toml``'s ``[config]`` table (or its top level); missing file → no values.
+    A file it cannot reach or read raises PermissionError, never reads as missing (18.169)."""
+    if not signing.is_regular_file(path):
         return {}
     with path.open("rb") as handle:
         data = tomllib.load(handle)
@@ -80,7 +84,7 @@ def _load_file(path: Path) -> dict[str, Any]:
 
 def _discover_file(start: Path | None) -> Path | None:
     candidate = (start or Path.cwd()) / "agentce.toml"
-    return candidate if candidate.is_file() else None
+    return candidate if signing.is_regular_file(candidate) else None
 
 
 def resolve(
@@ -93,8 +97,15 @@ def resolve(
     """Resolve every config key to ``{key, value, source}`` under the precedence order."""
     env = os.environ if env is None else env
     flags = flags or {}
-    chosen = config_file or _discover_file(cwd)
-    file_values = _load_file(chosen) if chosen is not None else {}
+    try:
+        chosen = config_file or _discover_file(cwd)
+        file_values = _load_file(chosen) if chosen is not None else {}
+    except PermissionError as exc:
+        raise InputError(
+            "input.config_unreadable",
+            f"agentce.toml {exc.filename} could not be read ({exc.strerror}).",
+            "make agentce.toml and its folder readable, then re-run.",
+        ) from exc
 
     resolved: list[dict[str, Any]] = []
     for ck in CONFIG_KEYS:

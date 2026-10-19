@@ -25,11 +25,11 @@ from typing import Any
 
 import yaml
 
-from .. import bundle, bundled
+from .. import bundle, bundled, signing
 from ..activity import summarize_activity
 from ..canonical import canonical_string
 from ..errors import InputError
-from ..outputs import write_file
+from ..outputs import OUT_DIR, UNREACHABLE, write_file
 from ..ingest import _max_nesting
 from ..profile import Profile
 from . import otel_genai
@@ -237,7 +237,7 @@ def _candidates(
         for d in sorted(dirnames):
             if d.startswith(".") or any(_same(here / d, tree) for tree in skip):
                 continue
-            if (here / d).is_symlink():
+            if signing.is_link(here / d, unreadable_is_absent=True):
                 unread.append(
                     {
                         "path": (here / d).relative_to(folder).as_posix(),
@@ -326,27 +326,48 @@ def scan(
         out = exclude.resolve()
         stale = out / BUNDLE_DIR
         skip.append(stale)
-        if (
-            _within(folder, stale)
-            or stale.is_symlink()
-            or (stale.is_dir() and not (stale / "manifest.json").is_file())
-        ):
+        try:
+            collides = (
+                _within(folder, stale)
+                or signing.is_link(stale)
+                or (
+                    signing.is_directory(stale)
+                    and not signing.is_regular_file(stale / "manifest.json")
+                )
+            )
+            inside_and_used = (
+                not collides
+                and _within(out, folder)
+                and (
+                    _same(out, folder)
+                    or (
+                        signing.path_exists(out)
+                        and not signing.is_directory(stale)
+                        and any(out.iterdir())
+                    )
+                )
+            )
+        except PermissionError as exc:  # unreachable, on every Python (18.169)
+            raise InputError(
+                OUT_DIR.key,
+                f"{OUT_DIR.flag} {str(exclude)!r} {UNREACHABLE}.",
+                OUT_DIR.fix,
+            ) from exc
+        if collides:
             raise InputError(
                 "input.records_out_collides",
                 f"{BUNDLE_DIR!r} in the output folder is where the run's bundle is rebuilt, and it "
                 "holds the records or is not a previous run's bundle; writing there would overwrite records.",
                 "choose an output folder outside the records folder with --out, or an empty one.",
             )
+        if inside_and_used:
+            raise InputError(
+                "input.records_out_collides",
+                f"the output folder {out.name!r} is the records folder or lies inside it and holds "
+                "files that are not a previous run's output; writing there would overwrite records.",
+                "choose an output folder outside the records folder with --out, or an empty one.",
+            )
         if _within(out, folder):
-            if _same(out, folder) or (
-                out.exists() and not stale.is_dir() and any(out.iterdir())
-            ):
-                raise InputError(
-                    "input.records_out_collides",
-                    f"the output folder {out.name!r} is the records folder or lies inside it and holds "
-                    "files that are not a previous run's output; writing there would overwrite records.",
-                    "choose an output folder outside the records folder with --out, or an empty one.",
-                )
             skip.append(out)
     by_id: dict[str, dict[str, Any]] = {}
     read: list[dict[str, Any]] = []

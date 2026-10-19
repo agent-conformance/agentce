@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from . import signing
 from .assertions import Assertion
 from .errors import InputError
 
@@ -64,7 +65,17 @@ class StateDir:
     @classmethod
     def load(cls, path: Path) -> StateDir:
         state_file = path / STATE_FILE
-        if not state_file.is_file():
+        try:
+            has_state = signing.is_regular_file(state_file)
+        except (
+            PermissionError
+        ) as exc:  # unreadable, never read as a fresh series (18.169)
+            raise InputError(
+                "input.state_dir_unwritable",
+                exc.strerror or str(exc),
+                "choose a writable --state directory.",
+            ) from exc
+        if not has_state:
             return cls(path=path)
         data = json.loads(state_file.read_text(encoding="utf-8"))
         version = int(data.get("state_version", 0))

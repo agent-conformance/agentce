@@ -12,7 +12,9 @@ to the baseline in review.
 A site is ``<path under engines/python>::<qualified function>::<receiver>.<predicate>`` (the receiver
 as ``ast.unparse`` prints it), counted; line numbers are left out so unrelated edits do not move it. The
 check fails on a site missing from the baseline, a count above the baseline's, and a baseline count
-above the code's (a paid-down site must leave the file).
+above the code's (a paid-down site must leave the file). Every baseline site also needs a non-empty
+entry under ``reasons`` saying why its path never comes from the user, and a reason must name a site in
+the baseline (18.169).
 
 Standard library only; reads source, runs nothing.
 
@@ -74,6 +76,21 @@ def census(package: Path) -> Counter[str]:
     return total
 
 
+def reason_problems(baseline: dict[str, int], reasons: dict[str, str]) -> list[str]:
+    """A baseline site with no reason, or a reason for no baseline site (18.169)."""
+    out = [
+        f"no reason for baseline site: {site}; say why its path never comes from the user, "
+        "or route it through the signing helpers"
+        for site in sorted(baseline)
+        if not str(reasons.get(site, "")).strip()
+    ]
+    out += [
+        f"reason for a site not in the baseline: {site}; remove it"
+        for site in sorted(set(reasons) - set(baseline))
+    ]
+    return out
+
+
 def problems(found: Counter[str], baseline: dict[str, int]) -> list[str]:
     out = []
     for site in sorted(set(found) | set(baseline)):
@@ -125,8 +142,24 @@ def self_test() -> int:
     assert stale == [
         "stale baseline entry: agentce/gone.py::h::p.exists (baseline 1, code 0); lower or remove it"
     ], stale
+    reasons = {k: "engine-owned" for k in exact}
+    assert reason_problems(exact, reasons) == []
+    unexplained = reason_problems(
+        exact, {k: v for k, v in reasons.items() if "is_symlink" not in k}
+    )
+    assert unexplained == [
+        "no reason for baseline site: agentce/m.py::C.g::self.path.is_symlink; say why its path "
+        "never comes from the user, or route it through the signing helpers"
+    ], unexplained
+    blank = reason_problems(exact, {**reasons, "agentce/m.py::f::p.is_file": "  "})
+    assert len(blank) == 1 and "agentce/m.py::f::p.is_file" in blank[0], blank
+    orphan = reason_problems(exact, {**reasons, "agentce/gone.py::h::p.exists": "x"})
+    assert orphan == [
+        "reason for a site not in the baseline: agentce/gone.py::h::p.exists; remove it"
+    ], orphan
     print(
-        "pathlib-predicates self-test: ok (sites, new site, raised count, stale entry, exact match)"
+        "pathlib-predicates self-test: ok (sites, new site, raised count, stale entry, exact match, "
+        "missing, blank and orphan reasons)"
     )
     return 0
 
@@ -138,9 +171,12 @@ def main(argv: list[str]) -> int:
         print(__doc__, file=sys.stderr)
         return 2
     package, baseline_path = Path(argv[0]), Path(argv[1])
-    baseline = json.loads(baseline_path.read_text(encoding="utf-8"))["sites"]
+    data = json.loads(baseline_path.read_text(encoding="utf-8"))
+    baseline = data["sites"]
     found = census(package)
-    issues = problems(found, baseline)
+    issues = problems(found, baseline) + reason_problems(
+        baseline, data.get("reasons", {})
+    )
     for issue in issues:
         print(f"pathlib-predicates: {issue}", file=sys.stderr)
     print(

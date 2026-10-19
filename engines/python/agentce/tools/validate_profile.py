@@ -22,6 +22,8 @@ from typing import Any
 import jsonschema
 import yaml
 
+from .. import signing
+
 
 def _schema() -> dict[str, Any]:
     text = (
@@ -54,11 +56,14 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
     path = Path(argv[0])
-    if not path.is_file():
-        print(f"PROFILE INVALID: {path} is not a file", file=sys.stderr)
-        return 1
     try:
+        if not signing.is_regular_file(path):
+            print(f"PROFILE INVALID: {path} is not a file", file=sys.stderr)
+            return 1
         instance = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except PermissionError:  # the same answer on every Python, no traceback (18.169)
+        print(f"PROFILE INVALID: {path} could not be read", file=sys.stderr)
+        return 1
     except yaml.YAMLError as exc:
         print(f"PROFILE INVALID: not well-formed YAML: {exc}", file=sys.stderr)
         return 1

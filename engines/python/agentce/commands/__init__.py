@@ -1110,7 +1110,9 @@ def _verify_report(
         for name in _RERUN_COMPARE_FILES:
             shipped = report_dir / name
             produced = scratch / "out" / name
-            if not produced.is_file() or not signing.is_regular_file(shipped):
+            if not signing.is_regular_file(produced) or not signing.is_regular_file(
+                shipped
+            ):
                 mismatched_files.append(name)
                 continue
             if produced.read_bytes() != shipped.read_bytes():
@@ -1189,7 +1191,7 @@ def _verify_release(result: CommandResult, release_path: Path) -> CommandResult:
     adds uses a fixed, engine-neutral reason text, not an embedded native-parser message (brand-new
     code for all three engines; `--catalog`'s pre-existing unreadable-JSON path is unchanged)."""
     trust = signing.vendored_trust()
-    if release_path.is_file():
+    if signing.is_regular_file(release_path):
         envelope, err = _load_release_json(
             release_path,
             object,
@@ -2892,7 +2894,10 @@ def _cmd_catalog_init(ns: argparse.Namespace) -> CommandResult:
         failed_jsonl,
         inapplicable_jsonl,
     ]
-    existing = [str(p) for p in files if p.exists()]
+    with writing_into(
+        raw_dir or ".", CATALOG_INIT_OUT
+    ):  # a folder it cannot enter is unwritable
+        existing = [str(p) for p in files if signing.path_exists(p)]
     if existing and not _flag(ns, "force"):
         raise InputError(
             "catalog.init_exists",
@@ -3612,7 +3617,7 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
     sig_path = check_output(
         str(directory / signing.CATALOG_SIGNATURE_NAME), CATALOG_SIGN_FILE
     )
-    if sig_path.exists() and not _flag(ns, "force"):
+    if signing.path_exists(sig_path) and not _flag(ns, "force"):
         raise InputError(
             "catalog.sign_exists",
             f"{sig_path} already exists.",
@@ -3645,7 +3650,7 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
     new_key_written: str | None = None
     if new_key_arg is not None:
         new_key_path = check_output(new_key_arg, NEW_KEY_OUT)
-        if new_key_path.exists():
+        if signing.path_exists(new_key_path):
             raise InputError(
                 "catalog.sign_new_key_exists",
                 f"--new-key {new_key_arg!r} already exists.",
@@ -3818,8 +3823,19 @@ def _declaration_path(project: Path, name: str) -> Path:
     """Where ``name`` lives in ``project``: ``agentce/<name>``, else the flat layout the vendored
     quickstart project uses (``<name>`` beside the evidence directory)."""
     nested = project / DECLARATIONS_DIR / name
+    flat = project / name
     return (
-        nested if nested.is_file() or not (project / name).is_file() else project / name
+        nested
+        if signing.is_regular_file(nested) or not signing.is_regular_file(flat)
+        else flat
+    )
+
+
+def _doctor_unreadable(key: str, what: str, exc: PermissionError) -> dict[str, str]:
+    """doctor's problem for a declaration or bundle it cannot reach: named as unreadable, never as
+    missing, with one answer on every Python (18.169)."""
+    return _doctor_problem(
+        key, f"{what} {exc.filename} could not be read ({exc.strerror})"
     )
 
 
@@ -3852,70 +3868,90 @@ def cmd_doctor(ns: argparse.Namespace) -> CommandResult:
     environment, problems = inspect_environment()
     declared_sources: set[str] = set()
 
-    profile_path = _declaration_path(project, PROFILE_FILE)
-    if not profile_path.is_file():
+    try:
+        profile_path = _declaration_path(project, PROFILE_FILE)
+        has_profile = signing.is_regular_file(profile_path)
+    except PermissionError as exc:
         problems.append(
-            _doctor_problem(
-                "input.profile_missing",
-                f"no {PROFILE_FILE} in {project / DECLARATIONS_DIR} or {project}",
-            )
+            _doctor_unreadable("input.profile_unreadable", PROFILE_FILE, exc)
         )
     else:
-        from ..tools.validate_profile import validate_profile
-
-        profile_data = yaml.safe_load(profile_path.read_text("utf-8")) or {}
-        for problem in validate_profile(profile_data):
+        if not has_profile:
             problems.append(
                 _doctor_problem(
-                    "schema_invalid",
-                    problem,
-                    "correct the profile to match applicability-profile.schema.json.",
+                    "input.profile_missing",
+                    f"no {PROFILE_FILE} in {project / DECLARATIONS_DIR} or {project}",
                 )
             )
-        declared_sources = {
-            str(source.get("source"))
-            for subject in profile_data.get("subjects", [])
-            for source in subject.get("evidence_sources", [])
-            if source.get("source")
-        }
+        else:
+            from ..tools.validate_profile import validate_profile
 
-    bundle_dir = project / "evidence"
-    if not bundle_dir.is_dir():
-        problems.append(
-            _doctor_problem(
-                "input.bundle_manifest_missing",
-                f"no evidence bundle at {bundle_dir}",
-                f"run your agent with the emitter on, `AGENTCE_EMIT=1 AGENTCE_EMIT_OUT={bundle_dir}` "
-                "(see docs/integrate.md), or watch one built with "
-                f"`examples/custom-loop/run.sh {bundle_dir}` from a checkout; then check it with "
-                f"`agentce validate --bundle {bundle_dir}`.",
-            )
-        )
-    else:
-        try:
-            bundle = load_bundle(bundle_dir)
-            manifest_sources = {
-                str(source.get("id")) for source in bundle.manifest.get("sources", [])
-            }
-            for source in sorted(declared_sources - manifest_sources):
+            profile_data = yaml.safe_load(profile_path.read_text("utf-8")) or {}
+            for problem in validate_profile(profile_data):
                 problems.append(
                     _doctor_problem(
-                        "unknown_source",
-                        f"source {source} is declared but not in the bundle manifest",
-                        "add the source's stream and manifest entry, or remove the declaration.",
+                        "schema_invalid",
+                        problem,
+                        "correct the profile to match applicability-profile.schema.json.",
                     )
                 )
-        except AgentceError as err:
-            problems.append(_doctor_problem(err.key, err.cause, err.fix))
+            declared_sources = {
+                str(source.get("source"))
+                for subject in profile_data.get("subjects", [])
+                for source in subject.get("evidence_sources", [])
+                if source.get("source")
+            }
 
-    if not _declaration_path(project, DOMAIN_FILE).is_file():
+    bundle_dir = project / "evidence"
+    try:
+        has_bundle = signing.is_directory(bundle_dir)
+    except PermissionError as exc:
         problems.append(
-            _doctor_problem(
-                "input.catalog_not_found",
-                f"no domain binding {DOMAIN_FILE} in {project / DECLARATIONS_DIR} or {project}",
-                f"add {DECLARATIONS_DIR}/{DOMAIN_FILE} (`agentce init --out {project}` writes a starter).",
-            )
+            _doctor_unreadable("input.bundle_unreadable", "the evidence bundle", exc)
         )
+    else:
+        if not has_bundle:
+            problems.append(
+                _doctor_problem(
+                    "input.bundle_manifest_missing",
+                    f"no evidence bundle at {bundle_dir}",
+                    f"run your agent with the emitter on, `AGENTCE_EMIT=1 AGENTCE_EMIT_OUT={bundle_dir}` "
+                    "(see docs/integrate.md), or watch one built with "
+                    f"`examples/custom-loop/run.sh {bundle_dir}` from a checkout; then check it with "
+                    f"`agentce validate --bundle {bundle_dir}`.",
+                )
+            )
+        else:
+            try:
+                bundle = load_bundle(bundle_dir)
+                manifest_sources = {
+                    str(source.get("id"))
+                    for source in bundle.manifest.get("sources", [])
+                }
+                for source in sorted(declared_sources - manifest_sources):
+                    problems.append(
+                        _doctor_problem(
+                            "unknown_source",
+                            f"source {source} is declared but not in the bundle manifest",
+                            "add the source's stream and manifest entry, or remove the declaration.",
+                        )
+                    )
+            except AgentceError as err:
+                problems.append(_doctor_problem(err.key, err.cause, err.fix))
+
+    try:
+        has_domain = signing.is_regular_file(_declaration_path(project, DOMAIN_FILE))
+    except PermissionError as exc:
+        problems.append(_doctor_unreadable("input.domain_unreadable", DOMAIN_FILE, exc))
+    else:
+        if not has_domain:
+            problems.append(
+                _doctor_problem(
+                    "input.catalog_not_found",
+                    f"no domain binding {DOMAIN_FILE} in {project / DECLARATIONS_DIR} or {project}",
+                    f"add {DECLARATIONS_DIR}/{DOMAIN_FILE} (`agentce init --out {project}` writes a starter).",
+                )
+            )
 
     result.data.update(
         {
@@ -4031,8 +4067,10 @@ def cmd_init(ns: argparse.Namespace) -> CommandResult:
     )
     profile_path = Path(out) / DECLARATIONS_DIR / PROFILE_FILE
     domain_path = Path(out) / DECLARATIONS_DIR / DOMAIN_FILE
-    check_output(out, OUT_DIR)
-    existing = [str(p) for p in (profile_path, domain_path) if p.exists()]
+    with writing_into(out, OUT_DIR):  # a folder it cannot enter is unwritable
+        existing = [
+            str(p) for p in (profile_path, domain_path) if signing.path_exists(p)
+        ]
     if existing and not _flag(ns, "force"):
         raise InputError(
             "input.init_exists",

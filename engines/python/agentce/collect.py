@@ -29,6 +29,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
 
+from . import signing
 from .canonical import canonical_string
 from .errors import InputError
 from .outputs import OUT_DIR, write_file, writing_into
@@ -298,13 +299,21 @@ def run_collect(
         )
         if source.export and export_adapter is not None:
             export_path = Path(source.export)
-            if not export_path.is_file():
+            try:
+                missing = (
+                    None
+                    if signing.is_regular_file(export_path)
+                    else f"export not found: {source.export}"
+                )
+            except PermissionError:  # unreadable, never read as absent (18.169)
+                missing = f"export could not be read: {source.export}"
+            if missing is not None:
                 sources.append(
                     {
                         "id": source.id,
                         "adapter": source.adapter,
                         "completeness": "incomplete",
-                        "reason": f"export not found: {source.export}",
+                        "reason": missing,
                         "authenticated": authenticated,
                     }
                 )

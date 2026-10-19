@@ -373,7 +373,11 @@ def _load_control_schema() -> dict[str, Any]:
 
 def _load_test_domain(directory: Path) -> DomainBinding:
     path = directory / "test" / "domain.yaml"
-    return DomainBinding.load(path) if path.is_file() else DomainBinding.empty()
+    return (
+        DomainBinding.load(path)
+        if signing.is_regular_file(path)
+        else DomainBinding.empty()
+    )
 
 
 def _load_events(path: Path) -> list[dict[str, Any]]:
@@ -437,7 +441,7 @@ def _fixture_fingerprint(directory: Path, control: ControlSpec) -> tuple[Any, ..
     for case in sorted(control.test_cases, key=lambda entry: entry["id"]):
         path = directory / case["fixture"]
         events: tuple[str, ...] | None = None
-        if path.is_file():
+        if signing.is_regular_file(path):
             events = tuple(
                 json.dumps(event, sort_keys=True) for event in _load_events(path)
             )
@@ -687,11 +691,16 @@ def _lint_case(
     case: dict[str, str],
 ) -> list[str]:
     fixture = catalog.directory / case["fixture"]
-    if not fixture.is_file():
-        return [f"{control.id}/{case['id']}: fixture {case['fixture']} not found"]
-    if shape is None or case["expected"] not in _EXPECTED_TO_CHECK:
-        return []
-    events = _load_events(fixture)
+    try:
+        if not signing.is_regular_file(fixture):
+            return [f"{control.id}/{case['id']}: fixture {case['fixture']} not found"]
+        if shape is None or case["expected"] not in _EXPECTED_TO_CHECK:
+            return []
+        events = _load_events(fixture)
+    except OSError as exc:  # unreadable, never "not found", on every Python (18.169)
+        return [
+            f"{control.id}/{case['id']}: fixture {case['fixture']} could not be read ({exc.strerror})"
+        ]
     store = build_graph(events, domain=domain)
     outcome = evaluate_control(
         store, shape, catalog.shapes, control_id=control.id, tolerance=control.tolerance

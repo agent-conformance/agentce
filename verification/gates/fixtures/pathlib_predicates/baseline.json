@@ -1,37 +1,13 @@
 {
-  "note": "Bare pathlib predicate calls in engines/python/agentce at 18.163, by site (VG-PATHLIB-PREDICATES). Shrink-only: route a site through signing.is_regular_file/is_directory and remove or lower its entry; never add one without review. readiness.py reads report files with os.stat (18.165), so an unreadable one blocks rather than reading as absent.",
+  "note": "Bare pathlib predicate calls in engines/python/agentce, by site (VG-PATHLIB-PREDICATES). Shrink-only: route a site through signing.is_regular_file/is_directory/path_exists/is_link and remove or lower its entry; never add one without review. Every site carries a reason under `reasons` saying why its path never comes from the user (18.169).",
   "sites": {
-    "agentce/bundle.py::safe_is_file::path.is_file": 1,
-    "agentce/catalog.py::_fixture_fingerprint::path.is_file": 1,
-    "agentce/catalog.py::_lint_case::fixture.is_file": 1,
-    "agentce/catalog.py::_load_test_domain::path.is_file": 1,
-    "agentce/collect.py::run_collect::export_path.is_file": 1,
-    "agentce/commands/__init__.py::_cmd_catalog_init::p.exists": 1,
-    "agentce/commands/__init__.py::_cmd_catalog_sign::new_key_path.exists": 1,
-    "agentce/commands/__init__.py::_cmd_catalog_sign::sig_path.exists": 1,
-    "agentce/commands/__init__.py::_declaration_path::(project / name).is_file": 1,
-    "agentce/commands/__init__.py::_declaration_path::nested.is_file": 1,
-    "agentce/commands/__init__.py::_verify_release::release_path.is_file": 1,
-    "agentce/commands/__init__.py::_verify_report::produced.is_file": 1,
-    "agentce/commands/__init__.py::cmd_doctor::_declaration_path(project, DOMAIN_FILE).is_file": 1,
-    "agentce/commands/__init__.py::cmd_doctor::bundle_dir.is_dir": 1,
-    "agentce/commands/__init__.py::cmd_doctor::profile_path.is_file": 1,
-    "agentce/commands/__init__.py::cmd_init::p.exists": 1,
     "agentce/commands/__init__.py::cmd_quickstart::quickstart.is_dir": 1,
-    "agentce/config.py::_discover_file::candidate.is_file": 1,
-    "agentce/config.py::_load_file::path.is_file": 1,
-    "agentce/conformance.py::_materialise_corpus::(corpus_dir / 'corpus-manifest.json').is_file": 1,
     "agentce/conformance.py::_materialise_corpus::(tmp / 'corpus-manifest.json').is_file": 1,
-    "agentce/conformance.py::_materialise_corpus::generator.is_file": 1,
-    "agentce/coverage_matrix.py::check_matrix::committed_path.is_file": 1,
-    "agentce/i18n_format.py::load_catalog::path.is_file": 1,
-    "agentce/records/__init__.py::_candidates::(here / d).is_symlink": 1,
-    "agentce/records/__init__.py::scan::(stale / 'manifest.json').is_file": 1,
-    "agentce/records/__init__.py::scan::out.exists": 1,
-    "agentce/records/__init__.py::scan::stale.is_dir": 2,
-    "agentce/records/__init__.py::scan::stale.is_symlink": 1,
-    "agentce/signing.py::verify_catalog_directory::sig_path.is_file": 1,
-    "agentce/state.py::StateDir.load::state_file.is_file": 1,
-    "agentce/tools/validate_profile.py::main::path.is_file": 1
+    "agentce/i18n_format.py::load_catalog::path.is_file": 1
+  },
+  "reasons": {
+    "agentce/commands/__init__.py::cmd_quickstart::quickstart.is_dir": "the quickstart project shipped inside the package, never a user path",
+    "agentce/conformance.py::_materialise_corpus::(tmp / 'corpus-manifest.json').is_file": "a folder this run made with mkdtemp, never a user path",
+    "agentce/i18n_format.py::load_catalog::path.is_file": "the vendored message catalogues shipped inside the package, never a user path"
   }
 }

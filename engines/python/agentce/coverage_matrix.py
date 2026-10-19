@@ -12,6 +12,7 @@ from pathlib import Path
 
 import yaml
 
+from . import signing
 from .catalog import load_catalog
 
 MATRIX_FILE = "automation-coverage.md"
@@ -67,7 +68,7 @@ def check_matrix(catalog_dir: Path) -> tuple[bool, str]:
     """Return ``(ok, message)``: whether the committed matrix equals the regenerated one."""
     generated = automation_matrix(catalog_dir)
     committed_path = catalog_dir / MATRIX_FILE
-    if not committed_path.is_file():
+    if not signing.is_regular_file(committed_path):
         return False, f"no committed matrix at {committed_path}"
     committed = committed_path.read_text(encoding="utf-8")
     if committed != generated:

@@ -5259,8 +5259,8 @@
       "timeout_s": 120,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "verification/gates/pathlib_predicates_check.py's --self-test judges a new site, a raised count, a stale entry and an exact match correctly, then every bare is_file/is_dir/exists/is_symlink call (no arguments) in engines/python/agentce, keyed <path under engines/python>::<qualified function>::<receiver>.<predicate>, matches verification/gates/fixtures/pathlib_predicates/baseline.json count for count",
-        "fail": "a site not in the baseline or above its count (a new bare predicate, which answers a path under a folder that can be listed but not entered differently on 3.12/3.13 and 3.14), or a baseline count above the code's (a paid-down site whose entry was not removed)"
+        "pass": "verification/gates/pathlib_predicates_check.py's --self-test judges a new site, a raised count, a stale entry, an exact match and a missing, blank or orphan reason correctly, then every bare is_file/is_dir/exists/is_symlink call (no arguments) in engines/python/agentce, keyed <path under engines/python>::<qualified function>::<receiver>.<predicate>, matches verification/gates/fixtures/pathlib_predicates/baseline.json count for count, and every baseline site carries a non-empty reason under `reasons` naming why its path never comes from the user (18.169)",
+        "fail": "a site not in the baseline or above its count (a new bare predicate, which answers a path under a folder that can be listed but not entered differently on 3.12/3.13 and 3.14), or a baseline count above the code's (a paid-down site whose entry was not removed), or a baseline site with no reason, or a reason for a site not in the baseline"
       },
       "faults": [
         {
@@ -5274,9 +5274,21 @@
           "file": "engines/python/agentce/commands/__init__.py",
           "search": "    if not signing.is_regular_file(claim_path, unreadable_is_absent=True):\n",
           "replace": "    if not claim_path.is_file():\n"
+        },
+        {
+          "description": "the quickstart site loses its reason in the baseline, so a grandfathered bare predicate no longer says why its path never comes from the user (18.169)",
+          "file": "verification/gates/fixtures/pathlib_predicates/baseline.json",
+          "search": "    \"agentce/commands/__init__.py::cmd_quickstart::quickstart.is_dir\": \"the quickstart project shipped inside the package, never a user path\",\n",
+          "replace": ""
+        },
+        {
+          "description": "agentce.toml discovery goes back to a bare candidate.is_file(), the 18.169 site where config show crashed on Python 3.12 and silently used defaults on 3.14 for an agentce.toml it could not read",
+          "file": "engines/python/agentce/config.py",
+          "search": "    return candidate if signing.is_regular_file(candidate) else None\n",
+          "replace": "    return candidate if candidate.is_file() else None\n"
         }
       ],
-      "fix_hint": "Run verification/gates/pathlib_predicates.sh and read the site it names: route the call through signing.is_regular_file or signing.is_directory (unreadable_is_absent=True where 'not there' is the right answer and safe, the default where the caller must report the folder as unreadable), or, if the call is on an engine-owned path, add it to verification/gates/fixtures/pathlib_predicates/baseline.json in review."
+      "fix_hint": "Run verification/gates/pathlib_predicates.sh and read the site it names: route the call through signing.is_regular_file, is_directory, path_exists or is_link (unreadable_is_absent=True where 'not there' is the right answer and safe, the default where the caller must report the folder as unreadable), or, if the call is on an engine-owned path, add it to verification/gates/fixtures/pathlib_predicates/baseline.json in review with a one-line reason under `reasons`."
     },
     {
       "id": "VG-TASK-BUDGET",

@@ -301,11 +301,27 @@ def is_directory(path: Path, *, unreadable_is_absent: bool = False) -> bool:
     return _mode_matches(path, stat.S_ISDIR, unreadable_is_absent)
 
 
+def path_exists(path: Path, *, unreadable_is_absent: bool = False) -> bool:
+    """``Path.exists`` with the same answer on every Python; see `is_regular_file`."""
+    return _mode_matches(path, lambda _mode: True, unreadable_is_absent)
+
+
+def is_link(path: Path, *, unreadable_is_absent: bool = False) -> bool:
+    """``Path.is_symlink`` with the same answer on every Python; see `is_regular_file`."""
+    return _mode_matches(
+        path, stat.S_ISLNK, unreadable_is_absent, follow_symlinks=False
+    )
+
+
 def _mode_matches(
-    path: Path, test: Callable[[int], bool], unreadable_is_absent: bool
+    path: Path,
+    test: Callable[[int], bool],
+    unreadable_is_absent: bool,
+    *,
+    follow_symlinks: bool = True,
 ) -> bool:
     try:
-        return test(path.stat().st_mode)
+        return test(path.stat(follow_symlinks=follow_symlinks).st_mode)
     except ValueError:  # an embedded NUL: no such file, as Path.is_file answers
         return False
     except OSError as exc:
@@ -876,7 +892,7 @@ def verify_catalog_directory(source: Path | CatalogFiles, trust: TrustRoot) -> V
     directory = files.root
     recomputed = files.digest()
     sig_path = directory / CATALOG_SIGNATURE_NAME
-    if not sig_path.is_file():
+    if not is_regular_file(sig_path):
         raise UnsignedError.refusal("verify.catalog_unsigned")
     if files.links_out:
         # A signed catalog is one folder of files (18.181): bytes behind a link do not travel with it.

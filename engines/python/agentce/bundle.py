@@ -20,6 +20,7 @@ from typing import Any
 from . import canonical
 from .errors import InputError, UnreadableError
 from .error_catalogue import MESSAGE_KEYS
+from . import signing
 from .signing import parse_untrusted_json
 
 #: Ceiling on any single manifest-listed file's byte size, checked with `stat()` before the file is
@@ -92,9 +93,10 @@ def permission_denied(path: Path) -> bool:
 def safe_is_file(path: Path) -> bool:
     """``path.is_file()``, but an OS-level hazard a confined path can still hit at access time (a
     symlink loop, a name too long for the filesystem) is treated as "not present", never left to
-    propagate as an unexpected error."""
+    propagate as an unexpected error. Unreadable reads as absent here; callers test permission first
+    and refuse it as ``input.bundle_unreadable``."""
     try:
-        return path.is_file()
+        return signing.is_regular_file(path, unreadable_is_absent=True)
     except (OSError, RuntimeError, ValueError):
         return False
 
