@@ -96,8 +96,7 @@ each.
   followed. The loader checks `manifest.json` itself the same way. When the manifest is a link that
   resolves outside the bundle, whether directly, through a linked folder or through a chain of links,
   the loader refuses it with the same key, so a bundle's list of files always travels with the bundle
-  folder. Checked by
-  `engines/python/tests/test_bundle.py` and the bundle-manifest checks in
+  folder. Checked by `engines/python/tests/test_bundle.py` and the bundle-manifest checks in
   `engines/python/tests/test_input_hardening.py`.
 - **Structural depth limits.** `Profile.load`/`DomainBinding.load` (`safe_yaml.py`) and per-event JSON
   parsing (`ingest.py`) each catch the `RecursionError` a pathologically deep -- but small-byte --

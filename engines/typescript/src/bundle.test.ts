@@ -205,7 +205,7 @@ function placeManifest(dir: string, kind: string): string {
     return root;
   }
   const targets: Record<string, [string, string]> = {
-    outside: [join(out, "manifest.json"), join(out, "manifest.json")],
+    outside: ["../out/manifest.json", join(out, "manifest.json")],
     inside: ["meta/m.json", join(root, "meta", "m.json")],
     folder_link_out: ["meta/m.json", join(out, "m.json")],
     link_to_link_out: ["inner", join(out, "m.json")],

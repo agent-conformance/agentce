@@ -139,17 +139,16 @@ class BundleTest {
         writeManifest(root, "events/s.jsonl", events);
         Path manifest = root.resolve("manifest.json");
         Path out = Files.createDirectories(dir.resolve("out"));
-        switch (kind) {
-            case "plain":
-                return root;
-            case "root_link":
-                return Files.createSymbolicLink(dir.resolve("rl"), root);
-            case "dangling":
-                Files.delete(manifest);
-                Files.createSymbolicLink(manifest, out.resolve("none.json"));
-                return root;
-            default:
-                break;
+        if (kind.equals("plain")) {
+            return root;
+        }
+        if (kind.equals("root_link")) {
+            return Files.createSymbolicLink(dir.resolve("rl"), root);
+        }
+        if (kind.equals("dangling")) {
+            Files.delete(manifest);
+            Files.createSymbolicLink(manifest, out.resolve("none.json"));
+            return root;
         }
         String link;
         Path target;
