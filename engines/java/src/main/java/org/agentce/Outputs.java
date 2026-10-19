@@ -174,8 +174,9 @@ final class Outputs {
             Files.write(sibling, data);
             Files.move(sibling, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
                     java.nio.file.StandardCopyOption.ATOMIC_MOVE);
-        } finally {
+        } catch (IOException e) {
             Files.deleteIfExists(sibling);
+            throw e;
         }
     }
 
