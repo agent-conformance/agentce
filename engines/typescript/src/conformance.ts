@@ -12,14 +12,7 @@
  */
 
 import { execFileSync, spawnSync } from "node:child_process";
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { summarizeActivity } from "./activity";
@@ -38,6 +31,7 @@ import { integrityCaps, verifyStreams } from "./integrity";
 import { NonCanonicalNumber, asParsed, parseJson } from "./json";
 import { installedNoMl } from "./noMl";
 import { parsePythonIntGrammar, toBigIntFromInt } from "./otelGenai";
+import { OUT_DIR, writeFile, writingInto } from "./outputs";
 import { loadProfile } from "./profile";
 import { pyGet, pyTruthy } from "./readiness";
 import { writeReport } from "./report";
@@ -325,13 +319,16 @@ export function runEcs(options: RunEcsOptions): EcsReport {
     report.adapter_conformance = asParsed(detail) as AdapterDetail;
     report.adapters = adapterClaim(detail);
   }
-  if (options.outDir !== null) {
-    mkdirSync(options.outDir, { recursive: true });
-    // json.dumps(report, sort_keys=True, indent=2): Python's ensure_ascii default included
-    writeFileSync(
-      join(options.outDir, "implementation-report.json"),
-      `${jsonStringifyAscii(sortKeysDeep(report), 2)}\n`,
-    );
+  const outDir = options.outDir;
+  if (outDir !== null) {
+    writingInto(outDir, OUT_DIR, () => {
+      mkdirSync(outDir, { recursive: true });
+      // json.dumps(report, sort_keys=True, indent=2): Python's ensure_ascii default included
+      writeFile(
+        join(outDir, "implementation-report.json"),
+        `${jsonStringifyAscii(sortKeysDeep(report), 2)}\n`,
+      );
+    });
   }
   return report;
 }

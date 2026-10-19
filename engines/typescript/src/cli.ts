@@ -61,6 +61,7 @@ import {
 } from "./integrity";
 import { DEFAULT_LANGUAGE, availableLanguages, catalogue } from "./messages";
 import { installedNoMl } from "./noMl";
+import { OUT_DIR, type OutputRole, checkOutput, writeOutput } from "./outputs";
 import { type Profile, loadProfile } from "./profile";
 import { writeQuarantine } from "./quarantine";
 import {
@@ -256,6 +257,29 @@ export function digestOf(path: string): string {
   return digestBytes(bytes);
 }
 
+/** The options a command writes to (18.180): each output is checked and written through one role. */
+const REPORT_OUT: OutputRole = {
+  key: "input.out_file_unwritable",
+  flag: "--out",
+  fix: "pass --out <file> with a writable path.",
+};
+const SIGN_REPORT_DIR: OutputRole = {
+  key: "input.report_dir_unwritable",
+  flag: "the report directory",
+  fix: "make the report directory writable, then re-run.",
+  directory: true,
+};
+const SIGN_REPORT_FILE: OutputRole = {
+  key: "input.report_dir_unwritable",
+  flag: "the report file",
+  fix: "make the report directory writable, then re-run.",
+};
+const READINESS_OUT: OutputRole = {
+  key: "warning.readiness_file_unwritten",
+  flag: "the readiness file",
+  fix: "make the report directory writable to keep the readiness file.",
+};
+
 function requireDir(
   raw: string | undefined,
   key: string,
@@ -317,6 +341,19 @@ function requireFile(
     );
   }
   return raw;
+}
+
+/** A folder the command reads files inside must be listable and enterable, else `key`. */
+function requireEnterable(path: string, key: string, what: string): void {
+  try {
+    accessSync(path, fsConstants.R_OK | fsConstants.X_OK);
+  } catch {
+    throw new InputError(
+      key,
+      `${what} ${pyRepr(path)} exists but could not be read.`,
+      "make the folder readable and enterable, then re-run.",
+    );
+  }
 }
 
 /** The global flags every command accepts, none of which takes a value. */
@@ -777,6 +814,9 @@ function cmdConformance(argv: string[]): CommandResult {
   }
   const out = v["--out"];
   refuseEmptyOut(out);
+  if (out !== undefined) {
+    checkOutput(out, OUT_DIR);
+  }
   const report = runEcs({
     enginePath: engine,
     corpusDir: corpus,
@@ -1763,6 +1803,9 @@ function cmdReport(argv: string[]): CommandResult {
     "--out",
     "pass --out <file> with a writable path.",
   );
+  if (v["--out"] !== undefined) {
+    checkOutput(v["--out"], REPORT_OUT);
+  }
   const source = requireFile(v["--from"], "from", "the assertions file");
   const format = v["--format"] || "md";
   for (const [flag, reads, add] of REPORT_FORMAT_ONLY) {
@@ -1833,7 +1876,7 @@ function cmdReport(argv: string[]): CommandResult {
   result.data.rendering = rendering;
   const out = v["--out"];
   if (out !== undefined) {
-    writeFileSync(out, rendering);
+    writeOutput(out, REPORT_OUT, rendering);
     result.data.out = out;
   }
   result.note(rendering);
@@ -2068,6 +2111,7 @@ function cmdReadiness(argv: string[]): CommandResult {
     "the report directory",
     "pass the report directory: `agentce readiness <report-dir>`.",
   );
+  requireEnterable(reportDir, "input.report_dir_unreadable", "the report directory");
   let gaps = new Set<string>();
   if (args.gaps !== undefined) {
     const text = readFileSync(requireFile(args.gaps, "gaps", "the gaps file"), "utf-8");
@@ -2092,14 +2136,29 @@ function cmdReadiness(argv: string[]): CommandResult {
   if (verdict.limitations.length > 0) {
     lines.push("## Limitations", ...verdict.limitations.map((l) => `- ${l}`), "");
   }
-  writeFileSync(out, `${lines.join("\n")}\n`);
-  result.data.report = out;
+  let unwritten: string | undefined;
+  try {
+    writeOutput(out, READINESS_OUT, `${lines.join("\n")}\n`);
+    result.data.report = out;
+  } catch (err) {
+    if (!(err instanceof InputError)) {
+      throw err;
+    }
+    // Reading is all the verdict needs (a read-only report folder still gets one); the file is the
+    // only thing lost, and the run says so under its own key.
+    result.data.report = null;
+    result.data.report_warning = err.key;
+    unwritten = `warning [${err.key}]: ${err.cause} The verdict is not saved to a file.`;
+  }
   if (verdict.verdict === NOT_READY) {
     result.addCode(ExitCode.FINDINGS);
   }
   result.note(
     `${verdict.verdict}: ${verdict.reasons.length} reason(s), ${verdict.limitations.length} limitation(s)`,
   );
+  if (unwritten !== undefined) {
+    result.note(unwritten);
+  }
   return result;
 }
 
@@ -2337,6 +2396,9 @@ function cmdSign(argv: string[]): CommandResult {
     );
   }
   const dryRun = args.dryRun;
+  if (!dryRun) {
+    checkOutput(reportDir, SIGN_REPORT_DIR);
+  }
   result.data.report_dir = reportDir;
   result.data.as = role;
   result.data.profile = profile;
@@ -2374,6 +2436,14 @@ function cmdSign(argv: string[]): CommandResult {
     return result;
   }
 
+  // Every file sign writes is checked before claim.json is rewritten, so a refused run writes nothing.
+  const sigDir = join(reportDir, "signatures");
+  const detached = join(sigDir, `${role}-${profile}.dsse.json`);
+  const trustRootPath = join(reportDir, "trust-root.json");
+  checkOutput(sigDir, SIGN_REPORT_DIR);
+  for (const target of [claimPath, detached, ...(writeTrustRoot ? [trustRootPath] : [])]) {
+    checkOutput(target, SIGN_REPORT_FILE);
+  }
   const signer = signSigner(args.key, profile);
   const subjects = signSubjects(claim, manifest);
   const statement = {
@@ -2393,11 +2463,8 @@ function cmdSign(argv: string[]): CommandResult {
   const signatures = (claim.signatures as unknown[] | undefined) ?? [];
   signatures.push(record);
   claim.signatures = signatures;
-  writeFileSync(claimPath, `${jsonStringifyAscii(sortKeysDeep(claim), 2)}\n`);
-  const sigDir = join(reportDir, "signatures");
-  mkdirSync(sigDir, { recursive: true });
-  const detached = join(sigDir, `${role}-${profile}.dsse.json`);
-  writeFileSync(detached, `${jsonStringifyAscii(sortKeysDeep(record), 2)}\n`);
+  writeOutput(claimPath, SIGN_REPORT_FILE, `${jsonStringifyAscii(sortKeysDeep(claim), 2)}\n`);
+  writeOutput(detached, SIGN_REPORT_FILE, `${jsonStringifyAscii(sortKeysDeep(record), 2)}\n`);
   result.data.signature = detached;
   result.data.keyid = signer.keyid;
   result.data.signatures = signatures.length;
@@ -2413,13 +2480,16 @@ function cmdSign(argv: string[]): CommandResult {
     const kmsSigner = signer;
     const claimant = pyGetField(claim, "claimant", {});
     const org = pyGetField(claimant, "org", "unset");
-    const trustRootPath = join(reportDir, "trust-root.json");
     const document = {
       keys: {
         [kmsSigner.keyid]: { public_key: kmsSigner.publicKeyB64, identity: org },
       },
     };
-    writeFileSync(trustRootPath, `${jsonStringifyAscii(sortKeysDeep(document), 2)}\n`);
+    writeOutput(
+      trustRootPath,
+      SIGN_REPORT_FILE,
+      `${jsonStringifyAscii(sortKeysDeep(document), 2)}\n`,
+    );
     result.data.trust_root = trustRootPath;
   }
   result.note(`signed ${basename(claimPath)} as ${role} (${profile})`);
