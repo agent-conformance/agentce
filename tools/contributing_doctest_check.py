@@ -36,7 +36,9 @@ TEST_SRC = (
     '    assert False, "seeded fault: the contributor doc-test proves pytest runs"\n'
 )
 LINT_SRC = "import os\n\nx=1\n"  # F401 unused import + an unformatted line
-BLOCK_TIMEOUT_S = 250
+# A hang guard, not the gate: the engines/python pytest block took 251-276 s locally at 2163 tests
+# (2026-10-19) and timed out at 250 s in CI, so each block gets more than twice that.
+BLOCK_TIMEOUT_S = 600
 
 FENCE_OPEN = re.compile(r"^```(bash|sh|shell|console)(\s+no-run\b.*)?\s*$")
 FENCE_CLOSE = re.compile(r"^```\s*$")
