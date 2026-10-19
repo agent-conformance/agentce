@@ -264,7 +264,7 @@ def test_readiness_on_a_read_only_report_warns_under_its_key(
     assert code == json_code
     assert code in (0, 1)
     assert "warning [warning.readiness_file_unwritten]:" in out
-    assert "The verdict above is not saved to a file." in out
+    assert "The verdict is not saved to a file." in out
     assert env["report"] is None
     assert env["report_warning"] == "warning.readiness_file_unwritten"
 

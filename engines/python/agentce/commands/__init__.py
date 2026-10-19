@@ -3786,7 +3786,7 @@ def cmd_readiness(ns: argparse.Namespace) -> CommandResult:
         result.data["report"] = None
         result.data["report_warning"] = exc.key
         result.note(
-            f"warning [{exc.key}]: {exc.cause} The verdict above is not saved to a file."
+            f"warning [{exc.key}]: {exc.cause} The verdict is not saved to a file."
         )
     if verdict["verdict"] == readiness.NOT_READY:
         result.add_code(int(ExitCode.FINDINGS))
