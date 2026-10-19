@@ -325,7 +325,7 @@ public final class Conformance {
 
         // The running engine's own bundled dependency set, as `agentce version --json` and Python's
         // conformance run report it: never a lock file under whatever path --engine names (18.179).
-        NoMl.InstalledResult scan = NoMl.evaluateInstalled(NoMl.loadVendoredDenylist(), NoMl.loadRuntimeDeps());
+        NoMl.InstalledResult scan = NoMl.installedSelfReport();
         int total = projectIds.size();
         int different = total - identical;
         String claim;

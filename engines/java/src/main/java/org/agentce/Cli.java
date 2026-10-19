@@ -2661,7 +2661,7 @@ global options:
             result.usage = VERSION_USAGE;
             return result;
         }
-        NoMl.InstalledResult scan = NoMl.evaluateInstalled(NoMl.loadVendoredDenylist(), NoMl.loadRuntimeDeps());
+        NoMl.InstalledResult scan = NoMl.installedSelfReport();
         result.data.put("engine", Version.ENGINE_NAME);
         result.data.put("engine_version", Version.ENGINE_VERSION);
         result.data.put("spec_version", Version.SPEC_VERSION);

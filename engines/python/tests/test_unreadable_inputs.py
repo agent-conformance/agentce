@@ -35,6 +35,18 @@ def _refusal(argv: list[str], capsys: pytest.CaptureFixture[str]) -> tuple[int, 
         (["readiness", "{r}", "--gaps", "{f}"], "input.gaps_unreadable"),
         (["diff", "{f}", "{f}"], "input.report_a_unreadable"),
         (["report", "--from", "{f}"], "input.from_unreadable"),
+        (
+            [
+                "assess",
+                "--bundle",
+                _BUNDLE,
+                "--profile",
+                _PROFILE,
+                "--trust-root",
+                "{f}",
+            ],
+            "input.trust_root_unreadable",
+        ),
     ],
 )
 def test_unreadable_file_is_refused_with_the_role_key(
@@ -85,22 +97,6 @@ def test_unenterable_adapters_folder_is_refused(
         assert _refusal(argv, capsys) == (3, "input.adapters_unreadable")
     finally:
         adapters.chmod(0o700)
-
-
-def test_unreadable_trust_root_is_refused_with_its_key(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    locked = tmp_path / "trust.json"
-    locked.write_text("{}", encoding="utf-8")
-    locked.chmod(0)
-    argv = ["assess", "--bundle", _BUNDLE, "--profile", _PROFILE]
-    try:
-        assert _refusal([*argv, "--trust-root", str(locked)], capsys) == (
-            3,
-            "input.trust_root_unreadable",
-        )
-    finally:
-        locked.chmod(0o600)
 
 
 @pytest.mark.parametrize(

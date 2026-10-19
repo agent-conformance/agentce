@@ -9,8 +9,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { quickstartDir } from "./bundled";
-import { main } from "./cli";
 import { runEcs } from "./conformance";
+import { runJson } from "./testSupport";
 
 const QS = quickstartDir();
 const BUNDLE = join(QS, "evidence");
@@ -19,19 +19,8 @@ const REPO = join(__dirname, "..", "..", "..");
 const ROOT_READS_ANYTHING = process.getuid?.() === 0;
 
 function refusal(argv: string[]): { exitCode: number; key: unknown } {
-  const lines: string[] = [];
-  const original = console.log;
-  console.log = (line: string) => {
-    lines.push(line);
-  };
-  let exitCode: number;
-  try {
-    exitCode = main([argv[0] as string, "--json", ...argv.slice(1)]);
-  } finally {
-    console.log = original;
-  }
-  const envelope = JSON.parse(lines.join("\n")) as { error?: { message_key?: unknown } };
-  return { exitCode, key: envelope.error?.message_key };
+  const { exitCode, envelope } = runJson(argv);
+  return { exitCode, key: (envelope.error as { message_key?: unknown } | undefined)?.message_key };
 }
 
 function inScratch(body: (dir: string) => void): void {

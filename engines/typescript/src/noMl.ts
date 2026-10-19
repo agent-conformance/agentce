@@ -146,6 +146,12 @@ export function evaluateInstalledNoMl(
   return { result: present.length === 0 ? "pass" : "fail", denylisted_present: present };
 }
 
+/** This engine's own no_ml self-report: the vendored denylist against the installed package's
+ * own dependency tree. `agentce version --json` and `conformance run` both report this one value. */
+export function installedNoMl(): InstalledNoMlResult {
+  return evaluateInstalledNoMl(loadVendoredDenylist(), join(__dirname, ".."));
+}
+
 /** The vendored denylist copy an installed package carries (`data/no-ml-denylist.txt`,
  * byte-identical to `spec/rules/no-ml-denylist.txt`, `noMl.test.ts` holds them in sync), for the
  * installed self-report above -- unlike `loadDenylist`, this needs no repo checkout. */

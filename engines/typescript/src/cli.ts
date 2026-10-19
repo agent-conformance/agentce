@@ -60,7 +60,7 @@ import {
   verifyStreams,
 } from "./integrity";
 import { DEFAULT_LANGUAGE, availableLanguages, catalogue } from "./messages";
-import { evaluateInstalledNoMl, loadVendoredDenylist } from "./noMl";
+import { installedNoMl } from "./noMl";
 import { type Profile, loadProfile } from "./profile";
 import { writeQuarantine } from "./quarantine";
 import {
@@ -2561,8 +2561,7 @@ function cmdVersion(argv: string[]): CommandResult {
     result.usage = VERSION_USAGE;
     return result;
   }
-  const resolveFrom = join(__dirname, "..");
-  const scan = evaluateInstalledNoMl(loadVendoredDenylist(), resolveFrom);
+  const scan = installedNoMl();
   result.data.engine = ENGINE_NAME;
   result.data.engine_version = engineVersion();
   result.data.spec_version = SPEC_VERSION;

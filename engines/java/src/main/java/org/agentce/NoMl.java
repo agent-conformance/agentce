@@ -162,4 +162,11 @@ public final class NoMl {
         List<String> present = sortedIntersection(denylist, deps);
         return new InstalledResult(present.isEmpty() ? "pass" : "fail", present);
     }
+
+    /** This engine's own {@code no_ml} self-report: the vendored denylist against the running jar's
+     * bundled dependency set. {@code agentce version --json} and {@code conformance run} both report
+     * this one value. */
+    public static InstalledResult installedSelfReport() {
+        return evaluateInstalled(loadVendoredDenylist(), loadRuntimeDeps());
+    }
 }
