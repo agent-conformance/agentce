@@ -3,6 +3,15 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.116.0
+
+- `VG-PATHLIB-PREDICATES` (18.169, changed): the baseline now holds only the three sites whose path never comes from
+  the user (the bundled quickstart, the vendored message catalogues, the folder a conformance run makes for a generated
+  corpus), each with a reason under `reasons`, and the check fails on a site with no reason or a reason for no site.
+  The other 29 sites go through `signing.is_regular_file`, `is_directory`, `path_exists` or `is_link`, so a path inside
+  a folder that cannot be entered gets one answer on Python 3.12, 3.13 and 3.14. Two more seeded faults: a reason
+  removed from the baseline, and agentce.toml discovery back to a bare `is_file()`.
+
 ## 0.115.0
 
 - `VG-EUAIACT-CLUSTER2` (18.37e, new, tier quick) runs 68 cases through the real Python, TypeScript and Java CLIs.
