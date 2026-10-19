@@ -48,7 +48,8 @@ def _never_hang() -> Iterator[None]:
     """A FIFO open that blocks fails the test after ten seconds instead of hanging the suite."""
 
     def _hung(*_: object) -> None:
-        raise TimeoutError("an output write blocked")
+        # pytest.fail, not TimeoutError: TimeoutError is an OSError, which the refusal paths catch.
+        pytest.fail("an output write blocked")
 
     previous = signal.signal(signal.SIGALRM, _hung)
     signal.alarm(10)
