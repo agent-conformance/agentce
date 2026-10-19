@@ -38,6 +38,7 @@ from .domain import DomainBinding
 from .errors import InputError
 from .ingest import ingest
 from .integrity import integrity_caps, verify_streams
+from .outputs import OUT_DIR, write_file, writing_into
 from .profile import Profile
 from .report import write_report
 from .safe_json import JSONError, load_json
@@ -245,10 +246,12 @@ def run_ecs(
         report["adapter_conformance"] = detail
         report["adapters"] = _adapter_claim(detail)
     if out_dir is not None:
-        out_dir.mkdir(parents=True, exist_ok=True)
-        (out_dir / "implementation-report.json").write_text(
-            json.dumps(report, sort_keys=True, indent=2) + "\n", encoding="utf-8"
-        )
+        with writing_into(str(out_dir), OUT_DIR):
+            out_dir.mkdir(parents=True, exist_ok=True)
+            write_file(
+                out_dir / "implementation-report.json",
+                json.dumps(report, sort_keys=True, indent=2) + "\n",
+            )
     _ = (
         summaries,
         tempdir,

@@ -11,7 +11,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `catalog.control.source_class_from_unknown` | control {control} declares source_class_from {value}, which is not a list of graph links: each entry must be exactly actsOn, approvedBy, delegatedVia or releasedBy (SPEC §7.1), so the engine could not tell which records the judgment rests on. | set evaluation.source_class_from to a list of actsOn, approvedBy, delegatedVia or releasedBy, written as here, or remove it when the judgment rests on the focus record alone. |
 | `catalog.evidence_shape.passed_case_unjudged` | control {control}'s test case {case} expects passed, but its evidence shape targets nothing in that fixture or finds a record it cannot judge, so assess would never read it conformant. | check the evidence shape's target (a misspelt class targets nothing) and give the passed fixture the records the evidence shape asks for. |
 | `catalog.evidence_shape.unresolved` | control {control} names '{path}' as its evidence shape, but that is not a file inside the catalog folder holding exactly one node shape with a target, so the control could not tell which records it can judge. | name a file inside the catalog folder that holds exactly one node shape with a target (sh:targetClass, sh:targetNode or agentce:targetWhere), or remove evaluation.evidence_shape from the control. |
-| `catalog.init_dir_unwritable` | catalog init was given an empty directory, which names no directory. | pass the directory to scaffold the catalog in, or drop it to use the working directory. |
+| `catalog.init_dir_unwritable` | catalog init was given an empty directory, a path that is not a directory, a path that could not be reached, or a directory that could not be written. | pass a writable directory to scaffold the catalog in, or drop it to use the working directory. |
 | `catalog.init_exists` | catalog init would overwrite a scaffolded file that already exists. | pass --force to overwrite, or a different <dir>. |
 | `catalog.init_family_collision` | the control family named by --id is already used by a vendored base or overlay catalog. | pass a different --id. |
 | `catalog.init_family_invalid` | the --id given to catalog init is not 2-4 uppercase letters. | pass --id as 2-4 uppercase letters, e.g. --id ACM. |
@@ -21,6 +21,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `catalog.shape.script_forbidden` | a shape uses sh:js or sh:javascript, a script-based SHACL construct the Portable Shape Profile forbids (spec/rules/psp.md). | remove the sh:js constraint; express it with the profile's declarative vocabulary instead (spec/rules/psp.md). |
 | `catalog.shape.sparql_forbidden` | a shape uses sh:sparql, a SPARQL-based SHACL construct the Portable Shape Profile forbids (spec/rules/psp.md). | remove the sh:sparql constraint; express it with the profile's declarative vocabulary instead (spec/rules/psp.md). |
 | `catalog.shape.unresolved` | control {control} names '{path}' as its shape, but that is not a file the catalog's signature covers: a file inside the catalog folder, named exactly as it is on disk, with no part that starts with a dot or is __pycache__. | name the shape file by its exact path inside the catalog folder (for example shapes/<control>.ttl), outside any dot-named or __pycache__ folder, or remove evaluation.shape from the control. |
+| `catalog.sign_dir_unwritable` | the catalog directory could not be written, so the signature could not be saved in it. | make the catalog directory writable, then re-run. |
 | `catalog.sign_exists` | the catalog directory already carries a catalog.sig.json. | pass --force to re-sign, or remove the existing signature first. |
 | `catalog.sign_key_algorithm` | the signing key given to catalog sign is not an Ed25519 private key. | supply an Ed25519 key, or generate one with --new-key. |
 | `catalog.sign_key_inside_catalog` | the --key or --new-key path resolves inside the catalog directory being signed. | write the signing key outside the catalog directory. |
@@ -28,6 +29,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `catalog.sign_key_unreadable` | the signing key file given to catalog sign could not be parsed as an unencrypted PEM private key. | supply an unencrypted Ed25519 private key PEM, or generate one with --new-key. |
 | `catalog.sign_lint_failed` | the catalog fails agentce catalog lint. | fix the lint problems (`agentce catalog lint <dir>`) before signing. |
 | `catalog.sign_new_key_exists` | the path given to --new-key already exists. | pass a path that does not exist yet, or reuse it with --key instead. |
+| `catalog.sign_new_key_unwritable` | catalog sign --new-key named a folder or another non-file, a link that points nowhere, a path that could not be reached, or a file that could not be written. | pass --new-key <file> with a writable path outside the catalog directory. |
 | `catalog.sign_not_a_catalog` | the directory given to catalog sign has no catalog.yaml. | pass a catalog directory, or scaffold one first: `agentce catalog init <dir>`. |
 | `catalog.sign_trust_root_inside_catalog` | the --write-trust-root path resolves inside the catalog directory being signed. | write the trust root outside the catalog directory. |
 | `catalog.support_matrix_inside_catalog` | the --support-matrix path resolves inside the catalog directory being linted. | write the support matrix outside the catalog directory. |
@@ -113,7 +115,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.key_unreadable` | the signing key exists but could not be read. | make the file readable, then re-run. |
 | `input.nothing_evaluated` | no control reached conformant, non-conformant, or insufficient_evidence, so the run judged nothing. | emit under the subject and source the profile declares (agentce-emit reads AGENTCE_EMIT_SUBJECT and AGENTCE_EMIT_SOURCE), and record the evidence the catalog's controls apply to. |
 | `input.out_dir_unwritable` | the --out directory of assess, quickstart, validate, conformance, collect or init could not be created or written to, or --out was empty. | choose a writable --out directory. |
-| `input.out_file_unwritable` | report was given an empty --out, which names no file. | pass --out <file> with a writable path. |
+| `input.out_file_unwritable` | report --out was empty, named a folder or another non-file, could not be reached, or could not be written. | pass --out <file> with a writable path. |
 | `input.out_missing` | the command needs an output bundle path. | pass --out <bundle>. |
 | `input.package_path_overlap` | --out overlaps --bundle, --profile, --domain, or a --catalog-dir: packaging would read from or write into the tree it is producing. | point --out somewhere outside every input path, then re-run. |
 | `input.package_requires_bundle` | --package-for-sharing works only with --bundle/--profile; a records-folder run cannot be reproduced from a --bundle re-run. | pass --bundle and --profile instead of a records folder, or drop --package-for-sharing. |
@@ -141,6 +143,8 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.report_b_unreadable` | the second assertion set exists but could not be read. | make the file readable, then re-run. |
 | `input.report_catalog_label_empty` | --catalog holds an empty catalog label. | pass the labels comma-separated with none empty, e.g. --catalog eu-ai-act,nist-ai-rmf. |
 | `input.report_dir_not_a_directory` | the report directory does not exist or is not a directory. | pass the report directory argument as a path to an existing directory. |
+| `input.report_dir_unreadable` | the report directory exists but could not be listed or entered. | make the folder readable and enterable, then re-run. |
+| `input.report_dir_unwritable` | the report directory could not be written, so sign could not save the signed claim in it. | make the report directory writable, then re-run. |
 | `input.report_flag_unused` | report was given an option the run does not read: a rendering option beside --validate, or an option the chosen --format does not use. | drop the option, or pick the --format that reads it. |
 | `input.report_format` | report was given a --format it does not know. | pass --format with one of the formats report lists. |
 | `input.report_language_unknown` | --report-language (assess) or --language (report) names a language the engine has no report catalogue for. | choose one of: de, en. |
@@ -152,7 +156,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.sign_unrecognized_flag` | sign was given a flag it does not recognize. | pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag. |
 | `input.state_dir_unwritable` | the --state directory could not be created or written to, or --state was empty. | choose a writable --state directory. |
 | `input.state_version_incompatible` | the state directory was written by an incompatible state_version. | there is no migration command: move or delete the state directory and re-run with --state pointing at a fresh, empty directory (this discards the prior bundle/outcome history recorded there, so late-arriving evidence and drift are tracked only from that point forward). |
-| `input.support_matrix_unwritable` | catalog lint was given an empty --support-matrix, which names no file. | pass --support-matrix <file> with a writable path outside the catalog directory. |
+| `input.support_matrix_unwritable` | catalog lint --support-matrix was empty, named a folder or another non-file, could not be reached, or could not be written. | pass --support-matrix <file> with a writable path outside the catalog directory. |
 | `input.trust_root_invalid` | the trust root supplied by --trust-root or AGENTCE_TRUST_ROOT could not be loaded. | pass --trust-root <file> pointing at a trust root in the form of the engine's vendored data/trust/dev-root.json. |
 | `input.trust_root_not_a_file` | the trust root does not exist or is not a regular file. | pass --trust-root <file>, a path to an existing file. |
 | `input.trust_root_unreadable` | the trust root exists but could not be read. | make the file readable, then re-run. |
@@ -162,8 +166,8 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.verify_target` | verify's target flags were given more than once, none at all, or in a combination that isn't valid. | pass exactly one target, e.g. `agentce verify --bundle <dir>`. |
 | `input.verify_unrecognized_flag` | verify was given a flag it does not recognize. | pass --bundle, --catalog, --release, or --report (with --signer-trust-root or --expect-keyid for --report), or drop the flag. |
 | `input.version_unrecognized_flag` | version was given a flag it does not recognize, or an argument it does not take. | run `agentce version --help` for the flags version takes, or drop the flag. |
-| `input.write_errors_unwritable` | doctor --write-errors was empty, named a directory, or could not be written to. | pass --write-errors <file> with a writable path, e.g. docs/errors.md. |
-| `input.write_trust_root_unwritable` | catalog sign was given an empty --write-trust-root, which names no file. | pass --write-trust-root <file> with a writable path outside the catalog directory. |
+| `input.write_errors_unwritable` | doctor --write-errors was empty, named a folder or another non-file, could not be reached, or could not be written. | pass --write-errors <file> with a writable path, e.g. docs/errors.md. |
+| `input.write_trust_root_unwritable` | catalog sign --write-trust-root was empty, named a folder or another non-file, could not be reached, or could not be written. | pass --write-trust-root <file> with a writable path outside the catalog directory. |
 | `internal.unexpected` | an unexpected internal error occurred. | re-run with --debug to see the stack trace, then file an issue for an AgentCE maintainer to investigate. |
 | `report.missing_evidence_pointer` | an assertion reached a conformant, non-conformant, or partial outcome with no evidence pointer. | every conformant, non-conformant, or partial outcome must cite evidence (DC-5). |
 | `report.validation_failed` | a file in the report folder is missing, cannot be read, or does not match its schema. | restore the files each problem names, or produce the report again: `agentce assess … --out <report-dir>`. |
@@ -231,6 +235,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 |---|---|---|
 | `environment.cryptography_source_build` | cryptography was built from source because no prebuilt wheel is published for this platform. | install Rust and OpenSSL 3 before `uv sync` (macOS: `brew install openssl@3`, then set OPENSSL_DIR to its prefix). |
 | `warning.pilot_window` | the observation window is shorter than 90 days and is recorded as a pilot. | extend the window to at least 90 days for a full assessment. |
+| `warning.readiness_file_unwritten` | readiness gave its verdict but could not save the readiness file in the report directory. | make the report directory writable to keep the readiness file. |
 | `warning.stale_component` | a declared component digest differs from the one observed in the window (STALE). | update the profile's declared component digests and re-run. |
 
 ## Quarantine reasons

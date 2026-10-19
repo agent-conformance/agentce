@@ -72,6 +72,14 @@ from ..coverage_matrix import MATRIX_FILE, check_matrix, write_matrix
 from ..domain import DomainBinding
 from ..environment import inspect_environment
 from ..error_catalogue import MESSAGE_KEYS, render_errors_md
+from ..outputs import (
+    OUT_DIR,
+    OutputRole,
+    check_output,
+    write_file,
+    write_output,
+    writing_into,
+)
 from ..errors import (
     AgentceError,
     InputError,
@@ -261,6 +269,77 @@ def _refuse_empty_out(raw: str | None) -> None:
         fix="choose a writable --out directory.",
         noun="directory",
     )
+
+
+#: The options a command writes to (18.180): each output is checked and written through one role.
+REPORT_OUT = OutputRole(
+    "input.out_file_unwritable", "--out", "pass --out <file> with a writable path."
+)
+SUPPORT_MATRIX_OUT = OutputRole(
+    "input.support_matrix_unwritable",
+    "--support-matrix",
+    "pass --support-matrix <file> with a writable path outside the catalog directory.",
+)
+TRUST_ROOT_OUT = OutputRole(
+    "input.write_trust_root_unwritable",
+    "--write-trust-root",
+    "pass --write-trust-root <file> with a writable path outside the catalog directory.",
+)
+NEW_KEY_OUT = OutputRole(
+    "catalog.sign_new_key_unwritable",
+    "--new-key",
+    "pass --new-key <file> with a writable path outside the catalog directory.",
+)
+CATALOG_INIT_OUT = OutputRole(
+    "catalog.init_dir_unwritable",
+    "the catalog directory",
+    "pass a writable directory to scaffold the catalog in, or drop it to use the working directory.",
+    True,
+)
+CATALOG_SIGN_DIR = OutputRole(
+    "catalog.sign_dir_unwritable",
+    "the catalog directory",
+    "make the catalog directory writable, then re-run.",
+    True,
+)
+CATALOG_SIGN_FILE = OutputRole(
+    "catalog.sign_dir_unwritable",
+    "the catalog signature",
+    "make the catalog directory writable, then re-run.",
+)
+SIGN_REPORT_DIR = OutputRole(
+    "input.report_dir_unwritable",
+    "the report directory",
+    "make the report directory writable, then re-run.",
+    True,
+)
+SIGN_REPORT_FILE = OutputRole(
+    "input.report_dir_unwritable",
+    "the report file",
+    "make the report directory writable, then re-run.",
+)
+WRITE_ERRORS_OUT = OutputRole(
+    "input.write_errors_unwritable",
+    "--write-errors",
+    "pass --write-errors <file> with a writable path, e.g. docs/errors.md.",
+)
+
+
+READINESS_OUT = OutputRole(
+    "warning.readiness_file_unwritten",
+    "the readiness file",
+    "make the report directory writable to keep the readiness file.",
+)
+
+
+def _require_enterable(path: Path, *, key: str, what: str) -> None:
+    """A folder the command reads files inside must be listable and enterable, else ``key``."""
+    if not os.access(path, os.R_OK | os.X_OK):
+        raise InputError(
+            key,
+            f"{what} {str(path)!r} exists but could not be read.",
+            "make the folder readable and enterable, then re-run.",
+        )
 
 
 def _refuse_empty_adapters_root(raw: str | None) -> None:
@@ -2040,7 +2119,8 @@ def _check_package_path_overlap(
     or sits inside any input path ``--package-for-sharing`` will copy from (SPEC 18.8 D4): packaging
     would otherwise read from or write into the same tree it is producing (assessing back into the
     bundle it was just given, or a catalog directory that happens to sit inside ``--out`` already)."""
-    resolved_out = out_dir.resolve()
+    # `os.path.realpath`, not `Path.resolve`: on 3.12 resolve raises RuntimeError on a link loop (18.180).
+    resolved_out = Path(os.path.realpath(out_dir))
     candidates: list[tuple[str, Path]] = [("--bundle", bundle), ("--profile", profile)]
     if domain_path is not None:
         candidates.append(("--domain", Path(domain_path)))
@@ -2050,7 +2130,7 @@ def _check_package_path_overlap(
         candidates.append(("--catalog-dir", Path(raw_dir)))
     for label, path in candidates:
         try:
-            resolved = path.resolve()
+            resolved = Path(os.path.realpath(path))
         except OSError:
             continue
         if (
@@ -2264,6 +2344,8 @@ def cmd_report(ns: argparse.Namespace) -> CommandResult:
         flag="--out",
         fix="pass --out <file> with a writable path.",
     )
+    if _opt_str(ns, "out") is not None:
+        check_output(str(_opt_str(ns, "out")), REPORT_OUT)
     source = _require_file(
         _opt_str(ns, "from_"), key="from", what="the assertions file"
     )
@@ -2327,7 +2409,7 @@ def cmd_report(ns: argparse.Namespace) -> CommandResult:
     result.data.update({"from": str(source), "format": fmt, "rendering": rendering})
     out = _opt_str(ns, "out")
     if out is not None:
-        Path(out).write_text(rendering, encoding="utf-8")
+        write_output(out, REPORT_OUT, rendering)
         result.data["out"] = out
     result.note(rendering)
     return result
@@ -2410,10 +2492,11 @@ def _write_event_bundle(
     events_dir = out_dir / "events"
     events_dir.mkdir(exist_ok=True)
     stream = events_dir / "stream.jsonl"
-    stream.write_text(
-        "".join(canonical_string(event) + "\n" for event in events), encoding="utf-8"
+    stream_bytes = "".join(canonical_string(event) + "\n" for event in events).encode(
+        "utf-8"
     )
-    digest = hashlib.sha256(stream.read_bytes()).hexdigest()
+    write_file(stream, stream_bytes)
+    digest = hashlib.sha256(stream_bytes).hexdigest()
     source_classes = {
         str(event["source"]): str(event["agentcesourceclass"]) for event in events
     }
@@ -2425,8 +2508,8 @@ def _write_event_bundle(
         ],
         "files": [{"path": "events/stream.jsonl", "sha256": digest}],
     }
-    (out_dir / "manifest.json").write_text(
-        json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8"
+    write_file(
+        out_dir / "manifest.json", json.dumps(manifest, sort_keys=True, indent=2) + "\n"
     )
 
 
@@ -2442,6 +2525,7 @@ def cmd_ingest(ns: argparse.Namespace) -> CommandResult:
             "ingest needs an output bundle path.",
             "pass --out <bundle>.",
         )
+    check_output(out, OUT_DIR)
     adapter = _opt_str(ns, "adapter")
     if not adapter:
         raise InputError(
@@ -2472,8 +2556,8 @@ def cmd_ingest(ns: argparse.Namespace) -> CommandResult:
             f"adapter {adapter!r} produced no events from {in_path}.",
             "check the export file actually contains records the adapter recognizes.",
         )
-    out_dir = Path(out)
-    _write_event_bundle(out_dir, events, adapter=adapter)
+    with writing_into(out, OUT_DIR) as out_dir:
+        _write_event_bundle(out_dir, events, adapter=adapter)
     result.data.update(
         {
             "in": str(in_path),
@@ -2520,6 +2604,8 @@ def cmd_collect(ns: argparse.Namespace) -> CommandResult:
             "a real collection needs an output bundle path.",
             "pass --out <bundle>, or --dry-run to plan only.",
         )
+    if out is not None:
+        check_output(out, OUT_DIR)
     raw_adapters_root = _opt_str(ns, "adapters_root")
     if dry_run and raw_adapters_root is not None:
         raise InputError(
@@ -2674,6 +2760,7 @@ def cmd_catalog(ns: argparse.Namespace) -> CommandResult:
                 noun="support matrix",
                 shown_dir=catalog_dirs[0],
             )
+        check_output(support_matrix, SUPPORT_MATRIX_OUT)
     problems: list[str] = []
     if not catalog_dirs:
         problems.append(f"{directory}: no catalog.yaml (and none beneath it)")
@@ -2701,16 +2788,15 @@ def cmd_catalog(ns: argparse.Namespace) -> CommandResult:
     if support_matrix is not None and catalog_dirs:
         catalog = load_catalog(catalog_dirs[0])
         view = catalog_support_view(catalog)
-        sm_path = Path(support_matrix)
-        sm_path.parent.mkdir(parents=True, exist_ok=True)
-        sm_path.write_text(
+        sm_path = write_output(
+            support_matrix,
+            SUPPORT_MATRIX_OUT,
             json.dumps(
                 {"catalog": catalog.id, "version": catalog.version, "controls": view},
                 indent=2,
                 sort_keys=True,
             )
             + "\n",
-            encoding="utf-8",
         )
         result.data["support_matrix"] = str(sm_path)
     if problems:
@@ -2758,7 +2844,7 @@ def _cmd_catalog_init(ns: argparse.Namespace) -> CommandResult:
         fix="pass the directory to scaffold the catalog in, or drop it to use the working directory.",
         noun="directory",
     )
-    directory = Path(raw_dir or ".")
+    directory = check_output(raw_dir or ".", CATALOG_INIT_OUT)
     family = _opt_str(ns, "family")
     if family is None:
         family = _default_family(directory)
@@ -2888,22 +2974,23 @@ def _cmd_catalog_init(ns: argparse.Namespace) -> CommandResult:
         decision_type="dom:Minor", agent=',"agent":{"id":"spiffe://corp/agents/a"}'
     )
 
-    for path in (catalog_yaml, control_yaml, shape_ttl, domain_yaml):
-        path.parent.mkdir(parents=True, exist_ok=True)
-    fixtures_dir.mkdir(parents=True, exist_ok=True)
-    catalog_yaml.write_text(
-        yaml.safe_dump(catalog_doc, sort_keys=False, default_flow_style=False),
-        encoding="utf-8",
-    )
-    control_yaml.write_text(
-        yaml.safe_dump(control_doc, sort_keys=False, default_flow_style=False),
-        encoding="utf-8",
-    )
-    shape_ttl.write_text(shape_text, encoding="utf-8")
-    domain_yaml.write_text(domain_text, encoding="utf-8")
-    passed_jsonl.write_text(passed_text, encoding="utf-8")
-    failed_jsonl.write_text(failed_text, encoding="utf-8")
-    inapplicable_jsonl.write_text(inapplicable_text, encoding="utf-8")
+    with writing_into(raw_dir or ".", CATALOG_INIT_OUT):
+        for path in (catalog_yaml, control_yaml, shape_ttl, domain_yaml):
+            path.parent.mkdir(parents=True, exist_ok=True)
+        fixtures_dir.mkdir(parents=True, exist_ok=True)
+        write_file(
+            catalog_yaml,
+            yaml.safe_dump(catalog_doc, sort_keys=False, default_flow_style=False),
+        )
+        write_file(
+            control_yaml,
+            yaml.safe_dump(control_doc, sort_keys=False, default_flow_style=False),
+        )
+        write_file(shape_ttl, shape_text)
+        write_file(domain_yaml, domain_text)
+        write_file(passed_jsonl, passed_text)
+        write_file(failed_jsonl, failed_text)
+        write_file(inapplicable_jsonl, inapplicable_text)
 
     result.data.update(
         {
@@ -2995,6 +3082,8 @@ def cmd_conformance(ns: argparse.Namespace) -> CommandResult:
         )
     out = _opt_str(ns, "out")
     _refuse_empty_out(out)
+    if out is not None:
+        check_output(out, OUT_DIR)
     report = run_ecs(
         engine_path=engine,
         corpus_dir=corpus,
@@ -3225,6 +3314,8 @@ def cmd_sign(ns: argparse.Namespace) -> CommandResult:
             "pass --profile kms --key <ed25519-private-key.pem> --write-trust-root.",
         )
     dry_run = _flag(ns, "dry_run")
+    if not dry_run:
+        check_output(str(report_dir), SIGN_REPORT_DIR)
     result.data.update(
         {
             "report_dir": str(report_dir),
@@ -3263,6 +3354,17 @@ def cmd_sign(ns: argparse.Namespace) -> CommandResult:
         result.note(f"dry run: would sign the claim as {role} ({profile})")
         return result
 
+    # Every file sign writes is checked before claim.json is rewritten, so a refused run writes nothing.
+    sig_dir = report_dir / "signatures"
+    detached = sig_dir / f"{role}-{profile}.dsse.json"
+    trust_root_path = report_dir / "trust-root.json"
+    check_output(str(sig_dir), SIGN_REPORT_DIR)
+    for target in (
+        claim_path,
+        detached,
+        *([trust_root_path] if write_trust_root else []),
+    ):
+        check_output(str(target), SIGN_REPORT_FILE)
     signer = _sign_signer(ns, profile)
     subjects = _sign_subjects(claim, manifest)
     statement = {
@@ -3281,14 +3383,15 @@ def cmd_sign(ns: argparse.Namespace) -> CommandResult:
     envelope = signing.sign_statement(statement, signer)
     record = {"role": role, "profile": profile, **envelope}
     claim.setdefault("signatures", []).append(record)
-    claim_path.write_text(
-        json.dumps(claim, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    write_output(
+        str(claim_path),
+        SIGN_REPORT_FILE,
+        json.dumps(claim, indent=2, sort_keys=True) + "\n",
     )
-    sig_dir = report_dir / "signatures"
-    sig_dir.mkdir(exist_ok=True)
-    detached = sig_dir / f"{role}-{profile}.dsse.json"
-    detached.write_text(
-        json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    write_output(
+        str(detached),
+        SIGN_REPORT_FILE,
+        json.dumps(record, indent=2, sort_keys=True) + "\n",
     )
     result.data.update(
         {
@@ -3303,8 +3406,9 @@ def cmd_sign(ns: argparse.Namespace) -> CommandResult:
         # itself means no separate key exchange is required for the common case (D6's embedded-trust
         # exception applies, and is called out to the recipient there).
         assert isinstance(signer, signing.KmsSigner)
-        trust_root_path = report_dir / "trust-root.json"
-        trust_root_path.write_text(
+        write_output(
+            str(trust_root_path),
+            SIGN_REPORT_FILE,
             json.dumps(
                 signing.TrustRoot.document(
                     signer.keyid,
@@ -3315,7 +3419,6 @@ def cmd_sign(ns: argparse.Namespace) -> CommandResult:
                 sort_keys=True,
             )
             + "\n",
-            encoding="utf-8",
         )
         result.data["trust_root"] = str(trust_root_path)
     result.note(f"signed {claim_path.name} as {role} ({profile})")
@@ -3496,7 +3599,10 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
     if linted.files.links_out:
         # The catalog signed is the folder handed over (18.181): never sign bytes kept elsewhere.
         raise link_outside(min(linted.files.links_out))
-    sig_path = directory / signing.CATALOG_SIGNATURE_NAME
+    check_output(str(directory), CATALOG_SIGN_DIR)
+    sig_path = check_output(
+        str(directory / signing.CATALOG_SIGNATURE_NAME), CATALOG_SIGN_FILE
+    )
     if sig_path.exists() and not _flag(ns, "force"):
         raise InputError(
             "catalog.sign_exists",
@@ -3525,10 +3631,11 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
             noun="trust root",
             shown_dir=directory,
         )
+        check_output(write_trust_root, TRUST_ROOT_OUT)
 
     new_key_written: str | None = None
     if new_key_arg is not None:
-        new_key_path = Path(new_key_arg)
+        new_key_path = check_output(new_key_arg, NEW_KEY_OUT)
         if new_key_path.exists():
             raise InputError(
                 "catalog.sign_new_key_exists",
@@ -3544,12 +3651,7 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
 
         key = Ed25519PrivateKey.generate()
         pem = key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
-        new_key_path.parent.mkdir(parents=True, exist_ok=True)
-        fd = os.open(str(new_key_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        try:
-            os.write(fd, pem)
-        finally:
-            os.close(fd)
+        write_output(new_key_arg, NEW_KEY_OUT, pem, exclusive=True, mode=0o600)
         new_key_written = str(new_key_path)
     else:
         key_file = _require_file(key_arg, key="key", what="the signing key")
@@ -3578,8 +3680,10 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
         predicate={"kind": "catalog", "id": catalog_id},
     )
     envelope = signing.sign_statement(statement, signer)
-    sig_path.write_text(
-        json.dumps(envelope, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    write_output(
+        str(sig_path),
+        CATALOG_SIGN_FILE,
+        json.dumps(envelope, indent=2, sort_keys=True) + "\n",
     )
     result.data.update(
         {
@@ -3593,9 +3697,9 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
         result.data["new_key"] = new_key_written
 
     if write_trust_root is not None:
-        trust_root_path = Path(write_trust_root)
-        trust_root_path.parent.mkdir(parents=True, exist_ok=True)
-        trust_root_path.write_text(
+        trust_root_path = write_output(
+            write_trust_root,
+            TRUST_ROOT_OUT,
             json.dumps(
                 signing.TrustRoot.document(
                     signer.keyid,
@@ -3606,7 +3710,6 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
                 sort_keys=True,
             )
             + "\n",
-            encoding="utf-8",
         )
         result.data["trust_root"] = str(trust_root_path)
     result.note(
@@ -3641,6 +3744,9 @@ def cmd_readiness(ns: argparse.Namespace) -> CommandResult:
         what="the report directory",
         fix="pass the report directory: `agentce readiness <report-dir>`.",
     )
+    _require_enterable(
+        report_dir, key="input.report_dir_unreadable", what="the report directory"
+    )
     gaps: set[str] = set()
     gaps_path = _opt_str(ns, "gaps")
     if gaps_path is not None:
@@ -3671,8 +3777,17 @@ def cmd_readiness(ns: argparse.Namespace) -> CommandResult:
             *[f"- {limit}" for limit in verdict["limitations"]],
             "",
         ]
-    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    result.data["report"] = str(out)
+    try:
+        write_output(str(out), READINESS_OUT, "\n".join(lines) + "\n")
+        result.data["report"] = str(out)
+    except InputError as exc:
+        # Reading is all the verdict needs (a read-only report folder still gets one); the file is
+        # the only thing lost, and the run says so under its own key.
+        result.data["report"] = None
+        result.data["report_warning"] = exc.key
+        result.note(
+            f"warning [{exc.key}]: {exc.cause} The verdict above is not saved to a file."
+        )
     if verdict["verdict"] == readiness.NOT_READY:
         result.add_code(int(ExitCode.FINDINGS))
     return result
@@ -3712,17 +3827,8 @@ def cmd_doctor(ns: argparse.Namespace) -> CommandResult:
                 "catalogue instead of diagnosing.",
                 "drop --project to write the catalogue, or drop --write-errors to diagnose the project.",
             )
-        # An empty value is Path("."), a directory, so write_text refuses it with the rest.
-        path = Path(write_errors)
-        try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(render_errors_md(), encoding="utf-8")
-        except OSError as exc:
-            raise InputError(
-                "input.write_errors_unwritable",
-                f"--write-errors {write_errors!r}: {exc.strerror or exc}.",
-                "pass --write-errors <file> with a writable path, e.g. docs/errors.md.",
-            ) from exc
+        # An empty value is Path("."), a directory, so it is refused with the rest.
+        path = write_output(write_errors, WRITE_ERRORS_OUT, render_errors_md())
         result.data.update({"errors_md": str(path)})
         result.note(f"wrote {path}")
         return result
@@ -3916,6 +4022,7 @@ def cmd_init(ns: argparse.Namespace) -> CommandResult:
     )
     profile_path = Path(out) / DECLARATIONS_DIR / PROFILE_FILE
     domain_path = Path(out) / DECLARATIONS_DIR / DOMAIN_FILE
+    check_output(out, OUT_DIR)
     existing = [str(p) for p in (profile_path, domain_path) if p.exists()]
     if existing and not _flag(ns, "force"):
         raise InputError(
@@ -3923,16 +4030,10 @@ def cmd_init(ns: argparse.Namespace) -> CommandResult:
             f"init would overwrite {', '.join(existing)}.",
             "pass --force to overwrite, or --out <dir> to write somewhere else.",
         )
-    try:
+    with writing_into(out, OUT_DIR):
         profile_path.parent.mkdir(parents=True, exist_ok=True)
-        profile_path.write_text(profile, encoding="utf-8")
-        domain_path.write_text(_STARTER_DOMAIN_BINDING, encoding="utf-8")
-    except OSError as exc:
-        raise InputError(
-            "input.out_dir_unwritable",
-            exc.strerror or str(exc),
-            "choose a writable --out directory.",
-        ) from exc
+        write_file(profile_path, profile)
+        write_file(domain_path, _STARTER_DOMAIN_BINDING)
     result.data.update(
         {
             "out": out,

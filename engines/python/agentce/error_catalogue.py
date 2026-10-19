@@ -260,11 +260,16 @@ _KINDS: dict[str, str] = {
     "input.report_not_a_directory": "error",
     "input.validate_not_a_directory": "error",
     "input.adapters_unreadable": "error",
+    "catalog.sign_new_key_unwritable": "error",
+    "catalog.sign_dir_unwritable": "error",
+    "input.report_dir_unwritable": "error",
+    "input.report_dir_unreadable": "error",
     "cli.not_implemented": "error",
     # Warnings.
     "environment.cryptography_source_build": "warning",
     "warning.pilot_window": "warning",
     "warning.stale_component": "warning",
+    "warning.readiness_file_unwritten": "warning",
 }
 
 

@@ -31,6 +31,7 @@ from typing import Any, Protocol
 
 from .canonical import canonical_string
 from .errors import InputError
+from .outputs import OUT_DIR, write_file, writing_into
 from .safe_yaml import load_untrusted_yaml
 
 #: How a source's credential is referenced (never its value).
@@ -248,9 +249,7 @@ class CollectOutcome:
 
 
 def _write(out_dir: Path, name: str, data: dict[str, Any]) -> None:
-    (out_dir / name).write_text(
-        json.dumps(data, sort_keys=True, indent=2) + "\n", encoding="utf-8"
-    )
+    write_file(out_dir / name, json.dumps(data, sort_keys=True, indent=2) + "\n")
 
 
 def run_collect(
@@ -274,13 +273,16 @@ def run_collect(
         report = plan(config)
         written: tuple[str, ...] = ()
         if out_dir is not None:
-            out_dir.mkdir(parents=True, exist_ok=True)
-            _write(out_dir, "collect-plan.json", report)
-            _write(
-                out_dir,
-                "manifest.json",
-                _manifest(config, report["sources"], [{"path": "collect-plan.json"}]),
-            )
+            with writing_into(str(out_dir), OUT_DIR):
+                out_dir.mkdir(parents=True, exist_ok=True)
+                _write(out_dir, "collect-plan.json", report)
+                _write(
+                    out_dir,
+                    "manifest.json",
+                    _manifest(
+                        config, report["sources"], [{"path": "collect-plan.json"}]
+                    ),
+                )
             written = ("collect-plan.json", "manifest.json")
         return CollectOutcome(report=report, complete=True, written=written)
 
@@ -365,22 +367,37 @@ def run_collect(
     complete = bool(sources) and all(s["completeness"] != "incomplete" for s in sources)
     written = ()
     if out_dir is not None:
-        out_dir.mkdir(parents=True, exist_ok=True)
-        files: list[dict[str, str]] = [{"path": "collect-report.json"}]
-        written_names = ["collect-report.json"]
-        if all_events:
-            events_dir = out_dir / "events"
-            events_dir.mkdir(exist_ok=True)
-            stream = events_dir / "stream.jsonl"
-            stream.write_text(
-                "".join(canonical_string(event) + "\n" for event in all_events),
-                encoding="utf-8",
-            )
-            digest = hashlib.sha256(stream.read_bytes()).hexdigest()
-            files.append({"path": "events/stream.jsonl", "sha256": digest})
-            written_names.append("events/stream.jsonl")
-        _write(out_dir, "collect-report.json", report)
-        _write(out_dir, "manifest.json", _manifest(config, sources, files))
-        written_names.append("manifest.json")
-        written = tuple(written_names)
+        with writing_into(str(out_dir), OUT_DIR):
+            written = _write_collection(out_dir, config, report, sources, all_events)
     return CollectOutcome(report=report, complete=complete, written=written)
+
+
+def _write_collection(
+    out_dir: Path,
+    config: CollectConfig,
+    report: dict[str, Any],
+    sources: list[dict[str, Any]],
+    all_events: list[dict[str, Any]],
+) -> tuple[str, ...]:
+    """Write the collection's bundle into ``out_dir``: the report, the event stream, the manifest."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    files: list[dict[str, str]] = [{"path": "collect-report.json"}]
+    written_names = ["collect-report.json"]
+    if all_events:
+        events_dir = out_dir / "events"
+        events_dir.mkdir(exist_ok=True)
+        stream_bytes = "".join(
+            canonical_string(event) + "\n" for event in all_events
+        ).encode("utf-8")
+        write_file(events_dir / "stream.jsonl", stream_bytes)
+        files.append(
+            {
+                "path": "events/stream.jsonl",
+                "sha256": hashlib.sha256(stream_bytes).hexdigest(),
+            }
+        )
+        written_names.append("events/stream.jsonl")
+    _write(out_dir, "collect-report.json", report)
+    _write(out_dir, "manifest.json", _manifest(config, sources, files))
+    written_names.append("manifest.json")
+    return tuple(written_names)
