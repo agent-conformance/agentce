@@ -111,8 +111,12 @@ class OutputPathsTest {
         mkfifo(fifo);
         assertThrows(Outputs.NotRegularFile.class, () -> Outputs.writeFile(fifo, "x"));
         Path file = Files.writeString(dir.resolve("file"), "old");
+        Object before = Files.readAttributes(file, java.nio.file.attribute.BasicFileAttributes.class).fileKey();
         Outputs.writeFile(file, "new");
         assertEquals("new", Files.readString(file));
+        // A new inode: the bytes went to a sibling that was moved into place, not into the target (KD-465).
+        assertTrue(!before.equals(
+                Files.readAttributes(file, java.nio.file.attribute.BasicFileAttributes.class).fileKey()));
         try (Stream<Path> left = Files.list(dir)) {
             assertEquals(2, left.count(), "no sibling left behind");
         }
