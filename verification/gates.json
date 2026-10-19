@@ -2256,8 +2256,8 @@
         {
           "description": "TypeScript no longer refuses a folder named like a control file, so the walk enters it and the control vanishes",
           "file": "engines/typescript/src/verify.ts",
-          "search": "    if (name.endsWith(\".yaml\") && !skippedPart(name) && isDirFollowingLinks(join(controls, name))) {",
-          "replace": "    if (false && name.endsWith(\".yaml\") && !skippedPart(name) && isDirFollowingLinks(join(controls, name))) {"
+          "search": "    if (\n      name.endsWith(\".yaml\") &&",
+          "replace": "    if (\n      false &&\n      name.endsWith(\".yaml\") &&"
         },
         {
           "description": "TypeScript's catalog verification no longer refuses a covered file linked outside the catalog",
