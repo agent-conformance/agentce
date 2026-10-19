@@ -2031,7 +2031,6 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.bundle.load_bundle: parse_untrusted_json(manifest_path.read_bytes())": (
         "bundle-manifest",
     ),
-    "agentce.bundle.safe_is_file: path.is_file()": ("bundle-manifest", "bundle-files"),
     "agentce.commands._load_release_json: signing.read_verify_input(path)": (
         "release-file",
         "manifest-file",
@@ -2049,7 +2048,6 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.commands._require_file: path.open('rb')": "disposition: opens and closes the file "
     "to refuse an unreadable one under its role's key; no byte is read or parsed",
     "agentce.commands._verify_release: artifact_file.read_bytes()": ("artifact-path",),
-    "agentce.commands._verify_release: release_path.is_file()": ("release-file",),
     "agentce.commands._verify_report: candidate_path.read_bytes()": _HASHED_ONLY,
     "agentce.commands._verify_report: claim_path.read_bytes()": ("report-claim",),
     "agentce.commands._verify_report: deviations_path.read_bytes()": _HASHED_ONLY,
@@ -2059,8 +2057,6 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.commands._verify_report: packaging_path.read_bytes()": (
         "report-packaging",
     ),
-    "agentce.commands._verify_report: produced.is_file()": "disposition: the assess re-run's own "
-    "output in a scratch directory this command created",
     "agentce.commands._verify_report: produced.read_bytes()": "disposition: the assess re-run's "
     "own output, compared byte for byte with the shipped file",
     "agentce.commands._verify_report: profile_path.read_bytes()": _HASHED_ONLY,
@@ -2086,6 +2082,10 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
         "report-packaging",
         "catalog-tree",
         "target-argument",
+        "bundle-manifest",
+        "bundle-files",
+        "release-file",
+        "catalog-sig-file",
     ),
     "agentce.signing._identity: folder.stat()": ("catalog-tree",),
     "agentce.signing._refuse_folder_controls: os.listdir(controls)": ("catalog-tree",),
@@ -2138,9 +2138,6 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     ),
     "agentce.signing.vendored_trust: vendored_trust_path().read_text('utf-8')": _PACKAGED,
     "agentce.signing.verify_catalog_directory: read_verify_input(sig_path)": (
-        "catalog-sig-file",
-    ),
-    "agentce.signing.verify_catalog_directory: sig_path.is_file()": (
         "catalog-sig-file",
     ),
 }
