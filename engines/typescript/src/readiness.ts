@@ -7,7 +7,6 @@
  */
 
 import { lstatSync, readFileSync, statSync } from "node:fs";
-
 import { DEFAULT_SCHEMA, FAILSAFE_SCHEMA, Type as YamlType, load as yamlLoad } from "js-yaml";
 import { InputError } from "./errors";
 import { byteCompare, decodeUtf8Strict, joinPath, normalizePosixPath, pyRepr, pyStr } from "./util";

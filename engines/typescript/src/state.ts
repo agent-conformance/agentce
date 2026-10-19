@@ -12,7 +12,6 @@
 
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-
 import { InputError } from "./errors";
 import { byteCompare, joinPath, jsonStringifyAscii, sortKeysDeep } from "./util";
 

@@ -4,7 +4,6 @@
  * the package so the installed-artifact check can run them, but they are not `agentce` commands.
  */
 import { readFileSync } from "node:fs";
-
 import type { Activity } from "./activity";
 import { assertionFromJson } from "./assertions";
 import { computeAuditorView } from "./auditorView";

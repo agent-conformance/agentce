@@ -8,7 +8,6 @@
  */
 
 import { lstatSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
-
 import { load } from "js-yaml";
 import { errorCause, errorFix } from "./errorCatalogue";
 import { AgentceError, InputError, catalogUnreadable } from "./errors";

@@ -191,7 +191,8 @@ export function normalizePosixPath(raw: string): string {
 }
 
 /**
- * Join path parts the way Python's `pathlib` and Java's `Path.resolve` do: every `..` is kept for the
+ * Join relative path parts onto a base the way Python's `pathlib` and Java's `Path.resolve` do (an
+ * absolute later part is not restarted from, so callers pass relative ones): every `..` is kept for the
  * kernel to resolve, so `lnk/..` names the parent of the link's target, never the folder holding the
  * link, as `node:path`'s `join` folds it (18.182). Rendered by {@link normalizePosixPath}: with no `..`
  * it gives `join`'s answer, less a trailing slash, which Python drops too.
