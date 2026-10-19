@@ -2046,6 +2046,8 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
         "report-manifest",
         "report-packaging",
     ),
+    "agentce.commands._require_file: path.open('rb')": "disposition: opens and closes the file "
+    "to refuse an unreadable one under its role's key; no byte is read or parsed",
     "agentce.commands._verify_release: artifact_file.read_bytes()": ("artifact-path",),
     "agentce.commands._verify_release: release_path.is_file()": ("release-file",),
     "agentce.commands._verify_report: candidate_path.read_bytes()": _HASHED_ONLY,
