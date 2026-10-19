@@ -9,7 +9,15 @@
 
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -171,5 +179,76 @@ test("safeIsFile is false for a directory and for a missing path", () => {
     assert.equal(safeIsFile(join(dir, "absent")), false);
     writeFileSync(join(dir, "present"), "x", "utf-8");
     assert.equal(safeIsFile(join(dir, "present")), true);
+  });
+});
+
+/** A valid bundle at `<dir>/b` whose manifest.json is moved and linked back per `kind` (18.183);
+ * returns the folder to load. */
+function placeManifest(dir: string, kind: string): string {
+  const root = join(dir, "b");
+  mkdirSync(join(root, "events"), { recursive: true });
+  writeFileSync(join(root, "events", "s.jsonl"), "{}\n", "utf-8");
+  writeManifest(root, [{ path: "events/s.jsonl", sha256: sha256File("{}\n") }]);
+  const manifest = join(root, "manifest.json");
+  const out = join(dir, "out");
+  mkdirSync(out);
+  if (kind === "plain") {
+    return root;
+  }
+  if (kind === "root_link") {
+    symlinkSync(root, join(dir, "rl"));
+    return join(dir, "rl");
+  }
+  if (kind === "dangling") {
+    unlinkSync(manifest);
+    symlinkSync(join(out, "none.json"), manifest);
+    return root;
+  }
+  const targets: Record<string, [string, string]> = {
+    outside: [join(out, "manifest.json"), join(out, "manifest.json")],
+    inside: ["meta/m.json", join(root, "meta", "m.json")],
+    folder_link_out: ["meta/m.json", join(out, "m.json")],
+    link_to_link_out: ["inner", join(out, "m.json")],
+    out_and_back: ["../b/m.json", join(root, "m.json")],
+    sibling_prefix: ["../b-evil/manifest.json", join(dir, "b-evil", "manifest.json")],
+  };
+  const [link, target] = targets[kind];
+  mkdirSync(join(target, ".."), { recursive: true });
+  renameSync(manifest, target);
+  if (kind === "folder_link_out") {
+    symlinkSync(out, join(root, "meta"));
+  }
+  if (kind === "link_to_link_out") {
+    symlinkSync(target, join(root, "inner"));
+  }
+  symlinkSync(link, manifest);
+  return root;
+}
+
+for (const kind of ["outside", "folder_link_out", "link_to_link_out", "sibling_prefix"]) {
+  test(`a manifest.json that resolves outside the bundle is refused (${kind})`, () => {
+    withTempDir((dir) => {
+      assert.equal(
+        inputErrorKey(() => loadBundle(placeManifest(dir, kind))),
+        "input.bundle_manifest_path",
+      );
+    });
+  });
+}
+
+for (const kind of ["plain", "inside", "root_link", "out_and_back"]) {
+  test(`a manifest.json that resolves inside the bundle loads (${kind})`, () => {
+    withTempDir((dir) => {
+      assert.ok(Array.isArray(loadBundle(placeManifest(dir, kind)).manifest.files));
+    });
+  });
+}
+
+test("a manifest.json that is a dangling link is still missing", () => {
+  withTempDir((dir) => {
+    assert.equal(
+      inputErrorKey(() => loadBundle(placeManifest(dir, "dangling"))),
+      "input.bundle_manifest_missing",
+    );
   });
 });

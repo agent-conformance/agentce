@@ -206,6 +206,13 @@ export function loadBundle(bundleDir: string): Bundle {
         "`examples/custom-loop/run.sh <dir>` from a checkout, then `agentce validate --bundle <dir>`.",
     );
   }
+  if (confineToRoot(bundleDir, "manifest.json") === null) {
+    throw new InputError(
+      "input.bundle_manifest_path",
+      "manifest.json resolves outside the bundle root (a symlink or junction escapes it), so the bundle's list of files does not travel with the bundle.",
+      "replace the manifest.json link with the manifest file itself, inside the bundle folder.",
+    );
+  }
   if (readPermissionError(manifestPath)) {
     throw bundleUnreadable(bundleDir, "manifest.json");
   }

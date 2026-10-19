@@ -180,6 +180,13 @@ def load_bundle(bundle_dir: Path) -> Bundle:
             f"the bundle at {str(bundle_dir)} has no manifest.json.",
             MESSAGE_KEYS["input.bundle_manifest_missing"].fix,
         )
+    if confine_to_root(bundle_dir, "manifest.json") is None:
+        raise InputError(
+            "input.bundle_manifest_path",
+            "manifest.json resolves outside the bundle root (a symlink or junction escapes it), "
+            "so the bundle's list of files does not travel with the bundle.",
+            "replace the manifest.json link with the manifest file itself, inside the bundle folder.",
+        )
     try:
         parsed = parse_untrusted_json(manifest_path.read_bytes())
     except PermissionError as exc:

@@ -112,3 +112,64 @@ def test_copy_bundle_skips_unlisted_files(
     assert not (dst / ".env").exists()
     assert not (dst / "unlisted.txt").exists()
     load_bundle(dst)  # still loads cleanly: only manifest-listed files were copied
+
+
+def _place_manifest(tmp_path: Path, kind: str) -> Path:
+    """A valid bundle at ``tmp_path/b`` whose manifest.json is moved and linked back per ``kind``
+    (18.183); returns the folder to load."""
+    root = write_bundle(tmp_path / "b", ["{}"])
+    manifest = root / "manifest.json"
+    out = tmp_path / "out"
+    out.mkdir()
+    if kind == "plain":
+        return root
+    if kind == "root_link":
+        (tmp_path / "rl").symlink_to(root)
+        return tmp_path / "rl"
+    if kind == "dangling":
+        manifest.unlink()
+        manifest.symlink_to(out / "none.json")
+        return root
+    targets = {
+        "outside": ("../out/manifest.json", out / "manifest.json"),
+        "inside": ("meta/m.json", root / "meta" / "m.json"),
+        "folder_link_out": ("meta/m.json", out / "m.json"),
+        "link_to_link_out": ("inner", out / "m.json"),
+        "out_and_back": ("../b/m.json", root / "m.json"),
+        "sibling_prefix": (
+            "../b-evil/manifest.json",
+            tmp_path / "b-evil" / "manifest.json",
+        ),
+    }
+    link, target = targets[kind]
+    target.parent.mkdir(parents=True, exist_ok=True)
+    manifest.rename(target)
+    if kind == "folder_link_out":
+        (root / "meta").symlink_to(out)
+    if kind == "link_to_link_out":
+        (root / "inner").symlink_to(target)
+    manifest.symlink_to(link)
+    return root
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["outside", "folder_link_out", "link_to_link_out", "sibling_prefix"],
+)
+def test_manifest_linked_outside_the_bundle_is_refused(
+    tmp_path: Path, kind: str
+) -> None:
+    with pytest.raises(InputError) as excinfo:
+        load_bundle(_place_manifest(tmp_path, kind))
+    assert excinfo.value.key == "input.bundle_manifest_path"
+
+
+@pytest.mark.parametrize("kind", ["plain", "inside", "root_link", "out_and_back"])
+def test_manifest_resolving_inside_the_bundle_loads(tmp_path: Path, kind: str) -> None:
+    assert load_bundle(_place_manifest(tmp_path, kind)).manifest["files"]
+
+
+def test_manifest_dangling_link_is_still_missing(tmp_path: Path) -> None:
+    with pytest.raises(InputError) as excinfo:
+        load_bundle(_place_manifest(tmp_path, "dangling"))
+    assert excinfo.value.key == "input.bundle_manifest_missing"

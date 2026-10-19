@@ -13,6 +13,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
@@ -125,5 +127,71 @@ class BundleTest {
     void confineToRootHandlesAnEmbeddedNulWithoutRaising(@TempDir Path tempDir) {
         String nul = String.valueOf((char) 0);
         assertNull(Bundle.confineToRoot(tempDir, "evil" + nul + "name"));
+    }
+
+    /** A valid bundle at {@code <dir>/b} whose manifest.json is moved and linked back per {@code kind}
+     * (18.183); returns the folder to load. */
+    private static Path placeManifest(Path dir, String kind) throws IOException {
+        Path root = dir.resolve("b");
+        Files.createDirectories(root.resolve("events"));
+        byte[] events = "{}\n".getBytes(StandardCharsets.UTF_8);
+        Files.write(root.resolve("events").resolve("s.jsonl"), events);
+        writeManifest(root, "events/s.jsonl", events);
+        Path manifest = root.resolve("manifest.json");
+        Path out = Files.createDirectories(dir.resolve("out"));
+        switch (kind) {
+            case "plain":
+                return root;
+            case "root_link":
+                return Files.createSymbolicLink(dir.resolve("rl"), root);
+            case "dangling":
+                Files.delete(manifest);
+                Files.createSymbolicLink(manifest, out.resolve("none.json"));
+                return root;
+            default:
+                break;
+        }
+        String link;
+        Path target;
+        switch (kind) {
+            case "outside" -> { link = "../out/manifest.json"; target = out.resolve("manifest.json"); }
+            case "inside" -> { link = "meta/m.json"; target = root.resolve("meta/m.json"); }
+            case "folder_link_out" -> { link = "meta/m.json"; target = out.resolve("m.json"); }
+            case "link_to_link_out" -> { link = "inner"; target = out.resolve("m.json"); }
+            case "out_and_back" -> { link = "../b/m.json"; target = root.resolve("m.json"); }
+            case "sibling_prefix" -> { link = "../b-evil/manifest.json"; target = dir.resolve("b-evil/manifest.json"); }
+            default -> throw new IllegalArgumentException(kind);
+        }
+        Files.createDirectories(target.getParent());
+        Files.move(manifest, target);
+        if (kind.equals("folder_link_out")) {
+            Files.createSymbolicLink(root.resolve("meta"), out);
+        }
+        if (kind.equals("link_to_link_out")) {
+            Files.createSymbolicLink(root.resolve("inner"), target);
+        }
+        Files.createSymbolicLink(manifest, Path.of(link));
+        return root;
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"outside", "folder_link_out", "link_to_link_out", "sibling_prefix"})
+    void manifestResolvingOutsideTheBundleIsRefused(String kind, @TempDir Path tempDir) throws IOException {
+        Path bundle = placeManifest(tempDir, kind);
+        InputError error = assertThrows(InputError.class, () -> Bundle.load(bundle));
+        assertEquals("input.bundle_manifest_path", error.key);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"plain", "inside", "root_link", "out_and_back"})
+    void manifestResolvingInsideTheBundleLoads(String kind, @TempDir Path tempDir) throws IOException {
+        assertNotNull(Bundle.load(placeManifest(tempDir, kind)).manifest.get("files"));
+    }
+
+    @Test
+    void manifestDanglingLinkIsStillMissing(@TempDir Path tempDir) throws IOException {
+        Path bundle = placeManifest(tempDir, "dangling");
+        InputError error = assertThrows(InputError.class, () -> Bundle.load(bundle));
+        assertEquals("input.bundle_manifest_missing", error.key);
     }
 }
