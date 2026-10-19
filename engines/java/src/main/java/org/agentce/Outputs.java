@@ -42,6 +42,15 @@ final class Outputs {
         void run() throws IOException;
     }
 
+    /** The open target is not a regular file (a FIFO, a device or a socket). */
+    static final class NotRegularFile extends FileSystemException {
+        private static final long serialVersionUID = 1L;
+
+        NotRegularFile(Path path) {
+            super(path.toString(), null, NOT_A_FILE);
+        }
+    }
+
     private Outputs() {}
 
     private static InputError refuse(Role role, String raw, String reason) {
@@ -133,7 +142,7 @@ final class Outputs {
     static void writeFile(Path path, String data) throws IOException {
         try {
             if (!Files.readAttributes(path, BasicFileAttributes.class).isRegularFile()) {
-                throw new FileSystemException(path.toString(), null, NOT_A_FILE);
+                throw new NotRegularFile(path);
             }
         } catch (NoSuchFileException e) {
             // absent: created by the write below
@@ -151,8 +160,8 @@ final class Outputs {
                 Files.createDirectories(parent);
             }
             writeFile(path, data);
-        } catch (FileSystemException e) {
-            throw refuse(role, raw, NOT_A_FILE.equals(e.getReason()) ? NOT_A_FILE : UNWRITABLE);
+        } catch (NotRegularFile e) {
+            throw refuse(role, raw, NOT_A_FILE);
         } catch (IOException e) {
             throw refuse(role, raw, UNWRITABLE);
         }

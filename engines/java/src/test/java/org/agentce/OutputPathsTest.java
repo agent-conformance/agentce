@@ -124,26 +124,13 @@ class OutputPathsTest {
         return out;
     }
 
-    private static void copy(Path from, Path to) throws IOException {
-        try (Stream<Path> walk = Files.walk(from)) {
-            for (Path p : walk.toList()) {
-                Path target = to.resolve(from.relativize(p).toString());
-                if (Files.isDirectory(p)) {
-                    Files.createDirectories(target);
-                } else {
-                    Files.copy(p, target);
-                }
-            }
-        }
-    }
-
     @Test
     void signRefusesABadWriteTargetBeforeRewritingTheClaim(@TempDir Path dir) throws Exception {
         Path base = assessed(dir);
         String key = keyFile(dir);
         for (String kind : new String[] {"fifo", "folder", "signatures_file"}) {
             Path report = dir.resolve(kind);
-            copy(base, report);
+            Fixtures.copyTree(base, report);
             Path sigs = report.resolve("signatures");
             if (Files.isDirectory(sigs)) {
                 try (Stream<Path> walk = Files.walk(sigs)) {
