@@ -69,7 +69,7 @@ test("an empty path value is refused with the role's key and writes nothing (18.
     [["assess", "--bundle=", "--profile", PROFILE], "input.bundle_not_a_directory"],
     [
       ["assess", "--bundle", BUNDLE, "--profile", PROFILE, "--catalog-dir", ""],
-      "input.catalog-dir_not_a_directory",
+      "input.catalog_dir_not_a_directory",
     ],
     [["assess", "--bundle", BUNDLE, "--profile", PROFILE, "--out", ""], "input.out_dir_unwritable"],
     [["assess", "--bundle", BUNDLE, "--profile", PROFILE, "--out="], "input.out_dir_unwritable"],
@@ -88,7 +88,7 @@ test("an empty path value is refused with the role's key and writes nothing (18.
     [["readiness", ""], "input.report_dir_not_a_directory"],
     [["readiness", "r", "--gaps", ""], "input.gaps_not_a_file"],
     [["readiness", "r", "--deviations="], "input.deviations_not_a_file"],
-    [["readiness", "r", "--catalog-dir", ""], "input.catalog-dir_not_a_directory"],
+    [["readiness", "r", "--catalog-dir", ""], "input.catalog_dir_not_a_directory"],
     [["report", "--from", "a.json", "--out", ""], "input.out_file_unwritable"],
   ];
   inScratch((dir) => {

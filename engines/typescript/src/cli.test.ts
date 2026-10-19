@@ -1457,7 +1457,7 @@ test("readiness: a given-but-bad --deviations path is input.deviations_not_a_fil
   }
 });
 
-test("readiness: a bad --catalog-dir is input.catalog-dir_not_a_directory", () => {
+test("readiness: a bad --catalog-dir is input.catalog_dir_not_a_directory", () => {
   const dir = mkdtempSync(join(tmpdir(), "agentce-cli-readiness-"));
   try {
     const report = readinessReport(dir);
@@ -1470,7 +1470,7 @@ test("readiness: a bad --catalog-dir is input.catalog-dir_not_a_directory", () =
     assert.equal(exitCode, 3);
     assert.equal(
       (envelope.error as { message_key: string }).message_key,
-      "input.catalog-dir_not_a_directory",
+      "input.catalog_dir_not_a_directory",
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });

@@ -57,7 +57,7 @@ class EmptyPathValuesTest {
         assertRefused("input.records_not_a_directory", "assess", "");
         assertRefused("input.bundle_not_a_directory", "assess", "--bundle", "", "--profile", PROFILE);
         assertRefused("input.bundle_not_a_directory", "assess", "--bundle=", "--profile", PROFILE);
-        assertRefused("input.catalog-dir_not_a_directory",
+        assertRefused("input.catalog_dir_not_a_directory",
                 "assess", "--bundle", BUNDLE, "--profile", PROFILE, "--catalog-dir", "");
         assertRefused("input.out_dir_unwritable", "assess", "--bundle", BUNDLE, "--profile", PROFILE, "--out", "");
         assertRefused("input.out_dir_unwritable", "assess", "--bundle", BUNDLE, "--profile", PROFILE, "--out=");
@@ -70,7 +70,7 @@ class EmptyPathValuesTest {
         assertRefused("input.report_dir_not_a_directory", "readiness", "");
         assertRefused("input.gaps_not_a_file", "readiness", r, "--gaps", "");
         assertRefused("input.deviations_not_a_file", "readiness", r, "--deviations=");
-        assertRefused("input.catalog-dir_not_a_directory", "readiness", r, "--catalog-dir", "");
+        assertRefused("input.catalog_dir_not_a_directory", "readiness", r, "--catalog-dir", "");
         assertRefused("input.out_file_unwritable", "report", "--from", a, "--out", "");
     }
 

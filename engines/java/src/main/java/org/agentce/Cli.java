@@ -422,6 +422,16 @@ global options:
             throw new InputError(
                     "input." + key + "_not_a_file", what + " " + Readiness.pyRepr(raw) + " is not an existing file.", fix);
         }
+        // Opened once here, so a file the user cannot read is refused under the role's key before a
+        // loader reads it, never internal.unexpected (18.179).
+        try {
+            Files.newInputStream(path).close();
+        } catch (IOException e) {
+            throw new InputError(
+                    "input." + key + "_unreadable",
+                    what + " " + Readiness.pyRepr(raw) + " exists but could not be read.",
+                    "make the file readable, then re-run.");
+        }
         return raw;
     }
 
@@ -620,7 +630,7 @@ global options:
             boolean allowUnverified) {
         List<Catalog> loaded = new ArrayList<>();
         for (String d : catalogDirs) {
-            loaded.add(Catalog.load(Paths.get(requireDir(d, "catalog-dir", "the catalog directory"))));
+            loaded.add(Catalog.load(Paths.get(requireDir(d, "catalog_dir", "the catalog directory", "pass --catalog-dir <dir>."))));
         }
         List<String> limitations = verifyCatalogDirs(loaded, trust, allowUnverified);
         Map<String, Catalog> byLabel = new LinkedHashMap<>();
@@ -900,6 +910,15 @@ global options:
         String adapters = parsed.value("--adapters");
         if (adapters != null) {
             requireDir(adapters, "adapters", "the adapters directory");
+            // The adapters folder becomes the orchestrator's working folder, so one that cannot be
+            // listed or entered is refused here, before any subprocess starts (18.179).
+            Path adaptersPath = Paths.get(adapters);
+            if (!Files.isReadable(adaptersPath) || !Files.isExecutable(adaptersPath)) {
+                throw new InputError(
+                        "input.adapters_unreadable",
+                        "the adapters directory " + Readiness.pyRepr(adapters) + " exists but could not be read.",
+                        "make the folder readable and enterable, then re-run.");
+            }
         }
         String out = parsed.value("--out");
         refuseEmptyOut(out);
@@ -2117,7 +2136,7 @@ global options:
         }
         Map<String, String> severities = new LinkedHashMap<>();
         for (String dir : dirs) {
-            Catalog catalog = Catalog.load(Paths.get(requireDir(dir, "catalog-dir", "a catalog directory")));
+            Catalog catalog = Catalog.load(Paths.get(requireDir(dir, "catalog_dir", "a catalog directory", "pass --catalog-dir <dir>.")));
             for (Catalog.ControlSpec control : catalog.controls) {
                 severities.put(control.id, control.severity);
             }

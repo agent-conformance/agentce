@@ -309,7 +309,13 @@ def _mode_matches(
     except ValueError:  # an embedded NUL: no such file, as Path.is_file answers
         return False
     except OSError as exc:
-        if exc.errno in (errno.ENOENT, errno.ENOTDIR, errno.EBADF, errno.ELOOP):
+        if exc.errno in (
+            errno.ENOENT,
+            errno.ENOTDIR,
+            errno.EBADF,
+            errno.ELOOP,
+            errno.ENAMETOOLONG,
+        ):
             return False
         if unreadable_is_absent and exc.errno in (errno.EACCES, errno.EPERM):
             return False

@@ -5,7 +5,18 @@
  * implemented returns a stable `input_error` envelope rather than a guess.
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import {
+  accessSync,
+  closeSync,
+  existsSync,
+  constants as fsConstants,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, relative, resolve as resolvePath, sep } from "node:path";
 import { load } from "js-yaml";
@@ -294,6 +305,17 @@ function requireFile(
       fix,
     );
   }
+  // Opened once here, so a file the user cannot read is refused under the role's key before a
+  // loader reads it, never internal.unexpected (18.179).
+  try {
+    closeSync(openSync(raw, "r"));
+  } catch {
+    throw new InputError(
+      `input.${key}_unreadable`,
+      `${what} ${pyRepr(raw)} exists but could not be read.`,
+      "make the file readable, then re-run.",
+    );
+  }
   return raw;
 }
 
@@ -467,7 +489,7 @@ function resolveCatalogs(
   allowUnverified: boolean,
 ): { catalogs: Catalog[]; labels: string[]; limitations: string[] } {
   const loaded = catalogDirs.map((d) =>
-    loadCatalog(requireDir(d, "catalog-dir", "the catalog directory")),
+    loadCatalog(requireDir(d, "catalog_dir", "the catalog directory", "pass --catalog-dir <dir>.")),
   );
   const limitations = verifyCatalogDirs(loaded, trust, allowUnverified);
   const byLabel = new Map<string, Catalog>();
@@ -740,6 +762,19 @@ function cmdConformance(argv: string[]): CommandResult {
   const adapters = v["--adapters"];
   const adaptersDir =
     adapters !== undefined ? requireDir(adapters, "adapters", "the adapters directory") : null;
+  // The adapters folder becomes the orchestrator's working folder, so one that cannot be listed
+  // or entered is refused here, before any subprocess starts (18.179).
+  if (adaptersDir !== null) {
+    try {
+      accessSync(adaptersDir, fsConstants.R_OK | fsConstants.X_OK);
+    } catch {
+      throw new InputError(
+        "input.adapters_unreadable",
+        `the adapters directory ${pyRepr(adaptersDir)} exists but could not be read.`,
+        "make the folder readable and enterable, then re-run.",
+      );
+    }
+  }
   const out = v["--out"];
   refuseEmptyOut(out);
   const report = runEcs({
@@ -1926,7 +1961,9 @@ function readinessSeverities(catalogDirs: string[]): Map<string, string> {
   }
   const severities = new Map<string, string>();
   for (const dir of dirs) {
-    const catalog = loadCatalog(requireDir(dir, "catalog-dir", "a catalog directory"));
+    const catalog = loadCatalog(
+      requireDir(dir, "catalog_dir", "a catalog directory", "pass --catalog-dir <dir>."),
+    );
     for (const control of catalog.controls) {
       severities.set(control.id, control.severity);
     }

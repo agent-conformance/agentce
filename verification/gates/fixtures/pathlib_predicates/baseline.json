@@ -6,7 +6,6 @@
     "agentce/catalog.py::_lint_case::fixture.is_file": 1,
     "agentce/catalog.py::_load_test_domain::path.is_file": 1,
     "agentce/collect.py::run_collect::export_path.is_file": 1,
-    "agentce/commands/__init__.py::_adapt_export::adapter_dir.is_dir": 1,
     "agentce/commands/__init__.py::_cmd_catalog_init::p.exists": 1,
     "agentce/commands/__init__.py::_cmd_catalog_sign::new_key_path.exists": 1,
     "agentce/commands/__init__.py::_cmd_catalog_sign::sig_path.exists": 1,

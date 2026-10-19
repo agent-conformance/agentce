@@ -47,7 +47,7 @@ def _files(root: Path) -> list[str]:
         ),
         (
             ["assess", "--bundle", _BUNDLE, "--profile", _PROFILE, "--catalog-dir", ""],
-            "input.catalog-dir_not_a_directory",
+            "input.catalog_dir_not_a_directory",
         ),
         (
             ["assess", "--bundle", _BUNDLE, "--profile", _PROFILE, "--out", ""],
@@ -72,7 +72,7 @@ def _files(root: Path) -> list[str]:
         (["readiness", ""], "input.report_dir_not_a_directory"),
         (["readiness", "r", "--gaps", ""], "input.gaps_not_a_file"),
         (["readiness", "r", "--deviations="], "input.deviations_not_a_file"),
-        (["readiness", "r", "--catalog-dir", ""], "input.catalog-dir_not_a_directory"),
+        (["readiness", "r", "--catalog-dir", ""], "input.catalog_dir_not_a_directory"),
         (["report", "--from", "a.json", "--out", ""], "input.out_file_unwritable"),
         (["catalog", "lint", ""], "input.dir_not_a_directory"),
         (

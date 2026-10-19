@@ -286,6 +286,17 @@ def _require_file(
             f"{what} {raw!r} is not an existing file.",
             fix,
         )
+    # Opened once here, so a file the user cannot read is refused under the role's key before a
+    # loader reads it, never internal.unexpected (18.179).
+    try:
+        with path.open("rb"):
+            pass
+    except OSError as exc:
+        raise InputError(
+            f"input.{key}_unreadable",
+            f"{what} {raw!r} exists but could not be read.",
+            "make the file readable, then re-run.",
+        ) from exc
     return path
 
 
@@ -1431,7 +1442,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         by_dir = {c.directory: c for c in catalogs}
         for i, raw_dir in enumerate(raw_catalog_dirs):
             src_dir = _require_dir(
-                raw_dir, key="catalog-dir", what="the catalog directory"
+                raw_dir, key="catalog_dir", what="the catalog directory"
             )
             cat = by_dir[src_dir]
             label = f"{cat.id}@{cat.version}"
@@ -2078,7 +2089,7 @@ def _resolve_catalogs(
     The returned limitations are the signature checks ``--allow-unverified-catalog`` waived, for the
     manifest and the claim to record; the list is empty on an ordinary run."""
     loaded = [
-        load_catalog(_require_dir(d, key="catalog-dir", what="the catalog directory"))
+        load_catalog(_require_dir(d, key="catalog_dir", what="the catalog directory"))
         for d in catalog_dirs
     ]
     limitations = _verify_catalog_dirs(loaded, trust, allow_unverified=allow_unverified)
@@ -2339,7 +2350,7 @@ def _adapt_export(
     mirroring the engine conformance suite's own subprocess pattern for the identical reason.
     """
     adapter_dir = adapters_root / adapter
-    if not adapter_dir.is_dir():
+    if not signing.is_directory(adapter_dir, unreadable_is_absent=True):
         raise InputError(
             "input.adapter_not_found",
             f"no adapter directory at {adapter_dir}.",
@@ -2565,7 +2576,9 @@ def _reject_inside_catalog(
     """Raise ``InputError(key)`` if `value` resolves inside `catalog_dir` -- an operator-supplied path
     for something that must live outside the catalog it's paired with (a support matrix, a signing
     key, a trust root)."""
-    if Path(value).resolve().is_relative_to(catalog_dir):
+    # `os.path.realpath`, not `Path.resolve`: on 3.12 resolve raises RuntimeError on a link loop, where
+    # 3.13 and later return the path; the caller's own check then refuses the loop (18.179).
+    if Path(os.path.realpath(value)).is_relative_to(catalog_dir):
         raise InputError(
             key,
             f"{flag} {value!r} resolves inside the catalog directory {shown_dir}.",
@@ -2972,6 +2985,14 @@ def cmd_conformance(ns: argparse.Namespace) -> CommandResult:
         if adapters is not None
         else None
     )
+    # The adapters folder becomes the orchestrator's working folder, so one that cannot be listed
+    # or entered is refused here, before any subprocess starts (18.179).
+    if adapters_dir is not None and not os.access(adapters_dir, os.R_OK | os.X_OK):
+        raise InputError(
+            "input.adapters_unreadable",
+            f"the adapters directory {adapters!r} exists but could not be read.",
+            "make the folder readable and enterable, then re-run.",
+        )
     out = _opt_str(ns, "out")
     _refuse_empty_out(out)
     report = run_ecs(
@@ -3603,7 +3624,7 @@ def _readiness_severities(ns: argparse.Namespace) -> dict[str, str]:
     severities: dict[str, str] = {}
     for directory in dirs:
         catalog = load_catalog(
-            _require_dir(directory, key="catalog-dir", what="a catalog directory")
+            _require_dir(directory, key="catalog_dir", what="a catalog directory")
         )
         for control in catalog.controls:
             severities[control.id] = control.severity

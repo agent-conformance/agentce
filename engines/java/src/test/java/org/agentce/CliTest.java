@@ -436,7 +436,7 @@ class CliTest {
         JsonNode bad = assessQuickstart("--bundle", dir.resolve("nope").toString(), "--out", a.toString());
         assertRefusedNothingWritten(bad, "input.bundle_not_a_directory", null, a);
         assertRefusedNothingWritten(assessQuickstart("--catalog-dir=" + dir.resolve("nope"), "--out", a.toString()),
-                "input.catalog-dir_not_a_directory", null, a);
+                "input.catalog_dir_not_a_directory", null, a);
     }
 
     @Test
@@ -1218,7 +1218,7 @@ class CliTest {
         JsonNode env = runJson(
                 "readiness", report.toString(), "--catalog-dir", dir.resolve("no-such-catalog").toString());
         assertEquals(3, env.get("exit_code").asInt());
-        assertEquals("input.catalog-dir_not_a_directory", env.get("error").get("message_key").asText());
+        assertEquals("input.catalog_dir_not_a_directory", env.get("error").get("message_key").asText());
     }
 
     @Test
