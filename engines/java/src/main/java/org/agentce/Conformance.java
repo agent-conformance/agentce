@@ -135,9 +135,10 @@ public final class Conformance {
     }
 
     /** Python's {@code Path.resolve()} (non-strict): absolute, with every symbolic link in the part of
-     * the path that exists resolved and the rest appended as given, normalised. */
+     * the path that exists resolved and the rest appended as given, normalised. Nothing is normalised
+     * before the links are resolved, so {@code lnk/..} is the parent of the link's target (18.182). */
     static Path pyResolve(Path path) {
-        Path absolute = path.toAbsolutePath().normalize();
+        Path absolute = path.toAbsolutePath();
         Path existing = absolute;
         while (existing != null && !Files.exists(existing)) {
             existing = existing.getParent();
@@ -289,10 +290,11 @@ public final class Conformance {
 
     static ObjectNode runEcs(
             Path enginePath, Path corpusDir, Path outDir, Path adaptersDir, Orchestrator orchestrator) {
-        Path engine = enginePath.toAbsolutePath().normalize();
+        // Through links, as Python's engine_path.resolve(): a symlinked engine's repository is the target's.
+        Path engine = pyResolve(enginePath);
         Path repoRoot = engine.getParent().getParent();
         Catalogs cat = catalogsFor(repoRoot);
-        Corpus corpus = materialiseCorpus(corpusDir.toAbsolutePath().normalize());
+        Corpus corpus = materialiseCorpus(pyResolve(corpusDir));
         Path reportsRoot;
         try {
             reportsRoot = outDir != null ? outDir.resolve("projects") : Files.createTempDirectory("agentce-ecs-");

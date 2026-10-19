@@ -2185,7 +2185,7 @@ global options:
         verdict.reasons().forEach(reasonsArr::add);
         ArrayNode limitationsArr = result.data.putArray("limitations");
         verdict.limitations().forEach(limitationsArr::add);
-        Path out = reportDir.resolve("report-readiness-" + java.time.LocalDate.now() + ".md").normalize();
+        Path out = reportDir.resolve("report-readiness-" + java.time.LocalDate.now() + ".md");
         List<String> lines = new ArrayList<>();
         lines.add("# Report readiness — " + verdict.verdict());
         lines.add("");
