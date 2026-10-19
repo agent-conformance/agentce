@@ -323,7 +323,9 @@ public final class Conformance {
             }
         }
 
-        NoMl.Result scan = NoMl.evaluate(repoRoot, engine.resolve("gradle.lockfile"));
+        // The running engine's own bundled dependency set, as `agentce version --json` and Python's
+        // conformance run report it: never a lock file under whatever path --engine names (18.179).
+        NoMl.InstalledResult scan = NoMl.evaluateInstalled(NoMl.loadVendoredDenylist(), NoMl.loadRuntimeDeps());
         int total = projectIds.size();
         int different = total - identical;
         String claim;

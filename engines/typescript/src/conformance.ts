@@ -36,7 +36,7 @@ import { pyStrip } from "./failOn";
 import { ingest } from "./ingest";
 import { integrityCaps, verifyStreams } from "./integrity";
 import { NonCanonicalNumber, asParsed, parseJson } from "./json";
-import { evaluateNoMl } from "./noMl";
+import { evaluateInstalledNoMl, loadVendoredDenylist } from "./noMl";
 import { parsePythonIntGrammar, toBigIntFromInt } from "./otelGenai";
 import { loadProfile } from "./profile";
 import { pyGet, pyTruthy } from "./readiness";
@@ -295,7 +295,9 @@ export function runEcs(options: RunEcsOptions): EcsReport {
     }
   }
 
-  const scan = evaluateNoMl(repoRoot, join(enginePath, "pnpm-lock.yaml"));
+  // The running engine's own installed dependency tree, as `agentce version --json` and Python's
+  // conformance run report it: never a lock file under whatever path --engine names (18.179).
+  const scan = evaluateInstalledNoMl(loadVendoredDenylist(), join(__dirname, ".."));
   const total = projects.length;
   const different = total - identical;
   let claim: string;
