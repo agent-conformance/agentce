@@ -12,7 +12,6 @@ import {
   realpathSync,
   rmSync,
   statSync,
-  writeFileSync,
 } from "node:fs";
 import { basename, dirname, join, posix } from "node:path";
 import { summarizeActivity } from "./activity";
@@ -22,6 +21,7 @@ import { CanonicalizationError, canonicalString } from "./canonical";
 import { InputError } from "./errors";
 import { maxNesting, splitLines } from "./ingest";
 import { type AdaptResult, OtelGenaiAdapterError, adapt } from "./otelGenai";
+import { writeFile } from "./outputs";
 import { type Profile, profileFromDict } from "./profile";
 import { safeDump } from "./pyyaml";
 import { hasInvisibleCodepoint } from "./report";
@@ -188,7 +188,7 @@ export class ScannedRecords {
         const digest = createHash("sha256").update(source, "utf-8").digest("hex");
         const name = `events/${stem}-${digest.slice(0, 8)}.jsonl`;
         const data = this.streams.get(source) as Buffer;
-        writeFileSync(join(root, name), data);
+        writeFile(join(root, name), data);
         files.push({ path: name, sha256: createHash("sha256").update(data).digest("hex") });
       }
       const manifest = {
@@ -198,16 +198,11 @@ export class ScannedRecords {
           .sort(byteCompare)
           .map((id) => ({ id, class: this.sources.get(id) })),
       };
-      writeFileSync(
-        join(root, "manifest.json"),
-        `${jsonStringifyAscii(sortKeysDeep(manifest), 2)}\n`,
-        "utf-8",
-      );
+      writeFile(join(root, "manifest.json"), `${jsonStringifyAscii(sortKeysDeep(manifest), 2)}\n`);
       if (writeProfile) {
-        writeFileSync(
+        writeFile(
           join(outDir, DERIVED_PROFILE_FILE),
           `# The default profile \`agentce assess <folder>\` derived from the records it found.\n# Edit it (declare your agents, oversight and catalogs) and pass it back with --profile.\n${safeDump(this.profile())}`,
-          "utf-8",
         );
       }
     } catch (err) {

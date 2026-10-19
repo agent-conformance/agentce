@@ -10,14 +10,7 @@
  */
 
 import { createHash } from "node:crypto";
-import {
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  realpathSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { arch, platform } from "node:os";
 import { dirname, join } from "node:path";
 import type { Activity } from "./activity";
@@ -29,6 +22,7 @@ import { canonicalize, sha256Hex } from "./canonical";
 import type { Catalog, ControlSpec } from "./catalog";
 import type { Event } from "./graph";
 import { DEFAULT_LANGUAGE, catalogue } from "./messages";
+import { writeFile } from "./outputs";
 import { type Profile, type Subject, profileFromDict } from "./profile";
 import {
   type ProjectView,
@@ -1411,12 +1405,12 @@ export function writeReport(
 
   const writeJson = (name: string, obj: unknown): void => {
     const data = canonicalize(obj);
-    writeFileSync(join(outDir, name), data);
+    writeFile(join(outDir, name), data);
     outputs[name] = digestBytes(data);
   };
   const writeTextFile = (name: string, text: string): void => {
     const data = Buffer.from(text, "utf-8");
-    writeFileSync(join(outDir, name), data);
+    writeFile(join(outDir, name), data);
     outputs[name] = digestBytes(data);
   };
 
@@ -1545,7 +1539,7 @@ export function writeReport(
     const data = canonicalize(pack);
     const path = join(outDir, rel);
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, data);
+    writeFile(path, data);
     outputs[rel] = digestBytes(data);
   }
 
@@ -1563,12 +1557,12 @@ export function writeReport(
     domainBindingDigest: options.domainBindingDigest,
     deviationRegisterDigest: options.deviationRegisterDigest,
   });
-  writeFileSync(join(outDir, "manifest.json"), JSON.stringify(sortKeysDeep(manifest), null, 2));
+  writeFile(join(outDir, "manifest.json"), JSON.stringify(sortKeysDeep(manifest), null, 2));
   if (assertions.length > 0) {
     // claim.json is unsigned here (SPEC §9.1: the engine never signs its own claim) and is not one
     // of the manifest's outputs, as in report.py; it exists so `agentce sign` can sign a real run.
     const claim = buildClaim(assertions, manifest, options.limitations);
-    writeFileSync(join(outDir, "claim.json"), `${jsonStringifyAscii(sortKeysDeep(claim), 2)}\n`);
+    writeFile(join(outDir, "claim.json"), `${jsonStringifyAscii(sortKeysDeep(claim), 2)}\n`);
   }
   return manifest;
 }

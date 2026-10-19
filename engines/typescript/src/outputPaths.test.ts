@@ -125,6 +125,19 @@ test("report --out on a FIFO is refused, not waited on", () => {
   });
 });
 
+test("quickstart --out with a FIFO at a fixed report name is refused, not waited on", () => {
+  for (const name of ["report.md", "claim.json", "quarantine.jsonl"]) {
+    inScratch((dir) => {
+      mkdirSync(join(dir, "q"));
+      mkfifo(join(dir, "q", name));
+      assert.deepEqual(keyOf(["quickstart", "--out", join(dir, "q")]), [
+        3,
+        "input.out_dir_unwritable",
+      ]);
+    });
+  }
+});
+
 function assessed(dir: string): string {
   const out = join(dir, "report");
   const { exitCode } = runJson([

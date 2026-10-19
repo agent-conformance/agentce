@@ -3,9 +3,10 @@
  * Quarantine is an output, never a silent drop. Each record is one line of `quarantine.jsonl`.
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { InputError } from "./errors";
+import { writeFile } from "./outputs";
 import { jsonlText } from "./util";
 
 export enum QuarantineReason {
@@ -66,7 +67,7 @@ export function writeQuarantine(records: Iterable<QuarantineRecord>, path: strin
   const rows = Array.from(records, quarantineToJson);
   try {
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, jsonlText(rows));
+    writeFile(path, jsonlText(rows));
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
     throw new InputError(

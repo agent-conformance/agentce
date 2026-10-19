@@ -15,7 +15,6 @@ import {
   readFileSync,
   readdirSync,
   statSync,
-  writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, relative, resolve as resolvePath, sep } from "node:path";
@@ -61,7 +60,15 @@ import {
 } from "./integrity";
 import { DEFAULT_LANGUAGE, availableLanguages, catalogue } from "./messages";
 import { installedNoMl } from "./noMl";
-import { OUT_DIR, type OutputRole, checkOutput, writeOutput } from "./outputs";
+import {
+  OUT_DIR,
+  type OutputRole,
+  checkOutput,
+  writeFile,
+  writeJsonl,
+  writeOutput,
+  writingInto,
+} from "./outputs";
 import { type Profile, loadProfile } from "./profile";
 import { writeQuarantine } from "./quarantine";
 import {
@@ -106,7 +113,6 @@ import {
   pyRepr,
   pyStr,
   sortKeysDeep,
-  writeJsonl,
 } from "./util";
 import { summarize } from "./verdict";
 import {
@@ -1140,7 +1146,9 @@ function runAssess(options: AssessOptions): CommandResult {
     signedTrust,
   );
   const integrityResults = [...integrityStreams.values()];
-  writeJsonl(integrityResults.map(integrityResultToJson), join(out, "integrity.jsonl"));
+  writingInto(out, OUT_DIR, () =>
+    writeJsonl(integrityResults.map(integrityResultToJson), join(out, "integrity.jsonl")),
+  );
 
   // Stage 3: build the provenance graph (in-memory store; ADR-0001's TypeScript variant).
   const domainPath =
@@ -1155,11 +1163,13 @@ function runAssess(options: AssessOptions): CommandResult {
   // Stage 4: coverage and reconciliation against independent denominators.
   const coverage = computeCoverage(ingested.accepted, profileObj, bundleDir, listedPaths(bundle));
   mkdirSync(out, { recursive: true });
-  writeFileSync(join(out, "coverage.json"), `${JSON.stringify(sortKeysDeep(coverage), null, 2)}\n`);
+  writingInto(out, OUT_DIR, () =>
+    writeFile(join(out, "coverage.json"), `${JSON.stringify(sortKeysDeep(coverage), null, 2)}\n`),
+  );
 
   // Stage 5: applicability resolution and drift.
   const statements = resolveApplicability(profileObj, ingested.accepted);
-  writeJsonl(statements, join(out, "applicability.jsonl"));
+  writingInto(out, OUT_DIR, () => writeJsonl(statements, join(out, "applicability.jsonl")));
   const driftFindings = statements.reduce(
     (n, s) => n + ((s.drift as unknown[] | undefined)?.length ?? 0),
     0,
@@ -1242,29 +1252,31 @@ function runAssess(options: AssessOptions): CommandResult {
   const blindSpots = computeBlindSpots(evaluated, profileObj, catalogs, ingested.accepted);
   const applicabilityProfileDigest = digestOf(profilePath);
   const domainBindingDigest = domainPath !== undefined ? digestOf(domainPath) : undefined;
-  writeReport(out, evaluated, {
-    bundleDigest: bundle.digest,
-    catalogs: catalogLabels,
-    catalogObjects: catalogs,
-    // config.py's `operator` default (SPEC §8.4); agentce.toml is not read here (Python only).
-    operator: process.env.AGENTCE_OPERATOR ?? "unset",
-    invocation:
-      options.folder !== undefined
-        ? ["assess", scrubPath(options.folder)]
-        : [options.invocationCommand, scrubPath(bundleDir), scrubPath(profilePath)],
-    supersedes,
-    activity,
-    blindSpots,
-    events: ingested.accepted,
-    profile: profileObj,
-    limitations,
-    applicabilityProfileDigest,
-    domainBindingDigest,
-    deviationRegisterDigest,
-    deviations,
-    declaredSubjectIds,
-    reportLanguage: language,
-  });
+  writingInto(out, OUT_DIR, () =>
+    writeReport(out, evaluated, {
+      bundleDigest: bundle.digest,
+      catalogs: catalogLabels,
+      catalogObjects: catalogs,
+      // config.py's `operator` default (SPEC §8.4); agentce.toml is not read here (Python only).
+      operator: process.env.AGENTCE_OPERATOR ?? "unset",
+      invocation:
+        options.folder !== undefined
+          ? ["assess", scrubPath(options.folder)]
+          : [options.invocationCommand, scrubPath(bundleDir), scrubPath(profilePath)],
+      supersedes,
+      activity,
+      blindSpots,
+      events: ingested.accepted,
+      profile: profileObj,
+      limitations,
+      applicabilityProfileDigest,
+      domainBindingDigest,
+      deviationRegisterDigest,
+      deviations,
+      declaredSubjectIds,
+      reportLanguage: language,
+    }),
+  );
   if (state !== null) {
     state.record(bundle.digest, join(out, "manifest.json"), newWindowEnd);
   }

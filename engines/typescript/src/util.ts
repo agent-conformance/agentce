@@ -1,8 +1,5 @@
 /** Shared helpers. */
 
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
-
 /**
  * Compare two strings by their UTF-8 bytes, matching SQLite's BINARY collation (and so the Python
  * engine's `ORDER BY` on the graph store). For the ASCII IRIs and CURIEs the graph uses this equals
@@ -47,13 +44,6 @@ export function jsonlText(records: Iterable<unknown>): string {
     out += `${jsonStringifyAscii(sortKeysDeep(record))}\n`;
   }
   return out;
-}
-
-/** Write `records` to `path` as {@link jsonlText} (applicability.jsonl and integrity.jsonl are
- * compared byte for byte by VG-RECORDS-FOLDER-PARITY). */
-export function writeJsonl(records: Iterable<unknown>, path: string): void {
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, jsonlText(records));
 }
 
 /**

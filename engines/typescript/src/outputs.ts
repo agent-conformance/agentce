@@ -20,7 +20,7 @@ import {
 } from "node:fs";
 import { dirname } from "node:path";
 import { InputError } from "./errors";
-import { pyRepr } from "./util";
+import { jsonlText, pyRepr } from "./util";
 
 export const NOT_A_FILE = "is not a regular file";
 export const NOT_A_DIRECTORY = "is not a directory";
@@ -176,6 +176,13 @@ export function writeFile(
   } finally {
     closeSync(fd);
   }
+}
+
+/** Write `records` to `path` as {@link jsonlText} with {@link writeFile} (applicability.jsonl and
+ * integrity.jsonl are compared byte for byte by VG-RECORDS-FOLDER-PARITY). */
+export function writeJsonl(records: Iterable<unknown>, path: string): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFile(path, jsonlText(records));
 }
 
 /** Check `raw` (`checkOutput`), create its missing folders and write `data` to it (`writeFile`). */
