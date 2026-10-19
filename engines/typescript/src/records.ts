@@ -13,7 +13,7 @@ import {
   rmSync,
   statSync,
 } from "node:fs";
-import { basename, dirname, join, posix } from "node:path";
+import { basename, dirname, posix } from "node:path";
 import { summarizeActivity } from "./activity";
 import { confineToRoot, resolveLoose, safeIsFile } from "./bundle";
 import { DEFAULT_LENS } from "./bundled";
@@ -28,6 +28,7 @@ import { hasInvisibleCodepoint } from "./report";
 import {
   byteCompare,
   isPrintableCodePoint,
+  joinPath,
   jsonStringifyAscii,
   pyRepr,
   sortKeysDeep,
@@ -171,14 +172,14 @@ export class ScannedRecords {
   /** Write the evidence bundle under `outDir` (replacing a previous run's) and, when `writeProfile`,
    * the default profile beside it. */
   write(outDir: string, writeProfile: boolean): void {
-    const root = join(outDir, BUNDLE_DIR);
+    const root = joinPath(outDir, BUNDLE_DIR);
     try {
       try {
         rmSync(root, { recursive: true, force: true });
       } catch {
         // shutil.rmtree(ignore_errors=True)
       }
-      mkdirSync(join(root, "events"), { recursive: true });
+      mkdirSync(joinPath(root, "events"), { recursive: true });
       const files: Array<{ path: string; sha256: string }> = [];
       for (const source of [...this.streams.keys()].sort(byteCompare)) {
         const stem = source
@@ -188,7 +189,7 @@ export class ScannedRecords {
         const digest = createHash("sha256").update(source, "utf-8").digest("hex");
         const name = `events/${stem}-${digest.slice(0, 8)}.jsonl`;
         const data = this.streams.get(source) as Buffer;
-        writeFile(join(root, name), data);
+        writeFile(joinPath(root, name), data);
         files.push({ path: name, sha256: createHash("sha256").update(data).digest("hex") });
       }
       const manifest = {
@@ -198,10 +199,13 @@ export class ScannedRecords {
           .sort(byteCompare)
           .map((id) => ({ id, class: this.sources.get(id) })),
       };
-      writeFile(join(root, "manifest.json"), `${jsonStringifyAscii(sortKeysDeep(manifest), 2)}\n`);
+      writeFile(
+        joinPath(root, "manifest.json"),
+        `${jsonStringifyAscii(sortKeysDeep(manifest), 2)}\n`,
+      );
       if (writeProfile) {
         writeFile(
-          join(outDir, DERIVED_PROFILE_FILE),
+          joinPath(outDir, DERIVED_PROFILE_FILE),
           `# The default profile \`agentce assess <folder>\` derived from the records it found.\n# Edit it (declare your agents, oversight and catalogs) and pass it back with --profile.\n${safeDump(this.profile())}`,
         );
       }
@@ -336,7 +340,7 @@ function candidates(
       const name = entry.name;
       if (entry.isSymbolicLink()) {
         links.add(name);
-        (isDir(join(here, name)) ? dirnames : filenames).push(name);
+        (isDir(joinPath(here, name)) ? dirnames : filenames).push(name);
       } else if (entry.isDirectory()) {
         dirnames.push(name);
       } else {
@@ -347,10 +351,10 @@ function candidates(
       }
     }
     const isFile = (name: string): boolean =>
-      links.has(name) ? safeIsFile(join(here, name)) : regular.has(name);
+      links.has(name) ? safeIsFile(joinPath(here, name)) : regular.has(name);
     const kept: string[] = [];
     for (const d of dirnames.sort(byteCompare)) {
-      const path = join(here, d);
+      const path = joinPath(here, d);
       if (d.startsWith(".") || sameAsAny(statOrNull(path), skipTrees)) {
         continue;
       }
@@ -361,7 +365,7 @@ function candidates(
       kept.push(d);
     }
     for (const name of filenames.sort(byteCompare)) {
-      const path = join(here, name);
+      const path = joinPath(here, name);
       if (name.startsWith(".")) {
         continue;
       }
@@ -378,7 +382,7 @@ function candidates(
       found.push([rel(path), confineToRoot(folder, rel(path))]);
     }
     for (const d of kept) {
-      walk(join(here, d));
+      walk(joinPath(here, d));
     }
   };
   walk(folder);
@@ -454,16 +458,16 @@ function realId(event: Event): string | undefined {
 
 /** Read every recognised trace export under `folder`; refuse a folder with none (Python's `scan`). */
 export function scanRecords(folderArg: string, options: ScanOptions = {}): ScannedRecords {
-  const folder = realpathSync(folderArg);
+  const folder = realpathSync.native(folderArg);
   const skip: string[] = [];
   if (options.exclude !== undefined) {
     const out = resolveLoose(options.exclude) ?? options.exclude;
-    const stale = join(out, BUNDLE_DIR);
+    const stale = joinPath(out, BUNDLE_DIR);
     skip.push(stale);
     if (
       within(folder, stale) ||
       isSymlink(stale) ||
-      (isDir(stale) && !safeIsFile(join(stale, "manifest.json")))
+      (isDir(stale) && !safeIsFile(joinPath(stale, "manifest.json")))
     ) {
       throw new InputError(
         "input.records_out_collides",

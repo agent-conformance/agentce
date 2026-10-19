@@ -17,7 +17,7 @@ import {
   statSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { basename, join, relative, resolve as resolvePath, sep } from "node:path";
+import { basename, relative, resolve as resolvePath, sep } from "node:path";
 import { load } from "js-yaml";
 import { summarizeActivity } from "./activity";
 import { resolve as resolveApplicability } from "./applicability";
@@ -109,6 +109,7 @@ import { GraphStore } from "./store";
 import {
   byteCompare,
   formatTemplate,
+  joinPath,
   jsonStringifyAscii,
   pyRepr,
   pyStr,
@@ -391,7 +392,7 @@ function vendoredCatalogs(): Map<string, string> {
   const found = new Map<string, string>();
   const root = bundledCatalogsDir();
   for (const kind of ["base", "overlays"]) {
-    const dir = join(root, kind);
+    const dir = joinPath(root, kind);
     let names: string[] = [];
     try {
       names = readdirSync(dir).sort(byteCompare);
@@ -399,14 +400,14 @@ function vendoredCatalogs(): Map<string, string> {
       names = [];
     }
     for (const name of names) {
-      const catalogYaml = join(dir, name, "catalog.yaml");
+      const catalogYaml = joinPath(dir, name, "catalog.yaml");
       if (!existsSync(catalogYaml)) {
         continue;
       }
       try {
         const meta = load(readFileSync(catalogYaml, "utf-8")) as Record<string, unknown> | null;
         if (meta && typeof meta.id === "string" && typeof meta.version === "string") {
-          found.set(`${meta.id}@${meta.version}`, join(dir, name));
+          found.set(`${meta.id}@${meta.version}`, joinPath(dir, name));
         }
       } catch {
         // a malformed vendored catalog is skipped, never fatal to discovery
@@ -912,7 +913,7 @@ function cmdValidate(argv: string[]): CommandResult {
   }
   result.data.quarantine_by_reason = quarantineByReason;
   if (out !== undefined) {
-    const quarantinePath = join(out, "quarantine.jsonl");
+    const quarantinePath = joinPath(out, "quarantine.jsonl");
     writeQuarantine(ingested.quarantined, quarantinePath);
     result.data.quarantine_file = quarantinePath;
   }
@@ -1061,7 +1062,7 @@ function runAssess(options: AssessOptions): CommandResult {
       profilePath = requireFile(options.profile, "profile", "the applicability profile");
       declared = loadProfile(profilePath);
     } else {
-      profilePath = join(out, DERIVED_PROFILE_FILE);
+      profilePath = joinPath(out, DERIVED_PROFILE_FILE);
     }
     const forced = recordsSubject(declared);
     scanned = scanRecords(folder, {
@@ -1070,7 +1071,7 @@ function runAssess(options: AssessOptions): CommandResult {
       perAgent: declared !== undefined && forced === undefined,
     });
     profileObj = recordsProfile(declared, scanned);
-    bundleDir = join(out, BUNDLE_DIR);
+    bundleDir = joinPath(out, BUNDLE_DIR);
     if (options.packageForSharing) {
       throw new InputError(
         "input.package_requires_bundle",
@@ -1136,7 +1137,7 @@ function runAssess(options: AssessOptions): CommandResult {
   const ingested = ingest(bundle);
   // Resolved before anything is written: a trust root that cannot be loaded refuses the run (SPEC §6.6).
   const signedTrust = sourceTrust(options.trustRootFlag, ingested.rawAccepted);
-  writeQuarantine(ingested.quarantined, join(out, "quarantine.jsonl"));
+  writeQuarantine(ingested.quarantined, joinPath(out, "quarantine.jsonl"));
 
   // Stage 2: integrity verification, one IntegrityResult per stream.
   const integrityStreams = verifyStreams(
@@ -1147,7 +1148,7 @@ function runAssess(options: AssessOptions): CommandResult {
   );
   const integrityResults = [...integrityStreams.values()];
   writingInto(out, OUT_DIR, () =>
-    writeJsonl(integrityResults.map(integrityResultToJson), join(out, "integrity.jsonl")),
+    writeJsonl(integrityResults.map(integrityResultToJson), joinPath(out, "integrity.jsonl")),
   );
 
   // Stage 3: build the provenance graph (in-memory store; ADR-0001's TypeScript variant).
@@ -1164,12 +1165,15 @@ function runAssess(options: AssessOptions): CommandResult {
   const coverage = computeCoverage(ingested.accepted, profileObj, bundleDir, listedPaths(bundle));
   mkdirSync(out, { recursive: true });
   writingInto(out, OUT_DIR, () =>
-    writeFile(join(out, "coverage.json"), `${JSON.stringify(sortKeysDeep(coverage), null, 2)}\n`),
+    writeFile(
+      joinPath(out, "coverage.json"),
+      `${JSON.stringify(sortKeysDeep(coverage), null, 2)}\n`,
+    ),
   );
 
   // Stage 5: applicability resolution and drift.
   const statements = resolveApplicability(profileObj, ingested.accepted);
-  writingInto(out, OUT_DIR, () => writeJsonl(statements, join(out, "applicability.jsonl")));
+  writingInto(out, OUT_DIR, () => writeJsonl(statements, joinPath(out, "applicability.jsonl")));
   const driftFindings = statements.reduce(
     (n, s) => n + ((s.drift as unknown[] | undefined)?.length ?? 0),
     0,
@@ -1278,7 +1282,7 @@ function runAssess(options: AssessOptions): CommandResult {
     }),
   );
   if (state !== null) {
-    state.record(bundle.digest, join(out, "manifest.json"), newWindowEnd);
+    state.record(bundle.digest, joinPath(out, "manifest.json"), newWindowEnd);
   }
 
   const nonConformant = evaluated.filter((a) => a.outcome === "non-conformant").length;
@@ -1634,11 +1638,11 @@ function cmdQuickstart(argv: string[]): CommandResult {
       "reinstall the engine: the quickstart project ships inside the package.",
     );
   }
-  const catalogDir = join(bundledCatalogsDir(), "base", "eu-ai-act");
+  const catalogDir = joinPath(bundledCatalogsDir(), "base", "eu-ai-act");
   const assess = runAssess({
-    bundle: join(quickstart, "evidence"),
-    profile: join(quickstart, "applicability.yaml"),
-    domain: join(quickstart, "domain.linkml.yaml"),
+    bundle: joinPath(quickstart, "evidence"),
+    profile: joinPath(quickstart, "applicability.yaml"),
+    domain: joinPath(quickstart, "domain.linkml.yaml"),
     catalog: "eu-ai-act@2026.09",
     catalogDirs: [catalogDir],
     out,
@@ -2003,7 +2007,7 @@ function localIsoDate(): string {
 function readinessSeverities(catalogDirs: string[]): Map<string, string> {
   let dirs = catalogDirs;
   if (dirs.length === 0) {
-    const base = join(bundledCatalogsDir(), "base");
+    const base = joinPath(bundledCatalogsDir(), "base");
     let names: string[] = [];
     try {
       names = readdirSync(base).sort(byteCompare);
@@ -2011,8 +2015,8 @@ function readinessSeverities(catalogDirs: string[]): Map<string, string> {
       names = [];
     }
     dirs = names
-      .map((name) => join(base, name))
-      .filter((dir) => existsSync(join(dir, "catalog.yaml")));
+      .map((name) => joinPath(base, name))
+      .filter((dir) => existsSync(joinPath(dir, "catalog.yaml")));
   }
   const severities = new Map<string, string>();
   for (const dir of dirs) {
@@ -2140,7 +2144,7 @@ function cmdReadiness(argv: string[]): CommandResult {
   result.data.verdict = verdict.verdict;
   result.data.reasons = verdict.reasons;
   result.data.limitations = verdict.limitations;
-  const out = join(reportDir, `report-readiness-${localIsoDate()}.md`);
+  const out = joinPath(reportDir, `report-readiness-${localIsoDate()}.md`);
   const lines = [`# Report readiness — ${verdict.verdict}`, ""];
   if (verdict.reasons.length > 0) {
     lines.push("## Blocking reasons", ...verdict.reasons.map((r) => `- ${r}`), "");
@@ -2431,7 +2435,7 @@ function cmdSign(argv: string[]): CommandResult {
 
   // The claim is read and checked before the dry-run return, so a dry run answers as the real sign
   // would, and before the key is read (TRADEOFFS 2026-10-06 18.53).
-  const claimPath = join(reportDir, "claim.json");
+  const claimPath = joinPath(reportDir, "claim.json");
   if (!existsSync(claimPath) || !statSync(claimPath).isFile()) {
     throw new InputError(
       "sign.no_claim",
@@ -2441,7 +2445,7 @@ function cmdSign(argv: string[]): CommandResult {
   }
   refuseSignTargetsOutside(reportDir, role, profile, writeTrustRoot);
   const claim = readSignClaim(claimPath);
-  const manifest = readSignManifest(join(reportDir, "manifest.json"));
+  const manifest = readSignManifest(joinPath(reportDir, "manifest.json"));
 
   if (dryRun) {
     result.note(`dry run: would sign the claim as ${role} (${profile})`);
@@ -2449,9 +2453,9 @@ function cmdSign(argv: string[]): CommandResult {
   }
 
   // Every file sign writes is checked before claim.json is rewritten, so a refused run writes nothing.
-  const sigDir = join(reportDir, "signatures");
-  const detached = join(sigDir, `${role}-${profile}.dsse.json`);
-  const trustRootPath = join(reportDir, "trust-root.json");
+  const sigDir = joinPath(reportDir, "signatures");
+  const detached = joinPath(sigDir, `${role}-${profile}.dsse.json`);
+  const trustRootPath = joinPath(reportDir, "trust-root.json");
   checkOutput(sigDir, SIGN_REPORT_DIR);
   for (const target of [claimPath, detached, ...(writeTrustRoot ? [trustRootPath] : [])]) {
     checkOutput(target, SIGN_REPORT_FILE);

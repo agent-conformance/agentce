@@ -7,10 +7,10 @@
  */
 
 import { lstatSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+
 import { DEFAULT_SCHEMA, FAILSAFE_SCHEMA, Type as YamlType, load as yamlLoad } from "js-yaml";
 import { InputError } from "./errors";
-import { byteCompare, decodeUtf8Strict, normalizePosixPath, pyRepr, pyStr } from "./util";
+import { byteCompare, decodeUtf8Strict, joinPath, normalizePosixPath, pyRepr, pyStr } from "./util";
 
 export const READY = "READY";
 export const READY_WITH_LIMITATIONS = "READY WITH LIMITATIONS";
@@ -706,7 +706,7 @@ export function computeReadiness(
   const reportFile = (name: string): string | undefined => {
     let text: string | undefined;
     try {
-      text = readReportFile(join(reportDir, name));
+      text = readReportFile(joinPath(reportDir, name));
     } catch {
       reasons.push(`cannot read report file ${name}`);
       return undefined;

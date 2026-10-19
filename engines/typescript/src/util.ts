@@ -190,6 +190,16 @@ export function normalizePosixPath(raw: string): string {
   return joined === "" ? "." : joined;
 }
 
+/**
+ * Join path parts the way Python's `pathlib` and Java's `Path.resolve` do: every `..` is kept for the
+ * kernel to resolve, so `lnk/..` names the parent of the link's target, never the folder holding the
+ * link, as `node:path`'s `join` folds it (18.182). Rendered by {@link normalizePosixPath}: with no `..`
+ * it gives `join`'s answer, less a trailing slash, which Python drops too.
+ */
+export function joinPath(...parts: string[]): string {
+  return normalizePosixPath(parts.filter((p) => p !== "").join("/"));
+}
+
 /** Fill the `{name}` slots in a message template; an unknown name is left as written. */
 export function formatTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (whole, key: string) => vars[key] ?? whole);

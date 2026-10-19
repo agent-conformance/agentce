@@ -8,14 +8,14 @@
  */
 
 import { lstatSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
-import { join } from "node:path";
+
 import { load } from "js-yaml";
 import { errorCause, errorFix } from "./errorCatalogue";
 import { AgentceError, InputError, catalogUnreadable } from "./errors";
 import { type Shape, parseShapesTtl } from "./psp";
 import { insideFolder, isFileFollowingLinks } from "./report";
 import { SOURCE_CLASS_FROM, SOURCE_CLASS_RANK } from "./sourceClass";
-import { byteCompare, formatTemplate } from "./util";
+import { byteCompare, formatTemplate, joinPath } from "./util";
 import { type CatalogFiles, readCatalogFiles } from "./verify";
 
 const EVIDENCE_SHAPE_UNRESOLVED = "catalog.evidence_shape.unresolved";
@@ -244,8 +244,10 @@ function fileInside(directory: string, path: string): string | null {
     return null;
   }
   try {
-    const named = join(directory, path);
-    return insideFolder(directory, named) && statSync(named).isFile() ? realpathSync(named) : null;
+    const named = joinPath(directory, path);
+    return insideFolder(directory, named) && statSync(named).isFile()
+      ? realpathSync.native(named)
+      : null;
   } catch {
     return null;
   }
@@ -305,7 +307,7 @@ function loadCovered(directory: string): Catalog {
   // but is not a regular file (a FIFO would block the read) is refused unopened (18.181). Every covered
   // file is then read once (18.171) and kept as `files`, which the signature check and provenance
   // digest read.
-  const metaPath = join(directory, "catalog.yaml");
+  const metaPath = joinPath(directory, "catalog.yaml");
   if (isPresentButNotAFile(metaPath)) {
     throw Object.assign(new Error("not a regular file: catalog.yaml"), {
       code: "EINVAL",

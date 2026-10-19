@@ -12,7 +12,7 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { arch, platform } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import type { Activity } from "./activity";
 import { DENIED_KINDS, RECORDER_CLASSES, summarizeActivity } from "./activity";
 import { type Assertion, OUTCOMES, aggregate, assertionToJson, checkDc5 } from "./assertions";
@@ -30,7 +30,14 @@ import {
   checksBySubject,
   computeProjectView,
 } from "./project";
-import { byteCompare, formatTemplate, jsonStringifyAscii, pyStr, sortKeysDeep } from "./util";
+import {
+  byteCompare,
+  formatTemplate,
+  joinPath,
+  jsonStringifyAscii,
+  pyStr,
+  sortKeysDeep,
+} from "./util";
 import { gapText, summarize as summarizeVerdict } from "./verdict";
 import type { CatalogFiles } from "./verify";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
@@ -63,7 +70,7 @@ function folderIdentity(path: string): string {
  * which a case-insensitive filesystem allows many of (18.181); mirrors Python's `signing.inside_folder`. */
 export function insideFolder(root: string, path: string): boolean {
   const rootId = folderIdentity(root);
-  for (let at = realpathSync(path), up = dirname(at); up !== at; at = up, up = dirname(at)) {
+  for (let at = realpathSync.native(path), up = dirname(at); up !== at; at = up, up = dirname(at)) {
     if (folderIdentity(up) === rootId) {
       return true;
     }
@@ -94,7 +101,7 @@ export function isDirFollowingLinks(path: string): boolean {
 function walkFiles(dir: string, base: string, entered: Set<string>, odd: string[]): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir).sort(byteCompare)) {
-    const full = join(dir, name);
+    const full = joinPath(dir, name);
     const rel = base === "" ? name : `${base}/${name}`;
     if (isDirFollowingLinks(full)) {
       const identity = folderIdentity(full);
@@ -134,7 +141,7 @@ export function coveredFiles(dir: string, exclude: ReadonlySet<string> = new Set
   if (refused !== undefined) {
     throw Object.assign(new Error(`not a regular file or folder: ${refused}`), {
       code: "EINVAL",
-      path: join(dir, refused),
+      path: joinPath(dir, refused),
     });
   }
   return found.sort(byteCompare).filter(covered);
@@ -149,7 +156,7 @@ export function coveredFiles(dir: string, exclude: ReadonlySet<string> = new Set
  * catalog's stored `provenance.digest` field. */
 export function digestTree(dir: string, exclude: ReadonlySet<string> = new Set()): string {
   return digestFiles(
-    new Map(coveredFiles(dir, exclude).map((rel) => [rel, readFileSync(join(dir, rel))])),
+    new Map(coveredFiles(dir, exclude).map((rel) => [rel, readFileSync(joinPath(dir, rel))])),
   );
 }
 
@@ -1405,12 +1412,12 @@ export function writeReport(
 
   const writeJson = (name: string, obj: unknown): void => {
     const data = canonicalize(obj);
-    writeFile(join(outDir, name), data);
+    writeFile(joinPath(outDir, name), data);
     outputs[name] = digestBytes(data);
   };
   const writeTextFile = (name: string, text: string): void => {
     const data = Buffer.from(text, "utf-8");
-    writeFile(join(outDir, name), data);
+    writeFile(joinPath(outDir, name), data);
     outputs[name] = digestBytes(data);
   };
 
@@ -1477,7 +1484,7 @@ export function writeReport(
     }
     for (const subjectId of projectSubjectIds) {
       const subjectDirname = agentDirname(subjectId);
-      mkdirSync(join(outDir, "agents", subjectDirname), { recursive: true });
+      mkdirSync(joinPath(outDir, "agents", subjectDirname), { recursive: true });
       const subjectAssertions = assertionsBySubject.get(subjectId) ?? [];
       // Populated above for every id in `projectSubjectIds`, including this one.
       const subjectActivity = projectActivityBySubject.get(subjectId) as Activity;
@@ -1537,7 +1544,7 @@ export function writeReport(
     );
     const rel = `packs/${safe(subject)}/pack.json`;
     const data = canonicalize(pack);
-    const path = join(outDir, rel);
+    const path = joinPath(outDir, rel);
     mkdirSync(dirname(path), { recursive: true });
     writeFile(path, data);
     outputs[rel] = digestBytes(data);
@@ -1557,12 +1564,12 @@ export function writeReport(
     domainBindingDigest: options.domainBindingDigest,
     deviationRegisterDigest: options.deviationRegisterDigest,
   });
-  writeFile(join(outDir, "manifest.json"), JSON.stringify(sortKeysDeep(manifest), null, 2));
+  writeFile(joinPath(outDir, "manifest.json"), JSON.stringify(sortKeysDeep(manifest), null, 2));
   if (assertions.length > 0) {
     // claim.json is unsigned here (SPEC §9.1: the engine never signs its own claim) and is not one
     // of the manifest's outputs, as in report.py; it exists so `agentce sign` can sign a real run.
     const claim = buildClaim(assertions, manifest, options.limitations);
-    writeFile(join(outDir, "claim.json"), `${jsonStringifyAscii(sortKeysDeep(claim), 2)}\n`);
+    writeFile(joinPath(outDir, "claim.json"), `${jsonStringifyAscii(sortKeysDeep(claim), 2)}\n`);
   }
   return manifest;
 }

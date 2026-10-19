@@ -116,19 +116,27 @@ function checkCreatable(path: string, role: OutputRole, raw: string): void {
   }
 }
 
+/** The file `raw` names, as Python's `Path(raw)` and Java's `Paths.get(raw)` read it: trailing
+ * slashes dropped (18.182). Messages keep `raw` as typed. */
+function targetOf(raw: string): string {
+  return raw.replace(/(?<=.)\/+$/, "");
+}
+
 /** Refuse `raw` under `role.key` unless it can be written: an existing target of the role's type that
- * can be written, or a new one whose nearest existing folder can be. Nothing is opened. */
+ * can be written, or a new one whose nearest existing folder can be. Nothing is opened. Returns the path
+ * written to ({@link targetOf}). */
 export function checkOutput(raw: string, role: OutputRole): string {
+  const path = targetOf(raw);
   let info: ReturnType<typeof statSync>;
   try {
-    info = statSync(raw);
+    info = statSync(path);
   } catch (err) {
     if (errCode(err) === "ENOENT") {
-      if (isLink(raw)) {
+      if (isLink(path)) {
         throw refuse(role, raw, DANGLING);
       }
-      checkCreatable(raw, role, raw);
-      return raw;
+      checkCreatable(path, role, raw);
+      return path;
     }
     throw refuse(role, raw, UNREACHABLE);
   }
@@ -136,18 +144,18 @@ export function checkOutput(raw: string, role: OutputRole): string {
     if (!info.isDirectory()) {
       throw refuse(role, raw, NOT_A_DIRECTORY);
     }
-    if (!canAccess(raw, constants.W_OK | constants.X_OK)) {
+    if (!canAccess(path, constants.W_OK | constants.X_OK)) {
       throw refuse(role, raw, UNWRITABLE);
     }
   } else {
     if (!info.isFile()) {
       throw refuse(role, raw, NOT_A_FILE);
     }
-    if (!canAccess(raw, constants.W_OK)) {
+    if (!canAccess(path, constants.W_OK)) {
       throw refuse(role, raw, UNWRITABLE);
     }
   }
-  return raw;
+  return path;
 }
 
 /** Write `data` to `path`, opened non-blocking, so a FIFO fails the open instead of waiting for a
@@ -192,10 +200,10 @@ export function writeOutput(
   data: string | Buffer,
   options: { exclusive?: boolean; mode?: number } = {},
 ): string {
-  checkOutput(raw, role);
+  const path = checkOutput(raw, role);
   try {
-    mkdirSync(dirname(raw), { recursive: true });
-    writeFile(raw, data, options);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFile(path, data, options);
   } catch (err) {
     throw refuse(role, raw, err instanceof NotRegularFile ? NOT_A_FILE : UNWRITABLE);
   }
@@ -205,9 +213,9 @@ export function writeOutput(
 /** Check the directory `raw` names and refuse any write inside `body` that fails anyway; files
  * inside it are written with `writeFile`, so a FIFO at a fixed name is refused too. */
 export function writingInto<T>(raw: string, role: OutputRole, body: (dir: string) => T): T {
-  checkOutput(raw, role);
+  const dir = checkOutput(raw, role);
   try {
-    return body(raw);
+    return body(dir);
   } catch (err) {
     if (err instanceof InputError || errCode(err) === undefined) {
       throw err;

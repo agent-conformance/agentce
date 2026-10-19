@@ -12,9 +12,9 @@
 
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+
 import { InputError } from "./errors";
-import { byteCompare, jsonStringifyAscii, sortKeysDeep } from "./util";
+import { byteCompare, joinPath, jsonStringifyAscii, sortKeysDeep } from "./util";
 
 export const STATE_VERSION = 1;
 const STATE_FILE = "state.json";
@@ -71,7 +71,7 @@ export class StateDir {
 
   static load(path: string): StateDir {
     const state = new StateDir(path);
-    const file = join(path, STATE_FILE);
+    const file = joinPath(path, STATE_FILE);
     if (!isFile(file)) {
       return state;
     }
@@ -108,7 +108,7 @@ export class StateDir {
         last_outcomes: this.lastOutcomes,
       };
       writeFileSync(
-        join(this.path, STATE_FILE),
+        joinPath(this.path, STATE_FILE),
         `${jsonStringifyAscii(sortKeysDeep(payload), 2)}\n`,
       );
     } catch (err) {
@@ -126,7 +126,7 @@ export class StateDir {
    * that exists but lost its write bit after creation would pass a recursive `mkdir` and only fail on
    * a real write. */
   static ensureWritable(path: string): void {
-    const probe = join(path, `.agentce-write-test-${process.pid}`);
+    const probe = joinPath(path, `.agentce-write-test-${process.pid}`);
     try {
       mkdirSync(path, { recursive: true });
       writeFileSync(probe, "");

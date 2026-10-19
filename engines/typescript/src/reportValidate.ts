@@ -10,14 +10,14 @@
  */
 
 import { lstatSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { resolve } from "node:path";
 import type { CodeKeywordDefinition, KeywordCxt } from "ajv";
 import Ajv2020 from "ajv/dist/2020";
 import anyOfDef from "ajv/dist/vocabularies/applicator/anyOf";
 import oneOfDef from "ajv/dist/vocabularies/applicator/oneOf";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import { MAX_INT_STR_DIGITS, parseJson } from "./json";
-import { byteCompare, decodeUtf8Strict } from "./util";
+import { byteCompare, decodeUtf8Strict, joinPath } from "./util";
 
 /** Always written, regardless of `--emit`: the run's structural core. */
 const MANDATORY_ARTIFACT_SCHEMAS: Record<string, string> = {
@@ -64,7 +64,7 @@ const REPORT_DATA_FILES = [
 const CSV_COLUMNS = ["control", "subject", "outcome", "control_version", "rung", "mode"];
 
 function schemaDir(): string {
-  return join(__dirname, "..", "schema");
+  return resolve(__dirname, "..", "schema");
 }
 
 /** A digit run long enough to hold an over-limit integer literal; text without one needs no token scan. */
@@ -84,7 +84,7 @@ function parseJsonText(text: string): unknown {
 }
 
 function loadSchemaJson(name: string): Record<string, unknown> {
-  const text = readFileSync(join(schemaDir(), `${name}.schema.json`), "utf-8");
+  const text = readFileSync(joinPath(schemaDir(), `${name}.schema.json`), "utf-8");
   return JSON.parse(text) as Record<string, unknown>;
 }
 
@@ -303,7 +303,7 @@ function readArtifactText(path: string): string | null {
 
 function recordedOutputs(outDir: string): Record<string, string> {
   try {
-    const text = readArtifactText(join(outDir, "manifest.json"));
+    const text = readArtifactText(joinPath(outDir, "manifest.json"));
     const manifest = text === null ? null : parseJsonText(text);
     const outputs = isRecord(manifest) ? manifest.outputs : undefined;
     return isRecord(outputs) ? (outputs as Record<string, string>) : {};
@@ -489,7 +489,7 @@ function readOrReport(
   problems: string[],
 ): string | null | undefined {
   try {
-    return readArtifactText(join(outDir, filename));
+    return readArtifactText(joinPath(outDir, filename));
   } catch (exc) {
     if (!(exc instanceof CannotRead)) {
       throw exc;
@@ -505,7 +505,7 @@ function readOrReport(
 export function validateReport(outDir: string): string[] {
   const problems: string[] = [];
   for (const filename of Object.keys(MANDATORY_ARTIFACT_SCHEMAS)) {
-    if (!hasEntry(join(outDir, filename))) {
+    if (!hasEntry(joinPath(outDir, filename))) {
       problems.push(`${filename}: missing`);
     }
   }
@@ -518,7 +518,7 @@ export function validateReport(outDir: string): string[] {
     ...REPORT_DATA_FILES,
   ]);
   for (const filename of trackedNames) {
-    if (filename in recorded && !hasEntry(join(outDir, filename))) {
+    if (filename in recorded && !hasEntry(joinPath(outDir, filename))) {
       problems.push(`${filename}: missing (recorded in manifest.json's outputs but not on disk)`);
     }
   }

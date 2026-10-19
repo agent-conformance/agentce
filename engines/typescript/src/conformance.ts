@@ -12,15 +12,22 @@
  */
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname } from "node:path";
 import { summarizeActivity } from "./activity";
 import { resolve as resolveApplicability } from "./applicability";
 import { aggregate } from "./assertions";
 import { assessSubjects } from "./assess";
 import { computeBlindSpots } from "./blindSpots";
-import { listedPaths, loadBundle } from "./bundle";
+import { listedPaths, loadBundle, resolveLoose } from "./bundle";
 import { type Catalog, loadCatalog } from "./catalog";
 import { computeCoverage } from "./coverage";
 import { DomainBinding } from "./domain";
@@ -35,19 +42,19 @@ import { OUT_DIR, writeFile, writingInto } from "./outputs";
 import { loadProfile } from "./profile";
 import { pyGet, pyTruthy } from "./readiness";
 import { writeReport } from "./report";
-import { byteCompare, decodeUtf8Strict, jsonStringifyAscii, sortKeysDeep } from "./util";
+import { byteCompare, decodeUtf8Strict, joinPath, jsonStringifyAscii, sortKeysDeep } from "./util";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 
 /** Stable provenance for ECS assessments, so per-project manifests are identical across machines. */
 const ECS_OPERATOR = "ecs";
 
 function materialiseCorpus(corpusDir: string): string {
-  if (existsSync(join(corpusDir, "corpus-manifest.json"))) {
+  if (existsSync(joinPath(corpusDir, "corpus-manifest.json"))) {
     return corpusDir;
   }
-  const generator = join(corpusDir, "generator", "generate.py");
+  const generator = joinPath(corpusDir, "generator", "generate.py");
   if (existsSync(generator)) {
-    const tmp = mkdtempSync(join(tmpdir(), "agentce-corpus-"));
+    const tmp = mkdtempSync(joinPath(tmpdir(), "agentce-corpus-"));
     try {
       execFileSync(
         "uv",
@@ -64,7 +71,7 @@ function materialiseCorpus(corpusDir: string): string {
         "check that the corpus generator runs: python corpus/generator/generate.py --out <dir>.",
       );
     }
-    if (!existsSync(join(tmp, "corpus-manifest.json"))) {
+    if (!existsSync(joinPath(tmp, "corpus-manifest.json"))) {
       throw new InputError(
         "input.corpus_generate_failed",
         `the corpus generator at ${corpusDir} produced no corpus-manifest.json.`,
@@ -81,7 +88,7 @@ function materialiseCorpus(corpusDir: string): string {
 }
 
 function catalogsFor(repoRoot: string): { catalogs: Catalog[]; labels: string[] } {
-  const base = join(repoRoot, "spec", "catalogs", "base");
+  const base = joinPath(repoRoot, "spec", "catalogs", "base");
   const catalogs: Catalog[] = [];
   const labels: string[] = [];
   let subdirs: string[] = [];
@@ -91,8 +98,8 @@ function catalogsFor(repoRoot: string): { catalogs: Catalog[]; labels: string[] 
     subdirs = [];
   }
   for (const sub of subdirs) {
-    if (existsSync(join(base, sub, "catalog.yaml"))) {
-      const catalog = loadCatalog(join(base, sub));
+    if (existsSync(joinPath(base, sub, "catalog.yaml"))) {
+      const catalog = loadCatalog(joinPath(base, sub));
       catalogs.push(catalog);
       labels.push(`${catalog.id}@${catalog.version}`);
     }
@@ -115,13 +122,13 @@ function assessProject(
   labels: string[],
 ): void {
   const pid = String(project.id);
-  const proj = join(corpusRoot, "projects", pid);
-  const bundle = loadBundle(join(proj, "evidence"));
+  const proj = joinPath(corpusRoot, "projects", pid);
+  const bundle = loadBundle(joinPath(proj, "evidence"));
   const ingested = ingest(bundle);
   // Findings inform, never abort; hash what the source signed, not the trust-corrected copy.
   const streams = verifyStreams(ingested.rawAccepted, bundle.manifest, bundle.root);
-  const domain = DomainBinding.load(join(proj, "domain.linkml.yaml"));
-  const profile = loadProfile(join(proj, "applicability.yaml"));
+  const domain = DomainBinding.load(joinPath(proj, "domain.linkml.yaml"));
+  const profile = loadProfile(joinPath(proj, "applicability.yaml"));
   const coverage = computeCoverage(ingested.accepted, profile, bundle.root, listedPaths(bundle));
   resolveApplicability(profile, ingested.accepted);
   const assertions = assessSubjects(
@@ -192,7 +199,7 @@ export function adapterConformance(
 ): AdapterDetail {
   const args = ["run", "--quiet", "python", "conformance.py", "--json"];
   if (outDir !== null) {
-    args.push("--out", resolve(outDir));
+    args.push("--out", resolveLoose(outDir) ?? outDir);
   }
   const proc = run("uv", args, adaptersDir);
   let parsed: unknown;
@@ -261,16 +268,16 @@ export interface RunEcsOptions {
 
 /** Run every corpus project through the engine and return the implementation report. */
 export function runEcs(options: RunEcsOptions): EcsReport {
-  const enginePath = resolve(options.enginePath);
+  const enginePath = realpathSync.native(options.enginePath);
   const repoRoot = dirname(dirname(enginePath));
   const { catalogs, labels } = catalogsFor(repoRoot);
-  const corpusRoot = materialiseCorpus(resolve(options.corpusDir));
+  const corpusRoot = materialiseCorpus(realpathSync.native(options.corpusDir));
   const reportsRoot =
     options.outDir !== null
-      ? join(options.outDir, "projects")
-      : mkdtempSync(join(tmpdir(), "agentce-ecs-"));
+      ? joinPath(options.outDir, "projects")
+      : mkdtempSync(joinPath(tmpdir(), "agentce-ecs-"));
 
-  const manifest = JSON.parse(readFileSync(join(corpusRoot, "corpus-manifest.json"), "utf-8"));
+  const manifest = JSON.parse(readFileSync(joinPath(corpusRoot, "corpus-manifest.json"), "utf-8"));
   const projects: Array<Record<string, unknown>> = Array.isArray(manifest.projects)
     ? manifest.projects
     : [];
@@ -280,7 +287,7 @@ export function runEcs(options: RunEcsOptions): EcsReport {
   for (const project of sorted) {
     const pid = String(project.id);
     try {
-      assessProject(corpusRoot, project, join(reportsRoot, pid), catalogs, labels);
+      assessProject(corpusRoot, project, joinPath(reportsRoot, pid), catalogs, labels);
       identical += 1; // self-golden: the reference regenerates its own golden (SPEC §11.7)
     } catch (exc) {
       const name = exc instanceof Error ? exc.name : "Error";
@@ -325,7 +332,7 @@ export function runEcs(options: RunEcsOptions): EcsReport {
       mkdirSync(outDir, { recursive: true });
       // json.dumps(report, sort_keys=True, indent=2): Python's ensure_ascii default included
       writeFile(
-        join(outDir, "implementation-report.json"),
+        joinPath(outDir, "implementation-report.json"),
         `${jsonStringifyAscii(sortKeysDeep(report), 2)}\n`,
       );
     });

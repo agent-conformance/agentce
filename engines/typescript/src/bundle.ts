@@ -8,9 +8,10 @@
 
 import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, readlinkSync, realpathSync, statSync } from "node:fs";
-import { isAbsolute, join, posix, relative, sep } from "node:path";
+import { isAbsolute, posix, relative, sep } from "node:path";
 import { sha256Hex } from "./canonical";
 import { InputError, isPermissionError, readPermissionError, unreadableError } from "./errors";
+import { joinPath } from "./util";
 import { readUntrustedJsonFile } from "./verify";
 
 export interface Bundle {
@@ -61,10 +62,10 @@ export function confineToRoot(root: string, rel: string): string | null {
     return null;
   }
   // Trailing slashes dropped, as Python's `root / rel` drops them: `name/` names the file `name`.
-  const candidate = join(root, rel).replace(/(?<=.)\/+$/, "");
+  const candidate = joinPath(root, rel).replace(/(?<=.)\/+$/, "");
   let resolvedRoot: string;
   try {
-    resolvedRoot = realpathSync(root);
+    resolvedRoot = realpathSync.native(root);
   } catch {
     return null;
   }
@@ -87,10 +88,11 @@ export function confineToRoot(root: string, rel: string): string | null {
  * too long, inside a folder that cannot be listed) is kept as written, with the rest of the path, so
  * a link that leaves the root is seen to leave it even when its target cannot be read. `null` where
  * Python's `resolve()` raises: a symlink loop, a link that cannot be read, or a name no path can
- * hold (18.68).
+ * hold (18.68). A relative path is walked from the working directory as written, never through
+ * `posix.join`, which would fold `lnk/..` before the link is followed (18.182).
  */
 export function resolveLoose(path: string): string | null {
-  return walkLoose("/", isAbsolute(path) ? path : posix.join(process.cwd(), path), new Map());
+  return walkLoose("/", isAbsolute(path) ? path : `${process.cwd()}/${path}`, new Map());
 }
 
 /** `rest` resolved from the already resolved folder `start`, for {@link resolveLoose}; `seen` maps
@@ -191,7 +193,7 @@ export function listedPaths(bundle: Bundle): Set<string> {
 }
 
 export function loadBundle(bundleDir: string): Bundle {
-  const manifestPath = join(bundleDir, "manifest.json");
+  const manifestPath = joinPath(bundleDir, "manifest.json");
   if (!safeIsFile(manifestPath)) {
     if (permissionDenied(manifestPath)) {
       throw bundleUnreadable(bundleDir, "manifest.json");

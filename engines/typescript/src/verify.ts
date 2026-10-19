@@ -11,7 +11,7 @@
 
 import { type KeyObject, createHash, createPublicKey, verify as cryptoVerify } from "node:crypto";
 import { lstatSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { resolve } from "node:path";
 import { confineToRoot } from "./bundle";
 import { CanonicalizationError, canonicalize, sha256Hex } from "./canonical";
 import { errorCause } from "./errorCatalogue";
@@ -33,7 +33,14 @@ import {
   skippedPart,
 } from "./report";
 import { dssePae, keyidFor } from "./sign";
-import { b64dStrict, byteCompare, decodeUtf8Strict, formatTemplate, pyRepr } from "./util";
+import {
+  b64dStrict,
+  byteCompare,
+  decodeUtf8Strict,
+  formatTemplate,
+  joinPath,
+  pyRepr,
+} from "./util";
 
 /** The detached signature a signed catalog (or corpus) directory carries (SPEC §8.7). */
 export const CATALOG_SIGNATURE_NAME = "catalog.sig.json";
@@ -52,15 +59,19 @@ export interface CatalogFiles {
 /** A folder named like a control file (`controls/<name>.yaml`) is where the loader reads a control:
  * the walk would enter it and the control would vanish, so it throws naming it (18.181). */
 function refuseFolderControls(root: string): void {
-  const controls = join(root, "controls");
+  const controls = joinPath(root, "controls");
   if (!isDirFollowingLinks(controls)) {
     return;
   }
   for (const name of readdirSync(controls).sort(byteCompare)) {
-    if (name.endsWith(".yaml") && !skippedPart(name) && isDirFollowingLinks(join(controls, name))) {
+    if (
+      name.endsWith(".yaml") &&
+      !skippedPart(name) &&
+      isDirFollowingLinks(joinPath(controls, name))
+    ) {
       throw Object.assign(new Error(`a folder, not a file: ${name}`), {
         code: "EISDIR",
-        path: join(controls, name),
+        path: joinPath(controls, name),
       });
     }
   }
@@ -68,7 +79,7 @@ function refuseFolderControls(root: string): void {
 
 /** Whether `rel` is itself a link whose target resolves outside `root`. */
 function linksOutside(root: string, rel: string): boolean {
-  const path = join(root, rel);
+  const path = joinPath(root, rel);
   return lstatSync(path).isSymbolicLink() && !insideFolder(root, path);
 }
 
@@ -84,7 +95,7 @@ export function readCatalogFiles(
   refuseFolderControls(root);
   return {
     root,
-    files: new Map(rels.map((rel) => [rel, first.get(rel) ?? readFileSync(join(root, rel))])),
+    files: new Map(rels.map((rel) => [rel, first.get(rel) ?? readFileSync(joinPath(root, rel))])),
     linksOut: new Set(rels.filter((rel) => linksOutside(root, rel))),
   };
 }
@@ -451,7 +462,7 @@ export class TrustRoot {
  * `engines/python/agentce/data/trust/dev-root.json`, pinned by `bundledData.test.ts`'s sibling
  * sync test, `verify.test.ts`). */
 export function vendoredTrustPath(): string {
-  return join(__dirname, "..", "data", "trust", "dev-root.json");
+  return resolve(__dirname, "..", "data", "trust", "dev-root.json");
 }
 
 /** Reads a trust root file (`--trust-root`-shaped JSON), mirroring `signing.load_trust_root`: the
@@ -621,7 +632,7 @@ export function verifyCatalog(
     digest,
     ...refused(exc),
   });
-  const sigPath = join(dir, CATALOG_SIGNATURE_NAME);
+  const sigPath = joinPath(dir, CATALOG_SIGNATURE_NAME);
   let sigIsFile = false;
   try {
     sigIsFile = statSync(sigPath).isFile();
@@ -777,8 +788,8 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
     }
   }
 
-  const manifestPath = join(releasePath, "release-manifest.json");
-  const signaturesPath = join(releasePath, "signatures.json");
+  const manifestPath = joinPath(releasePath, "release-manifest.json");
+  const signaturesPath = joinPath(releasePath, "signatures.json");
   const isFile = (path: string): boolean => {
     try {
       return statSync(path).isFile();

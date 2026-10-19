@@ -4,7 +4,7 @@
  * the package so the installed-artifact check can run them, but they are not `agentce` commands.
  */
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+
 import type { Activity } from "./activity";
 import { assertionFromJson } from "./assertions";
 import { computeAuditorView } from "./auditorView";
@@ -16,6 +16,7 @@ import { computeVectorFile } from "./numerics";
 import { OtelGenaiAdapterError, adapt as adaptOtelGenai } from "./otelGenai";
 import { catalogProvenanceDigest } from "./report";
 import { computeSecurityView } from "./securityView";
+import { joinPath } from "./util";
 
 export function main(argv: string[]): number {
   const command = argv[0];
@@ -122,8 +123,8 @@ export function main(argv: string[]): number {
       console.error("otel-genai-fixture: a directory path is required");
       return ExitCode.INPUT_ERROR;
     }
-    const inputBytes = readFileSync(join(dir, "input.json"));
-    const adaptArgs = JSON.parse(readFileSync(join(dir, "adapt.json"), "utf-8"));
+    const inputBytes = readFileSync(joinPath(dir, "input.json"));
+    const adaptArgs = JSON.parse(readFileSync(joinPath(dir, "adapt.json"), "utf-8"));
     try {
       const result = adaptOtelGenai(inputBytes, {
         subject: adaptArgs.subject,
