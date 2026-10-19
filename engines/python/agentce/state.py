@@ -65,11 +65,10 @@ class StateDir:
     @classmethod
     def load(cls, path: Path) -> StateDir:
         state_file = path / STATE_FILE
+        # unreadable, never read as a fresh series (18.169)
         try:
             has_state = signing.is_regular_file(state_file)
-        except (
-            PermissionError
-        ) as exc:  # unreadable, never read as a fresh series (18.169)
+        except PermissionError as exc:
             raise InputError(
                 "input.state_dir_unwritable",
                 exc.strerror or str(exc),

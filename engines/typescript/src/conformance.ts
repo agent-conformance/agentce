@@ -32,7 +32,7 @@ import { listedPaths, loadBundle, resolveLoose } from "./bundle";
 import { type Catalog, loadCatalog } from "./catalog";
 import { computeCoverage } from "./coverage";
 import { DomainBinding } from "./domain";
-import { InputError } from "./errors";
+import { InputError, isPermissionError } from "./errors";
 import { pyStrip } from "./failOn";
 import { ingest } from "./ingest";
 import { integrityCaps, verifyStreams } from "./integrity";
@@ -55,8 +55,7 @@ function isCorpusFile(corpusDir: string, path: string): boolean {
   try {
     return statSync(path).isFile();
   } catch (exc) {
-    const code = (exc as NodeJS.ErrnoException).code;
-    if (code === "EACCES" || code === "EPERM") {
+    if (isPermissionError(exc)) {
       throw new InputError(
         "input.corpus_unreadable",
         `${path} in the corpus folder ${corpusDir} could not be read (Permission denied).`,

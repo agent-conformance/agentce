@@ -7,8 +7,10 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -38,13 +40,16 @@ public final class Conformance {
     /** Whether {@code path} in the corpus folder is a regular file after links. One it cannot reach is
      * refused as unreadable, never read as absent, as Python's {@code _materialise_corpus} (18.169). */
     private static boolean isCorpusFile(Path corpusDir, Path path) {
-        if (Bundle.permissionDenied(path)) {
+        try {
+            return Files.readAttributes(path, BasicFileAttributes.class).isRegularFile();
+        } catch (AccessDeniedException e) {
             throw new InputError(
                     "input.corpus_unreadable",
                     path + " in the corpus folder " + corpusDir + " could not be read (Permission denied).",
                     "make the corpus folder readable and enterable, then re-run.");
+        } catch (IOException | RuntimeException e) {
+            return false;
         }
-        return Files.isRegularFile(path);
     }
 
     private static Corpus materialiseCorpus(Path corpusDir) {
