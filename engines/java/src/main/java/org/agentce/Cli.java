@@ -467,9 +467,9 @@ global options:
             for (ObjectNode record : records) {
                 out.append(Canonical.canonicalString(record)).append('\n');
             }
-            Files.write(path, out.toString().getBytes(StandardCharsets.UTF_8));
+            Outputs.writeFile(path, out.toString());
         } catch (IOException e) {
-            throw new IllegalStateException("cannot write " + path + ": " + e.getMessage(), e);
+            throw new java.io.UncheckedIOException("cannot write " + path + ": " + e.getMessage(), e);
         }
     }
 
@@ -492,7 +492,7 @@ global options:
             for (ObjectNode record : nodes) {
                 out.append(Canonical.canonicalString(record)).append('\n');
             }
-            Files.write(path, out.toString().getBytes(StandardCharsets.UTF_8));
+            Outputs.writeFile(path, out.toString());
         } catch (IOException e) {
             throw new InputError(
                     "input.out_dir_unwritable",
@@ -1180,7 +1180,7 @@ global options:
         for (Integrity.Result r : integrityResults) {
             integrityNodes.add(r.toJson());
         }
-        writeJsonl(integrityNodes, out.resolve("integrity.jsonl"));
+        Outputs.writingInto(out.toString(), Outputs.OUT_DIR, () -> writeJsonl(integrityNodes, out.resolve("integrity.jsonl")));
 
         // Stage 3: build the provenance graph (in-memory store).
         String domainPath = options.domain() != null
@@ -1193,12 +1193,10 @@ global options:
         // Stage 4: coverage and reconciliation against independent denominators.
         ObjectNode coverage = Coverage.computeCoverage(
                 ingested.accepted, profileObj, Paths.get(bundleDir), bundle.listedPaths());
-        try {
+        Outputs.writingInto(out.toString(), Outputs.OUT_DIR, () -> {
             Files.createDirectories(out);
-            Files.write(out.resolve("coverage.json"), (Json.pretty(coverage) + "\n").getBytes(StandardCharsets.UTF_8));
-        } catch (IOException e) {
-            throw new IllegalStateException("cannot write coverage.json: " + e.getMessage(), e);
-        }
+            Outputs.writeFile(out.resolve("coverage.json"), Json.pretty(coverage) + "\n");
+        });
 
         // Stage 5: applicability resolution and drift.
         ArrayNode statements = Applicability.resolve(profileObj, ingested.accepted, List.of());
@@ -1206,7 +1204,7 @@ global options:
         for (JsonNode s : statements) {
             statementNodes.add((ObjectNode) s);
         }
-        writeJsonl(statementNodes, out.resolve("applicability.jsonl"));
+        Outputs.writingInto(out.toString(), Outputs.OUT_DIR, () -> writeJsonl(statementNodes, out.resolve("applicability.jsonl")));
         int driftFindings = 0;
         for (JsonNode s : statements) {
             JsonNode drift = s.get("drift");
@@ -1282,13 +1280,17 @@ global options:
         ObjectNode blindSpots = BlindSpots.computeBlindSpots(evaluated, profileObj, resolved.catalogs(), ingested.accepted);
         String applicabilityProfileDigest = digestOf(Paths.get(profilePath));
         String domainBindingDigest = domainPath != null ? digestOf(Paths.get(domainPath)) : null;
-        Report.writeReport(
-                out, evaluated, bundle.digest(), resolved.labels(),
-                // config.py's operator default (SPEC §8.4); agentce.toml is not read here (Python only).
-                operatorEnv != null ? operatorEnv : "unset",
-                invocation, supersedes, language, resolved.catalogs(), activity, blindSpots,
-                profileObj, null, ingested.accepted, limitations,
-                applicabilityProfileDigest, domainBindingDigest, deviationRegisterDigest, deviations);
+        try {
+            Report.writeReport(
+                    out, evaluated, bundle.digest(), resolved.labels(),
+                    // config.py's operator default (SPEC §8.4); agentce.toml is not read here (Python only).
+                    operatorEnv != null ? operatorEnv : "unset",
+                    invocation, supersedes, language, resolved.catalogs(), activity, blindSpots,
+                    profileObj, null, ingested.accepted, limitations,
+                    applicabilityProfileDigest, domainBindingDigest, deviationRegisterDigest, deviations);
+        } catch (java.io.UncheckedIOException e) {
+            throw Outputs.unwritable(out.toString(), Outputs.OUT_DIR);
+        }
         if (state != null) {
             state.record(bundle.digest(), out.resolve("manifest.json"), newWindowEnd);
         }

@@ -1635,23 +1635,23 @@ public final class Report {
                 byte[] data = Canonical.canonicalize(pack);
                 Path path = outDir.resolve(rel);
                 Files.createDirectories(path.getParent());
-                Files.write(path, data);
+                Outputs.writeFile(path, data);
                 outputs.put(rel, digestBytes(data));
             }
 
             ObjectNode manifest = buildManifest(
                     bundleDigest, catalogs, outputs, operator, invocation, supersedes, reportLanguage, catalogObjects,
                     limitations, applicabilityProfileDigest, domainBindingDigest, deviationRegisterDigest);
-            Files.write(outDir.resolve("manifest.json"), Json.pretty(manifest).getBytes(StandardCharsets.UTF_8));
+            Outputs.writeFile(outDir.resolve("manifest.json"), Json.pretty(manifest));
             if (!assertions.isEmpty()) {
                 // claim.json is unsigned here (SPEC §9.1: the engine never signs its own claim) and is not
                 // one of the manifest's outputs, as in report.py; it exists so `agentce sign` can sign a real run.
                 ObjectNode claim = buildClaim(assertions, manifest, limitations);
-                Files.write(outDir.resolve("claim.json"), (Json.pretty(claim) + "\n").getBytes(StandardCharsets.UTF_8));
+                Outputs.writeFile(outDir.resolve("claim.json"), Json.pretty(claim) + "\n");
             }
             return manifest;
         } catch (IOException e) {
-            throw new IllegalStateException("cannot write report to " + outDir + ": " + e.getMessage(), e);
+            throw new java.io.UncheckedIOException("cannot write report to " + outDir + ": " + e.getMessage(), e);
         }
     }
 
@@ -1716,13 +1716,13 @@ public final class Report {
 
     private static String writeJson(Path outDir, String name, JsonNode obj) throws IOException {
         byte[] data = Canonical.canonicalize(obj);
-        Files.write(outDir.resolve(name), data);
+        Outputs.writeFile(outDir.resolve(name), data);
         return digestBytes(data);
     }
 
     private static String writeText(Path outDir, String name, String text) throws IOException {
         byte[] data = text.getBytes(StandardCharsets.UTF_8);
-        Files.write(outDir.resolve(name), data);
+        Outputs.writeFile(outDir.resolve(name), data);
         return digestBytes(data);
     }
 }

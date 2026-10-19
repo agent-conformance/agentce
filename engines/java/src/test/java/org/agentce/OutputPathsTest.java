@@ -14,6 +14,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Stream;
@@ -93,6 +94,28 @@ class OutputPathsTest {
         mkfifo(fifo);
         Path from = Files.writeString(dir.resolve("assertions.json"), "[]");
         assertRefused("input.out_file_unwritable", "report", "--from", from.toString(), "--out", fifo.toString());
+    }
+
+    @Test
+    void quickstartOutWithAFifoAtAFixedReportNameIsRefused(@TempDir Path dir) throws Exception {
+        for (String name : List.of("report.md", "claim.json", "quarantine.jsonl")) {
+            Path out = Files.createDirectory(dir.resolve("q-" + name));
+            mkfifo(out.resolve(name));
+            assertRefused("input.out_dir_unwritable", "quickstart", "--out", out.toString());
+        }
+    }
+
+    @Test
+    void writeFileReplacesAFifoRatherThanOpeningIt(@TempDir Path dir) throws Exception {
+        Path fifo = dir.resolve("fifo");
+        mkfifo(fifo);
+        assertThrows(Outputs.NotRegularFile.class, () -> Outputs.writeFile(fifo, "x"));
+        Path file = Files.writeString(dir.resolve("file"), "old");
+        Outputs.writeFile(file, "new");
+        assertEquals("new", Files.readString(file));
+        try (Stream<Path> left = Files.list(dir)) {
+            assertEquals(2, left.count(), "no sibling left behind");
+        }
     }
 
     private static Path assessed(Path dir) {

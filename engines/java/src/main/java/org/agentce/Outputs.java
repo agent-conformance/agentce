@@ -14,8 +14,8 @@ import java.nio.file.attribute.BasicFileAttributes;
  * 3), ported from Python's {@code outputs.py}. Every output a command writes goes through one role: a
  * target that exists as the wrong type, a path that cannot be reached, or a folder that cannot be
  * written is refused under the role's key before anything is written, and a write that fails anyway
- * is refused under the same key (18.180). Java has no non-blocking open, so a FIFO is refused by its
- * attributes before the open; one put in place between the check and the open can still block. */
+ * is refused under the same key (18.180). Java has no non-blocking open, so a file is written to a
+ * fresh sibling and moved over its target: no path that can be a FIFO is ever opened. */
 final class Outputs {
     static final String NOT_A_FILE = "is not a regular file";
     static final String NOT_A_DIRECTORY = "is not a directory";
@@ -55,6 +55,11 @@ final class Outputs {
 
     private static InputError refuse(Role role, String raw, String reason) {
         return new InputError(role.key(), role.flag() + " " + Readiness.pyRepr(raw) + " " + reason + ".", role.fix());
+    }
+
+    /** The refusal for a write under {@code role} that failed after its check passed. */
+    static InputError unwritable(String raw, Role role) {
+        return refuse(role, raw, UNWRITABLE);
     }
 
     private static Path path(String raw, Role role) {
@@ -137,17 +142,45 @@ final class Outputs {
         return path;
     }
 
-    /** Write {@code data} to {@code path} after checking that it is absent or a regular file, so an
-     * existing FIFO is never opened. Throws the I/O error; callers key it under their role. */
-    static void writeFile(Path path, String data) throws IOException {
+    /** Write {@code data} to {@code path} without ever opening a path that can be a FIFO: an existing
+     * target must be a regular file that can be written, and the bytes go to a fresh sibling that is
+     * then moved over it. Java has no non-blocking open, so this is how a FIFO put in place after the
+     * check is replaced rather than waited on. A link to a regular file is followed, as an open would.
+     * Throws the I/O error; callers key it under their role. */
+    static void writeFile(Path path, byte[] data) throws IOException {
+        Path target = path;
+        java.util.Set<java.nio.file.attribute.PosixFilePermission> mode = null;
         try {
             if (!Files.readAttributes(path, BasicFileAttributes.class).isRegularFile()) {
                 throw new NotRegularFile(path);
             }
+            if (!Files.isWritable(path)) {
+                throw new java.nio.file.AccessDeniedException(path.toString());
+            }
+            target = path.toRealPath();
+            if (target.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+                mode = Files.getPosixFilePermissions(target);
+            }
         } catch (NoSuchFileException e) {
-            // absent: created by the write below
+            // absent: the move below creates it
         }
-        Files.write(path, data.getBytes(StandardCharsets.UTF_8));
+        Path parent = target.toAbsolutePath().getParent();
+        Path sibling = parent.resolve("." + target.getFileName() + "." + java.util.UUID.randomUUID() + ".tmp");
+        Files.createFile(sibling);
+        try {
+            if (mode != null) {
+                Files.setPosixFilePermissions(sibling, mode);
+            }
+            Files.write(sibling, data);
+            Files.move(sibling, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                    java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        } finally {
+            Files.deleteIfExists(sibling);
+        }
+    }
+
+    static void writeFile(Path path, String data) throws IOException {
+        writeFile(path, data.getBytes(StandardCharsets.UTF_8));
     }
 
     /** Check {@code raw} ({@link #check}), create its missing folders and write {@code data} to it
@@ -175,7 +208,7 @@ final class Outputs {
         check(raw, role);
         try {
             writes.run();
-        } catch (IOException e) {
+        } catch (IOException | java.io.UncheckedIOException e) {
             throw refuse(role, raw, UNWRITABLE);
         }
     }
