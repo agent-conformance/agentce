@@ -32,7 +32,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `catalog.sign_trust_root_inside_catalog` | the --write-trust-root path resolves inside the catalog directory being signed. | write the trust root outside the catalog directory. |
 | `catalog.support_matrix_inside_catalog` | the --support-matrix path resolves inside the catalog directory being linted. | write the support matrix outside the catalog directory. |
 | `catalog.support_matrix_multi` | --support-matrix was given while linting a directory that holds more than one catalog. | pass the single catalog's own directory, not a directory holding several. |
-| `cli.not_implemented` | this engine does not run this command or option yet. | run it with the Python engine (pip install agentce), which implements every command. |
+| `cli.not_implemented` | this engine does not run this command or option yet. | run it with the Python engine, which implements every command. |
 | `environment.cryptography_unavailable` | the cryptography package the engine signs and verifies with is missing or does not import. | install the engine's dependencies with `uv sync`; where no prebuilt wheel exists, install Rust and OpenSSL 3 first. |
 | `environment.python_unsupported` | the running Python is older than the interpreter the engine supports. | run the engine under Python 3.12 or newer (`uv python install 3.12`). |
 | `input.adapter_missing` | ingest needs an adapter. | pass --adapter, e.g. --adapter otel-genai. |

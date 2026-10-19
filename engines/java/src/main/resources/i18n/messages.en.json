@@ -592,5 +592,5 @@
   "errors.input.adapters_unreadable.cause": "the adapters directory exists but could not be listed or entered.",
   "errors.input.adapters_unreadable.fix": "make the folder readable and enterable, then re-run.",
   "errors.cli.not_implemented.cause": "this engine does not run this command or option yet.",
-  "errors.cli.not_implemented.fix": "run it with the Python engine (pip install agentce), which implements every command."
+  "errors.cli.not_implemented.fix": "run it with the Python engine, which implements every command."
 }
