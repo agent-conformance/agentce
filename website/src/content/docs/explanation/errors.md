@@ -35,11 +35,14 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `catalog.sign_trust_root_inside_catalog` | the --write-trust-root path resolves inside the catalog directory being signed. | write the trust root outside the catalog directory. |
 | `catalog.support_matrix_inside_catalog` | the --support-matrix path resolves inside the catalog directory being linted. | write the support matrix outside the catalog directory. |
 | `catalog.support_matrix_multi` | --support-matrix was given while linting a directory that holds more than one catalog. | pass the single catalog's own directory, not a directory holding several. |
+| `cli.not_implemented` | this engine does not run this command or option yet. | run it with the Python engine (pip install agentce), which implements every command. |
 | `environment.cryptography_unavailable` | the cryptography package the engine signs and verifies with is missing or does not import. | install the engine's dependencies with `uv sync`; where no prebuilt wheel exists, install Rust and OpenSSL 3 first. |
 | `environment.python_unsupported` | the running Python is older than the interpreter the engine supports. | run the engine under Python 3.12 or newer (`uv python install 3.12`). |
 | `input.adapter_missing` | ingest needs an adapter. | pass --adapter, e.g. --adapter otel-genai. |
 | `input.adapter_not_found` | no adapter directory exists at the given adapters-root and adapter name. | pass --adapters-root pointing at the adapters checkout, or check the adapter name. |
+| `input.adapters_not_a_directory` | the adapters directory does not exist or is not a directory. | pass --adapters <dir>, a path to an existing directory. |
 | `input.adapters_root_not_a_directory` | collect or ingest was given an empty --adapters-root, which names no adapters checkout. | pass --adapters-root <dir> (an adapters checkout), or drop it to use ./adapters. |
+| `input.adapters_unreadable` | the adapters directory exists but could not be listed or entered. | make the folder readable and enterable, then re-run. |
 | `input.allow_unverified_requires_catalog_dir` | --allow-unverified-catalog was given without --catalog-dir, so there is no catalog for it to apply to. | add --catalog-dir <dir>, or drop --allow-unverified-catalog. |
 | `input.assess_flag_needs_value` | argument --deviations: expected one argument | pass --deviations <file>. |
 | `input.assess_unrecognized_flag` | assess was given a flag it does not recognize, or more than one records folder. | run `agentce assess --help` for the flags assess takes, or drop the flag. |
@@ -50,10 +53,13 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.bundle_manifest_mismatch` | a stream file's digest does not match the manifest. | regenerate the bundle so its files match the manifest. |
 | `input.bundle_manifest_missing` | the evidence bundle has no manifest.json. | an agent writes a bundle by running with the agentce_emit emitter on: set `AGENTCE_EMIT=1 AGENTCE_EMIT_OUT=<dir>` and see docs/integrate.md; to watch one built, run `examples/custom-loop/run.sh <dir>` from a checkout, then `agentce validate --bundle <dir>`. |
 | `input.bundle_manifest_path` | a bundle manifest entry's path is absolute, contains '..', or escapes the bundle root through a symlink. | the manifest must list only paths that stay inside the bundle after symlinks resolve. |
+| `input.bundle_not_a_directory` | the evidence bundle does not exist or is not a directory. | pass --bundle <dir>, a path to an existing directory. |
 | `input.bundle_unreadable` | the evidence bundle, or a file or folder inside it, could not be read (permissions). | make every file and folder in the evidence bundle readable, then re-run. |
 | `input.catalog_action` | the catalog actions are `lint`, `coverage-matrix`, `init`, and `sign`. | run `agentce catalog lint <dir>`, `agentce catalog coverage-matrix <dir>`, `agentce catalog init <dir>`, or `agentce catalog sign <dir>`. |
+| `input.catalog_dir_not_a_directory` | the catalog directory does not exist or is not a directory. | pass --catalog-dir <dir>, a path to an existing directory. |
 | `input.catalog_mismatch` | a --catalog-dir carries an id@version the --catalog request did not name. | pass --catalog-dir for the catalog you named, or name the id@version the directory carries. |
 | `input.catalog_missing` | --catalog was given but names no catalog. | pass --catalog <id@version>, or leave --catalog out to assess against the baseline. |
+| `input.catalog_not_a_directory` | the catalog directory does not exist or is not a directory. | pass --catalog <dir>, a path to an existing directory. |
 | `input.catalog_not_found` | no base catalog was found under the expected path. | run from the repository root or pass --catalog-dir to a catalog directory. |
 | `input.catalog_unreadable` | a file or folder in the catalog directory could not be read (permissions, a non-UTF-8 file name, or an entry that is not a file or folder, such as a FIFO or a broken link). | make every file and folder in the catalog directory readable, then re-run. |
 | `input.catalog_unrecognized_flag` | catalog was given a flag it does not recognize, or an argument it does not take. | run `agentce catalog <action> --help` for the flags it takes, or drop the flag. |
@@ -63,27 +69,42 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.collect_flag_unused` | collect was given --adapters-root with --dry-run; a dry run adapts no source, so the flag is never read. | drop --adapters-root, or drop --dry-run to run the collection. |
 | `input.collect_unrecognized_flag` | collect was given a flag it does not recognize, or an argument it does not take. | run `agentce collect --help` for the flags collect takes, or drop the flag. |
 | `input.config_action` | the only config action is `show`. | run `agentce config show`. |
+| `input.config_not_a_file` | the collect configuration file does not exist or is not a regular file. | pass --config <file>, a path to an existing file. |
+| `input.config_unreadable` | the collect configuration file exists but could not be read. | make the file readable, then re-run. |
 | `input.config_unrecognized_flag` | config was given a flag it does not recognize, or an argument it does not take. | run `agentce config show --help` for the flags it takes, or drop the flag. |
 | `input.conformance_action` | the only conformance action is `run`. | run `agentce conformance run ...`. |
 | `input.conformance_unrecognized_flag` | conformance was given a flag it does not recognize, or an argument it does not take. | run `agentce conformance run --help` for the flags it takes, or drop the flag. |
 | `input.corpus_generate_failed` | the corpus generator did not produce a corpus-manifest.json. | check that the corpus generator runs: python corpus/generator/generate.py --out <dir>. |
+| `input.corpus_not_a_directory` | the corpus directory does not exist or is not a directory. | pass --corpus <dir>, a path to an existing directory. |
 | `input.corpus_not_found` | the given directory has neither a corpus-manifest.json nor a generator/generate.py. | pass a generated corpus directory or the corpus source tree. |
 | `input.coverage_denominator_manifest_invalid` | a coverage denominator's manifest file is nested too deeply to parse safely. | flatten the denominator manifest's structure; it exceeds the engine's safe nesting depth. |
 | `input.deviation_invalid` | the deviation register is not a well-formed mapping with a `deviations:` list of mapping entries, or fails a rule of SPEC §13.3.4 (control not in the catalog, wrong outcome, missing field, same approver as owner, or lifetime over the maximum). | correct the deviation register and re-run. |
+| `input.deviations_not_a_file` | the deviation register does not exist or is not a regular file. | pass --deviations <file>, a path to an existing file. |
+| `input.deviations_unreadable` | the deviation register exists but could not be read. | make the file readable, then re-run. |
 | `input.diff_extra_argument` | diff was given more than the two positional arguments it takes. | pass exactly two files: `agentce diff <report-a> <report-b>`. |
 | `input.diff_field_not_string` | diff was given an assertion whose control, subject, or outcome field is present but is not a JSON string. | emit control/subject/outcome as JSON strings. |
 | `input.diff_format` | --format must be one of text, json, or md. | pass --format text|json|md. |
 | `input.diff_unrecognized_flag` | diff was given a flag it does not recognize. | pass --format text|json|md, or drop the flag. |
 | `input.digest_unreadable` | assess could not read the deviation register, profile or domain file again to record its digest. | make the file readable, then re-run. |
+| `input.dir_not_a_directory` | the catalog directory does not exist or is not a directory. | pass the catalog lint argument as a path to an existing directory. |
 | `input.doctor_flag_unused` | doctor was given --project with --write-errors; --write-errors writes the message-key catalogue instead of diagnosing, so --project is never read. | drop --project to write the catalogue, or drop --write-errors to diagnose the project. |
 | `input.doctor_unrecognized_flag` | doctor was given a flag it does not recognize, or an argument it does not take. | run `agentce doctor --help` for the flags doctor takes, or drop the flag. |
 | `input.domain_binding_invalid` | the domain binding is not safe YAML: a disallowed construct, or a structure nested too deeply to parse safely. | remove custom YAML tags and flatten deep nesting in the domain binding file. |
+| `input.domain_not_a_file` | the domain binding does not exist or is not a regular file. | pass --domain <file>, a path to an existing file. |
+| `input.domain_unreadable` | the domain binding exists but could not be read. | make the file readable, then re-run. |
 | `input.emit_format` | --emit named a format the engine does not write. | pass --emit with formats from the list the error names. |
 | `input.emit_unsupported` | this engine cannot write --emit or --for output yet; it writes only the core outputs. | drop the flag for the core outputs, or run assess with the Python engine for the role views and extra formats. |
+| `input.engine_not_a_directory` | the engine path does not exist or is not a directory. | pass --engine <dir>, a path to an existing directory. |
 | `input.event_structure_too_deep` | an evidence event line is nested too deeply to parse safely. | flatten the event's structure; reference deeply nested content by an opaque locator instead (SPEC R12). |
 | `input.fail_on_invalid_expression` | the --fail-on expression could not be read. | use comparisons of the form field=="literal" joined by and/or, over the fields the error lists. |
 | `input.for_emit_ambiguous` | both --for and --emit were given. | pass --for <preset> or --emit <formats>, not both. |
 | `input.for_preset` | --for names a preset assess does not know. | choose one of: ci, compliance, engineering, security, share. |
+| `input.from_not_a_file` | the assertions file does not exist or is not a regular file. | pass --from <file>, a path to an existing file. |
+| `input.from_unreadable` | the assertions file exists but could not be read. | make the file readable, then re-run. |
+| `input.gaps_not_a_file` | the gaps file does not exist or is not a regular file. | pass --gaps <file>, a path to an existing file. |
+| `input.gaps_unreadable` | the gaps file exists but could not be read. | make the file readable, then re-run. |
+| `input.in_not_a_file` | the adapter export file does not exist or is not a regular file. | pass --in <file>, a path to an existing file. |
+| `input.in_unreadable` | the adapter export file exists but could not be read. | make the file readable, then re-run. |
 | `input.ingest_empty` | the adapter produced no events from the given export file. | check the export file actually contains records the adapter recognizes. |
 | `input.ingest_failed` | the adapter could not adapt the export, or printed something other than the expected JSON result. | check the export file matches the adapter's expected shape. |
 | `input.ingest_unrecognized_flag` | ingest was given a flag it does not recognize, or an argument it does not take. | run `agentce ingest --help` for the flags ingest takes, or drop the flag. |
@@ -91,6 +112,8 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.init_role` | --role must be one of deployer, provider, or both. | pass --role deployer|provider|both. |
 | `input.init_unrecognized_flag` | init was given a flag it does not recognize, or an argument it does not take. | run `agentce init --help` for the flags init takes, or drop the flag. |
 | `input.init_value_empty` | init was given an empty --subject or --framework. | pass a value with the flag, or drop it to use the default. |
+| `input.key_not_a_file` | the signing key does not exist or is not a regular file. | pass --key <file>, a path to an existing file. |
+| `input.key_unreadable` | the signing key exists but could not be read. | make the file readable, then re-run. |
 | `input.nothing_evaluated` | no control reached conformant, non-conformant, or insufficient_evidence, so the run judged nothing. | emit under the subject and source the profile declares (agentce-emit reads AGENTCE_EMIT_SUBJECT and AGENTCE_EMIT_SOURCE), and record the evidence the catalog's controls apply to. |
 | `input.out_dir_unwritable` | the --out directory of assess, quickstart, validate, conformance, collect or init could not be created or written to, or --out was empty. | choose a writable --out directory. |
 | `input.out_file_unwritable` | report was given an empty --out, which names no file. | pass --out <file> with a writable path. |
@@ -100,6 +123,9 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.package_unsupported` | this engine does not yet write the shareable bundle that --package-for-sharing asks for. | run assess with the Python engine for --package-for-sharing, or drop the flag. |
 | `input.profile_invalid` | the applicability profile is not safe YAML: a disallowed construct, or a structure nested too deeply to parse safely. | remove custom YAML tags and flatten deep nesting; regenerate the profile from `agentce init`. |
 | `input.profile_missing` | the applicability profile was not supplied. | pass --profile agentce/applicability.yaml (start from agentce init). |
+| `input.profile_not_a_file` | the applicability profile does not exist or is not a regular file. | pass --profile <file>, a path to an existing file. |
+| `input.profile_unreadable` | the applicability profile exists but could not be read. | make the file readable, then re-run. |
+| `input.project_not_a_directory` | the project directory does not exist or is not a directory. | pass --project <dir>, a path to an existing directory. |
 | `input.quickstart_missing` | the bundled quickstart project is missing from the installed package. | reinstall the engine: the quickstart project ships inside the package. |
 | `input.quickstart_unrecognized_flag` | quickstart was given a flag it does not recognize, or an argument it does not take. | run `agentce quickstart --help` for the flags quickstart takes, or drop the flag. |
 | `input.readiness_unrecognized_flag` | readiness was given a flag it does not recognize. | pass --gaps, --deviations, or --catalog-dir, or drop the flag. |
@@ -112,10 +138,16 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.release_bundle` | the given directory has no release-manifest.json or signatures.json, so it is not a release bundle. | pass the --out directory produced by the release tooling. |
 | `input.release_missing` | the release artifact named on the command line does not exist. | pass --release <bundle-dir-or-envelope>. |
 | `input.release_unreadable` | the release artifact, or a file or folder inside it, could not be read (permissions). | make every file and folder in the release readable, then re-run. |
+| `input.report_a_not_a_file` | the first assertion set does not exist or is not a regular file. | pass the first diff argument as a path to an existing file. |
+| `input.report_a_unreadable` | the first assertion set exists but could not be read. | make the file readable, then re-run. |
+| `input.report_b_not_a_file` | the second assertion set does not exist or is not a regular file. | pass the second diff argument as a path to an existing file. |
+| `input.report_b_unreadable` | the second assertion set exists but could not be read. | make the file readable, then re-run. |
 | `input.report_catalog_label_empty` | --catalog holds an empty catalog label. | pass the labels comma-separated with none empty, e.g. --catalog eu-ai-act,nist-ai-rmf. |
+| `input.report_dir_not_a_directory` | the report directory does not exist or is not a directory. | pass the report directory argument as a path to an existing directory. |
 | `input.report_flag_unused` | report was given an option the run does not read: a rendering option beside --validate, or an option the chosen --format does not use. | drop the option, or pick the --format that reads it. |
 | `input.report_format` | report was given a --format it does not know. | pass --format with one of the formats report lists. |
 | `input.report_language_unknown` | --report-language (assess) or --language (report) names a language the engine has no report catalogue for. | choose one of: de, en. |
+| `input.report_not_a_directory` | the report directory does not exist or is not a directory. | pass --report <dir>, a path to an existing directory. |
 | `input.report_role` | report was given a --role it does not know. | choose one of: provider, deployer. |
 | `input.report_unrecognized_flag` | report was given a flag it does not recognize, or an argument it does not take. | run `agentce report --help` for the flags report takes, or drop the flag. |
 | `input.sign_profile` | unknown signing profile. | choose one of: sigstore-public, sigstore-private, kms. |
@@ -125,7 +157,10 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.state_version_incompatible` | the state directory was written by an incompatible state_version. | there is no migration command: move or delete the state directory and re-run with --state pointing at a fresh, empty directory (this discards the prior bundle/outcome history recorded there, so late-arriving evidence and drift are tracked only from that point forward). |
 | `input.support_matrix_unwritable` | catalog lint was given an empty --support-matrix, which names no file. | pass --support-matrix <file> with a writable path outside the catalog directory. |
 | `input.trust_root_invalid` | the trust root supplied by --trust-root or AGENTCE_TRUST_ROOT could not be loaded. | pass --trust-root <file> pointing at a trust root in the form of the engine's vendored data/trust/dev-root.json. |
+| `input.trust_root_not_a_file` | the trust root does not exist or is not a regular file. | pass --trust-root <file>, a path to an existing file. |
+| `input.trust_root_unreadable` | the trust root exists but could not be read. | make the file readable, then re-run. |
 | `input.unknown_command` | agentce was given a command or a global flag it does not recognize. | run `agentce --help` for the commands and global flags agentce takes. |
+| `input.validate_not_a_directory` | the report directory does not exist or is not a directory. | pass --validate <dir>, a path to an existing directory. |
 | `input.validate_unrecognized_flag` | validate was given a flag it does not recognize, or an argument it does not take. | run `agentce validate --help` for the flags validate takes, or drop the flag. |
 | `input.verify_target` | verify's target flags were given more than once, none at all, or in a combination that isn't valid. | pass exactly one target, e.g. `agentce verify --bundle <dir>`. |
 | `input.verify_unrecognized_flag` | verify was given a flag it does not recognize. | pass --bundle, --catalog, --release, or --report (with --signer-trust-root or --expect-keyid for --report), or drop the flag. |
