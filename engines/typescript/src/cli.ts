@@ -814,7 +814,7 @@ function cmdConformance(argv: string[]): CommandResult {
       throw new InputError(
         "input.adapters_unreadable",
         `the adapters directory ${pyRepr(adaptersDir)} exists but could not be read.`,
-        "make the report directory readable and enterable, then re-run.",
+        "make the folder readable and enterable, then re-run.",
       );
     }
   }

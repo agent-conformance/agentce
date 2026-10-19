@@ -44,7 +44,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.adapter_not_found` | no adapter directory exists at the given adapters-root and adapter name. | pass --adapters-root pointing at the adapters checkout, or check the adapter name. |
 | `input.adapters_not_a_directory` | the adapters directory does not exist or is not a directory. | pass --adapters <dir>, a path to an existing directory. |
 | `input.adapters_root_not_a_directory` | collect or ingest was given an empty --adapters-root, which names no adapters checkout. | pass --adapters-root <dir> (an adapters checkout), or drop it to use ./adapters. |
-| `input.adapters_unreadable` | the adapters directory exists but could not be listed or entered. | make the report directory readable and enterable, then re-run. |
+| `input.adapters_unreadable` | the adapters directory exists but could not be listed or entered. | make the folder readable and enterable, then re-run. |
 | `input.allow_unverified_requires_catalog_dir` | --allow-unverified-catalog was given without --catalog-dir, so there is no catalog for it to apply to. | add --catalog-dir <dir>, or drop --allow-unverified-catalog. |
 | `input.assess_flag_needs_value` | argument --deviations: expected one argument | pass --deviations <file>. |
 | `input.assess_unrecognized_flag` | assess was given a flag it does not recognize, or more than one records folder. | run `agentce assess --help` for the flags assess takes, or drop the flag. |

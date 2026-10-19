@@ -917,7 +917,7 @@ global options:
                 throw new InputError(
                         "input.adapters_unreadable",
                         "the adapters directory " + Readiness.pyRepr(adapters) + " exists but could not be read.",
-                        "make the report directory readable and enterable, then re-run.");
+                        "make the folder readable and enterable, then re-run.");
             }
         }
         String out = parsed.value("--out");

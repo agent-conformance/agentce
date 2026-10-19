@@ -3087,7 +3087,7 @@ def cmd_conformance(ns: argparse.Namespace) -> CommandResult:
         raise InputError(
             "input.adapters_unreadable",
             f"the adapters directory {adapters!r} exists but could not be read.",
-            "make the report directory readable and enterable, then re-run.",
+            "make the folder readable and enterable, then re-run.",
         )
     out = _opt_str(ns, "out")
     _refuse_empty_out(out)

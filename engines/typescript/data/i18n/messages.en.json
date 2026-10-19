@@ -590,7 +590,7 @@
   "errors.input.validate_not_a_directory.cause": "the report directory does not exist or is not a directory.",
   "errors.input.validate_not_a_directory.fix": "pass --validate <dir>, a path to an existing directory.",
   "errors.input.adapters_unreadable.cause": "the adapters directory exists but could not be listed or entered.",
-  "errors.input.adapters_unreadable.fix": "make the report directory readable and enterable, then re-run.",
+  "errors.input.adapters_unreadable.fix": "make the folder readable and enterable, then re-run.",
   "errors.catalog.sign_new_key_unwritable.cause": "catalog sign --new-key named a folder or another non-file, a link that points nowhere, a path that could not be reached, or a file that could not be written.",
   "errors.catalog.sign_new_key_unwritable.fix": "pass --new-key <file> with a writable path outside the catalog directory.",
   "errors.catalog.sign_dir_unwritable.cause": "the catalog directory could not be written, so the signature could not be saved in it.",
