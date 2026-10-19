@@ -922,6 +922,9 @@ global options:
         }
         String out = parsed.value("--out");
         refuseEmptyOut(out);
+        if (out != null) {
+            Outputs.check(out, Outputs.OUT_DIR);
+        }
         ObjectNode report = Conformance.runEcs(
                 Paths.get(engine),
                 Paths.get(corpus),
@@ -1833,6 +1836,9 @@ global options:
         }
         refuseEmpty(parsed.value("--out"), "input.out_file_unwritable", "--out",
                 "pass --out <file> with a writable path.", "file");
+        if (parsed.value("--out") != null) {
+            Outputs.check(parsed.value("--out"), REPORT_OUT);
+        }
         String source = requireFile(parsed.value("--from"), "from", "the assertions file");
         String format = Objects.requireNonNullElse(parsed.value("--format"), "md");
         String role = parsed.value("--role");
@@ -1892,11 +1898,7 @@ global options:
         result.data.put("rendering", rendering);
         String out = parsed.value("--out");
         if (out != null) {
-            try {
-                Files.write(Paths.get(out), rendering.getBytes(StandardCharsets.UTF_8));
-            } catch (IOException e) {
-                throw new IllegalStateException("cannot write " + out + ": " + e.getMessage(), e);
-            }
+            Outputs.write(out, REPORT_OUT, rendering);
             result.data.put("out", out);
         }
         result.note(rendering);
@@ -2156,6 +2158,7 @@ global options:
                 "report_dir",
                 "the report directory",
                 "pass the report directory: `agentce readiness <report-dir>`."));
+        requireEnterable(reportDir, "input.report_dir_unreadable", "the report directory");
         Set<String> gaps = new LinkedHashSet<>();
         String gapsPath = parsed.gaps();
         if (gapsPath != null) {
@@ -2198,18 +2201,47 @@ global options:
             }
             lines.add("");
         }
+        String unwritten = null;
         try {
-            Files.writeString(out, String.join("\n", lines) + "\n");
-        } catch (IOException e) {
-            throw new IllegalStateException("cannot write " + out + ": " + e.getMessage(), e);
+            Outputs.write(out.toString(), READINESS_OUT, String.join("\n", lines) + "\n");
+            result.data.put("report", out.toString());
+        } catch (InputError e) {
+            // Reading is all the verdict needs (a read-only report folder still gets one); the file is
+            // the only thing lost, and the run says so under its own key.
+            result.data.putNull("report");
+            result.data.put("report_warning", e.key);
+            unwritten = "warning [" + e.key + "]: " + e.reason + " The verdict is not saved to a file.";
         }
-        result.data.put("report", out.toString());
         if (Readiness.NOT_READY.equals(verdict.verdict())) {
             result.addCode(ExitCode.FINDINGS.code);
         }
         result.note(verdict.verdict() + ": " + verdict.reasons().size() + " reason(s), "
                 + verdict.limitations().size() + " limitation(s)");
+        if (unwritten != null) {
+            result.note(unwritten);
+        }
         return result;
+    }
+
+    /** The options a command writes to (18.180): each output is checked and written through one role. */
+    private static final Outputs.Role REPORT_OUT =
+            new Outputs.Role("input.out_file_unwritable", "--out", "pass --out <file> with a writable path.");
+    private static final Outputs.Role SIGN_REPORT_DIR = new Outputs.Role(
+            "input.report_dir_unwritable", "the report directory", "make the report directory writable, then re-run.", true);
+    private static final Outputs.Role SIGN_REPORT_FILE = new Outputs.Role(
+            "input.report_dir_unwritable", "the report file", "make the report directory writable, then re-run.");
+    private static final Outputs.Role READINESS_OUT = new Outputs.Role(
+            "warning.readiness_file_unwritten", "the readiness file",
+            "make the report directory writable to keep the readiness file.");
+
+    /** A folder the command reads files inside must be listable and enterable, else {@code key}. */
+    private static void requireEnterable(Path path, String key, String what) {
+        if (!Files.isReadable(path) || !Files.isExecutable(path)) {
+            throw new InputError(
+                    key,
+                    what + " " + Readiness.pyRepr(path.toString()) + " exists but could not be read.",
+                    "make the folder readable and enterable, then re-run.");
+        }
     }
 
     private static final List<String> SIGN_PROFILES = List.of("sigstore-public", "sigstore-private", "kms");
@@ -2421,6 +2453,9 @@ global options:
         result.data.put("as", role);
         result.data.put("profile", profile);
         result.data.put("dry_run", dryRun);
+        if (!dryRun) {
+            Outputs.check(reportDir.toString(), SIGN_REPORT_DIR);
+        }
 
         // The engine refuses to sign a report that is not ready to publish (SPEC §8.5); `sign` never
         // takes its own `--catalog-dir`/`--gaps`/`--deviations` flags, so this always uses the bundled
@@ -2453,6 +2488,19 @@ global options:
             return result;
         }
 
+        // Every file sign writes is checked before claim.json is rewritten, so a refused run writes
+        // nothing.
+        Path sigDir = reportDir.resolve("signatures");
+        Path detached = sigDir.resolve(role + "-" + profile + ".dsse.json");
+        Path trustRootPath = reportDir.resolve("trust-root.json");
+        Outputs.check(sigDir.toString(), SIGN_REPORT_DIR);
+        List<Path> targets = new ArrayList<>(List.of(claimPath, detached));
+        if (writeTrustRoot) {
+            targets.add(trustRootPath);
+        }
+        for (Path target : targets) {
+            Outputs.check(target.toString(), SIGN_REPORT_FILE);
+        }
         Sign.Signer signer = signSigner(parsed.key(), profile);
         ArrayNode subjects = Sign.signSubjects(claim, manifest);
         ObjectNode statement = Json.nodes().objectNode();
@@ -2477,20 +2525,9 @@ global options:
                 : claim.putArray("signatures");
         signatures.add(record);
         claim.set("signatures", signatures);
-        try {
-            Files.writeString(claimPath, Json.pretty(claim) + "\n");
-        } catch (IOException e) {
-            throw new IllegalStateException("cannot write " + claimPath + ": " + e.getMessage(), e);
-        }
-        Path sigDir = reportDir.resolve("signatures");
-        try {
-            Files.createDirectories(sigDir);
-            Path detached = sigDir.resolve(role + "-" + profile + ".dsse.json");
-            Files.writeString(detached, Json.pretty(record) + "\n");
-            result.data.put("signature", detached.toString());
-        } catch (IOException e) {
-            throw new IllegalStateException("cannot write to " + sigDir + ": " + e.getMessage(), e);
-        }
+        Outputs.write(claimPath.toString(), SIGN_REPORT_FILE, Json.pretty(claim) + "\n");
+        Outputs.write(detached.toString(), SIGN_REPORT_FILE, Json.pretty(record) + "\n");
+        result.data.put("signature", detached.toString());
         result.data.put("keyid", signer.keyid());
         result.data.put("signatures", signatures.size());
 
@@ -2503,17 +2540,12 @@ global options:
             }
             JsonNode claimant = pyGetField(claim, "claimant", Json.nodes().objectNode());
             JsonNode org = pyGetField(claimant, "org", Json.nodes().textNode("unset"));
-            Path trustRootPath = reportDir.resolve("trust-root.json");
             ObjectNode document = Json.nodes().objectNode();
             ObjectNode keys = document.putObject("keys");
             ObjectNode keyEntry = keys.putObject(kmsSigner.keyid());
             keyEntry.put("public_key", kmsSigner.publicKeyB64());
             keyEntry.set("identity", org);
-            try {
-                Files.writeString(trustRootPath, Json.pretty(document) + "\n");
-            } catch (IOException e) {
-                throw new IllegalStateException("cannot write " + trustRootPath + ": " + e.getMessage(), e);
-            }
+            Outputs.write(trustRootPath.toString(), SIGN_REPORT_FILE, Json.pretty(document) + "\n");
             result.data.put("trust_root", trustRootPath.toString());
         }
         result.note("signed " + claimPath.getFileName() + " as " + role + " (" + profile + ")");

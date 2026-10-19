@@ -359,13 +359,10 @@ public final class Conformance {
         }
 
         if (outDir != null) {
-            try {
+            Outputs.writingInto(outDir.toString(), Outputs.OUT_DIR, () -> {
                 Files.createDirectories(outDir);
-                Files.write(outDir.resolve("implementation-report.json"),
-                        (Json.pretty(report) + "\n").getBytes(StandardCharsets.UTF_8));
-            } catch (IOException e) {
-                throw new IllegalStateException("cannot write the implementation report: " + e.getMessage(), e);
-            }
+                Outputs.writeFile(outDir.resolve("implementation-report.json"), Json.pretty(report) + "\n");
+            });
         }
         return report;
     }
