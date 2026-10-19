@@ -337,6 +337,8 @@
   "errors.input.corpus_generate_failed.fix": "check that the corpus generator runs: python corpus/generator/generate.py --out <dir>.",
   "errors.input.corpus_not_found.cause": "the given directory has neither a corpus-manifest.json nor a generator/generate.py.",
   "errors.input.corpus_not_found.fix": "pass a generated corpus directory or the corpus source tree.",
+  "errors.input.corpus_unreadable.cause": "the corpus folder holds a corpus-manifest.json or generator/generate.py that cannot be read.",
+  "errors.input.corpus_unreadable.fix": "make the corpus folder readable and enterable, then re-run.",
   "errors.input.state_version_incompatible.cause": "the state directory was written by an incompatible state_version.",
   "errors.input.state_version_incompatible.fix": "there is no migration command: move or delete the state directory and re-run with --state pointing at a fresh, empty directory (this discards the prior bundle/outcome history recorded there, so late-arriving evidence and drift are tracked only from that point forward).",
   "errors.input.state_dir_unwritable.cause": "the --state directory could not be created or written to, or --state was empty.",

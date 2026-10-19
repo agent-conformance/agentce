@@ -25,7 +25,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from . import ENGINE_NAME, SPEC_VERSION, __version__, no_ml
+from . import ENGINE_NAME, SPEC_VERSION, __version__, no_ml, signing
 from .activity import summarize_activity
 from .applicability import resolve as resolve_applicability
 from .assess import assess_subjects
@@ -54,11 +54,22 @@ def _materialise_corpus(corpus_dir: Path) -> tuple[Path, Path | None]:
     If ``corpus_dir`` already holds a generated corpus it is used as is. Otherwise, if it holds a
     generator (``generator/generate.py``), the corpus is generated into a temporary directory with the
     engine's own interpreter (which carries the ``agentce`` the generator imports) — the corpus output
-    itself is never committed (SPEC §11.7)."""
-    if (corpus_dir / "corpus-manifest.json").is_file():
-        return corpus_dir, None
+    itself is never committed (SPEC §11.7). A manifest or generator it cannot reach or read is
+    refused as unreadable, never read as absent (18.169)."""
+    manifest = corpus_dir / "corpus-manifest.json"
     generator = corpus_dir / "generator" / "generate.py"
-    if generator.is_file():
+    try:
+        has_manifest = signing.is_regular_file(manifest)
+        has_generator = not has_manifest and signing.is_regular_file(generator)
+    except PermissionError as exc:
+        raise InputError(
+            "input.corpus_unreadable",
+            f"{exc.filename} in the corpus folder {corpus_dir} could not be read ({exc.strerror}).",
+            "make the corpus folder readable and enterable, then re-run.",
+        ) from exc
+    if has_manifest:
+        return corpus_dir, None
+    if has_generator:
         tmp = Path(tempfile.mkdtemp(prefix="agentce-corpus-"))
         proc = subprocess.run(
             [sys.executable, str(generator), "--set", "v1", "--out", str(tmp)],

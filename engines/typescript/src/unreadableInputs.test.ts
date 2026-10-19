@@ -4,7 +4,15 @@
  * from the folder --engine names (item 18.179). Mirrors Python's tests/test_unreadable_inputs.py.
  */
 import assert from "node:assert/strict";
-import { chmodSync, cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -102,6 +110,42 @@ test(
     });
   },
 );
+
+for (const withGenerator of [false, true]) {
+  test(
+    `a corpus-manifest.json that cannot be reached is refused, not read as absent${withGenerator ? ", with a generator beside it" : ""} (18.169)`,
+    {
+      skip: ROOT_READS_ANYTHING,
+    },
+    () => {
+      inScratch((dir) => {
+        const corpus = join(dir, "corpus");
+        const locked = join(dir, "L");
+        mkdirSync(corpus);
+        mkdirSync(locked);
+        writeFileSync(join(locked, "f"), "{}");
+        symlinkSync(join(locked, "f"), join(corpus, "corpus-manifest.json"));
+        if (withGenerator) {
+          symlinkSync(join(REPO, "corpus", "generator"), join(corpus, "generator"));
+        }
+        chmodSync(locked, 0o600);
+        const argv = ["conformance", "run", "--engine", join(REPO, "engines", "typescript")];
+        try {
+          assert.deepEqual(refusal([...argv, "--corpus", corpus]), {
+            exitCode: 3,
+            key: "input.corpus_unreadable",
+          });
+        } finally {
+          chmodSync(locked, 0o700);
+        }
+        assert.deepEqual(refusal([...argv, "--corpus", locked]), {
+          exitCode: 3,
+          key: "input.corpus_not_found",
+        });
+      });
+    },
+  );
+}
 
 test("conformance run's no_ml does not follow --engine to another engine's folder (18.179)", () => {
   inScratch((dir) => {

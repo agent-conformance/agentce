@@ -19,6 +19,7 @@ import {
   readFileSync,
   readdirSync,
   realpathSync,
+  statSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname } from "node:path";
@@ -48,12 +49,30 @@ import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 /** Stable provenance for ECS assessments, so per-project manifests are identical across machines. */
 const ECS_OPERATOR = "ecs";
 
+/** Whether `path` in the corpus folder is a regular file after links. One it cannot reach is refused
+ * as unreadable, never read as absent, as Python's `_materialise_corpus` (18.169). */
+function isCorpusFile(corpusDir: string, path: string): boolean {
+  try {
+    return statSync(path).isFile();
+  } catch (exc) {
+    const code = (exc as NodeJS.ErrnoException).code;
+    if (code === "EACCES" || code === "EPERM") {
+      throw new InputError(
+        "input.corpus_unreadable",
+        `${path} in the corpus folder ${corpusDir} could not be read (Permission denied).`,
+        "make the corpus folder readable and enterable, then re-run.",
+      );
+    }
+    return false;
+  }
+}
+
 function materialiseCorpus(corpusDir: string): string {
-  if (existsSync(joinPath(corpusDir, "corpus-manifest.json"))) {
+  if (isCorpusFile(corpusDir, joinPath(corpusDir, "corpus-manifest.json"))) {
     return corpusDir;
   }
   const generator = joinPath(corpusDir, "generator", "generate.py");
-  if (existsSync(generator)) {
+  if (isCorpusFile(corpusDir, generator)) {
     const tmp = mkdtempSync(joinPath(tmpdir(), "agentce-corpus-"));
     try {
       execFileSync(

@@ -79,6 +79,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.corpus_generate_failed` | the corpus generator did not produce a corpus-manifest.json. | check that the corpus generator runs: python corpus/generator/generate.py --out <dir>. |
 | `input.corpus_not_a_directory` | the corpus directory does not exist or is not a directory. | pass --corpus <dir>, a path to an existing directory. |
 | `input.corpus_not_found` | the given directory has neither a corpus-manifest.json nor a generator/generate.py. | pass a generated corpus directory or the corpus source tree. |
+| `input.corpus_unreadable` | the corpus folder holds a corpus-manifest.json or generator/generate.py that cannot be read. | make the corpus folder readable and enterable, then re-run. |
 | `input.coverage_denominator_manifest_invalid` | a coverage denominator's manifest file is nested too deeply to parse safely. | flatten the denominator manifest's structure; it exceeds the engine's safe nesting depth. |
 | `input.deviation_invalid` | the deviation register is not a well-formed mapping with a `deviations:` list of mapping entries, or fails a rule of SPEC §13.3.4 (control not in the catalog, wrong outcome, missing field, same approver as owner, or lifetime over the maximum). | correct the deviation register and re-run. |
 | `input.deviations_not_a_file` | the deviation register does not exist or is not a regular file. | pass --deviations <file>, a path to an existing file. |

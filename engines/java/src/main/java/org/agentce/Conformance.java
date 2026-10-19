@@ -35,12 +35,24 @@ public final class Conformance {
         }
     }
 
+    /** Whether {@code path} in the corpus folder is a regular file after links. One it cannot reach is
+     * refused as unreadable, never read as absent, as Python's {@code _materialise_corpus} (18.169). */
+    private static boolean isCorpusFile(Path corpusDir, Path path) {
+        if (Bundle.permissionDenied(path)) {
+            throw new InputError(
+                    "input.corpus_unreadable",
+                    path + " in the corpus folder " + corpusDir + " could not be read (Permission denied).",
+                    "make the corpus folder readable and enterable, then re-run.");
+        }
+        return Files.isRegularFile(path);
+    }
+
     private static Corpus materialiseCorpus(Path corpusDir) {
-        if (Files.isRegularFile(corpusDir.resolve("corpus-manifest.json"))) {
+        if (isCorpusFile(corpusDir, corpusDir.resolve("corpus-manifest.json"))) {
             return new Corpus(corpusDir);
         }
         Path generator = corpusDir.resolve("generator/generate.py");
-        if (Files.isRegularFile(generator)) {
+        if (isCorpusFile(corpusDir, generator)) {
             try {
                 Path tmp = Files.createTempDirectory("agentce-corpus-");
                 Process proc = new ProcessBuilder(

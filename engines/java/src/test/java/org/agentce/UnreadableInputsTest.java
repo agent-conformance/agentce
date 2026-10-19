@@ -11,6 +11,8 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * A path the user names that cannot be read, or whose name is too long, is refused with the role's key, never
@@ -69,6 +71,30 @@ class UnreadableInputsTest {
         } finally {
             Files.setPosixFilePermissions(adapters, PosixFilePermissions.fromString("rwx------"));
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void aCorpusManifestThatCannotBeReachedIsRefusedNotReadAsAbsent(boolean withGenerator, @TempDir Path dir)
+            throws IOException {
+        assumeFalse(ROOT, "root enters a mode 600 folder");
+        Path corpus = Files.createDirectory(dir.resolve("corpus"));
+        Path locked = Files.createDirectory(dir.resolve("L"));
+        Files.writeString(locked.resolve("f"), "{}");
+        Files.createSymbolicLink(corpus.resolve("corpus-manifest.json"), locked.resolve("f"));
+        if (withGenerator) {
+            Files.createSymbolicLink(corpus.resolve("generator"), REPO.resolve("corpus/generator"));
+        }
+        String engine = REPO.resolve("engines/java").toString();
+        Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("rw-------"));
+        try {
+            assertRefused("input.corpus_unreadable",
+                    "conformance", "run", "--engine", engine, "--corpus", corpus.toString());
+        } finally {
+            Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("rwx------"));
+        }
+        assertRefused("input.corpus_not_found",
+                "conformance", "run", "--engine", engine, "--corpus", locked.toString());
     }
 
     @Test
