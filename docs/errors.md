@@ -41,7 +41,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.adapter_not_found` | no adapter directory exists at the given adapters-root and adapter name. | pass --adapters-root pointing at the adapters checkout, or check the adapter name. |
 | `input.adapters_not_a_directory` | the adapters directory does not exist or is not a directory. | pass --adapters <dir>, a path to an existing directory. |
 | `input.adapters_root_not_a_directory` | collect or ingest was given an empty --adapters-root, which names no adapters checkout. | pass --adapters-root <dir> (an adapters checkout), or drop it to use ./adapters. |
-| `input.adapters_unreadable` | the adapters directory exists but could not be listed or entered. | make the folder readable and enterable, then re-run. |
+| `input.adapters_unreadable` | the adapters directory exists but could not be listed or entered. | make the report directory readable and enterable, then re-run. |
 | `input.allow_unverified_requires_catalog_dir` | --allow-unverified-catalog was given without --catalog-dir, so there is no catalog for it to apply to. | add --catalog-dir <dir>, or drop --allow-unverified-catalog. |
 | `input.assess_flag_needs_value` | argument --deviations: expected one argument | pass --deviations <file>. |
 | `input.assess_unrecognized_flag` | assess was given a flag it does not recognize, or more than one records folder. | run `agentce assess --help` for the flags assess takes, or drop the flag. |
@@ -143,7 +143,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.report_b_unreadable` | the second assertion set exists but could not be read. | make the file readable, then re-run. |
 | `input.report_catalog_label_empty` | --catalog holds an empty catalog label. | pass the labels comma-separated with none empty, e.g. --catalog eu-ai-act,nist-ai-rmf. |
 | `input.report_dir_not_a_directory` | the report directory does not exist or is not a directory. | pass the report directory argument as a path to an existing directory. |
-| `input.report_dir_unreadable` | the report directory exists but could not be listed or entered. | make the folder readable and enterable, then re-run. |
+| `input.report_dir_unreadable` | the report directory exists but could not be listed or entered. | make the report directory readable and enterable, then re-run. |
 | `input.report_dir_unwritable` | the report directory could not be written, so sign could not save the signed claim in it. | make the report directory writable, then re-run. |
 | `input.report_flag_unused` | report was given an option the run does not read: a rendering option beside --validate, or an option the chosen --format does not use. | drop the option, or pick the --format that reads it. |
 | `input.report_format` | report was given a --format it does not know. | pass --format with one of the formats report lists. |

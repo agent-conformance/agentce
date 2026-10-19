@@ -338,7 +338,7 @@ def _require_enterable(path: Path, *, key: str, what: str) -> None:
         raise InputError(
             key,
             f"{what} {str(path)!r} exists but could not be read.",
-            "make the folder readable and enterable, then re-run.",
+            "make the report directory readable and enterable, then re-run.",
         )
 
 
@@ -3078,7 +3078,7 @@ def cmd_conformance(ns: argparse.Namespace) -> CommandResult:
         raise InputError(
             "input.adapters_unreadable",
             f"the adapters directory {adapters!r} exists but could not be read.",
-            "make the folder readable and enterable, then re-run.",
+            "make the report directory readable and enterable, then re-run.",
         )
     out = _opt_str(ns, "out")
     _refuse_empty_out(out)

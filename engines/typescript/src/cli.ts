@@ -351,7 +351,7 @@ function requireEnterable(path: string, key: string, what: string): void {
     throw new InputError(
       key,
       `${what} ${pyRepr(path)} exists but could not be read.`,
-      "make the folder readable and enterable, then re-run.",
+      "make the report directory readable and enterable, then re-run.",
     );
   }
 }
@@ -808,7 +808,7 @@ function cmdConformance(argv: string[]): CommandResult {
       throw new InputError(
         "input.adapters_unreadable",
         `the adapters directory ${pyRepr(adaptersDir)} exists but could not be read.`,
-        "make the folder readable and enterable, then re-run.",
+        "make the report directory readable and enterable, then re-run.",
       );
     }
   }
