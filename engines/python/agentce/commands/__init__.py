@@ -394,10 +394,13 @@ def _digest_of(path: Path) -> str:
 
 def _write_jsonl(records: Iterable[dict[str, Any]], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
-        for record in records:
-            handle.write(json.dumps(record, sort_keys=True, separators=(",", ":")))
-            handle.write("\n")
+    write_file(
+        path,
+        "".join(
+            json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n"
+            for record in records
+        ),
+    )
 
 
 def cmd_validate(ns: argparse.Namespace) -> CommandResult:
@@ -1371,7 +1374,7 @@ def _package_catalog(catalog: Catalog, dest: Path) -> str:
     for rel, content in files.items():
         target = dest / rel
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(content)
+        write_file(target, content)
     dest.mkdir(parents=True, exist_ok=True)
     return signing.digest_files(files)
 
@@ -1537,7 +1540,10 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         source_trust=source_trust,
     )
     integrity_results = list(integrity_streams.values())
-    _write_jsonl((r.to_json() for r in integrity_results), out_dir / "integrity.jsonl")
+    with writing_into(out, OUT_DIR):
+        _write_jsonl(
+            (r.to_json() for r in integrity_results), out_dir / "integrity.jsonl"
+        )
     # Stage 3: build the provenance graph into the on-disk store (ADR-0001).
     domain_path = _opt_str(ns, "domain")
     domain = (
@@ -1557,12 +1563,14 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     coverage = compute_coverage(
         ingested.accepted, profile_obj, loaded.root, listed=loaded.listed_paths
     )
-    (out_dir / "coverage.json").write_text(
-        json.dumps(coverage, sort_keys=True, indent=2), encoding="utf-8"
-    )
+    with writing_into(out, OUT_DIR):
+        write_file(
+            out_dir / "coverage.json", json.dumps(coverage, sort_keys=True, indent=2)
+        )
     # Stage 5: applicability resolution and drift (catalog controls arrive with item 1.9).
     statements = resolve_applicability(profile_obj, ingested.accepted)
-    _write_jsonl(statements, out_dir / "applicability.jsonl")
+    with writing_into(out, OUT_DIR):
+        _write_jsonl(statements, out_dir / "applicability.jsonl")
     drift_findings = sum(len(s["drift"]) for s in statements)
     # Stage 6: catalog evaluation and report artifacts. Each resolved catalog is evaluated
     # against every subject to produce assertions; the report artifacts are rendered from them.
@@ -1729,31 +1737,32 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     blind_spots = compute_blind_spots(
         evaluated, profile_obj, catalogs, ingested.accepted
     )
-    write_report(
-        out_dir,
-        evaluated,
-        bundle_digest=loaded.digest,
-        catalogs=catalogs,
-        operator=_operator(),
-        invocation=invocation,
-        supersedes=supersedes,
-        report_language=_opt_str(ns, "report_language") or "en",
-        limitations=limitations,
-        emit=resolved_emit,
-        events=ingested.accepted,
-        reverify_command=reverify_argv,
-        extra_outputs=extra_outputs,
-        activity=activity,
-        blind_spots=blind_spots,
-        applicability_profile_digest=applicability_profile_digest,
-        domain_binding_digest=domain_binding_digest,
-        deviation_register_digest=deviation_register_digest,
-        deviations=deviations,
-        profile=profile_obj,
-        declared_subject_ids=declared_subject_ids,
-        for_preset=for_preset,
-        buyer_packaged=package_for_sharing,
-    )
+    with writing_into(out, OUT_DIR):
+        write_report(
+            out_dir,
+            evaluated,
+            bundle_digest=loaded.digest,
+            catalogs=catalogs,
+            operator=_operator(),
+            invocation=invocation,
+            supersedes=supersedes,
+            report_language=_opt_str(ns, "report_language") or "en",
+            limitations=limitations,
+            emit=resolved_emit,
+            events=ingested.accepted,
+            reverify_command=reverify_argv,
+            extra_outputs=extra_outputs,
+            activity=activity,
+            blind_spots=blind_spots,
+            applicability_profile_digest=applicability_profile_digest,
+            domain_binding_digest=domain_binding_digest,
+            deviation_register_digest=deviation_register_digest,
+            deviations=deviations,
+            profile=profile_obj,
+            declared_subject_ids=declared_subject_ids,
+            for_preset=for_preset,
+            buyer_packaged=package_for_sharing,
+        )
     if state is not None:
         state.record(loaded.digest, out_dir / "manifest.json", new_window_end)
     non_conformant = sum(1 for a in evaluated if a.outcome == "non-conformant")

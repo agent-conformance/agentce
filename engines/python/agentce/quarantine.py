@@ -13,6 +13,7 @@ from enum import Enum
 from pathlib import Path
 
 from .errors import InputError
+from .outputs import write_file
 
 
 class QuarantineReason(str, Enum):
@@ -61,13 +62,14 @@ def write_quarantine(records: Iterable[QuarantineRecord], path: Path) -> int:
     written = 0
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("w", encoding="utf-8") as handle:
-            for record in records:
-                handle.write(
-                    json.dumps(record.to_json(), sort_keys=True, separators=(",", ":"))
-                )
-                handle.write("\n")
-                written += 1
+        lines = []
+        for record in records:
+            lines.append(
+                json.dumps(record.to_json(), sort_keys=True, separators=(",", ":"))
+                + "\n"
+            )
+            written += 1
+        write_file(path, "".join(lines))
     except OSError as exc:
         raise InputError(
             "input.out_dir_unwritable",

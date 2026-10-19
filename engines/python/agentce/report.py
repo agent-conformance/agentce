@@ -58,6 +58,7 @@ from .buyer_view import (
     compute_buyer_view,
 )
 from .catalog import Catalog, ControlSpec, catalog_provenance_digest
+from .outputs import write_file
 from .profile import Profile, Subject
 from .safe_json import JSONError, load_json
 from .project import (
@@ -3294,16 +3295,16 @@ def write_report(
 
     def write_json(name: str, obj: Any) -> None:
         data = canonical.canonicalize(obj)
-        (out_dir / name).write_bytes(data)
+        write_file(out_dir / name, data)
         outputs[name] = _digest_bytes(data)
 
     def write_text(name: str, text: str) -> None:
         data = text.encode("utf-8")
-        (out_dir / name).write_bytes(data)
+        write_file(out_dir / name, data)
         outputs[name] = _digest_bytes(data)
 
     def write_bytes(name: str, data: bytes) -> None:
-        (out_dir / name).write_bytes(data)
+        write_file(out_dir / name, data)
         outputs[name] = _digest_bytes(data)
 
     counts = aggregate(assertions)
@@ -3546,7 +3547,7 @@ def write_report(
             data = canonical.canonicalize(pack)
             path = out_dir / rel
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(data)
+            write_file(path, data)
             outputs[rel] = _digest_bytes(data)
 
     if wants("remediation"):
@@ -3567,10 +3568,10 @@ def write_report(
             rel_dir = f"remediation/{_safe(subject)}"
             (out_dir / rel_dir).mkdir(parents=True, exist_ok=True)
             pkg_bytes = canonical.canonicalize(package)
-            (out_dir / rel_dir / "remediation-package.json").write_bytes(pkg_bytes)
+            write_file(out_dir / rel_dir / "remediation-package.json", pkg_bytes)
             outputs[f"{rel_dir}/remediation-package.json"] = _digest_bytes(pkg_bytes)
             md_bytes = md.encode("utf-8")
-            (out_dir / rel_dir / "remediation.md").write_bytes(md_bytes)
+            write_file(out_dir / rel_dir / "remediation.md", md_bytes)
             outputs[f"{rel_dir}/remediation.md"] = _digest_bytes(md_bytes)
 
     if wants("skill"):
@@ -3595,7 +3596,7 @@ def write_report(
             (skill_dir / "findings").mkdir(parents=True, exist_ok=True)
 
             pkg_bytes = canonical.canonicalize(package)
-            (skill_dir / "remediation-package.json").write_bytes(pkg_bytes)
+            write_file(skill_dir / "remediation-package.json", pkg_bytes)
             outputs[f"{rel_dir}/remediation-package.json"] = _digest_bytes(pkg_bytes)
 
             skill_md_bytes = render_skill_md(
@@ -3604,7 +3605,7 @@ def write_report(
                 catalog_version=catalog_version,
                 assertions_digest=assertions_digest,
             ).encode("utf-8")
-            (skill_dir / "SKILL.md").write_bytes(skill_md_bytes)
+            write_file(skill_dir / "SKILL.md", skill_md_bytes)
             outputs[f"{rel_dir}/SKILL.md"] = _digest_bytes(skill_md_bytes)
 
             for i, finding in enumerate(package["findings"], start=1):
@@ -3612,11 +3613,11 @@ def write_report(
                     "utf-8"
                 )
                 name = _skill_finding_filename(str(finding["control"]), i)
-                (skill_dir / "findings" / name).write_bytes(note_bytes)
+                write_file(skill_dir / "findings" / name, note_bytes)
                 outputs[f"{rel_dir}/findings/{name}"] = _digest_bytes(note_bytes)
 
             reverify_bytes = render_reverify_md(["agentce", *argv]).encode("utf-8")
-            (skill_dir / "REVERIFY.md").write_bytes(reverify_bytes)
+            write_file(skill_dir / "REVERIFY.md", reverify_bytes)
             outputs[f"{rel_dir}/REVERIFY.md"] = _digest_bytes(reverify_bytes)
 
     if assertions:
@@ -3629,8 +3630,8 @@ def write_report(
             limitations=limitations,
             deviations=applied_deviations,
         )
-        (out_dir / "claim.json").write_text(
-            json.dumps(claim, sort_keys=True, indent=2) + "\n", encoding="utf-8"
+        write_file(
+            out_dir / "claim.json", json.dumps(claim, sort_keys=True, indent=2) + "\n"
         )
 
     manifest = build_manifest(
@@ -3647,8 +3648,8 @@ def write_report(
         domain_binding_digest=domain_binding_digest,
         deviation_register_digest=deviation_register_digest,
     )
-    (out_dir / "manifest.json").write_text(
-        json.dumps(manifest, sort_keys=True, indent=2), encoding="utf-8"
+    write_file(
+        out_dir / "manifest.json", json.dumps(manifest, sort_keys=True, indent=2)
     )
     return manifest
 

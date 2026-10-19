@@ -154,6 +154,13 @@ def test_a_new_file_in_new_folders_is_written(tmp_path: Path) -> None:
             "c/catalog.yaml",
             "catalog.init_dir_unwritable",
         ),
+        (["quickstart", "--out", "{t}/q"], "q/report.md", "input.out_dir_unwritable"),
+        (["quickstart", "--out", "{t}/q"], "q/claim.json", "input.out_dir_unwritable"),
+        (
+            ["quickstart", "--out", "{t}/q"],
+            "q/quarantine.jsonl",
+            "input.out_dir_unwritable",
+        ),
     ],
 )
 def test_a_fifo_at_a_fixed_name_inside_the_output_folder_is_refused(

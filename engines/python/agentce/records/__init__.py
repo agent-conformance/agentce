@@ -29,6 +29,7 @@ from .. import bundle, bundled
 from ..activity import summarize_activity
 from ..canonical import canonical_string
 from ..errors import InputError
+from ..outputs import write_file
 from ..ingest import _max_nesting
 from ..profile import Profile
 from . import otel_genai
@@ -131,7 +132,7 @@ class ScannedRecords:
                 stem = re.sub(r"[^A-Za-z0-9]+", "-", source).strip("-")[:60]
                 name = f"events/{stem}-{hashlib.sha256(source.encode()).hexdigest()[:8]}.jsonl"
                 data = self._streams[source]
-                (root / name).write_bytes(data)
+                write_file(root / name, data)
                 files.append({"path": name, "sha256": hashlib.sha256(data).hexdigest()})
             manifest = {
                 "agentce_bundle_version": 1,
@@ -141,15 +142,16 @@ class ScannedRecords:
                     for source in sorted(self._sources)
                 ],
             }
-            (root / "manifest.json").write_text(
-                json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8"
+            write_file(
+                root / "manifest.json",
+                json.dumps(manifest, sort_keys=True, indent=2) + "\n",
             )
             if write_profile:
-                (out_dir / DERIVED_PROFILE_FILE).write_text(
+                write_file(
+                    out_dir / DERIVED_PROFILE_FILE,
                     "# The default profile `agentce assess <folder>` derived from the records it found.\n"
                     "# Edit it (declare your agents, oversight and catalogs) and pass it back with --profile.\n"
                     + yaml.safe_dump(self.profile, sort_keys=False),
-                    encoding="utf-8",
                 )
         except OSError as exc:
             raise InputError(
