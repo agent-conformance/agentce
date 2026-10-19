@@ -69,7 +69,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.collect_unrecognized_flag` | collect was given a flag it does not recognize, or an argument it does not take. | run `agentce collect --help` for the flags collect takes, or drop the flag. |
 | `input.config_action` | the only config action is `show`. | run `agentce config show`. |
 | `input.config_not_a_file` | the collect configuration file does not exist or is not a regular file. | pass --config <file>, a path to an existing file. |
-| `input.config_unreadable` | the collect configuration file exists but could not be read. | make the file readable, then re-run. |
+| `input.config_unreadable` | agentce.toml exists but could not be read. | make agentce.toml and its folder readable, then re-run. |
 | `input.config_unrecognized_flag` | config was given a flag it does not recognize, or an argument it does not take. | run `agentce config show --help` for the flags it takes, or drop the flag. |
 | `input.conformance_action` | the only conformance action is `run`. | run `agentce conformance run ...`. |
 | `input.conformance_unrecognized_flag` | conformance was given a flag it does not recognize, or an argument it does not take. | run `agentce conformance run --help` for the flags it takes, or drop the flag. |
