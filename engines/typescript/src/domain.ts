@@ -7,11 +7,8 @@
  * binding is valid (an empty binding).
  */
 
-import { readFileSync } from "node:fs";
-import { load } from "js-yaml";
-import { InputError } from "./errors";
 import { pyStrip } from "./failOn";
-import { PYYAML_SAFE_SCHEMA } from "./readiness";
+import { loadPyyaml } from "./readiness";
 
 export const DECISION_ROOT = "agentce:Decision";
 export const CONTEXT_ROOT = "agentce:ContextItem";
@@ -192,20 +189,10 @@ export class DomainBinding {
     return [];
   }
 
-  /** Reads the binding as Python's PyYAML `SafeLoader` types it (PYYAML_SAFE_SCHEMA), refusing a key written
-   * twice (no `json: true`) and any other YAML it cannot load with `input.domain_binding_invalid`. */
+  /** Reads the binding as Python's PyYAML `SafeLoader` types it, refusing a key written twice and any other YAML
+   * it cannot load with `input.domain_binding_invalid`. */
   static load(path: string): DomainBinding {
-    const text = readFileSync(path, "utf-8");
-    let data: unknown;
-    try {
-      data = load(text, { schema: PYYAML_SAFE_SCHEMA });
-    } catch (error) {
-      throw new InputError(
-        "input.domain_binding_invalid",
-        `the domain binding at '${path}' carries YAML the engine refuses to load: ${(error as Error).message}.`,
-        "write each key once, and use only plain YAML scalars, mappings and sequences in the domain binding.",
-      );
-    }
+    const data = loadPyyaml(path, "input.domain_binding_invalid", "the domain binding", true);
     if (!isRecord(data)) {
       return DomainBinding.empty();
     }

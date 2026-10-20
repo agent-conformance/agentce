@@ -334,6 +334,44 @@ export function normalizeDeviationDates(
   });
 }
 
+/** The YAML at `path` as Python's `load_untrusted_yaml` reads it (PyYAML's `SafeLoader` typing, PYYAML_SAFE_SCHEMA),
+ * refusing a file that is not UTF-8, nests too deeply, or carries YAML it cannot load under `key`. With `uniqueKeys`, a
+ * mapping that writes one key twice is refused too (js-yaml's own duplicate-key error); without it the last value wins,
+ * as `SafeLoader` keeps it (`json: true`). */
+export function loadPyyaml(path: string, key: string, what: string, uniqueKeys = false): unknown {
+  // Python passes the loader a `Path`, so its errors name `./r.yaml` as `r.yaml`.
+  const where = `${what} at ${pyRepr(normalizePosixPath(path))}`;
+  let text: string;
+  try {
+    // A fatal decode, as Python's `read_text(encoding="utf-8")`: a lossy one would turn a 0xff byte
+    // into U+FFFD and read the mangled text instead of refusing the file.
+    text = decodeUtf8Strict(readFileSync(path));
+  } catch (error) {
+    throw new InputError(
+      key,
+      `${where} is not valid UTF-8: ${(error as Error).message}.`,
+      `save ${what} as UTF-8 text.`,
+    );
+  }
+  try {
+    return yamlLoad(text, { schema: PYYAML_SAFE_SCHEMA, json: !uniqueKeys });
+  } catch (error) {
+    if (error instanceof RangeError || /exceeded maxDepth/.test((error as Error).message)) {
+      // js-yaml caps nesting (and recurses per level), as PyYAML's composer hits its RecursionError.
+      throw new InputError(
+        key,
+        `${where} is nested too deeply to parse safely.`,
+        `flatten ${what}'s structure; it exceeds the engine's safe nesting depth.`,
+      );
+    }
+    throw new InputError(
+      key,
+      `${where} carries a YAML construct the engine refuses to load: ${(error as Error).message}.`,
+      `remove custom tags and aliases from ${what}; only plain YAML scalars, mappings, and sequences are accepted.`,
+    );
+  }
+}
+
 /** Loads and validates a deviation register's *shape* (SPEC §13.3.4): a mapping with a top-level
  * `deviations` list of mappings, refused as `input.deviation_invalid` rather than crashing on
  * hostile or malformed YAML -- ports `_load_deviation_register`'s three shape corrections exactly: a
@@ -346,40 +384,7 @@ export function normalizeDeviationDates(
 export function loadDeviationRegister(path: string): Record<string, unknown>[] {
   // Python passes the loader a `Path`, so its errors name `./r.yaml` as `r.yaml`.
   const where = `the deviation register at ${pyRepr(normalizePosixPath(path))}`;
-  let text: string;
-  try {
-    // A fatal decode, as Python's `read_text(encoding="utf-8")`: a lossy one would turn a 0xff byte
-    // into U+FFFD and lint the mangled control id instead of refusing the file.
-    text = decodeUtf8Strict(readFileSync(path));
-  } catch (error) {
-    throw new InputError(
-      "input.deviation_invalid",
-      `${where} is not valid UTF-8: ${(error as Error).message}.`,
-      "save the deviation register as UTF-8 text.",
-    );
-  }
-  let parsed: unknown;
-  try {
-    // `json: true` disables js-yaml's own duplicate-mapping-key error (PyYAML's `SafeLoader` never
-    // rejects a duplicate key -- `BaseConstructor.construct_mapping` just does `dict[key] = value` in
-    // document order, so the last occurrence wins, confirmed this item).
-    parsed = yamlLoad(text, { schema: PYYAML_SAFE_SCHEMA, json: true });
-  } catch (error) {
-    if (error instanceof RangeError || /exceeded maxDepth/.test((error as Error).message)) {
-      // js-yaml caps nesting (and recurses per level), as PyYAML's composer hits its RecursionError.
-      throw new InputError(
-        "input.deviation_invalid",
-        `${where} is nested too deeply to parse safely.`,
-        "flatten the deviation register's structure; it exceeds the engine's safe nesting depth.",
-      );
-    }
-    throw new InputError(
-      "input.deviation_invalid",
-      `${where} carries a YAML construct the engine refuses to load: ${(error as Error).message}.`,
-      "remove custom tags and aliases from the deviation register; only plain YAML scalars, " +
-        "mappings, and sequences are accepted.",
-    );
-  }
+  const parsed = loadPyyaml(path, "input.deviation_invalid", "the deviation register");
   const data: unknown = pyTruthy(parsed) ? parsed : {};
   if (!isRecord(data)) {
     throw new InputError(

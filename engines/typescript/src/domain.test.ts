@@ -133,11 +133,12 @@ test("allowed_tools YAML 1.1 booleans name no tool; quoted they are names (18.18
   assert.deepEqual(scopeFromYaml('allowed_tools: ["yes"]').allowedTools, new Set(["yes"]));
 });
 
-test("a key written twice, at any depth, is refused input.domain_binding_invalid (18.184g)", () => {
+test("a key written twice, at any depth, or a Python tag is refused input.domain_binding_invalid (18.184g)", () => {
   for (const text of [
     'task_scopes:\n  - {task_type: a, allowed_tools: ["x"], allowed_tools: ["y"]}\n',
     "task_scopes:\n  - {task_type: a, budgets: {spend: 1, spend: 2}}\n",
     "task_scopes: []\ntask_scopes: []\n",
+    "task_scopes: !!python/object:os.system {}\n",
   ]) {
     assert.throws(
       () => loadText(text),
