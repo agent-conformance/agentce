@@ -207,6 +207,14 @@ KEY_FORMS = {
     "flow_entry_scalar": "{K, x: V}",
     "hash_in_quoted_key": '{"K #": [V]}',
     "hash_in_quoted_value": "{x: 'K #', y: [V]}",
+    "comment_glued_after_comma": "{x: V,#:\n [K]}",
+    "comment_glued_after_brace": "{#:\n [K]}",
+    "comment_glued_question": "{x: V,#?\n [K]}",
+    "comment_glued_in_seq": "[x,#?\n [K]]",
+    "comment_glued_in_seq_colon": "[x,#:\n [K]]",
+    "comment_glued_after_key": "? [K]#:\n: V",
+    "comment_glued_after_value": "{x: [K]#:\n, y: V}",
+    "comment_glued_after_question": "?#:\n  [K]\n: V",
 }
 MERGE_FORMS = {
     "one": "b: {<<: {t: 1}}",
@@ -231,6 +239,11 @@ MERGE_FORMS = {
     "alias_seq_source": "a: &a [x]\nb: {<<: *a}",
     "no_value": "b: {<<}",
     "block_seq_source": "b:\n  <<:\n    - {t: 1}\n    - [x]",
+    "explicit_no_value": "b:\n  ? <<",
+    "explicit_with_value": "b:\n  ? <<\n  : {t: 1}",
+    "explicit_flow_no_value": "b: {? <<}",
+    "explicit_flow_with_value": "b: {? << : {t: 1}, u: 2}",
+    "explicit_seq_sources": "b:\n  t: 3\n  ? <<\n  : [{t: 1, u: 1}, {u: 2, w: 2}]",
 }
 
 

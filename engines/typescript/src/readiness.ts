@@ -555,15 +555,16 @@ interface ComposerState {
   readonly anchorMap: Record<string, unknown>;
 }
 
-/** Where the next character in `text` from `from` (before `end`) sits that is not a space, a line break or in a comment
- * (a `#` at the start or after white space, to the end of its line). */
+/** Where the next character in `text` from `from` (before `end`) sits that is not a space, a line break or in a comment.
+ * Only called between nodes, where the YAML scanner reads every `#` as a comment to the end of its line, even right
+ * after an indicator (`,#:` is a comma then a comment). */
 function skipSeparation(text: string, from: number, end = text.length): number {
   let at = from;
   while (at < end) {
     const ch = text[at];
     if (ch === " " || ch === "\t" || ch === "\r" || ch === "\n") {
       at += 1;
-    } else if (ch === "#" && (at === 0 || /\s/.test(text[at - 1] ?? ""))) {
+    } else if (ch === "#") {
       const lineEnd = text.indexOf("\n", at);
       at = lineEnd === -1 || lineEnd > end ? end : lineEnd;
     } else {
@@ -614,6 +615,24 @@ function isMergeSource(value: unknown): boolean {
   return isRecord(value) && isCollection(value);
 }
 
+function notMergeable(): YAMLException {
+  return new YAMLException(
+    "while constructing a mapping: expected a mapping or list of mappings for merging",
+  );
+}
+
+/** PyYAML's merge for a `? <<` key js-yaml stored under its text: the mapping's own keys win, then the first source. */
+function mergeExplicit(mapping: Record<string, unknown>, sources: unknown[]): void {
+  delete mapping[String(PYYAML_MERGE_VALUE)];
+  for (const source of sources) {
+    for (const [key, value] of Object.entries(source as Record<string, unknown>)) {
+      if (!Object.hasOwn(mapping, key)) {
+        mapping[key] = value;
+      }
+    }
+  }
+}
+
 function unhashableKey(): YAMLException {
   return new YAMLException("while constructing a mapping: found unhashable key");
 }
@@ -626,6 +645,9 @@ interface OpenNode {
   childEnd: number;
   /** Whether a merge key has closed directly inside this node, and its value is still to come (`pending`) or not. */
   merge: "none" | "pending" | "done";
+  /** The sources of a merge written as an explicit block key (`? <<`), which js-yaml stores under the key's text as
+   * it drops an explicit block key's tag (js-yaml 4.3.2 `readBlockMapping`); merged when this mapping closes. */
+  explicitMergeSources?: unknown[];
   /** The sequences and mappings directly inside this node with no `:` before them: keys, if this node is a mapping
    * (js-yaml also opens a node around a whole collection, whose one child is its own result). */
   withoutValueIndicator?: unknown[];
@@ -659,8 +681,16 @@ class PyyamlComposer {
       resolveNonSpecific(state);
     }
     const result = state.result;
-    if (state.kind === "mapping" && node.withoutValueIndicator?.some((child) => child !== result)) {
-      throw unhashableKey();
+    if (state.kind === "mapping") {
+      if (node.withoutValueIndicator?.some((child) => child !== result)) {
+        throw unhashableKey();
+      }
+      if (node.merge === "pending") {
+        throw notMergeable();
+      }
+      if (node.explicitMergeSources !== undefined && isRecord(result)) {
+        mergeExplicit(result, node.explicitMergeSources);
+      }
     }
     if (container === undefined) {
       return;
@@ -669,18 +699,23 @@ class PyyamlComposer {
     if (container.merge === "pending") {
       container.merge = "done";
       if (!(isMergeSource(result) || (Array.isArray(result) && result.every(isMergeSource)))) {
-        throw new YAMLException(
-          "while constructing a mapping: expected a mapping or list of mappings for merging",
-        );
+        throw notMergeable();
+      }
+      if (container.explicitMergeSources !== undefined) {
+        container.explicitMergeSources = Array.isArray(result) ? result : [result];
       }
       return;
     }
-    if (state.tag === MERGE_TAG) {
+    // js-yaml opens an untagged node around an explicit block key, so a merge key can close inside one.
+    if (state.tag === MERGE_TAG || (state.kind === "scalar" && node.merge === "pending")) {
       if (container.merge === "done" && this.uniqueKeys) {
         // `<<` is a key too: which of two merges wins is never read (18.184k D1).
         throw new YAMLException("while constructing a mapping: found the merge key '<<' twice");
       }
       container.merge = "pending";
+      if (node.before === "?") {
+        container.explicitMergeSources = [];
+      }
       return;
     }
     if (!isCollection(result)) {

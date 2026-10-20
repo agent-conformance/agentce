@@ -24950,6 +24950,233 @@
     }
   },
   {
+    "name": "key.comment_glued_after_comma",
+    "yaml": "{x: 1,#:\n [a]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.comment_glued_after_comma.task_scopes",
+    "yaml": "task_scopes:\n  - {x: [\"yes\"],#:\n     [allowed_tools]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.comment_glued_after_brace",
+    "yaml": "{#:\n [a]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.comment_glued_after_brace.task_scopes",
+    "yaml": "task_scopes:\n  - {#:\n     [allowed_tools]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.comment_glued_question",
+    "yaml": "{x: 1,#?\n [a]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.comment_glued_question.task_scopes",
+    "yaml": "task_scopes:\n  - {x: [\"yes\"],#?\n     [allowed_tools]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.comment_glued_in_seq",
+    "yaml": "[x,#?\n [a]]\n",
+    "reads": {
+      "seq": [
+        {
+          "s": "x"
+        },
+        {
+          "seq": [
+            {
+              "s": "a"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "key.comment_glued_in_seq.task_scopes",
+    "yaml": "task_scopes:\n  - [x,#?\n     [allowed_tools]]\n",
+    "reads": {
+      "map": [
+        [
+          "task_scopes",
+          {
+            "seq": [
+              {
+                "seq": [
+                  {
+                    "s": "x"
+                  },
+                  {
+                    "seq": [
+                      {
+                        "s": "allowed_tools"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "key.comment_glued_in_seq_colon",
+    "yaml": "[x,#:\n [a]]\n",
+    "reads": {
+      "seq": [
+        {
+          "s": "x"
+        },
+        {
+          "seq": [
+            {
+              "s": "a"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "key.comment_glued_in_seq_colon.task_scopes",
+    "yaml": "task_scopes:\n  - [x,#:\n     [allowed_tools]]\n",
+    "reads": {
+      "map": [
+        [
+          "task_scopes",
+          {
+            "seq": [
+              {
+                "seq": [
+                  {
+                    "s": "x"
+                  },
+                  {
+                    "seq": [
+                      {
+                        "s": "allowed_tools"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "key.comment_glued_after_key",
+    "yaml": "? [a]#:\n: 1\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.comment_glued_after_key.task_scopes",
+    "yaml": "task_scopes:\n  - ? [allowed_tools]#:\n    : [\"yes\"]\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.comment_glued_after_value",
+    "yaml": "{x: [a]#:\n, y: 1}\n",
+    "reads": {
+      "map": [
+        [
+          "x",
+          {
+            "seq": [
+              {
+                "s": "a"
+              }
+            ]
+          }
+        ],
+        [
+          "y",
+          {
+            "n": 1.0
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "key.comment_glued_after_value.task_scopes",
+    "yaml": "task_scopes:\n  - {x: [allowed_tools]#:\n    , y: [\"yes\"]}\n",
+    "reads": {
+      "map": [
+        [
+          "task_scopes",
+          {
+            "seq": [
+              {
+                "map": [
+                  [
+                    "x",
+                    {
+                      "seq": [
+                        {
+                          "s": "allowed_tools"
+                        }
+                      ]
+                    }
+                  ],
+                  [
+                    "y",
+                    {
+                      "seq": [
+                        {
+                          "s": "yes"
+                        }
+                      ]
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "key.comment_glued_after_question",
+    "yaml": "?#:\n  [a]\n: 1\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.comment_glued_after_question.task_scopes",
+    "yaml": "task_scopes:\n  - ?#:\n      [allowed_tools]\n    : [\"yes\"]\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
     "name": "merge.one",
     "yaml": "b: {<<: {t: 1}}\n",
     "reads": {
@@ -25710,6 +25937,247 @@
     "yaml": "task_scopes:\n  - task_type: x\n    budgets:\n      <<:\n        - {tokens: 1}\n        - [x]\n",
     "reads": {
       "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "merge.explicit_no_value",
+    "yaml": "b:\n  ? <<\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "merge.explicit_no_value.budgets",
+    "yaml": "task_scopes:\n  - task_type: x\n    budgets:\n      ? <<\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "merge.explicit_with_value",
+    "yaml": "b:\n  ? <<\n  : {t: 1}\n",
+    "reads": {
+      "map": [
+        [
+          "b",
+          {
+            "map": [
+              [
+                "t",
+                {
+                  "n": 1.0
+                }
+              ]
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "merge.explicit_with_value.budgets",
+    "yaml": "task_scopes:\n  - task_type: x\n    budgets:\n      ? <<\n      : {tokens: 1}\n",
+    "reads": {
+      "map": [
+        [
+          "task_scopes",
+          {
+            "seq": [
+              {
+                "map": [
+                  [
+                    "budgets",
+                    {
+                      "map": [
+                        [
+                          "tokens",
+                          {
+                            "n": 1.0
+                          }
+                        ]
+                      ]
+                    }
+                  ],
+                  [
+                    "task_type",
+                    {
+                      "s": "x"
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "merge.explicit_flow_no_value",
+    "yaml": "b: {? <<}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "merge.explicit_flow_no_value.budgets",
+    "yaml": "task_scopes:\n  - task_type: x\n    budgets: {? <<}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "merge.explicit_flow_with_value",
+    "yaml": "b: {? << : {t: 1}, u: 2}\n",
+    "reads": {
+      "map": [
+        [
+          "b",
+          {
+            "map": [
+              [
+                "t",
+                {
+                  "n": 1.0
+                }
+              ],
+              [
+                "u",
+                {
+                  "n": 2.0
+                }
+              ]
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "merge.explicit_flow_with_value.budgets",
+    "yaml": "task_scopes:\n  - task_type: x\n    budgets: {? << : {tokens: 1}, u: 2}\n",
+    "reads": {
+      "map": [
+        [
+          "task_scopes",
+          {
+            "seq": [
+              {
+                "map": [
+                  [
+                    "budgets",
+                    {
+                      "map": [
+                        [
+                          "tokens",
+                          {
+                            "n": 1.0
+                          }
+                        ],
+                        [
+                          "u",
+                          {
+                            "n": 2.0
+                          }
+                        ]
+                      ]
+                    }
+                  ],
+                  [
+                    "task_type",
+                    {
+                      "s": "x"
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "merge.explicit_seq_sources",
+    "yaml": "b:\n  t: 3\n  ? <<\n  : [{t: 1, u: 1}, {u: 2, w: 2}]\n",
+    "reads": {
+      "map": [
+        [
+          "b",
+          {
+            "map": [
+              [
+                "t",
+                {
+                  "n": 3.0
+                }
+              ],
+              [
+                "u",
+                {
+                  "n": 1.0
+                }
+              ],
+              [
+                "w",
+                {
+                  "n": 2.0
+                }
+              ]
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "merge.explicit_seq_sources.budgets",
+    "yaml": "task_scopes:\n  - task_type: x\n    budgets:\n      tokens: 3\n      ? <<\n      : [{tokens: 1, u: 1}, {u: 2, w: 2}]\n",
+    "reads": {
+      "map": [
+        [
+          "task_scopes",
+          {
+            "seq": [
+              {
+                "map": [
+                  [
+                    "budgets",
+                    {
+                      "map": [
+                        [
+                          "tokens",
+                          {
+                            "n": 3.0
+                          }
+                        ],
+                        [
+                          "u",
+                          {
+                            "n": 1.0
+                          }
+                        ],
+                        [
+                          "w",
+                          {
+                            "n": 2.0
+                          }
+                        ]
+                      ]
+                    }
+                  ],
+                  [
+                    "task_type",
+                    {
+                      "s": "x"
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      ]
     }
   }
 ]
