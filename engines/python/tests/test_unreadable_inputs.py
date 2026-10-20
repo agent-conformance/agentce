@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -119,3 +120,75 @@ def test_catalog_sign_key_link_is_refused_on_every_python(
         link.symlink_to(link)
     argv = ["catalog", "sign", str(catalog), "--key", str(link)]
     assert _refusal(argv, capsys) == (3, key)
+
+
+@pytest.mark.parametrize(
+    ("argv", "key"),
+    [
+        (
+            ["assess", "--bundle", _BUNDLE, "--profile", "{f}/"],
+            "input.profile_not_a_file",
+        ),
+        (
+            [
+                "assess",
+                "--bundle",
+                _BUNDLE,
+                "--profile",
+                _PROFILE,
+                "--trust-root",
+                "{f}/",
+            ],
+            "input.trust_root_not_a_file",
+        ),
+        (["readiness", "{r}", "--gaps", "{f}/"], "input.gaps_not_a_file"),
+        (["diff", "{f}/", "{f}"], "input.report_a_not_a_file"),
+        (["diff", "{f}", "{f}/"], "input.report_b_not_a_file"),
+        (["report", "--from", "{f}/"], "input.from_not_a_file"),
+        (["report", "--from", "{f}/."], "input.from_not_a_file"),
+    ],
+)
+def test_file_named_with_a_trailing_slash_is_not_a_file(
+    argv: list[str],
+    key: str,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """``name/`` resolves only to a directory (POSIX ENOTDIR), so it is refused, never read as the file
+    ``name`` that ``Path`` would normalise it to (18.184b)."""
+    readable = tmp_path / "file.json"
+    readable.write_text("[]", encoding="utf-8")
+    (tmp_path / "r").mkdir()
+    filled = [a.format(f=readable, r=tmp_path / "r") for a in argv]
+    assert _refusal(filled, capsys) == (3, key)
+
+
+def test_adapters_root_through_a_link_runs_the_folder_it_checked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``link/../adapters`` names the adapters folder beside the link's target (POSIX), which the engine
+    checks; uv reads ``--project`` lexically, so it must get that folder's real path, not the decoy
+    beside the link (18.184b)."""
+    from agentce import commands
+
+    far = tmp_path / "far"
+    (far / "adapters" / "otel-genai").mkdir(parents=True)
+    (far / "deep").mkdir()
+    (tmp_path / "lnk").symlink_to(far / "deep", target_is_directory=True)
+    (tmp_path / "adapters").write_text("a decoy, not a folder\n", encoding="utf-8")
+    seen: list[list[str]] = []
+
+    def fake_run(cmd: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        seen.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout='{"events": []}', stderr="")
+
+    monkeypatch.setattr(commands.subprocess, "run", fake_run)
+    root = tmp_path / "lnk" / ".." / "adapters"
+    export = tmp_path / "export.json"
+    export.write_text("{}", encoding="utf-8")
+    commands._adapt_export(
+        root, "otel-genai", export, subject="s", source_class="self_report"
+    )
+    real = os.path.realpath(far / "adapters")
+    assert seen[0][seen[0].index("--project") + 1] == os.path.join(real, "otel-genai")
+    assert os.path.join(real, "_ingest.py") in seen[0]

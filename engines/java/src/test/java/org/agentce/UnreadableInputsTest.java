@@ -58,6 +58,22 @@ class UnreadableInputsTest {
                 "assess", "--bundle", BUNDLE, "--profile", dir.resolve("a".repeat(300)).toString());
     }
 
+    /** {@code name/} resolves only to a directory (POSIX ENOTDIR), so it is refused, never read as the file
+     * {@code name} that {@code Paths.get} normalises it to (18.184b). */
+    @Test
+    void aFileNamedWithATrailingSlashIsNotAFile(@TempDir Path dir) throws IOException {
+        String f = Files.writeString(dir.resolve("file.json"), "[]").toString();
+        String r = Files.createDirectory(dir.resolve("r")).toString();
+        assertRefused("input.profile_not_a_file", "assess", "--bundle", BUNDLE, "--profile", f + "/");
+        assertRefused("input.trust_root_not_a_file",
+                "assess", "--bundle", BUNDLE, "--profile", PROFILE, "--trust-root", f + "/");
+        assertRefused("input.gaps_not_a_file", "readiness", r, "--gaps", f + "/");
+        assertRefused("input.report_a_not_a_file", "diff", f + "/", f);
+        assertRefused("input.report_b_not_a_file", "diff", f, f + "/");
+        assertRefused("input.from_not_a_file", "report", "--from", f + "/");
+        assertRefused("input.from_not_a_file", "report", "--from", f + "/.");
+    }
+
     @Test
     void anAdaptersFolderThatCannotBeListedOrEnteredIsRefused(@TempDir Path dir) throws IOException {
         assumeFalse(ROOT, "root enters a mode 600 folder");

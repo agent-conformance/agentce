@@ -82,6 +82,29 @@ test("a 300-byte name is not a file (18.179)", () => {
   });
 });
 
+test("a file named with a trailing slash is not a file (18.184b)", () => {
+  inScratch((dir) => {
+    const f = join(dir, "file.json");
+    writeFileSync(f, "[]");
+    mkdirSync(join(dir, "r"));
+    const cases: Array<[string[], string]> = [
+      [["assess", "--bundle", BUNDLE, "--profile", `${f}/`], "input.profile_not_a_file"],
+      [
+        ["assess", "--bundle", BUNDLE, "--profile", PROFILE, "--trust-root", `${f}/`],
+        "input.trust_root_not_a_file",
+      ],
+      [["readiness", join(dir, "r"), "--gaps", `${f}/`], "input.gaps_not_a_file"],
+      [["diff", `${f}/`, f], "input.report_a_not_a_file"],
+      [["diff", f, `${f}/`], "input.report_b_not_a_file"],
+      [["report", "--from", `${f}/`], "input.from_not_a_file"],
+      [["report", "--from", `${f}/.`], "input.from_not_a_file"],
+    ];
+    for (const [argv, key] of cases) {
+      assert.deepEqual(refusal(argv), { exitCode: 3, key }, argv.join(" "));
+    }
+  });
+});
+
 test(
   "an adapters folder that cannot be listed or entered is refused (18.179)",
   {

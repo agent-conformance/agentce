@@ -359,7 +359,9 @@ def _require_file(
     if raw is None:
         raise InputError(f"input.{key}_missing", f"{what} is required.", fix)
     path = Path(raw)
-    if raw == "" or not signing.is_regular_file(path, unreadable_is_absent=True):
+    # The text as typed, not ``path``: Path() drops a trailing ``/`` or ``/.``, so ``name/`` would read the
+    # file ``name`` where POSIX refuses it (ENOTDIR), as TypeScript and Java do (18.184b).
+    if raw == "" or not signing.is_regular_file(raw, unreadable_is_absent=True):
         raise InputError(
             f"input.{key}_not_a_file",
             f"{what} {raw!r} is not an existing file.",
@@ -2449,7 +2451,11 @@ def _adapt_export(
             f"no adapter directory at {adapter_dir}.",
             "pass --adapters-root pointing at the adapters checkout, or check the adapter name.",
         )
-    script = adapters_root / "_ingest.py"
+    # The folder just checked, by its real path: uv reads ``--project link/../x`` lexically (as ``x``), where
+    # the check above resolved ``link`` first, so the two would name different folders (18.184b).
+    real_root = Path(os.path.realpath(adapters_root))
+    adapter_dir = real_root / adapter
+    script = real_root / "_ingest.py"
     cmd = [
         "uv",
         "run",

@@ -288,11 +288,13 @@ def _pae(payload_type: str, payload: bytes) -> bytes:
 # --- Path kinds. ---
 
 
-def is_regular_file(path: Path, *, unreadable_is_absent: bool = False) -> bool:
+def is_regular_file(path: Path | str, *, unreadable_is_absent: bool = False) -> bool:
     """``Path.is_file`` with the same answer on every Python. A PermissionError (a parent folder
     that can be listed but not entered) propagates for the caller to report as unreadable, as on
     3.12, where 3.14's ``is_file`` swallows it (18.114); with ``unreadable_is_absent`` it reads as
-    False instead, the answer TypeScript and Java give (18.163)."""
+    False instead, the answer TypeScript and Java give (18.163). Given the user's own text (a ``str``), it
+    stats that text as written: ``Path`` drops a trailing ``/`` or ``/.``, which POSIX refuses for a file
+    (ENOTDIR, 18.184b)."""
     return _mode_matches(path, stat.S_ISREG, unreadable_is_absent)
 
 
@@ -314,14 +316,14 @@ def is_link(path: Path, *, unreadable_is_absent: bool = False) -> bool:
 
 
 def _mode_matches(
-    path: Path,
+    path: Path | str,
     test: Callable[[int], bool],
     unreadable_is_absent: bool,
     *,
     follow_symlinks: bool = True,
 ) -> bool:
     try:
-        return test(path.stat(follow_symlinks=follow_symlinks).st_mode)
+        return test(os.stat(path, follow_symlinks=follow_symlinks).st_mode)
     except ValueError:  # an embedded NUL: no such file, as Path.is_file answers
         return False
     except OSError as exc:

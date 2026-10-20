@@ -418,7 +418,9 @@ global options:
             throw new InputError("input." + key + "_missing", what + " is required.", fix);
         }
         Path path = Paths.get(raw);
-        if (raw.isEmpty() || !Files.isRegularFile(path)) {
+        // Paths.get drops a trailing separator, so "name/" would read the file "name"; POSIX resolves
+        // "name/" only to a directory (ENOTDIR), so it is never a file (18.184b, as TypeScript's stat).
+        if (raw.isEmpty() || raw.endsWith("/") || raw.endsWith(File.separator) || !Files.isRegularFile(path)) {
             throw new InputError(
                     "input." + key + "_not_a_file", what + " " + Readiness.pyRepr(raw) + " is not an existing file.", fix);
         }
