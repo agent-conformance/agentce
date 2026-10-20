@@ -283,3 +283,42 @@ def test_explicit_tags_construct_as_safe_loader_does(tmp_path: Path) -> None:
         tmp_path,
         'budgets: {tokens: !!str 1000, spend: !!int "10", compute_seconds: !!float "5"}',
     ).budgets == (("tokens", None), ("compute_seconds", 5.0), ("spend", 10))
+
+
+def test_tagged_text_reads_as_python_int_and_float_do(tmp_path: Path) -> None:
+    """The reference Java and TypeScript match (18.184g): int()/float() spellings, a non-finite limit unreadable."""
+    assert _scope_from_yaml(
+        tmp_path,
+        'budgets: {tokens: !!int "0o10", compute_seconds: !!float "+.5", spend: !!float "inf"}',
+    ).budgets == (("tokens", 8), ("compute_seconds", 0.5), ("spend", None))
+    assert _scope_from_yaml(tmp_path, 'budgets: {tokens: !!int " 5"}').budgets == (
+        ("tokens", 5),
+    )
+
+
+def test_a_date_no_calendar_holds_is_text(tmp_path: Path) -> None:
+    """The reference Java and TypeScript match (18.184g); two date keys stay two keys."""
+    assert _scope_from_yaml(
+        tmp_path, "allowed_tools: [2021-02-29, 2020-02-29]"
+    ).allowed_tools == {"2021-02-29"}
+    assert (
+        _scope_from_yaml(tmp_path, "budgets: {2020-01-01: 1, 2020-01-02: 2}").budgets
+        == ()
+    )
+
+
+@pytest.mark.parametrize(
+    "scope",
+    [
+        "allowed_tools: !!str [x]",
+        "task_type_x: !!seq x",
+        "allowed_tools: [<<]",
+        'budgets: {tokens: !!int "1:"}',
+        'budgets: {spend: !!float "5f"}',
+    ],
+)
+def test_a_tag_the_node_cannot_take_is_refused(tmp_path: Path, scope: str) -> None:
+    """The reference Java and TypeScript match (18.184g)."""
+    with pytest.raises(InputError) as exc:
+        _scope_from_yaml(tmp_path, scope)
+    assert exc.value.key == "input.domain_binding_invalid"
