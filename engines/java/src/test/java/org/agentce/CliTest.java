@@ -88,6 +88,22 @@ class CliTest {
     }
 
     @Test
+    void assessRecordsTheDataFilesItWritesInManifestOutputsByTheirRealDigests(@TempDir Path out) throws IOException {
+        runJson(
+                "assess",
+                "--bundle", QUICKSTART.resolve("evidence").toString(),
+                "--profile", QUICKSTART.resolve("applicability.yaml").toString(),
+                "--catalog-dir", CATALOG_DIR.toString(),
+                "--out", out.toString());
+        JsonNode outputs = Json.parseFile(out.resolve("manifest.json")).get("outputs");
+        for (String name : List.of("integrity.jsonl", "coverage.json", "applicability.jsonl", "quarantine.jsonl")) {
+            byte[] data = Files.readAllBytes(out.resolve(name));
+            assertTrue(data.length > 0, name);
+            assertEquals(Report.digestBytes(data), outputs.get(name).asText(), name);
+        }
+    }
+
+    @Test
     void assessManifestHasNoDomainBindingDigestWhenDomainIsOmitted(@TempDir Path out) {
         runJson(
                 "assess",

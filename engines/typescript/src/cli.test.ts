@@ -159,6 +159,39 @@ test("assess --profile and --domain: manifest.json carries their real sha256 dig
   }
 });
 
+test("assess records the data files it writes in manifest.json outputs, by their real digests (18.184e)", () => {
+  const out = mkdtempSync(join(tmpdir(), "agentce-cli-manifest-data-files-"));
+  try {
+    const quickstart = quickstartDir();
+    runJson([
+      "assess",
+      "--bundle",
+      join(quickstart, "evidence"),
+      "--profile",
+      join(quickstart, "applicability.yaml"),
+      "--catalog",
+      "eu-ai-act@2026.09",
+      "--out",
+      out,
+    ]);
+    const manifest = JSON.parse(readFileSync(join(out, "manifest.json"), "utf-8")) as {
+      outputs: Record<string, string>;
+    };
+    for (const name of [
+      "integrity.jsonl",
+      "coverage.json",
+      "applicability.jsonl",
+      "quarantine.jsonl",
+    ]) {
+      const data = readFileSync(join(out, name));
+      assert.ok(data.length > 0, name);
+      assert.equal(manifest.outputs[name], digestBytes(data), name);
+    }
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
 test("assess with no --domain: manifest.json has no domain_binding_digest (18.42, loophole L18.2)", () => {
   const out = mkdtempSync(join(tmpdir(), "agentce-cli-manifest-no-domain-"));
   try {
