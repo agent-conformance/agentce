@@ -152,10 +152,16 @@ def test_task_scope_budgets() -> None:
     assert binding.task_scopes["d"][0].budgets == ()
 
 
-def _scope_from_yaml(tmp_path: Path, scope: str) -> TaskScope:
+def _load_text(tmp_path: Path, text: str) -> DomainBinding:
     path = tmp_path / "domain.yaml"
-    path.write_text(f"task_scopes:\n  - {{task_type: a, {scope}}}\n", encoding="utf-8")
-    return DomainBinding.load(path).task_scopes["a"][0]
+    path.write_text(text, encoding="utf-8")
+    return DomainBinding.load(path)
+
+
+def _scope_from_yaml(tmp_path: Path, scope: str) -> TaskScope:
+    return _load_text(
+        tmp_path, f"task_scopes:\n  - {{task_type: a, {scope}}}\n"
+    ).task_scopes["a"][0]
 
 
 @pytest.mark.parametrize("value", [".inf", "-.inf", ".nan"])
@@ -206,24 +212,21 @@ def test_allowed_tools_yaml11_booleans_are_not_tool_names(tmp_path: Path) -> Non
         'task_scopes:\n  - {task_type: a, allowed_tools: ["x"], allowed_tools: ["y"]}\n',
         "task_scopes:\n  - {task_type: a, budgets: {spend: 1, spend: 2}}\n",
         "task_scopes: []\ntask_scopes: []\n",
+        "task_scopes: !!python/object:os.system {}\n",
     ],
 )
 def test_repeated_key_is_refused(tmp_path: Path, text: str) -> None:
-    """A key written twice, at any depth, is refused with one stable key, never the last value (18.184g)."""
-    path = tmp_path / "domain.yaml"
-    path.write_text(text, encoding="utf-8")
+    """A key written twice, at any depth, is refused with one stable key, never the last value, as is a Python
+    tag (18.184g)."""
     with pytest.raises(InputError) as caught:
-        DomainBinding.load(path)
+        _load_text(tmp_path, text)
     assert caught.value.key == "input.domain_binding_invalid"
 
 
 def test_merge_key_may_be_written_again(tmp_path: Path) -> None:
     """A key a << merge brings in may be set again, as PyYAML allows (18.184g)."""
-    path = tmp_path / "domain.yaml"
-    path.write_text(
+    binding = _load_text(
+        tmp_path,
         "base: &b {task_type: a, allowed_tools: [x]}\ntask_scopes:\n  - {<<: *b, allowed_tools: [y]}\n",
-        encoding="utf-8",
     )
-    assert DomainBinding.load(path).task_scopes["a"][0].allowed_tools == frozenset(
-        {"y"}
-    )
+    assert binding.task_scopes["a"][0].allowed_tools == frozenset({"y"})
