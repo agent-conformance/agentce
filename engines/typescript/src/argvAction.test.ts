@@ -5,6 +5,7 @@
  * `_adapter_conformance`/`_adapter_claim` are the reference; `ArgvActionTest.java` pins the same.
  */
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -268,6 +269,24 @@ test("runEcs folds the fake runner's JSON into the report as adapter_conformance
     });
     assert.equal("adapters" in bare, false);
     assert.equal("adapter_conformance" in bare, false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("runEcs refuses the run when a project report under --out cannot be written (18.184d)", () => {
+  const root = mkdtempSync(join(tmpdir(), "agentce-ecs-fifo-"));
+  try {
+    const out = join(root, "out");
+    mkdirSync(join(out, "projects", "q"), { recursive: true });
+    execFileSync("mkfifo", [join(out, "projects", "q", "report.md")]);
+    assert.throws(
+      () => runEcs({ enginePath: join(__dirname, ".."), corpusDir: corpusOne(root), outDir: out }),
+      (err: unknown) =>
+        err instanceof InputError &&
+        err.key === "input.out_dir_unwritable" &&
+        err.message.includes("cannot be written"),
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

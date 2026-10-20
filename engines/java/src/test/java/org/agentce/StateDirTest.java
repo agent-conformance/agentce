@@ -1,13 +1,17 @@
 package org.agentce;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
@@ -100,5 +104,88 @@ class StateDirTest {
         } finally {
             Files.setPosixFilePermissions(stateDir, PosixFilePermissions.fromString("rwxr-xr-x"));
         }
+    }
+
+    /** A state directory with one recorded report; returns its state.json path. */
+    private static Path saved(Path work) throws IOException {
+        Path manifest = work.resolve("manifest.json");
+        Files.writeString(manifest, "{}\n");
+        StateDir.load(work.resolve("state")).record("sha256:bbb", manifest, "2026-02-01T00:00:00Z");
+        return work.resolve("state").resolve("state.json");
+    }
+
+    private static void assertRefused(Path state, String causeEnd) {
+        InputError err = assertThrows(InputError.class, () -> StateDir.ensureWritable(state));
+        assertEquals("input.state_dir_unwritable", err.key);
+        assertTrue(err.getMessage().contains(causeEnd), err.getMessage());
+    }
+
+    @Test
+    void ensureWritableRefusesAFifoStateJsonWithoutOpeningIt(@TempDir Path work) throws Exception {
+        Path state = Files.createDirectory(work.resolve("state"));
+        assertEquals(0, new ProcessBuilder("mkfifo", state.resolve("state.json").toString()).start().waitFor());
+        assertRefused(state, "state.json' is not a regular file.");
+    }
+
+    @Test
+    void ensureWritableRefusesAnUnreadableStateJson(@TempDir Path work) throws IOException {
+        Path sj = saved(work);
+        Files.setPosixFilePermissions(sj, PosixFilePermissions.fromString("---------"));
+        try {
+            assertRefused(work.resolve("state"), "state.json': Permission denied");
+        } finally {
+            Files.setPosixFilePermissions(sj, PosixFilePermissions.fromString("rw-r--r--"));
+        }
+    }
+
+    @Test
+    void aDanglingStateJsonIsAFreshSeriesAndSaveReplacesTheLink(@TempDir Path work) throws IOException {
+        Path state = Files.createDirectory(work.resolve("state"));
+        Files.createSymbolicLink(state.resolve("state.json"), work.resolve("away").resolve("state.json"));
+        StateDir.ensureWritable(state);
+        assertNull(StateDir.load(state).lastReportDigest);
+        Path sj = saved(work);
+        assertTrue(Files.isRegularFile(sj, LinkOption.NOFOLLOW_LINKS));
+        assertFalse(Files.exists(work.resolve("away")));
+    }
+
+    @Test
+    void saveKeepsAHardLinkOutsideStateAndTheMode(@TempDir Path work) throws IOException {
+        Path sj = saved(work);
+        Files.setPosixFilePermissions(sj, PosixFilePermissions.fromString("rw-------"));
+        Path outside = Files.createLink(work.resolve("outside.json"), sj);
+        String before = Files.readString(outside);
+        StateDir state = StateDir.load(work.resolve("state"));
+        state.lastWindowEnd = "2026-03-01T00:00:00Z";
+        state.save();
+        assertEquals(before, Files.readString(outside));
+        assertEquals(1, (int) Files.getAttribute(outside, "unix:nlink"));
+        assertEquals("rw-------", PosixFilePermissions.toString(Files.getPosixFilePermissions(sj)));
+        assertEquals("2026-03-01T00:00:00Z", Json.parseFile(sj).get("last_window_end").textValue());
+    }
+
+    @Test
+    void aFifoAtAProjectReportUnderOutRefusesTheConformanceRun(@TempDir Path work) throws Exception {
+        Path corpus = work.resolve("corpus");
+        Path project = corpus.resolve("projects").resolve("q");
+        Path quickstart = TestPaths.repoRoot().resolve("corpus/quickstart");
+        try (var walk = Files.walk(quickstart)) {
+            for (Path p : (Iterable<Path>) walk::iterator) {
+                Path to = project.resolve(quickstart.relativize(p).toString());
+                if (Files.isDirectory(p)) {
+                    Files.createDirectories(to);
+                } else {
+                    Files.copy(p, to);
+                }
+            }
+        }
+        Files.writeString(corpus.resolve("corpus-manifest.json"), "{\"corpus_version\": \"t\", \"projects\": [{\"id\": \"q\"}]}");
+        Path out = work.resolve("out");
+        Path report = Files.createDirectories(out.resolve("projects").resolve("q")).resolve("report.md");
+        assertEquals(0, new ProcessBuilder("mkfifo", report.toString()).start().waitFor());
+        InputError err = assertThrows(InputError.class,
+                () -> Conformance.runEcs(TestPaths.repoRoot().resolve("engines/java"), corpus, out));
+        assertEquals("input.out_dir_unwritable", err.key);
+        assertTrue(err.getMessage().contains("cannot be written"), err.getMessage());
     }
 }

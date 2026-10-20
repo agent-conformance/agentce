@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -241,3 +242,31 @@ def test_adapter_conformance_reports_failure_on_bad_output(
     assert result["round_trip"] is False
     assert result["total"] == 0
     assert "boom" in result["error"]
+
+
+def test_a_fifo_at_a_project_report_under_out_refuses_the_run(tmp_path: Path) -> None:
+    """18.184d: under the user's --out a report write that fails is refused under OUT_DIR, as assess
+    --out refuses it, never recorded as one project's failure."""
+    corpus = tmp_path / "corpus"
+    _write_corpus(corpus, ["credit/x/known-pass"])
+    out = tmp_path / "out"
+    (out / "projects" / "credit/x/known-pass").mkdir(parents=True)
+    os.mkfifo(out / "projects" / "credit/x/known-pass" / "report.md")
+    with pytest.raises(InputError) as info:
+        run_ecs(engine_path=_ENGINE, corpus_dir=corpus, out_dir=out)
+    assert info.value.key == "input.out_dir_unwritable"
+    assert "cannot be written" in info.value.cause
+    assert not (out / "implementation-report.json").exists()
+
+
+def test_a_broken_project_under_out_stays_a_failure(tmp_path: Path) -> None:
+    """Only a refusal of --out itself ends the run; a project that cannot be assessed is a finding."""
+    corpus = tmp_path / "corpus"
+    _write_corpus(
+        corpus,
+        ["credit/x/known-pass", "credit/z/broken"],
+        broken={"credit/z/broken"},
+    )
+    report = run_ecs(engine_path=_ENGINE, corpus_dir=corpus, out_dir=tmp_path / "out")
+    assert report["claim"] == "partial"
+    assert [f["project"] for f in report["failures"]] == ["credit/z/broken"]

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -226,3 +227,61 @@ def _manifest(tmp_path: Path, name: str) -> Path:
         json.dumps({"agentce_manifest_version": 1, "name": name}), encoding="utf-8"
     )
     return path
+
+
+def _saved(tmp_path: Path) -> Path:
+    state = StateDir(path=tmp_path / "state")
+    state.record("sha256:bbb", _manifest(tmp_path, "one"), "2026-02-01T00:00:00Z")
+    return tmp_path / "state" / "state.json"
+
+
+def test_ensure_writable_refuses_a_fifo_state_json_without_opening_it(
+    tmp_path: Path,
+) -> None:
+    """18.184d: a FIFO named state.json is refused before any --out write, never waited on."""
+    (tmp_path / "state").mkdir()
+    os.mkfifo(tmp_path / "state" / "state.json")
+    with pytest.raises(InputError) as info:
+        StateDir.ensure_writable(tmp_path / "state")
+    assert info.value.key == "input.state_dir_unwritable"
+    assert info.value.cause.endswith("state.json' is not a regular file.")
+
+
+def test_ensure_writable_refuses_an_unreadable_state_json(tmp_path: Path) -> None:
+    sj = _saved(tmp_path)
+    sj.chmod(0)
+    try:
+        with pytest.raises(InputError) as info:
+            StateDir.ensure_writable(tmp_path / "state")
+    finally:
+        sj.chmod(0o644)
+    assert info.value.key == "input.state_dir_unwritable"
+    assert info.value.cause.endswith("state.json': Permission denied")
+
+
+def test_ensure_writable_accepts_a_dangling_state_json_and_save_replaces_it(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "state").mkdir()
+    away = tmp_path / "away" / "state.json"
+    (tmp_path / "state" / "state.json").symlink_to(away)
+    StateDir.ensure_writable(tmp_path / "state")
+    assert StateDir.load(tmp_path / "state").last_report_digest is None
+    sj = _saved(tmp_path)
+    assert sj.is_file() and not sj.is_symlink()
+    assert not away.parent.exists()
+
+
+def test_save_keeps_a_hard_link_outside_state_and_the_mode(tmp_path: Path) -> None:
+    sj = _saved(tmp_path)
+    sj.chmod(0o600)
+    outside = tmp_path / "outside.json"
+    os.link(sj, outside)
+    before = outside.read_bytes()
+    state = StateDir.load(tmp_path / "state")
+    state.last_window_end = "2026-03-01T00:00:00Z"
+    state.save()
+    assert outside.read_bytes() == before
+    assert outside.stat().st_nlink == 1
+    assert sj.stat().st_mode & 0o777 == 0o600
+    assert json.loads(sj.read_text())["last_window_end"] == "2026-03-01T00:00:00Z"

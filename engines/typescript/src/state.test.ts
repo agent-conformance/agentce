@@ -8,7 +8,19 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  chmodSync,
+  existsSync,
+  linkSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -83,4 +95,68 @@ test("StateDir.save raises a keyed error on an unwritable --state directory", ()
       (err: unknown) => err instanceof InputError && err.key === "input.state_dir_unwritable",
     );
   });
+});
+
+/** A state directory with one recorded report; returns its state.json path. */
+function saved(work: string): string {
+  const manifest = join(work, "manifest.json");
+  writeFileSync(manifest, "{}\n");
+  StateDir.load(join(work, "state")).record("sha256:bbb", manifest, "2026-02-01T00:00:00Z");
+  return join(work, "state", "state.json");
+}
+
+const refusedWith = (cause: string) => (err: unknown) =>
+  err instanceof InputError &&
+  err.key === "input.state_dir_unwritable" &&
+  err.message.endsWith(cause);
+
+test("ensureWritable refuses a FIFO state.json without opening it (18.184d)", () => {
+  const work = mkdtempSync(join(tmpdir(), "agentce-state-"));
+  mkdirSync(join(work, "state"));
+  execFileSync("mkfifo", [join(work, "state", "state.json")]);
+  assert.throws(
+    () => StateDir.ensureWritable(join(work, "state")),
+    refusedWith("state.json' is not a regular file."),
+  );
+});
+
+test("ensureWritable refuses an unreadable state.json", () => {
+  const work = mkdtempSync(join(tmpdir(), "agentce-state-"));
+  const sj = saved(work);
+  chmodSync(sj, 0);
+  try {
+    assert.throws(
+      () => StateDir.ensureWritable(join(work, "state")),
+      refusedWith("state.json': Permission denied"),
+    );
+  } finally {
+    chmodSync(sj, 0o644);
+  }
+});
+
+test("a dangling state.json is a fresh series and save replaces the link", () => {
+  const work = mkdtempSync(join(tmpdir(), "agentce-state-"));
+  mkdirSync(join(work, "state"));
+  symlinkSync(join(work, "away", "state.json"), join(work, "state", "state.json"));
+  StateDir.ensureWritable(join(work, "state"));
+  assert.equal(StateDir.load(join(work, "state")).lastReportDigest, null);
+  const sj = saved(work);
+  assert.equal(lstatSync(sj).isFile(), true);
+  assert.equal(existsSync(join(work, "away")), false);
+});
+
+test("save keeps a hard link outside --state and the mode of state.json", () => {
+  const work = mkdtempSync(join(tmpdir(), "agentce-state-"));
+  const sj = saved(work);
+  chmodSync(sj, 0o600);
+  const outside = join(work, "outside.json");
+  linkSync(sj, outside);
+  const before = readFileSync(outside, "utf-8");
+  const state = StateDir.load(join(work, "state"));
+  state.lastWindowEnd = "2026-03-01T00:00:00Z";
+  state.save();
+  assert.equal(readFileSync(outside, "utf-8"), before);
+  assert.equal(statSync(outside).nlink, 1);
+  assert.equal(statSync(sj).mode & 0o777, 0o600);
+  assert.equal(JSON.parse(readFileSync(sj, "utf-8")).last_window_end, "2026-03-01T00:00:00Z");
 });
