@@ -474,7 +474,7 @@ public final class Readiness {
      * null}/{@link List}/{@link Map}, per {@link #composeValue}) rendered as a {@link JsonNode}. Called
      * only after {@link #normalizeDeviationDates} has rewritten every {@link PyyamlTimestamp} marker to
      * a plain string, so no marker ever reaches this method. */
-    private static JsonNode toJsonNode(Object value) {
+    static JsonNode toJsonNode(Object value) {
         JsonNodeFactory f = Json.nodes();
         if (value == null) {
             return f.nullNode();
@@ -587,13 +587,17 @@ public final class Readiness {
         return out;
     }
 
-    /** A YAML file read as PyYAML's {@code SafeLoader} types it (the compose path above), as a {@link JsonNode}, refusing
-     * a mapping that writes one key twice (a key a {@code <<} merge brings in may be written again) and anything else
-     * it cannot load under {@code key}. Used by {@link DomainBinding#load} (18.184g); the register keeps its own loader. */
-    static JsonNode loadPyyamlUniqueKeys(Path path, String key, String what) {
-        String where = what + " at " + pyRepr(path.toString());
+    /** The YAML at {@code path} as Python's {@code load_untrusted_yaml} reads it (PyYAML's {@code SafeLoader} typing,
+     * the compose path above), refusing a file that is not UTF-8, nests too deeply, or carries YAML it cannot load
+     * under {@code key}. With {@code uniqueKeys}, a mapping that writes one key twice is refused too (a key a
+     * {@code <<} merge brings in may be written again); without it the last value wins, as {@code SafeLoader} keeps it. */
+    static Object loadPyyaml(Path path, String key, String what, boolean uniqueKeys) {
+        // Python passes the loader a Path, so its errors name ./r.yaml as r.yaml.
+        String where = what + " at " + pyRepr(Diff.normalizePosixPath(path.toString()));
         String text;
         try {
+            // A fatal decode, as Python's `read_text(encoding="utf-8")`: a lossy one would turn a 0xff
+            // byte into U+FFFD and read the mangled text instead of refusing the file.
             text = Verify.decodeStrict(Files.readAllBytes(path)).toString();
         } catch (CharacterCodingException e) {
             throw new InputError(key, where + " is not valid UTF-8: " + e + ".", "save " + what + " as UTF-8 text.");
@@ -604,16 +608,24 @@ public final class Readiness {
             LoaderOptions options = new LoaderOptions();
             options.setNestingDepthLimit(DEVIATION_REGISTER_MAX_DEPTH);
             Node root = new Yaml(options).compose(new StringReader(text));
-            if (root == null) {
-                return null;
+            if (root != null && uniqueKeys) {
+                rejectRepeatedKeys(root);
             }
-            rejectRepeatedKeys(root);
-            return toJsonNode(composeValue(root));
+            return root == null ? null : composeValue(root);
         } catch (StackOverflowError | RuntimeException e) {
+            if (e instanceof StackOverflowError || String.valueOf(e.getMessage()).contains("Nesting Depth exceeded")) {
+                // SnakeYAML caps nesting (and composeValue recurses per level), as PyYAML's composer
+                // hits its RecursionError.
+                throw new InputError(
+                        key,
+                        where + " is nested too deeply to parse safely.",
+                        "flatten " + what + "'s structure; it exceeds the engine's safe nesting depth.");
+            }
             throw new InputError(
                     key,
-                    where + " carries YAML the engine refuses to load: " + e.getMessage() + ".",
-                    "write each key once, and use only plain YAML scalars, mappings and sequences in " + what + ".");
+                    where + " carries a YAML construct the engine refuses to load: " + e.getMessage() + ".",
+                    "remove custom tags and aliases from " + what + "; only plain YAML scalars, "
+                            + "mappings, and sequences are accepted.");
         }
     }
 
@@ -625,10 +637,9 @@ public final class Readiness {
         } else if (node instanceof MappingNode map) {
             Set<String> seen = new HashSet<>();
             for (NodeTuple tuple : map.getValue()) {
-                if (!Tag.MERGE.equals(tuple.getKeyNode().getTag())
-                        && !seen.add(String.valueOf(composeValue(tuple.getKeyNode())))) {
-                    throw new IllegalArgumentException(
-                            "found the key " + composeValue(tuple.getKeyNode()) + " twice");
+                String k = String.valueOf(composeValue(tuple.getKeyNode()));
+                if (!Tag.MERGE.equals(tuple.getKeyNode().getTag()) && !seen.add(k)) {
+                    throw new IllegalArgumentException("found the key " + k + " twice");
                 }
                 rejectRepeatedKeys(tuple.getValueNode());
             }
@@ -644,42 +655,8 @@ public final class Readiness {
      * defaults to an empty list); every {@code granted}/{@code expiry} value YAML resolved as a
      * timestamp is normalized via {@link #normalizeDeviationDates} before use. */
     public static List<JsonNode> loadDeviationRegister(Path path) {
-        // Python passes the loader a Path, so its errors name ./r.yaml as r.yaml.
         String where = "the deviation register at " + pyRepr(Diff.normalizePosixPath(path.toString()));
-        String text;
-        try {
-            // A fatal decode, as Python's `read_text(encoding="utf-8")`: a lossy one would turn a 0xff
-            // byte into U+FFFD and lint the mangled control id instead of refusing the file.
-            text = Verify.decodeStrict(Files.readAllBytes(path)).toString();
-        } catch (CharacterCodingException e) {
-            throw new InputError(
-                    "input.deviation_invalid",
-                    where + " is not valid UTF-8: " + e + ".",
-                    "save the deviation register as UTF-8 text.");
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-        Object parsed;
-        try {
-            LoaderOptions options = new LoaderOptions();
-            options.setNestingDepthLimit(DEVIATION_REGISTER_MAX_DEPTH);
-            Node root = new Yaml(options).compose(new StringReader(text));
-            parsed = root == null ? null : composeValue(root);
-        } catch (StackOverflowError | RuntimeException e) {
-            if (e instanceof StackOverflowError || String.valueOf(e.getMessage()).contains("Nesting Depth exceeded")) {
-                // SnakeYAML caps nesting (and composeValue recurses per level), as PyYAML's composer
-                // hits its RecursionError.
-                throw new InputError(
-                        "input.deviation_invalid",
-                        where + " is nested too deeply to parse safely.",
-                        "flatten the deviation register's structure; it exceeds the engine's safe nesting depth.");
-            }
-            throw new InputError(
-                    "input.deviation_invalid",
-                    where + " carries a YAML construct the engine refuses to load: " + e.getMessage() + ".",
-                    "remove custom tags and aliases from the deviation register; only plain YAML scalars, "
-                            + "mappings, and sequences are accepted.");
-        }
+        Object parsed = loadPyyaml(path, "input.deviation_invalid", "the deviation register", false);
         Object data = pyTruthyRaw(parsed) ? parsed : new LinkedHashMap<String, Object>();
         if (!(data instanceof Map<?, ?> dataMap)) {
             throw new InputError(

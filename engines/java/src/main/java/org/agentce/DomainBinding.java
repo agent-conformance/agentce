@@ -144,7 +144,8 @@ public final class DomainBinding {
     }
 
     public static DomainBinding load(Path path) {
-        JsonNode data = Readiness.loadPyyamlUniqueKeys(path, "input.domain_binding_invalid", "the domain binding");
+        JsonNode data = Readiness.toJsonNode(
+                Readiness.loadPyyaml(path, "input.domain_binding_invalid", "the domain binding", true));
         if (data == null || !data.isObject()) {
             return empty();
         }
@@ -185,9 +186,8 @@ public final class DomainBinding {
             Long tokens = wholeNumber(value);
             return tokens == null || tokens > MAX_COUNT ? null : tokens.doubleValue();
         }
-        return value.isNumber() && Double.isFinite(value.doubleValue()) && value.doubleValue() >= 0
-                ? value.doubleValue()
-                : null;
+        double limit = value.doubleValue();
+        return value.isNumber() && Double.isFinite(limit) && limit >= 0 ? limit : null;
     }
 
     /** A non-negative whole number ({@code 5}, or {@code 5.0} as another engine's reader may give it), else null;
