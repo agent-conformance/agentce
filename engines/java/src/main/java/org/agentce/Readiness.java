@@ -297,72 +297,109 @@ public final class Readiness {
         return (c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.';
     }
 
+    /** The whitespace Python's {@code int()} and {@code float()} ignore around a number ({@code str.isspace}). */
+    private static final String PY_SPACE =
+            "[\\t\\n\\x0b\\x0c\\r\\x1c-\\x1f \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*";
+
+    /** Python's {@code int(text, base)} over ASCII digits, by base: an optional sign, the base's own
+     * optional prefix, then digits (Python also takes non-ASCII digits, which are refused here). */
+    private static final Map<Integer, java.util.regex.Pattern> PY_INT_RE = Map.of(
+            2, java.util.regex.Pattern.compile("^" + PY_SPACE + "([-+]?)(?:0[bB])?([01]+)" + PY_SPACE + "$"),
+            8, java.util.regex.Pattern.compile("^" + PY_SPACE + "([-+]?)(?:0[oO])?([0-7]+)" + PY_SPACE + "$"),
+            10, java.util.regex.Pattern.compile("^" + PY_SPACE + "([-+]?)([0-9]+)" + PY_SPACE + "$"),
+            16, java.util.regex.Pattern.compile("^" + PY_SPACE + "([-+]?)(?:0[xX])?([0-9a-fA-F]+)" + PY_SPACE + "$"));
+
+    /** Python's {@code float(text)} over ASCII digits: decimal with an optional exponent, {@code inf},
+     * {@code infinity} or {@code nan}, any case, after an optional sign. */
+    private static final java.util.regex.Pattern PY_FLOAT_RE = java.util.regex.Pattern.compile(
+            "^" + PY_SPACE + "([-+]?)(?:((?:[0-9]+\\.?[0-9]*|\\.[0-9]+)(?:e[-+]?[0-9]+)?)|(inf|infinity)|(nan))" + PY_SPACE + "$",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    private static BigInteger pythonInt(String text, int base) {
+        java.util.regex.Matcher m = PY_INT_RE.get(base).matcher(text);
+        if (!m.matches()) {
+            throw new IllegalArgumentException("invalid literal for int() with base " + base + ": " + pyRepr(text));
+        }
+        BigInteger n = new BigInteger(m.group(2), base);
+        return m.group(1).equals("-") ? n.negate() : n;
+    }
+
+    private static double pythonFloat(String text) {
+        java.util.regex.Matcher m = PY_FLOAT_RE.matcher(text);
+        if (!m.matches()) {
+            throw new IllegalArgumentException("could not convert string to float: " + pyRepr(text));
+        }
+        double n = m.group(2) != null ? Double.parseDouble(m.group(2))
+                : m.group(3) != null ? Double.POSITIVE_INFINITY : Double.NaN;
+        return m.group(1).equals("-") ? -n : n;
+    }
+
+    /** PyYAML's sign handling: the sign of {@code value}'s first character, and {@code value} without
+     * it. Empty text is refused, where PyYAML's {@code value[0]} raises. */
+    private static String pyyamlUnsigned(String value, int[] sign) {
+        if (value.isEmpty()) {
+            throw new IllegalArgumentException("string index out of range");
+        }
+        sign[0] = value.charAt(0) == '-' ? -1 : 1;
+        return value.charAt(0) == '+' || value.charAt(0) == '-' ? value.substring(1) : value;
+    }
+
     /** PyYAML's {@code construct_yaml_int} ({@code yaml/constructor.py:237-263}), copied verbatim:
      * strip {@code _}, take the sign, then dispatch on the {@code 0b}/{@code 0x}/leading-{@code
      * 0}/colon-sexagesimal/plain-decimal forms in that exact order (order matters, since these
-     * prefixes overlap textually -- {@code 0b101} starts with {@code 0} too). */
+     * prefixes overlap textually -- {@code 0b101} starts with {@code 0} too), each read as Python's
+     * {@code int()} reads it. Throws {@link IllegalArgumentException} where PyYAML raises. */
     private static BigInteger pyyamlConstructInt(String data) {
-        String value = data.replace("_", "");
-        int sign = 1;
-        if (value.charAt(0) == '-') {
-            sign = -1;
-        }
-        if (value.charAt(0) == '+' || value.charAt(0) == '-') {
-            value = value.substring(1);
-        }
+        int[] sign = new int[1];
+        String value = pyyamlUnsigned(data.replace("_", ""), sign);
         BigInteger magnitude;
         if (value.equals("0")) {
             return BigInteger.ZERO;
         } else if (value.startsWith("0b")) {
-            magnitude = new BigInteger(value.substring(2), 2);
+            magnitude = pythonInt(value.substring(2), 2);
         } else if (value.startsWith("0x")) {
-            magnitude = new BigInteger(value.substring(2), 16);
+            magnitude = pythonInt(value.substring(2), 16);
         } else if (value.charAt(0) == '0') {
-            magnitude = new BigInteger(value, 8);
+            magnitude = pythonInt(value, 8);
         } else if (value.contains(":")) {
-            String[] parts = value.split(":");
+            String[] parts = value.split(":", -1);
             BigInteger out = BigInteger.ZERO;
             BigInteger base = BigInteger.ONE;
             for (int i = parts.length - 1; i >= 0; i--) {
-                out = out.add(BigInteger.valueOf(Long.parseLong(parts[i])).multiply(base));
+                out = out.add(pythonInt(parts[i], 10).multiply(base));
                 base = base.multiply(BigInteger.valueOf(60));
             }
             magnitude = out;
         } else {
-            magnitude = new BigInteger(value);
+            magnitude = pythonInt(value, 10);
         }
-        return sign < 0 ? magnitude.negate() : magnitude;
+        return sign[0] < 0 ? magnitude.negate() : magnitude;
     }
 
     /** PyYAML's {@code construct_yaml_float} ({@code yaml/constructor.py:270-292}), copied verbatim:
      * lower-case, strip {@code _}, take the sign, then dispatch on {@code .inf}/{@code .nan}/
-     * colon-sexagesimal/plain-decimal. */
+     * colon-sexagesimal/plain-decimal, each read as Python's {@code float()} reads it. Throws {@link
+     * IllegalArgumentException} where PyYAML raises. */
     private static double pyyamlConstructFloat(String data) {
-        String value = data.replace("_", "").toLowerCase(Locale.ROOT);
-        int sign = 1;
-        if (value.charAt(0) == '-') {
-            sign = -1;
-        }
-        if (value.charAt(0) == '+' || value.charAt(0) == '-') {
-            value = value.substring(1);
-        }
+        int[] sign = new int[1];
+        String value = pyyamlUnsigned(data.replace("_", "").toLowerCase(Locale.ROOT), sign);
         if (value.equals(".inf")) {
-            return sign * Double.POSITIVE_INFINITY;
+            return sign[0] * Double.POSITIVE_INFINITY;
         }
         if (value.equals(".nan")) {
             return Double.NaN;
         }
         if (value.contains(":")) {
-            String[] parts = value.split(":");
+            String[] parts = value.split(":", -1);
             double out = 0;
             double base = 1;
             for (int i = parts.length - 1; i >= 0; i--) {
-                out += Double.parseDouble(parts[i]) * base;
+                out += pythonFloat(parts[i]) * base;
                 base *= 60;
             }
-            return sign * out;
+            return sign[0] * out;
         }
-        return sign * Double.parseDouble(value);
+        return sign[0] * pythonFloat(value);
     }
 
     /** The deepest nesting the register loader composes, the same cap TypeScript's js-yaml applies by
@@ -393,13 +430,23 @@ public final class Readiness {
             throw new IllegalArgumentException(
                     "could not determine a constructor for the tag '" + tag.getValue() + "'");
         }
+        boolean collectionTag = tag.equals(Tag.SEQ) || tag.equals(Tag.MAP);
+        if (tag.equals(Tag.MERGE) || collectionTag == node instanceof ScalarNode
+                || tag.equals(Tag.SEQ) && !(node instanceof SequenceNode)
+                || tag.equals(Tag.MAP) && !(node instanceof MappingNode)) {
+            // SafeLoader has no constructor for a merge key read as a value, and each constructor takes
+            // one kind of node: !!str [1] and !!seq x are refused.
+            throw new IllegalArgumentException(
+                    "could not construct the tag '" + tag.getValue() + "' from a " + node.getNodeId() + " node");
+        }
         if (node instanceof ScalarNode scalar) {
             String text = scalar.getValue();
             if (tag.equals(Tag.NULL)) {
                 return null;
             }
             if (tag.equals(Tag.TIMESTAMP)) {
-                return new PyyamlTimestamp(text);
+                // A date construct_yaml_timestamp cannot build stays text, as load_untrusted_yaml keeps it.
+                return isPyyamlCalendarTimestamp(text) ? new PyyamlTimestamp(text) : pythonizeTimestamp(text);
             }
             String lower = text.toLowerCase(Locale.ROOT);
             if (tag.equals(Tag.BOOL)) {
@@ -421,15 +468,11 @@ public final class Readiness {
                 return text;
             }
             // A tag the file writes, or str for a quoted scalar: constructed by that tag, as SafeLoader does.
-            try {
-                if (tag.equals(Tag.INT)) {
-                    return pyyamlConstructInt(text);
-                }
-                if (tag.equals(Tag.FLOAT)) {
-                    return pyyamlConstructFloat(text);
-                }
-            } catch (RuntimeException e) {
-                throw new IllegalArgumentException("'" + text + "' is not a YAML " + tag.getValue());
+            if (tag.equals(Tag.INT)) {
+                return pyyamlConstructInt(text);
+            }
+            if (tag.equals(Tag.FLOAT)) {
+                return pyyamlConstructFloat(text);
             }
             return text;
         }
@@ -573,6 +616,31 @@ public final class Readiness {
                     + "(?:\\.(?<fraction>[0-9]*))?"
                     + "(?:[ \\t]*(?<tz>Z|(?<tzSign>[-+])(?<tzHour>[0-9][0-9]?)(?::(?<tzMinute>[0-9][0-9]))?))?)?");
 
+    /** Whether {@code construct_yaml_timestamp} builds a {@code date}/{@code datetime} from {@code raw}:
+     * its fields match and lie in the calendar, the clock and a UTC offset under 24 hours. */
+    private static boolean isPyyamlCalendarTimestamp(String raw) {
+        java.util.regex.Matcher m = PYYAML_TIMESTAMP_FIELDS_RE.matcher(raw);
+        if (!m.matches()) {
+            return false;
+        }
+        int year = Integer.parseInt(m.group("year"));
+        int month = Integer.parseInt(m.group("month"));
+        int day = Integer.parseInt(m.group("day"));
+        if (year < 1 || month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)) {
+            return false;
+        }
+        if (m.group("hour") == null) {
+            return true;
+        }
+        if (Integer.parseInt(m.group("hour")) > 23 || Integer.parseInt(m.group("minute")) > 59
+                || Integer.parseInt(m.group("second")) > 59) {
+            return false;
+        }
+        String tzMinute = m.group("tzMinute");
+        return m.group("tzSign") == null
+                || Integer.parseInt(m.group("tzHour")) * 60 + (tzMinute == null ? 0 : Integer.parseInt(tzMinute)) < 24 * 60;
+    }
+
     /** PyYAML's {@code construct_yaml_timestamp} ({@code yaml/constructor.py:322-351}) plus Python's
      * own {@code str(date)}/{@code str(datetime)} rendering, given a {@link PyyamlTimestamp} marker's
      * raw text -- never a plain string, which {@link #normalizeDeviationDates} passes through
@@ -691,9 +759,11 @@ public final class Readiness {
         } else if (node instanceof MappingNode map) {
             Set<String> seen = new HashSet<>();
             for (NodeTuple tuple : map.getValue()) {
-                String k = String.valueOf(composeValue(tuple.getKeyNode()));
-                if (!Tag.MERGE.equals(pyyamlTag(tuple.getKeyNode())) && !seen.add(k)) {
-                    throw new IllegalArgumentException("found the key " + k + " twice");
+                if (!Tag.MERGE.equals(pyyamlTag(tuple.getKeyNode()))) {
+                    String k = String.valueOf(composeValue(tuple.getKeyNode()));
+                    if (!seen.add(k)) {
+                        throw new IllegalArgumentException("found the key " + k + " twice");
+                    }
                 }
                 rejectRepeatedKeys(tuple.getValueNode());
             }

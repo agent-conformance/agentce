@@ -206,4 +206,37 @@ class DomainBindingTest {
                 List.of(new DomainBinding.Budget("tokens", 10.0), new DomainBinding.Budget("spend", null)),
                 scopeFromYaml("budgets: {tokens: !!int \"1_0\", spend: !!float \".inf\"}").budgets());
     }
+
+    @Test
+    void taggedTextReadsAsPythonsIntAndFloatDo() throws IOException {
+        assertEquals(
+                List.of(
+                        new DomainBinding.Budget("tokens", 8.0),
+                        new DomainBinding.Budget("compute_seconds", 0.5),
+                        new DomainBinding.Budget("spend", null)),
+                scopeFromYaml("budgets: {tokens: !!int \"0o10\", compute_seconds: !!float \"+.5\", spend: !!float \"inf\"}")
+                        .budgets());
+        assertEquals(
+                List.of(new DomainBinding.Budget("tokens", 5.0)),
+                scopeFromYaml("budgets: {tokens: !!int \" 5\"}").budgets());
+    }
+
+    @Test
+    void aDateNoCalendarHoldsIsText() throws IOException {
+        assertEquals(Set.of("2021-02-29"), scopeFromYaml("allowed_tools: [2021-02-29, 2020-02-29]").allowedTools());
+        assertEquals(List.of(), scopeFromYaml("budgets: {2020-01-01: 1, 2020-01-02: 2}").budgets());
+    }
+
+    @Test
+    void aTagTheNodeCannotTakeIsRefused() {
+        for (String scope : List.of(
+                "allowed_tools: !!str [x]",
+                "task_type_x: !!seq x",
+                "allowed_tools: [<<]",
+                "budgets: {tokens: !!int \"1:\"}",
+                "budgets: {spend: !!float \"5f\"}")) {
+            InputError e = assertThrows(InputError.class, () -> scopeFromYaml(scope), scope);
+            assertEquals("input.domain_binding_invalid", e.key);
+        }
+    }
 }
