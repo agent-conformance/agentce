@@ -24701,6 +24701,255 @@
     }
   },
   {
+    "name": "key.flow_entry_seq",
+    "yaml": "{[a]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.flow_entry_seq.task_scopes",
+    "yaml": "task_scopes:\n  - {[allowed_tools]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.flow_entry_seq_after",
+    "yaml": "{x: 1, [a]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.flow_entry_seq_after.task_scopes",
+    "yaml": "task_scopes:\n  - {x: [\"yes\"], [allowed_tools]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.flow_entry_map",
+    "yaml": "{{a: 1}}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.flow_entry_map.task_scopes",
+    "yaml": "task_scopes:\n  - {{allowed_tools: 1}}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.flow_entry_tagged",
+    "yaml": "{!!seq [a]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.flow_entry_tagged.task_scopes",
+    "yaml": "task_scopes:\n  - {!!seq [allowed_tools]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.flow_entry_alias",
+    "yaml": "x: &s [a]\ny: {*s}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.flow_entry_alias.task_scopes",
+    "yaml": "task_scopes:\n  - x: &s [allowed_tools]\n    y: {*s}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.flow_entry_comment",
+    "yaml": "{x: 1, # c\n [a]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.flow_entry_comment.task_scopes",
+    "yaml": "task_scopes:\n  - {x: [\"yes\"], # c\n     [allowed_tools]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.flow_entry_scalar",
+    "yaml": "{a, x: 1}\n",
+    "reads": {
+      "map": [
+        [
+          "a",
+          null
+        ],
+        [
+          "x",
+          {
+            "n": 1.0
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "key.flow_entry_scalar.task_scopes",
+    "yaml": "task_scopes:\n  - {allowed_tools, x: [\"yes\"]}\n",
+    "reads": {
+      "map": [
+        [
+          "task_scopes",
+          {
+            "seq": [
+              {
+                "map": [
+                  [
+                    "allowed_tools",
+                    null
+                  ],
+                  [
+                    "x",
+                    {
+                      "seq": [
+                        {
+                          "s": "yes"
+                        }
+                      ]
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "key.hash_in_quoted_key",
+    "yaml": "{\"a #\": [1]}\n",
+    "reads": {
+      "map": [
+        [
+          "a #",
+          {
+            "seq": [
+              {
+                "n": 1.0
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "key.hash_in_quoted_key.task_scopes",
+    "yaml": "task_scopes:\n  - {\"allowed_tools #\": [[\"yes\"]]}\n",
+    "reads": {
+      "map": [
+        [
+          "task_scopes",
+          {
+            "seq": [
+              {
+                "map": [
+                  [
+                    "allowed_tools #",
+                    {
+                      "seq": [
+                        {
+                          "seq": [
+                            {
+                              "s": "yes"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "key.hash_in_quoted_value",
+    "yaml": "{x: 'a #', y: [1]}\n",
+    "reads": {
+      "map": [
+        [
+          "x",
+          {
+            "s": "a #"
+          }
+        ],
+        [
+          "y",
+          {
+            "seq": [
+              {
+                "n": 1.0
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "key.hash_in_quoted_value.task_scopes",
+    "yaml": "task_scopes:\n  - {x: 'allowed_tools #', y: [[\"yes\"]]}\n",
+    "reads": {
+      "map": [
+        [
+          "task_scopes",
+          {
+            "seq": [
+              {
+                "map": [
+                  [
+                    "x",
+                    {
+                      "s": "allowed_tools #"
+                    }
+                  ],
+                  [
+                    "y",
+                    {
+                      "seq": [
+                        {
+                          "seq": [
+                            {
+                              "s": "yes"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
     "name": "merge.one",
     "yaml": "b: {<<: {t: 1}}\n",
     "reads": {
@@ -25375,6 +25624,90 @@
   {
     "name": "merge.repeat_after_merge.budgets",
     "yaml": "task_scopes:\n  - task_type: x\n    budgets: {<<: {tokens: 1}, tokens: 2, tokens: 3}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "merge.seq_with_seq",
+    "yaml": "b: {<<: [{t: 1}, [x]]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "merge.seq_with_seq.budgets",
+    "yaml": "task_scopes:\n  - task_type: x\n    budgets: {<<: [{tokens: 1}, [x]]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "merge.seq_of_seq",
+    "yaml": "b: {<<: [[x]]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "merge.seq_of_seq.budgets",
+    "yaml": "task_scopes:\n  - task_type: x\n    budgets: {<<: [[x]]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "merge.seq_source",
+    "yaml": "b: {<<: [x]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "merge.seq_source.budgets",
+    "yaml": "task_scopes:\n  - task_type: x\n    budgets: {<<: [x]}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "merge.alias_seq_source",
+    "yaml": "a: &a [x]\nb: {<<: *a}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "merge.alias_seq_source.budgets",
+    "yaml": "task_scopes:\n  - task_type: x\n    a: &a [x]\n    budgets: {<<: *a}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "merge.no_value",
+    "yaml": "b: {<<}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "merge.no_value.budgets",
+    "yaml": "task_scopes:\n  - task_type: x\n    budgets: {<<}\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "merge.block_seq_source",
+    "yaml": "b:\n  <<:\n    - {t: 1}\n    - [x]\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "merge.block_seq_source.budgets",
+    "yaml": "task_scopes:\n  - task_type: x\n    budgets:\n      <<:\n        - {tokens: 1}\n        - [x]\n",
     "reads": {
       "refused": "input.domain_binding_invalid"
     }

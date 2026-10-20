@@ -198,6 +198,15 @@ KEY_FORMS = {
     "json_like": '{"K":[1],"b":V}',
     "empty_value": "K:\nb: V",
     "eq_key": "=: V",
+    "flow_entry_seq": "{[K]}",
+    "flow_entry_seq_after": "{x: V, [K]}",
+    "flow_entry_map": "{{K: 1}}",
+    "flow_entry_tagged": "{!!seq [K]}",
+    "flow_entry_alias": "x: &s [K]\ny: {*s}",
+    "flow_entry_comment": "{x: V, # c\n [K]}",
+    "flow_entry_scalar": "{K, x: V}",
+    "hash_in_quoted_key": '{"K #": [V]}',
+    "hash_in_quoted_value": "{x: 'K #', y: [V]}",
 }
 MERGE_FORMS = {
     "one": "b: {<<: {t: 1}}",
@@ -216,6 +225,12 @@ MERGE_FORMS = {
     "tagged_quoted": 'b: {!!merge "<<": {t: 1}}',
     "scalar_source": "b: {<<: 1}",
     "repeat_after_merge": "b: {<<: {t: 1}, t: 2, t: 3}",
+    "seq_with_seq": "b: {<<: [{t: 1}, [x]]}",
+    "seq_of_seq": "b: {<<: [[x]]}",
+    "seq_source": "b: {<<: [x]}",
+    "alias_seq_source": "a: &a [x]\nb: {<<: *a}",
+    "no_value": "b: {<<}",
+    "block_seq_source": "b:\n  <<:\n    - {t: 1}\n    - [x]",
 }
 
 

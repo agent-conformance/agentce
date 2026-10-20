@@ -581,65 +581,109 @@ function valueIndicatorFollows(text: string, position: number): boolean {
   );
 }
 
-/** Whether the text before `position`, past spaces, line breaks and comments, ends in the `?` of an explicit key. */
-function explicitKeyPrecedes(text: string, position: number): boolean {
-  let end = position;
-  while (end > 0) {
-    const lineStart = text.lastIndexOf("\n", end - 1) + 1;
-    const line = text
-      .slice(lineStart, end)
-      .replace(/(^|\s)#.*$/, "")
-      .trimEnd();
-    if (line !== "") {
-      return (
-        line.endsWith("?") && (line.length === 1 || /[\s,[{]/.test(line[line.length - 2] ?? ""))
-      );
-    }
-    end = lineStart - 1;
-  }
-  return false;
+/** The last indicator in `text` between two sibling nodes (or a collection's start and its first node), past spaces,
+ * line breaks and comments: `?` before an explicit key, `:` before a mapping value. Only separators, indicators and
+ * comments sit between two nodes, so no quoted text can hide a `#` here. */
+function lastIndicator(text: string, from: number, to: number): string {
+  const gap = text
+    .slice(from, to)
+    .replace(/(^|\s)#[^\n]*/g, "$1")
+    .trimEnd();
+  return gap.at(-1) ?? "";
+}
+
+/** A value js-yaml composed as a sequence or mapping (an alias to one included), which PyYAML cannot hash as a key. */
+function isCollection(value: unknown): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    value !== PYYAML_MERGE_VALUE &&
+    !isPyyamlTimestamp(value)
+  );
+}
+
+/** A value PyYAML merges: a mapping, never a sequence. */
+function isMergeSource(value: unknown): boolean {
+  return isCollection(value) && !Array.isArray(value);
+}
+
+/** Per open node, as {@link PyyamlComposer} reads it. */
+interface OpenNode {
+  /** The indicator written right before this node in its parent (see {@link lastIndicator}). */
+  readonly before: string;
+  /** Where the last node directly inside this one ended (this node's start until one has). */
+  childEnd: number;
+  /** A merge key has closed directly inside this node; `mergeValueNext` while its value is still to come. */
+  merged: boolean;
+  mergeValueNext: boolean;
+  /** The sequences and mappings directly inside this node with no `:` before them: keys, if this node is a mapping
+   * (js-yaml also opens a node around a whole collection, whose one child is its own result). */
+  readonly withoutValueIndicator: unknown[];
 }
 
 /** The PyYAML node rules js-yaml's composer does not follow, applied as each node closes (its `listener` option):
  * a scalar tagged `!` resolves as if untagged whatever its quoting; a sequence or mapping read as a mapping key is
- * refused, as PyYAML cannot hash it (js-yaml would name it by its text); with `uniqueKeys`, a mapping that writes
- * `<<` twice is refused. */
+ * refused, as PyYAML cannot hash it (js-yaml would name it by its text); a merge value that is not a mapping or a
+ * sequence of mappings is refused; with `uniqueKeys`, a mapping that writes `<<` twice is refused. A node is a key
+ * from where it sits among its siblings: after `?`, before `:`, or in a mapping with no `:` before it. */
 class PyyamlComposer {
-  /** Per open node: whether a merge key has closed directly inside it, and whether it is an explicit `?` key. */
-  private readonly open: { merged: boolean; explicitKey: boolean }[] = [];
+  private readonly open: OpenNode[] = [];
 
   constructor(private readonly uniqueKeys: boolean) {}
 
   readonly listener = (event: string, composer: unknown): void => {
     const state = composer as ComposerState;
+    const parent = this.open.at(-1);
     if (event === "open") {
       this.open.push({
+        before:
+          parent === undefined ? "" : lastIndicator(state.input, parent.childEnd, state.position),
+        childEnd: state.position,
         merged: false,
-        explicitKey: explicitKeyPrecedes(state.input, state.position),
+        mergeValueNext: false,
+        withoutValueIndicator: [],
       });
       return;
     }
-    const node = this.open.pop();
+    const node = this.open.pop() as OpenNode;
+    const container = this.open.at(-1);
     if (state.tag === "!" && state.kind === "scalar" && typeof state.result === "string") {
       resolveNonSpecific(state);
     }
-    const parent = this.open.at(-1);
-    if (state.tag === MERGE_TAG && this.uniqueKeys && parent !== undefined) {
-      if (parent.merged) {
+    const result = state.result;
+    if (state.kind === "mapping" && node.withoutValueIndicator.some((child) => child !== result)) {
+      throw new YAMLException("while constructing a mapping: found unhashable key");
+    }
+    if (container === undefined) {
+      return;
+    }
+    container.childEnd = state.position;
+    if (container.mergeValueNext) {
+      container.mergeValueNext = false;
+      if (!(isMergeSource(result) || (Array.isArray(result) && result.every(isMergeSource)))) {
+        throw new YAMLException(
+          "while constructing a mapping: expected a mapping or list of mappings for merging",
+        );
+      }
+      return;
+    }
+    if (state.tag === MERGE_TAG) {
+      if (container.merged && this.uniqueKeys) {
         // `<<` is a key too: which of two merges wins is never read (18.184k D1).
         throw new YAMLException("while constructing a mapping: found the merge key '<<' twice");
       }
-      parent.merged = true;
+      container.merged = true;
+      container.mergeValueNext = true;
+      return;
     }
-    const result = state.result;
-    if (
-      typeof result === "object" &&
-      result !== null &&
-      result !== PYYAML_MERGE_VALUE &&
-      !isPyyamlTimestamp(result) &&
-      (node?.explicitKey === true || valueIndicatorFollows(state.input, state.position))
-    ) {
+    if (!isCollection(result)) {
+      return;
+    }
+    if (node.before === "?" || valueIndicatorFollows(state.input, state.position)) {
       throw new YAMLException("while constructing a mapping: found unhashable key");
+    }
+    if (node.before !== ":") {
+      container.withoutValueIndicator.push(result);
     }
   };
 }
