@@ -232,6 +232,34 @@ def test_merge_key_may_be_written_again(tmp_path: Path) -> None:
     assert binding.task_scopes["a"][0].allowed_tools == frozenset({"y"})
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "b: &b {task_type: a}\ntask_scopes:\n  - {<<: *b, <<: {allowed_tools: [x]}}\n",
+        "task_scopes:\n  - task_type: a\n    budgets:\n      <<: {tokens: 1000}\n      <<: {tokens: 10}\n",
+        "<<: {x: 1}\n!!merge y: {x: 2}\n",
+    ],
+)
+def test_merge_key_written_twice_is_refused(tmp_path: Path, text: str) -> None:
+    """Two merge keys in one mapping are refused, as any key written twice is: which merge wins is never read
+    (18.184k D1)."""
+    with pytest.raises(InputError) as caught:
+        _load_text(tmp_path, text)
+    assert caught.value.key == "input.domain_binding_invalid"
+
+
+def test_one_merge_key_beside_explicit_keys_still_reads(tmp_path: Path) -> None:
+    """One << with an explicit key written either side still merges, the explicit key winning (18.184k)."""
+    binding = _load_text(
+        tmp_path,
+        "b: &b {task_type: a, allowed_tools: [x]}\n"
+        "task_scopes:\n  - {allowed_tools: [y], <<: *b, budgets: {tokens: 5}}\n",
+    )
+    scope = binding.task_scopes["a"][0]
+    assert scope.allowed_tools == frozenset({"y"})
+    assert dict(scope.budgets)["tokens"] == 5
+
+
 def test_yaml_dates_are_neither_text_nor_numbers(tmp_path: Path) -> None:
     """A YAML date names no tool, sets no limit and no task type, and renders as str(date) where an id is read
     (18.184g: the reference the TypeScript and Java readers match)."""

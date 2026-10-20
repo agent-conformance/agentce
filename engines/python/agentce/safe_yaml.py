@@ -68,14 +68,24 @@ class _PermissiveTimestampSafeLoader(yaml.SafeLoader):
 
 class _UniqueKeySafeLoader(_PermissiveTimestampSafeLoader):
     """The loader above, refusing a mapping that writes one key twice, where ``SafeLoader`` keeps the last value. A
-    key a ``<<`` merge brings in may still be written again, as PyYAML's ``flatten_mapping`` allows."""
+    key a ``<<`` merge brings in may still be written again, as PyYAML's ``flatten_mapping`` allows; ``<<`` itself is a
+    key, so two merge keys in one mapping are refused too (the ports cannot all follow PyYAML's last-merge-wins)."""
 
     def construct_mapping(
         self, node: yaml.MappingNode, deep: bool = False
     ) -> dict[Any, Any]:
         seen: set[Any] = set()
+        merged = False
         for key_node, _ in node.value:
             if key_node.tag == "tag:yaml.org,2002:merge":
+                if merged:
+                    raise yaml.constructor.ConstructorError(
+                        "while constructing a mapping",
+                        node.start_mark,
+                        "found the merge key '<<' twice",
+                        key_node.start_mark,
+                    )
+                merged = True
                 continue
             key = self.construct_object(key_node, deep=deep)
             try:
