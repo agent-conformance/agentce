@@ -188,4 +188,22 @@ class DomainBindingTest {
                 List.of(new DomainBinding.Budget("compute_seconds", null), new DomainBinding.Budget("spend", null)),
                 scopeFromYaml("budgets: {spend: " + huge + ", compute_seconds: " + huge + "}").budgets());
     }
+
+    @Test
+    void explicitTagsConstructAsSafeLoaderDoes() throws IOException {
+        assertEquals(
+                Set.of("7", "x", "yes"),
+                scopeFromYaml("allowed_tools: [!!bool \"yes\", !!bool \"true\", !!bool 'on', !!int \"7\", !!float \"1.5\","
+                                + " !!str 7, !!str yes, x]")
+                        .allowedTools());
+        assertEquals(
+                List.of(
+                        new DomainBinding.Budget("tokens", null),
+                        new DomainBinding.Budget("compute_seconds", 5.0),
+                        new DomainBinding.Budget("spend", 10.0)),
+                scopeFromYaml("budgets: {tokens: !!str 1000, spend: !!int \"10\", compute_seconds: !!float \"5\"}").budgets());
+        assertEquals(
+                List.of(new DomainBinding.Budget("tokens", 10.0), new DomainBinding.Budget("spend", null)),
+                scopeFromYaml("budgets: {tokens: !!int \"1_0\", spend: !!float \".inf\"}").budgets());
+    }
 }

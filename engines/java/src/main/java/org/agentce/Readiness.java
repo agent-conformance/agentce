@@ -24,14 +24,19 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 import org.yaml.snakeyaml.nodes.MappingNode;
 import org.yaml.snakeyaml.nodes.Node;
+import org.yaml.snakeyaml.nodes.NodeId;
 import org.yaml.snakeyaml.nodes.NodeTuple;
 import org.yaml.snakeyaml.nodes.ScalarNode;
 import org.yaml.snakeyaml.nodes.SequenceNode;
 import org.yaml.snakeyaml.nodes.Tag;
+import org.yaml.snakeyaml.representer.Representer;
+import org.yaml.snakeyaml.resolver.Resolver;
 
 /**
  * {@code agentce readiness} (SPEC §13.3.4): the report-readiness verdict (READY / READY WITH
@@ -234,6 +239,31 @@ public final class Readiness {
     private record PyyamlTimestamp(String text) {}
 
     private static final Set<String> PYYAML_BOOL_TRUE = Set.of("yes", "true", "on");
+    private static final Set<String> PYYAML_BOOL_FALSE = Set.of("no", "false", "off");
+
+    /** Marks the tag SnakeYAML resolves for an untagged plain scalar, so {@link #composeValue} can tell it from
+     * a tag the file writes ({@code !!str 7}, {@code !!bool "yes"}): PyYAML resolves only the first and
+     * constructs the second by its tag. */
+    private static final String IMPLICIT_TAG_PREFIX = "tag:agentce.org,implicit:";
+
+    private static final class ImplicitMarkingResolver extends Resolver {
+        @Override
+        public Tag resolve(NodeId kind, String value, boolean implicit) {
+            Tag tag = super.resolve(kind, value, implicit);
+            return kind == NodeId.scalar && implicit ? new Tag(IMPLICIT_TAG_PREFIX + tag.getValue()) : tag;
+        }
+    }
+
+    /** {@code node}'s tag with the implicit mark removed. */
+    private static Tag pyyamlTag(Node node) {
+        String text = node.getTag().getValue();
+        return text.startsWith(IMPLICIT_TAG_PREFIX) ? new Tag(text.substring(IMPLICIT_TAG_PREFIX.length())) : node.getTag();
+    }
+
+    private static Yaml pyyamlComposer(LoaderOptions options) {
+        DumperOptions dumper = new DumperOptions();
+        return new Yaml(new SafeConstructor(options), new Representer(dumper), dumper, options, new ImplicitMarkingResolver());
+    }
 
     /** PyYAML's own {@code Resolver}, {@code tag:yaml.org,2002:int} implicit-resolution regex
      * ({@code yaml/resolver.py}), copied verbatim -- SnakeYAML's own {@code Tag.INT} resolution
@@ -357,32 +387,49 @@ public final class Readiness {
      * PyYAML's "implicit resolution applies only to the plain scalar style" rule). Never touches
      * Jackson's own YAML reader ({@link Yaml}, this engine's other loader) for this file. */
     private static Object composeValue(Node node) {
-        if (!SAFE_TAGS.contains(node.getTag())) {
+        boolean implicit = node.getTag().getValue().startsWith(IMPLICIT_TAG_PREFIX);
+        Tag tag = pyyamlTag(node);
+        if (!SAFE_TAGS.contains(tag)) {
             throw new IllegalArgumentException(
-                    "could not determine a constructor for the tag '" + node.getTag().getValue() + "'");
+                    "could not determine a constructor for the tag '" + tag.getValue() + "'");
         }
         if (node instanceof ScalarNode scalar) {
             String text = scalar.getValue();
-            if (!scalar.isPlain()) {
-                return text;
-            }
-            Tag tag = scalar.getTag();
             if (tag.equals(Tag.NULL)) {
                 return null;
-            }
-            if (tag.equals(Tag.BOOL)) {
-                return PYYAML_BOOL_TRUE.contains(text.toLowerCase(Locale.ROOT));
             }
             if (tag.equals(Tag.TIMESTAMP)) {
                 return new PyyamlTimestamp(text);
             }
-            if (couldBeNumeric(text)) {
-                if (PYYAML_INT_RESOLVE_RE.matcher(text).matches()) {
+            String lower = text.toLowerCase(Locale.ROOT);
+            if (tag.equals(Tag.BOOL)) {
+                if (!PYYAML_BOOL_TRUE.contains(lower) && !PYYAML_BOOL_FALSE.contains(lower)) {
+                    throw new IllegalArgumentException("'" + text + "' is not a YAML boolean");
+                }
+                return PYYAML_BOOL_TRUE.contains(lower);
+            }
+            if (implicit) {
+                // SnakeYAML's int/float resolution differs from PyYAML's; its null/bool/timestamp agree.
+                if (couldBeNumeric(text)) {
+                    if (PYYAML_INT_RESOLVE_RE.matcher(text).matches()) {
+                        return pyyamlConstructInt(text);
+                    }
+                    if (PYYAML_FLOAT_RESOLVE_RE.matcher(text).matches()) {
+                        return pyyamlConstructFloat(text);
+                    }
+                }
+                return text;
+            }
+            // A tag the file writes, or str for a quoted scalar: constructed by that tag, as SafeLoader does.
+            try {
+                if (tag.equals(Tag.INT)) {
                     return pyyamlConstructInt(text);
                 }
-                if (PYYAML_FLOAT_RESOLVE_RE.matcher(text).matches()) {
+                if (tag.equals(Tag.FLOAT)) {
                     return pyyamlConstructFloat(text);
                 }
+            } catch (RuntimeException e) {
+                throw new IllegalArgumentException("'" + text + "' is not a YAML " + tag.getValue());
             }
             return text;
         }
@@ -418,7 +465,7 @@ public final class Readiness {
         List<NodeTuple> own = new ArrayList<>();
         for (NodeTuple tuple : map.getValue()) {
             Node keyNode = tuple.getKeyNode();
-            if (keyNode instanceof ScalarNode keyScalar && keyScalar.getTag().equals(Tag.MERGE)) {
+            if (keyNode instanceof ScalarNode keyScalar && pyyamlTag(keyScalar).equals(Tag.MERGE)) {
                 Node valueNode = tuple.getValueNode();
                 if (valueNode instanceof MappingNode sourceMap) {
                     merged.addAll(flattenMapping(sourceMap));
@@ -614,7 +661,7 @@ public final class Readiness {
         try {
             LoaderOptions options = new LoaderOptions();
             options.setNestingDepthLimit(DEVIATION_REGISTER_MAX_DEPTH);
-            Node root = new Yaml(options).compose(new StringReader(text));
+            Node root = pyyamlComposer(options).compose(new StringReader(text));
             if (root != null && uniqueKeys) {
                 rejectRepeatedKeys(root);
             }
@@ -645,7 +692,7 @@ public final class Readiness {
             Set<String> seen = new HashSet<>();
             for (NodeTuple tuple : map.getValue()) {
                 String k = String.valueOf(composeValue(tuple.getKeyNode()));
-                if (!Tag.MERGE.equals(tuple.getKeyNode().getTag()) && !seen.add(k)) {
+                if (!Tag.MERGE.equals(pyyamlTag(tuple.getKeyNode())) && !seen.add(k)) {
                     throw new IllegalArgumentException("found the key " + k + " twice");
                 }
                 rejectRepeatedKeys(tuple.getValueNode());
