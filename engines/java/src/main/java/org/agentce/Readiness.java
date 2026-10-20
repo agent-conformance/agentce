@@ -16,6 +16,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -594,6 +595,54 @@ public final class Readiness {
      * explicit {@code null} value is a shape error, distinct from the key being absent (which silently
      * defaults to an empty list); every {@code granted}/{@code expiry} value YAML resolved as a
      * timestamp is normalized via {@link #normalizeDeviationDates} before use. */
+    /** A YAML file read as PyYAML's {@code SafeLoader} types it (the compose path above), as a {@link JsonNode}, refusing
+     * a mapping that writes one key twice (a key a {@code <<} merge brings in may be written again) and anything else
+     * it cannot load under {@code key}. Used by {@link DomainBinding#load} (18.184g); the register keeps its own loader. */
+    static JsonNode loadPyyamlUniqueKeys(Path path, String key, String what) {
+        String where = what + " at " + pyRepr(path.toString());
+        String text;
+        try {
+            text = Verify.decodeStrict(Files.readAllBytes(path)).toString();
+        } catch (CharacterCodingException e) {
+            throw new InputError(key, where + " is not valid UTF-8: " + e + ".", "save " + what + " as UTF-8 text.");
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        try {
+            LoaderOptions options = new LoaderOptions();
+            options.setNestingDepthLimit(DEVIATION_REGISTER_MAX_DEPTH);
+            Node root = new Yaml(options).compose(new StringReader(text));
+            if (root == null) {
+                return null;
+            }
+            rejectRepeatedKeys(root);
+            return toJsonNode(composeValue(root));
+        } catch (StackOverflowError | RuntimeException e) {
+            throw new InputError(
+                    key,
+                    where + " carries YAML the engine refuses to load: " + e.getMessage() + ".",
+                    "write each key once, and use only plain YAML scalars, mappings and sequences in " + what + ".");
+        }
+    }
+
+    private static void rejectRepeatedKeys(Node node) {
+        if (node instanceof SequenceNode seq) {
+            for (Node child : seq.getValue()) {
+                rejectRepeatedKeys(child);
+            }
+        } else if (node instanceof MappingNode map) {
+            Set<String> seen = new HashSet<>();
+            for (NodeTuple tuple : map.getValue()) {
+                if (!Tag.MERGE.equals(tuple.getKeyNode().getTag())
+                        && !seen.add(String.valueOf(composeValue(tuple.getKeyNode())))) {
+                    throw new IllegalArgumentException(
+                            "found the key " + composeValue(tuple.getKeyNode()) + " twice");
+                }
+                rejectRepeatedKeys(tuple.getValueNode());
+            }
+        }
+    }
+
     public static List<JsonNode> loadDeviationRegister(Path path) {
         // Python passes the loader a Path, so its errors name ./r.yaml as r.yaml.
         String where = "the deviation register at " + pyRepr(Diff.normalizePosixPath(path.toString()));
