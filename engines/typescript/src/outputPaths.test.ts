@@ -10,6 +10,9 @@ import { generateKeyPairSync } from "node:crypto";
 import {
   chmodSync,
   cpSync,
+  existsSync,
+  linkSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -223,5 +226,77 @@ test("readiness on a read-only report warns under its key", { skip: ROOT }, () =
     } finally {
       chmodSync(report, 0o755);
     }
+  });
+});
+
+// 18.184c: one write strategy in every engine, a bounded-name sibling moved over the target.
+
+test("a hard-linked target keeps its other name's bytes (18.184c)", () => {
+  inScratch((dir) => {
+    writeFileSync(join(dir, "outside.md"), "old\n");
+    linkSync(join(dir, "outside.md"), join(dir, "r.md"));
+    writeFile(join(dir, "r.md"), "new\n");
+    assert.equal(readFileSync(join(dir, "r.md"), "utf-8"), "new\n");
+    assert.equal(readFileSync(join(dir, "outside.md"), "utf-8"), "old\n");
+  });
+});
+
+test("a dangling link is replaced, not followed (18.184c)", () => {
+  inScratch((dir) => {
+    mkdirSync(join(dir, "away"));
+    symlinkSync(join(dir, "away", "r.md"), join(dir, "r.md"));
+    writeFile(join(dir, "r.md"), "new\n");
+    assert.ok(!lstatSync(join(dir, "r.md")).isSymbolicLink());
+    assert.ok(!existsSync(join(dir, "away", "r.md")));
+  });
+});
+
+test("an existing target keeps its mode, and a 255-byte name is written (18.184c)", () => {
+  inScratch((dir) => {
+    writeFileSync(join(dir, "r.md"), "old\n");
+    chmodSync(join(dir, "r.md"), 0o640);
+    writeFile(join(dir, "r.md"), "new\n");
+    assert.equal(statSync(join(dir, "r.md")).mode & 0o777, 0o640);
+    const long = `${"n".repeat(252)}.md`;
+    writeFile(join(dir, long), "new\n");
+    assert.deepEqual(readdirSync(dir).sort(), [long, "r.md"].sort());
+  });
+});
+
+test(
+  "a writable file in a read-only folder is refused and left as it was (18.184c)",
+  { skip: ROOT },
+  () => {
+    inScratch((dir) => {
+      mkdirSync(join(dir, "ro"));
+      writeFileSync(join(dir, "ro", "r.md"), "old\n");
+      chmodSync(join(dir, "ro"), 0o555);
+      try {
+        assert.throws(
+          () => writeOutput(join(dir, "ro", "r.md"), FILE, "new\n"),
+          (e: unknown) =>
+            e instanceof InputError && e.key === FILE.key && e.message.includes(UNWRITABLE),
+        );
+        assert.deepEqual(readdirSync(join(dir, "ro")), ["r.md"]);
+      } finally {
+        chmodSync(join(dir, "ro"), 0o755);
+      }
+    });
+  },
+);
+
+test("a path through a missing folder is refused and nothing is made (18.184c)", () => {
+  inScratch((dir) => {
+    for (const rel of ["nosub/../r.md", "nosub/..", "a/nosub/../b/r.md"]) {
+      assert.throws(
+        () => writeOutput(`${dir}/${rel}`, FILE, "new\n"),
+        (e: unknown) =>
+          e instanceof InputError && e.key === FILE.key && e.message.includes(UNREACHABLE),
+      );
+    }
+    assert.deepEqual(readdirSync(dir), []);
+    mkdirSync(join(dir, "sub"));
+    writeOutput(`${dir}/sub/../r.md`, FILE, "new\n");
+    assert.equal(readFileSync(join(dir, "r.md"), "utf-8"), "new\n");
   });
 });

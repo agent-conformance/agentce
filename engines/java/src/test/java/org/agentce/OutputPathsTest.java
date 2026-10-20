@@ -201,4 +201,46 @@ class OutputPathsTest {
             Files.setPosixFilePermissions(report, PosixFilePermissions.fromString("rwxr-xr-x"));
         }
     }
+
+    // 18.184c: one write strategy in every engine, a bounded-name sibling moved over the target.
+
+    @Test
+    void aHardLinkKeepsItsOtherNameAndADanglingLinkIsReplaced(@TempDir Path dir) throws IOException {
+        Path outside = Files.writeString(dir.resolve("outside.md"), "old\n");
+        Path linked = Files.createLink(dir.resolve("r.md"), outside);
+        Outputs.writeFile(linked, "new\n");
+        assertEquals("new\n", Files.readString(linked));
+        assertEquals("old\n", Files.readString(outside));
+        Files.createDirectory(dir.resolve("away"));
+        Path dangling = Files.createSymbolicLink(dir.resolve("d.md"), dir.resolve("away/d.md"));
+        Outputs.writeFile(dangling, "new\n");
+        assertTrue(!Files.isSymbolicLink(dangling) && Files.notExists(dir.resolve("away/d.md")));
+    }
+
+    @Test
+    void aLongNameIsWrittenAndTheModeIsKept(@TempDir Path dir) throws IOException {
+        Path longName = dir.resolve("n".repeat(252) + ".md");
+        Outputs.writeFile(longName, "new\n");
+        assertEquals("new\n", Files.readString(longName));
+        Path kept = Files.writeString(dir.resolve("r.md"), "old\n");
+        Files.setPosixFilePermissions(kept, PosixFilePermissions.fromString("rw-r-----"));
+        Outputs.writeFile(kept, "new\n");
+        assertEquals("rw-r-----", PosixFilePermissions.toString(Files.getPosixFilePermissions(kept)));
+        try (var names = Files.list(dir)) {
+            assertEquals(2, names.count());
+        }
+    }
+
+    @Test
+    void aPathThroughAMissingFolderIsRefusedAndNothingIsMade(@TempDir Path dir) throws IOException {
+        for (String rel : new String[] {"nosub/../r.md", "nosub/..", "a/nosub/../b/r.md"}) {
+            assertTrue(refusal(dir.resolve(rel), FILE).contains(Outputs.UNREACHABLE), rel);
+        }
+        try (var names = Files.list(dir)) {
+            assertEquals(0, names.count());
+        }
+        Files.createDirectory(dir.resolve("sub"));
+        Outputs.write(dir.resolve("sub/../r.md").toString(), FILE, "new\n");
+        assertEquals("new\n", Files.readString(dir.resolve("r.md")));
+    }
 }
