@@ -298,17 +298,17 @@ def is_regular_file(path: Path | str, *, unreadable_is_absent: bool = False) -> 
     return _mode_matches(path, stat.S_ISREG, unreadable_is_absent)
 
 
-def is_directory(path: Path, *, unreadable_is_absent: bool = False) -> bool:
+def is_directory(path: Path | str, *, unreadable_is_absent: bool = False) -> bool:
     """``Path.is_dir`` with the same answer on every Python; see `is_regular_file`."""
     return _mode_matches(path, stat.S_ISDIR, unreadable_is_absent)
 
 
-def path_exists(path: Path, *, unreadable_is_absent: bool = False) -> bool:
+def path_exists(path: Path | str, *, unreadable_is_absent: bool = False) -> bool:
     """``Path.exists`` with the same answer on every Python; see `is_regular_file`."""
     return _mode_matches(path, lambda _mode: True, unreadable_is_absent)
 
 
-def is_link(path: Path, *, unreadable_is_absent: bool = False) -> bool:
+def is_link(path: Path | str, *, unreadable_is_absent: bool = False) -> bool:
     """``Path.is_symlink`` with the same answer on every Python; see `is_regular_file`."""
     return _mode_matches(
         path, stat.S_ISLNK, unreadable_is_absent, follow_symlinks=False

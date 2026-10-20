@@ -407,6 +407,11 @@ global options:
         return raw;
     }
 
+    /** A trailing separator, which {@code Paths.get} drops: either form on Windows, "/" on POSIX. */
+    private static boolean endsWithSeparator(String raw) {
+        return raw.endsWith("/") || raw.endsWith(File.separator);
+    }
+
     private static String requireFile(String raw, String key, String what) {
         return requireFile(raw, key, what, "pass --" + key + " <file>.");
     }
@@ -420,7 +425,7 @@ global options:
         Path path = Paths.get(raw);
         // Paths.get drops a trailing separator, so "name/" would read the file "name"; POSIX resolves
         // "name/" only to a directory (ENOTDIR), so it is never a file (18.184b, as TypeScript's stat).
-        if (raw.isEmpty() || raw.endsWith("/") || raw.endsWith(File.separator) || !Files.isRegularFile(path)) {
+        if (raw.isEmpty() || endsWithSeparator(raw) || !Files.isRegularFile(path)) {
             throw new InputError(
                     "input." + key + "_not_a_file", what + " " + Readiness.pyRepr(raw) + " is not an existing file.", fix);
         }
@@ -2639,7 +2644,7 @@ global options:
             // asserts a directory; a trailing slash on something that is not a directory must refuse,
             // matching the raw-string `os.path.exists` check in the Python reference (F5, 18.65).
             boolean trailingSlashOnNonDirectory =
-                    (release.endsWith("/") || release.endsWith(File.separator)) && !Files.isDirectory(releasePath);
+                    endsWithSeparator(release) && !Files.isDirectory(releasePath);
             if (!Files.exists(releasePath) || trailingSlashOnNonDirectory) {
                 throw new InputError(
                         "input.release_missing",

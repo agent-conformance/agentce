@@ -358,15 +358,15 @@ def _require_file(
     fix = fix or f"pass --{key.replace('_', '-')} <file>."
     if raw is None:
         raise InputError(f"input.{key}_missing", f"{what} is required.", fix)
-    path = Path(raw)
-    # The text as typed, not ``path``: Path() drops a trailing ``/`` or ``/.``, so ``name/`` would read the
-    # file ``name`` where POSIX refuses it (ENOTDIR), as TypeScript and Java do (18.184b).
+    # The text as typed, not Path(raw): Path() drops a trailing ``/`` or ``/.``, so ``name/`` would read
+    # the file ``name`` where POSIX refuses it (ENOTDIR), as TypeScript and Java do (18.184b).
     if raw == "" or not signing.is_regular_file(raw, unreadable_is_absent=True):
         raise InputError(
             f"input.{key}_not_a_file",
             f"{what} {raw!r} is not an existing file.",
             fix,
         )
+    path = Path(raw)
     # Opened once here, so a file the user cannot read is refused under the role's key before a
     # loader reads it, never internal.unexpected (18.179).
     try:
@@ -2444,17 +2444,16 @@ def _adapt_export(
     alongside another; this shells out to ``adapters/_ingest.py`` in the adapter's own ``uv`` project,
     mirroring the engine conformance suite's own subprocess pattern for the identical reason.
     """
-    adapter_dir = adapters_root / adapter
+    # One real path for the check and the run: uv reads ``--project link/../x`` lexically (as ``x``),
+    # where POSIX resolves ``link`` first, so the typed text could name two folders (18.184b).
+    real_root = Path(os.path.realpath(adapters_root))
+    adapter_dir = real_root / adapter
     if not signing.is_directory(adapter_dir, unreadable_is_absent=True):
         raise InputError(
             "input.adapter_not_found",
-            f"no adapter directory at {adapter_dir}.",
+            f"no adapter directory at {adapters_root / adapter}.",
             "pass --adapters-root pointing at the adapters checkout, or check the adapter name.",
         )
-    # The folder just checked, by its real path: uv reads ``--project link/../x`` lexically (as ``x``), where
-    # the check above resolved ``link`` first, so the two would name different folders (18.184b).
-    real_root = Path(os.path.realpath(adapters_root))
-    adapter_dir = real_root / adapter
     script = real_root / "_ingest.py"
     cmd = [
         "uv",
