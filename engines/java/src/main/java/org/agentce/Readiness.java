@@ -587,14 +587,6 @@ public final class Readiness {
         return out;
     }
 
-    /** Loads and validates a deviation register's <i>shape</i> (SPEC §13.3.4): a mapping with a
-     * top-level {@code deviations} list of mappings, refused as {@code input.deviation_invalid} rather
-     * than crashing on hostile or malformed YAML -- ports {@code _load_deviation_register}'s three
-     * shape corrections exactly: a Python-falsy top-level value ({@link #pyTruthyRaw}'s falsy set, not
-     * just {@code null}) is treated as "no deviations"; a {@code deviations} key present with an
-     * explicit {@code null} value is a shape error, distinct from the key being absent (which silently
-     * defaults to an empty list); every {@code granted}/{@code expiry} value YAML resolved as a
-     * timestamp is normalized via {@link #normalizeDeviationDates} before use. */
     /** A YAML file read as PyYAML's {@code SafeLoader} types it (the compose path above), as a {@link JsonNode}, refusing
      * a mapping that writes one key twice (a key a {@code <<} merge brings in may be written again) and anything else
      * it cannot load under {@code key}. Used by {@link DomainBinding#load} (18.184g); the register keeps its own loader. */
@@ -643,6 +635,14 @@ public final class Readiness {
         }
     }
 
+    /** Loads and validates a deviation register's <i>shape</i> (SPEC §13.3.4): a mapping with a
+     * top-level {@code deviations} list of mappings, refused as {@code input.deviation_invalid} rather
+     * than crashing on hostile or malformed YAML -- ports {@code _load_deviation_register}'s three
+     * shape corrections exactly: a Python-falsy top-level value ({@link #pyTruthyRaw}'s falsy set, not
+     * just {@code null}) is treated as "no deviations"; a {@code deviations} key present with an
+     * explicit {@code null} value is a shape error, distinct from the key being absent (which silently
+     * defaults to an empty list); every {@code granted}/{@code expiry} value YAML resolved as a
+     * timestamp is normalized via {@link #normalizeDeviationDates} before use. */
     public static List<JsonNode> loadDeviationRegister(Path path) {
         // Python passes the loader a Path, so its errors name ./r.yaml as r.yaml.
         String where = "the deviation register at " + pyRepr(Diff.normalizePosixPath(path.toString()));
