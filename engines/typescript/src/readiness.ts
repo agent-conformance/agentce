@@ -555,21 +555,28 @@ interface ComposerState {
   readonly anchorMap: Record<string, unknown>;
 }
 
-/** Whether `text` from `position` on, past spaces, line breaks and comments, opens with the `:` of a mapping value:
- * one followed by a space, a line break, the end, or a flow indicator, or written right after a flow collection. */
-function valueIndicatorFollows(text: string, position: number): boolean {
-  let at = position;
-  while (at < text.length) {
+/** Where the next character in `text` from `from` (before `end`) sits that is not a space, a line break or in a comment
+ * (a `#` at the start or after white space, to the end of its line). */
+function skipSeparation(text: string, from: number, end = text.length): number {
+  let at = from;
+  while (at < end) {
     const ch = text[at];
     if (ch === " " || ch === "\t" || ch === "\r" || ch === "\n") {
       at += 1;
     } else if (ch === "#" && (at === 0 || /\s/.test(text[at - 1] ?? ""))) {
-      const end = text.indexOf("\n", at);
-      at = end === -1 ? text.length : end;
+      const lineEnd = text.indexOf("\n", at);
+      at = lineEnd === -1 || lineEnd > end ? end : lineEnd;
     } else {
       break;
     }
   }
+  return at;
+}
+
+/** Whether `text` from `position` on, past spaces, line breaks and comments, opens with the `:` of a mapping value:
+ * one followed by a space, a line break, the end, or a flow indicator, or written right after a flow collection. */
+function valueIndicatorFollows(text: string, position: number): boolean {
+  const at = skipSeparation(text, position);
   if (text[at] !== ":") {
     return false;
   }
@@ -585,11 +592,11 @@ function valueIndicatorFollows(text: string, position: number): boolean {
  * line breaks and comments: `?` before an explicit key, `:` before a mapping value. Only separators, indicators and
  * comments sit between two nodes, so no quoted text can hide a `#` here. */
 function lastIndicator(text: string, from: number, to: number): string {
-  const gap = text
-    .slice(from, to)
-    .replace(/(^|\s)#[^\n]*/g, "$1")
-    .trimEnd();
-  return gap.at(-1) ?? "";
+  let last = "";
+  for (let at = skipSeparation(text, from, to); at < to; at = skipSeparation(text, at + 1, to)) {
+    last = text[at] ?? "";
+  }
+  return last;
 }
 
 /** A value js-yaml composed as a sequence or mapping (an alias to one included), which PyYAML cannot hash as a key. */
@@ -602,9 +609,13 @@ function isCollection(value: unknown): boolean {
   );
 }
 
-/** A value PyYAML merges: a mapping, never a sequence. */
+/** A value PyYAML merges: a mapping, never a sequence (js-yaml would merge a sequence by its indexes). */
 function isMergeSource(value: unknown): boolean {
-  return isCollection(value) && !Array.isArray(value);
+  return isRecord(value) && isCollection(value);
+}
+
+function unhashableKey(): YAMLException {
+  return new YAMLException("while constructing a mapping: found unhashable key");
 }
 
 /** Per open node, as {@link PyyamlComposer} reads it. */
@@ -613,12 +624,11 @@ interface OpenNode {
   readonly before: string;
   /** Where the last node directly inside this one ended (this node's start until one has). */
   childEnd: number;
-  /** A merge key has closed directly inside this node; `mergeValueNext` while its value is still to come. */
-  merged: boolean;
-  mergeValueNext: boolean;
+  /** Whether a merge key has closed directly inside this node, and its value is still to come (`pending`) or not. */
+  merge: "none" | "pending" | "done";
   /** The sequences and mappings directly inside this node with no `:` before them: keys, if this node is a mapping
    * (js-yaml also opens a node around a whole collection, whose one child is its own result). */
-  readonly withoutValueIndicator: unknown[];
+  withoutValueIndicator?: unknown[];
 }
 
 /** The PyYAML node rules js-yaml's composer does not follow, applied as each node closes (its `listener` option):
@@ -639,9 +649,7 @@ class PyyamlComposer {
         before:
           parent === undefined ? "" : lastIndicator(state.input, parent.childEnd, state.position),
         childEnd: state.position,
-        merged: false,
-        mergeValueNext: false,
-        withoutValueIndicator: [],
+        merge: "none",
       });
       return;
     }
@@ -651,15 +659,15 @@ class PyyamlComposer {
       resolveNonSpecific(state);
     }
     const result = state.result;
-    if (state.kind === "mapping" && node.withoutValueIndicator.some((child) => child !== result)) {
-      throw new YAMLException("while constructing a mapping: found unhashable key");
+    if (state.kind === "mapping" && node.withoutValueIndicator?.some((child) => child !== result)) {
+      throw unhashableKey();
     }
     if (container === undefined) {
       return;
     }
     container.childEnd = state.position;
-    if (container.mergeValueNext) {
-      container.mergeValueNext = false;
+    if (container.merge === "pending") {
+      container.merge = "done";
       if (!(isMergeSource(result) || (Array.isArray(result) && result.every(isMergeSource)))) {
         throw new YAMLException(
           "while constructing a mapping: expected a mapping or list of mappings for merging",
@@ -668,21 +676,21 @@ class PyyamlComposer {
       return;
     }
     if (state.tag === MERGE_TAG) {
-      if (container.merged && this.uniqueKeys) {
+      if (container.merge === "done" && this.uniqueKeys) {
         // `<<` is a key too: which of two merges wins is never read (18.184k D1).
         throw new YAMLException("while constructing a mapping: found the merge key '<<' twice");
       }
-      container.merged = true;
-      container.mergeValueNext = true;
+      container.merge = "pending";
       return;
     }
     if (!isCollection(result)) {
       return;
     }
     if (node.before === "?" || valueIndicatorFollows(state.input, state.position)) {
-      throw new YAMLException("while constructing a mapping: found unhashable key");
+      throw unhashableKey();
     }
     if (node.before !== ":") {
+      container.withoutValueIndicator ??= [];
       container.withoutValueIndicator.push(result);
     }
   };
