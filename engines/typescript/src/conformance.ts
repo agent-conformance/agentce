@@ -138,6 +138,7 @@ function assessProject(
   outDir: string,
   catalogs: Catalog[],
   labels: string[],
+  outRaw: string | null,
 ): void {
   const pid = String(project.id);
   const proj = joinPath(corpusRoot, "projects", pid);
@@ -161,15 +162,23 @@ function assessProject(
   );
   const activity = summarizeActivity(ingested.accepted, profile);
   const blindSpots = computeBlindSpots(assertions, profile, catalogs, ingested.accepted);
-  writeReport(outDir, assertions, {
-    bundleDigest: bundle.digest,
-    catalogs: labels,
-    catalogObjects: catalogs,
-    operator: ECS_OPERATOR,
-    invocation: ["conformance", pid],
-    activity,
-    blindSpots,
-  });
+  const write = (): unknown =>
+    writeReport(outDir, assertions, {
+      bundleDigest: bundle.digest,
+      catalogs: labels,
+      catalogObjects: catalogs,
+      operator: ECS_OPERATOR,
+      invocation: ["conformance", pid],
+      activity,
+      blindSpots,
+    });
+  // Under the user's --out a report write that fails is refused under OUT_DIR, as assess --out
+  // refuses it (18.184d).
+  if (outRaw !== null) {
+    writingInto(outRaw, OUT_DIR, write);
+  } else {
+    write();
+  }
 }
 
 export interface EcsReport {
@@ -305,9 +314,19 @@ export function runEcs(options: RunEcsOptions): EcsReport {
   for (const project of sorted) {
     const pid = String(project.id);
     try {
-      assessProject(corpusRoot, project, joinPath(reportsRoot, pid), catalogs, labels);
+      assessProject(
+        corpusRoot,
+        project,
+        joinPath(reportsRoot, pid),
+        catalogs,
+        labels,
+        options.outDir,
+      );
       identical += 1; // self-golden: the reference regenerates its own golden (SPEC §11.7)
     } catch (exc) {
+      if (exc instanceof InputError && exc.key === OUT_DIR.key) {
+        throw exc; // --out cannot be written: the run is refused, not one project
+      }
       const name = exc instanceof Error ? exc.name : "Error";
       const message = exc instanceof Error ? exc.message : String(exc);
       failures.push({ project: pid, error: `${name}: ${message}` });

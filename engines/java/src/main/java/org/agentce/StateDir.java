@@ -6,7 +6,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +28,7 @@ import java.util.TreeSet;
 public final class StateDir {
     public static final int STATE_VERSION = 1;
     private static final String STATE_FILE = "state.json";
+    private static final String FIX = "choose a writable --state directory.";
 
     public final Path path;
     public int version = STATE_VERSION;
@@ -61,7 +64,13 @@ public final class StateDir {
         if (!Files.isRegularFile(file)) {
             return state;
         }
-        JsonNode data = Json.parseFile(file);
+        String text;
+        try {
+            text = Files.readString(file, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new InputError("input.state_dir_unwritable", e.getClass().getSimpleName() + ": " + e.getMessage(), FIX);
+        }
+        JsonNode data = Json.parse(text);
         int version = data.has("state_version") && data.get("state_version").isNumber()
                 ? data.get("state_version").asInt()
                 : 0;
@@ -112,26 +121,28 @@ public final class StateDir {
                 payload.putNull("last_window_end");
             }
             payload.set("last_outcomes", lastOutcomes);
-            Files.write(path.resolve(STATE_FILE), (Json.pretty(payload) + "\n").getBytes(StandardCharsets.UTF_8));
+            Outputs.writeFile(path.resolve(STATE_FILE), Json.pretty(payload) + "\n");
         } catch (IOException e) {
             throw new InputError(
                     "input.state_dir_unwritable",
                     e.getClass().getSimpleName() + ": " + e.getMessage(),
-                    "choose a writable --state directory.");
+                    FIX);
         }
     }
 
     /** Prove {@code path} is writable before any {@code --out} write begins (a refused run must leave
      * nothing behind), by actually creating and removing a probe file rather than only creating the
      * directory: a directory that exists but lost its write bit after creation would pass
-     * {@code createDirectories} and only fail on a real write. */
+     * {@code createDirectories} and only fail on a real write. {@code state.json} itself must then be
+     * absent (a dangling link counts: the write replaces it) or a regular file that can be read and
+     * written ({@link #checkStateFile}). */
     public static void ensureWritable(Path path) {
         Path probe = path.resolve(".agentce-write-test-" + ProcessHandle.current().pid());
         if (Outputs.throughMissingFolder(path)) {
             throw new InputError(
                     "input.state_dir_unwritable",
                     Readiness.pyRepr(path.toString()) + ": No such file or directory",
-                    "choose a writable --state directory.");
+                    FIX);
         }
         try {
             Files.createDirectories(path);
@@ -141,7 +152,29 @@ public final class StateDir {
             throw new InputError(
                     "input.state_dir_unwritable",
                     e.getClass().getSimpleName() + ": " + e.getMessage(),
-                    "choose a writable --state directory.");
+                    FIX);
+        }
+        checkStateFile(path.resolve(STATE_FILE));
+    }
+
+    /** Refuse a {@code state.json} that is not a regular file, cannot be read and written, or cannot be
+     * reached, under {@code input.state_dir_unwritable}; absent or a dangling link is a fresh series.
+     * Nothing is opened, so a FIFO is refused rather than waited on (18.184d). */
+    private static void checkStateFile(Path file) {
+        String shown = Readiness.pyRepr(file.toString());
+        BasicFileAttributes info;
+        try {
+            info = Files.readAttributes(file, BasicFileAttributes.class);
+        } catch (NoSuchFileException e) {
+            return;
+        } catch (IOException e) {
+            throw new InputError("input.state_dir_unwritable", shown + " " + Outputs.UNREACHABLE + ".", FIX);
+        }
+        if (!info.isRegularFile()) {
+            throw new InputError("input.state_dir_unwritable", shown + " " + Outputs.NOT_A_FILE + ".", FIX);
+        }
+        if (!Files.isReadable(file) || !Files.isWritable(file)) {
+            throw new InputError("input.state_dir_unwritable", shown + ": Permission denied", FIX);
         }
     }
 

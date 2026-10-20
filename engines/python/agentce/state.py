@@ -22,6 +22,7 @@ import errno
 import hashlib
 import json
 import os
+import stat
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -29,10 +30,11 @@ from typing import Any
 from . import signing
 from .assertions import Assertion
 from .errors import InputError
-from .outputs import through_missing_folder
+from .outputs import NOT_A_FILE, UNREACHABLE, through_missing_folder, write_file
 
 STATE_VERSION = 1
 STATE_FILE = "state.json"
+_FIX = "choose a writable --state directory."
 
 
 def _stream(event: dict[str, Any]) -> str:
@@ -51,6 +53,26 @@ def window_end(profile: Any, events: list[dict[str, Any]]) -> str:
         return str(window["end"])
     times = sorted(str(e.get("time", "")) for e in events if e.get("time"))
     return times[-1] if times else "1970-01-01T00:00:00Z"
+
+
+def _check_state_file(state_file: Path) -> None:
+    """Refuse a ``state.json`` that is not a regular file, cannot be read and written, or cannot be
+    reached, under ``input.state_dir_unwritable``; absent or a dangling link is a fresh series."""
+    shown = repr(str(state_file))
+    try:
+        info = os.stat(state_file)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise InputError(
+            "input.state_dir_unwritable", f"{shown} {UNREACHABLE}.", _FIX
+        ) from exc
+    if not stat.S_ISREG(info.st_mode):
+        raise InputError("input.state_dir_unwritable", f"{shown} {NOT_A_FILE}.", _FIX)
+    if not os.access(state_file, os.R_OK | os.W_OK):
+        raise InputError(
+            "input.state_dir_unwritable", f"{shown}: {os.strerror(errno.EACCES)}", _FIX
+        )
 
 
 @dataclass
@@ -74,11 +96,17 @@ class StateDir:
             raise InputError(
                 "input.state_dir_unwritable",
                 exc.strerror or str(exc),
-                "choose a writable --state directory.",
+                _FIX,
             ) from exc
         if not has_state:
             return cls(path=path)
-        data = json.loads(state_file.read_text(encoding="utf-8"))
+        try:
+            text = state_file.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise InputError(
+                "input.state_dir_unwritable", exc.strerror or str(exc), _FIX
+            ) from exc
+        data = json.loads(text)
         version = int(data.get("state_version", 0))
         if version != STATE_VERSION:
             raise InputError(
@@ -117,14 +145,15 @@ class StateDir:
                 "last_window_end": self.last_window_end,
                 "last_outcomes": dict(sorted(self.last_outcomes.items())),
             }
-            (self.path / STATE_FILE).write_text(
-                json.dumps(payload, sort_keys=True, indent=2) + "\n", encoding="utf-8"
+            write_file(
+                self.path / STATE_FILE,
+                json.dumps(payload, sort_keys=True, indent=2) + "\n",
             )
         except OSError as exc:
             raise InputError(
                 "input.state_dir_unwritable",
                 exc.strerror or str(exc),
-                "choose a writable --state directory.",
+                _FIX,
             ) from exc
 
     @staticmethod
@@ -132,13 +161,15 @@ class StateDir:
         """Prove ``path`` is writable before any ``--out`` write begins (a refused run must leave
         nothing behind), by actually creating and removing a probe file rather than only `mkdir`ing:
         a directory that exists but lost its write bit after creation would pass `mkdir(exist_ok=True)`
-        and only fail on a real write."""
+        and only fail on a real write. ``state.json`` itself must then be absent (a dangling link
+        counts: the write replaces it) or a regular file that can be read and written; it is never
+        opened here, so a FIFO is refused rather than waited on (18.184d)."""
         probe = path / f".agentce-write-test-{os.getpid()}"
         if through_missing_folder(path):
             raise InputError(
                 "input.state_dir_unwritable",
                 f"{str(path)!r}: {os.strerror(errno.ENOENT)}",
-                "choose a writable --state directory.",
+                _FIX,
             )
         try:
             path.mkdir(parents=True, exist_ok=True)
@@ -148,8 +179,9 @@ class StateDir:
             raise InputError(
                 "input.state_dir_unwritable",
                 exc.strerror or str(exc),
-                "choose a writable --state directory.",
+                _FIX,
             ) from exc
+        _check_state_file(path / STATE_FILE)
 
     def plan(
         self, bundle_digest: str, accepted: list[dict[str, Any]], new_window_end: str

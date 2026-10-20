@@ -22,6 +22,7 @@ import json
 import subprocess
 import sys
 import tempfile
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -113,8 +114,11 @@ def _assess_project(
     project: dict[str, Any],
     out_dir: Path,
     catalogs: list[Catalog],
+    out_raw: str | None = None,
 ) -> dict[str, Any]:
-    """Run one project through the full pipeline; write its report and return an outcome summary."""
+    """Run one project through the full pipeline; write its report and return an outcome summary.
+    Under the user's ``--out`` (``out_raw``) a report write that fails is refused under ``OUT_DIR``,
+    as assess --out refuses it (18.184d)."""
     pid = str(project["id"])
     proj = corpus_root / "projects" / pid
     bundle = load_bundle(proj / "evidence")
@@ -136,19 +140,20 @@ def _assess_project(
         integrity=integrity_caps(ingested.raw_accepted, ingested.accepted, streams),
         coverage=coverage,
     )
-    write_report(
-        out_dir,
-        assertions,
-        bundle_digest=bundle.digest,
-        catalogs=catalogs,
-        operator=_ECS_OPERATOR,
-        invocation=["conformance", pid],
-        events=ingested.accepted,
-        activity=summarize_activity(ingested.accepted, profile),
-        blind_spots=compute_blind_spots(
-            assertions, profile, catalogs, ingested.accepted
-        ),
-    )
+    activity = summarize_activity(ingested.accepted, profile)
+    blind_spots = compute_blind_spots(assertions, profile, catalogs, ingested.accepted)
+    with writing_into(out_raw, OUT_DIR) if out_raw is not None else nullcontext():
+        write_report(
+            out_dir,
+            assertions,
+            bundle_digest=bundle.digest,
+            catalogs=catalogs,
+            operator=_ECS_OPERATOR,
+            invocation=["conformance", pid],
+            events=ingested.accepted,
+            activity=activity,
+            blind_spots=blind_spots,
+        )
     counts = aggregate(assertions)
     return {"id": pid, "assertions": len(assertions), "outcomes": counts}
 
@@ -221,13 +226,19 @@ def run_ecs(
         pid = str(project["id"])
         try:
             summary = _assess_project(
-                corpus_root, project, reports_root / pid, catalogs
+                corpus_root,
+                project,
+                reports_root / pid,
+                catalogs,
+                str(out_dir) if out_dir is not None else None,
             )
             summaries.append(summary)
             identical += (
                 1  # self-golden: the reference regenerates its own golden (SPEC §11.7)
             )
         except Exception as exc:  # noqa: BLE001 - a failed project is a report finding, not a crash
+            if isinstance(exc, InputError) and exc.key == OUT_DIR.key:
+                raise  # --out cannot be written: the run is refused, not one project
             failures.append({"project": pid, "error": f"{type(exc).__name__}: {exc}"})
 
     scan = no_ml.evaluate()

@@ -130,7 +130,7 @@ public final class Conformance {
         return new Catalogs(catalogs, labels);
     }
 
-    private static void assessProject(Path corpusRoot, String pid, Path outDir, Catalogs cat) {
+    private static void assessProject(Path corpusRoot, String pid, Path outDir, Catalogs cat, Path outRaw) {
         Path proj = corpusRoot.resolve("projects").resolve(pid);
         Bundle bundle = Bundle.load(proj.resolve("evidence"));
         Ingest.Result ingested = Ingest.ingest(bundle);
@@ -146,9 +146,16 @@ public final class Conformance {
                 Integrity.integrityCaps(ingested.rawAccepted, ingested.accepted, streams), coverage);
         var activity = Activity.summarizeActivity(ingested.accepted, profile);
         var blindSpots = BlindSpots.computeBlindSpots(assertions, profile, cat.catalogs, ingested.accepted);
-        Report.writeReport(
+        Runnable write = () -> Report.writeReport(
                 outDir, assertions, bundle.digest(), cat.labels, ECS_OPERATOR, List.of("conformance", pid), List.of(),
                 "en", cat.catalogs, activity, blindSpots);
+        // Under the user's --out a report write that fails is refused under OUT_DIR, as assess --out
+        // refuses it (18.184d).
+        if (outRaw != null) {
+            Outputs.writingInto(outRaw.toString(), Outputs.OUT_DIR, write::run);
+        } else {
+            write.run();
+        }
     }
 
     /** Python's {@code Path.resolve()} (non-strict): absolute, with every symbolic link in the part of
@@ -333,9 +340,12 @@ public final class Conformance {
         ArrayNode failures = Json.nodes().arrayNode();
         for (String pid : projectIds) {
             try {
-                assessProject(corpus.root, pid, reportsRoot.resolve(pid), cat);
+                assessProject(corpus.root, pid, reportsRoot.resolve(pid), cat, outDir);
                 identical += 1; // self-golden: the reference regenerates its own golden (SPEC §11.7)
             } catch (RuntimeException exc) {
+                if (exc instanceof InputError input && input.key.equals(Outputs.OUT_DIR.key())) {
+                    throw input; // --out cannot be written: the run is refused, not one project
+                }
                 ObjectNode failure = failures.addObject();
                 failure.put("project", pid);
                 failure.put("error", exc.getClass().getSimpleName() + ": " + exc.getMessage());

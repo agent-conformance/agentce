@@ -11,13 +11,22 @@
  */
 
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  constants,
+  accessSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { InputError } from "./errors";
-import { throughMissingFolder } from "./outputs";
+import { NOT_A_FILE, UNREACHABLE, throughMissingFolder, writeFile } from "./outputs";
 import { byteCompare, joinPath, jsonStringifyAscii, pyRepr, sortKeysDeep } from "./util";
 
 export const STATE_VERSION = 1;
 const STATE_FILE = "state.json";
+const FIX = "choose a writable --state directory.";
 
 type Event = Record<string, unknown>;
 
@@ -30,6 +39,30 @@ function isFile(path: string): boolean {
     return statSync(path).isFile();
   } catch {
     return false;
+  }
+}
+
+/** Refuse a `state.json` that is not a regular file, cannot be read and written, or cannot be
+ * reached, under `input.state_dir_unwritable`; absent or a dangling link is a fresh series. Nothing is
+ * opened, so a FIFO is refused rather than waited on (18.184d). */
+function checkStateFile(file: string): void {
+  const shown = pyRepr(file);
+  let isRegular: boolean;
+  try {
+    isRegular = statSync(file).isFile();
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return;
+    }
+    throw new InputError("input.state_dir_unwritable", `${shown} ${UNREACHABLE}.`, FIX);
+  }
+  if (!isRegular) {
+    throw new InputError("input.state_dir_unwritable", `${shown} ${NOT_A_FILE}.`, FIX);
+  }
+  try {
+    accessSync(file, constants.R_OK | constants.W_OK);
+  } catch {
+    throw new InputError("input.state_dir_unwritable", `${shown}: Permission denied`, FIX);
   }
 }
 
@@ -75,7 +108,13 @@ export class StateDir {
     if (!isFile(file)) {
       return state;
     }
-    const data = JSON.parse(readFileSync(file, "utf-8"));
+    let text: string;
+    try {
+      text = readFileSync(file, "utf-8");
+    } catch (err) {
+      throw new InputError("input.state_dir_unwritable", (err as Error).message, FIX);
+    }
+    const data = JSON.parse(text);
     const version = Number(data.state_version ?? 0);
     if (version !== STATE_VERSION) {
       throw new InputError(
@@ -107,31 +146,28 @@ export class StateDir {
         last_window_end: this.lastWindowEnd,
         last_outcomes: this.lastOutcomes,
       };
-      writeFileSync(
+      writeFile(
         joinPath(this.path, STATE_FILE),
         `${jsonStringifyAscii(sortKeysDeep(payload), 2)}\n`,
       );
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
-      throw new InputError(
-        "input.state_dir_unwritable",
-        e.message,
-        "choose a writable --state directory.",
-      );
+      throw new InputError("input.state_dir_unwritable", e.message, FIX);
     }
   }
 
   /** Prove `path` is writable before any `--out` write begins (a refused run must leave nothing
    * behind), by actually creating and removing a probe file rather than only `mkdir`ing: a directory
    * that exists but lost its write bit after creation would pass a recursive `mkdir` and only fail on
-   * a real write. */
+   * a real write. `state.json` itself must then be absent (a dangling link counts: the write replaces
+   * it) or a regular file that can be read and written (`checkStateFile`). */
   static ensureWritable(path: string): void {
     const probe = joinPath(path, `.agentce-write-test-${process.pid}`);
     if (throughMissingFolder(path)) {
       throw new InputError(
         "input.state_dir_unwritable",
         `${pyRepr(path)}: No such file or directory`,
-        "choose a writable --state directory.",
+        FIX,
       );
     }
     try {
@@ -140,12 +176,9 @@ export class StateDir {
       unlinkSync(probe);
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
-      throw new InputError(
-        "input.state_dir_unwritable",
-        e.message,
-        "choose a writable --state directory.",
-      );
+      throw new InputError("input.state_dir_unwritable", e.message, FIX);
     }
+    checkStateFile(joinPath(path, STATE_FILE));
   }
 
   /** Return [supersedes, lateEventsByStream] for a new assessment against this state (HR-10). */
