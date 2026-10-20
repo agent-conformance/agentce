@@ -193,7 +193,7 @@ test("a limit past float range is unreadable (18.184g)", () => {
   ]);
 });
 
-test("a tag the file writes decides the type, quoted or not (18.184g; a quoted !!float is a census line)", () => {
+test("a tag the file writes decides the type, quoted or not (18.184g)", () => {
   assert.deepEqual(
     scopeFromYaml(
       `allowed_tools: [!!bool "yes", !!bool "true", !!bool 'on', !!int "7", !!str 7, !!str yes, x]`,
@@ -204,4 +204,46 @@ test("a tag the file writes decides the type, quoted or not (18.184g; a quoted !
     ["tokens", null],
     ["spend", 10],
   ]);
+});
+
+test("tagged text reads as Python's int() and float() read it (18.184g)", () => {
+  assert.deepEqual(
+    scopeFromYaml(
+      `budgets: {tokens: !!int "0o10", compute_seconds: !!float "+.5", spend: !!float "inf"}`,
+    ).budgets,
+    [
+      ["tokens", 8],
+      ["compute_seconds", 0.5],
+      ["spend", null],
+    ],
+  );
+  assert.deepEqual(scopeFromYaml(`budgets: {tokens: !!int " 5", spend: !!float "5"}`).budgets, [
+    ["tokens", 5],
+    ["spend", 5],
+  ]);
+  assert.equal(scopeFromYaml("allowed_tools: [!!null x]").allowedTools?.size, 0);
+});
+
+test("a date no calendar holds is text; two date keys stay two keys (18.184g)", () => {
+  assert.deepEqual(
+    scopeFromYaml("allowed_tools: [2021-02-29, 2020-02-29]").allowedTools,
+    new Set(["2021-02-29"]),
+  );
+  assert.deepEqual(scopeFromYaml("budgets: {2020-01-01: 1, 2020-01-02: 2}").budgets, []);
+});
+
+test("a tag the node cannot take is refused (18.184g)", () => {
+  for (const scope of [
+    "allowed_tools: !!str [x]",
+    "task_type_x: !!seq x",
+    "allowed_tools: [<<]",
+    `budgets: {tokens: !!int "1:"}`,
+    `budgets: {spend: !!float "5f"}`,
+  ]) {
+    assert.throws(
+      () => scopeFromYaml(scope),
+      (e: unknown) => e instanceof InputError && e.key === "input.domain_binding_invalid",
+      scope,
+    );
+  }
 });

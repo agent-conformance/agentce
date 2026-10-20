@@ -114,16 +114,59 @@ const PYYAML_TIMESTAMP_RESOLVE_RE =
 const PYYAML_TIMESTAMP_FIELDS_RE =
   /^(?<year>[0-9][0-9][0-9][0-9])-(?<month>[0-9][0-9]?)-(?<day>[0-9][0-9]?)(?:(?:[Tt]|[ \t]+)(?<hour>[0-9][0-9]?):(?<minute>[0-9][0-9]):(?<second>[0-9][0-9])(?:\.(?<fraction>[0-9]*))?(?:[ \t]*(?<tz>Z|(?<tz_sign>[-+])(?<tz_hour>[0-9][0-9]?)(?::(?<tz_minute>[0-9][0-9]))?))?)?$/;
 
+/** `construct_yaml_bool`'s whole table: any other word under `!!bool` is refused. */
+const PYYAML_BOOL_WORDS = new Set([...PYYAML_BOOL_TRUE, "no", "false", "off"]);
+
 const pyyamlBoolType = new YamlType("tag:yaml.org,2002:bool", {
   kind: "scalar",
   resolve: (data: unknown) => typeof data === "string" && PYYAML_BOOL_RESOLVE_RE.test(data),
   construct: (data: string) => PYYAML_BOOL_TRUE.has(data.toLowerCase()),
 });
 
+/** Whether `construct_yaml_timestamp` builds a `date`/`datetime` from `raw`: its fields match and lie
+ * in the calendar, the clock and a UTC offset under 24 hours. Otherwise `load_untrusted_yaml`'s loader
+ * keeps the text as a string ({@link pythonizeTimestamp}). */
+function isPyyamlCalendarTimestamp(raw: string): boolean {
+  const g = PYYAML_TIMESTAMP_FIELDS_RE.exec(raw)?.groups;
+  if (g === undefined) {
+    return false;
+  }
+  const year = Number(g.year);
+  const month = Number(g.month);
+  const day = Number(g.day);
+  if (year < 1 || month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)) {
+    return false;
+  }
+  if (g.hour === undefined) {
+    return true;
+  }
+  if (Number(g.hour) > 23 || Number(g.minute) > 59 || Number(g.second) > 59) {
+    return false;
+  }
+  return g.tz_sign === undefined || Number(g.tz_hour) * 60 + Number(g.tz_minute ?? 0) < 24 * 60;
+}
+
+/** A timestamp scalar as `load_untrusted_yaml` reads it: a date marker, or the text when no date can be built. */
+function pyyamlConstructTimestamp(data: string): PyyamlTimestamp | string {
+  if (!isPyyamlCalendarTimestamp(data)) {
+    return pythonizeTimestamp(data);
+  }
+  // Written as a mapping key, js-yaml names the key by the marker's own string tag and `toString`,
+  // so two dates stay two keys (Python keeps both `date` keys) and neither equals a string key, as
+  // Java's marker record names it.
+  return Object.defineProperties(
+    { pyyamlTimestamp: data },
+    {
+      [Symbol.toStringTag]: { value: "PyyamlTimestamp" },
+      toString: { value: () => `PyyamlTimestamp[text=${data}]` },
+    },
+  );
+}
+
 const pyyamlTimestampType = new YamlType("tag:yaml.org,2002:timestamp", {
   kind: "scalar",
   resolve: (data: unknown) => typeof data === "string" && PYYAML_TIMESTAMP_RESOLVE_RE.test(data),
-  construct: (data: string): PyyamlTimestamp => ({ pyyamlTimestamp: data }),
+  construct: pyyamlConstructTimestamp,
 });
 
 /** PyYAML's own `Resolver`, `tag:yaml.org,2002:int` implicit-resolution regex (`yaml/resolver.py`),
@@ -142,88 +185,191 @@ const PYYAML_INT_RESOLVE_RE =
 const PYYAML_FLOAT_RESOLVE_RE =
   /^(?:[-+]?[0-9][0-9_]*\.[0-9_]*(?:[eE][-+][0-9]+)?|\.[0-9][0-9_]*(?:[eE][-+][0-9]+)?|[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\.[0-9_]*|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN))$/;
 
-/** PyYAML's `construct_yaml_int` (`yaml/constructor.py:237-263`), copied verbatim: strip `_`, take
- * the sign, then dispatch on the `0b`/`0x`/leading-`0`/colon-sexagesimal/plain-decimal forms in that
- * exact order (order matters here, unlike the resolve regex above, since these prefixes overlap
- * textually -- `0b101` starts with `0` too). Returns a plain JS `number`: every value this codebase's
- * own adversarial fixtures exercise fits in `number`'s safe integer range, and downstream code only
- * ever calls {@link pyStr}/{@link pyTruthy}-equivalent checks or `pyEquals` on the result, never
- * arithmetic that would need arbitrary precision. */
-/** PyYAML's colon-sexagesimal base-60 place-value sum (`int(v, 60)`-equivalent for a
- * `":"`-separated value, e.g. `"1:30"` -> `90`), shared between {@link pyyamlConstructInt} and
- * {@link pyyamlConstructFloat} since both dispatch to it identically. */
-function sexagesimalToNumber(value: string): number {
-  const digits = value.split(":").map(Number).reverse();
+/** The whitespace Python's `int()` and `float()` ignore around a number (`str.isspace`). */
+const PY_SPACE =
+  "[\\t\\n\\x0b\\x0c\\r\\x1c-\\x1f \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*";
+
+/** Python's `int(text, base)` over ASCII digits: an optional sign, the base's own optional prefix,
+ * then digits. `undefined` where Python raises `ValueError` (it also takes non-ASCII digits, which
+ * are refused here). */
+const PY_INT_RE: Record<number, RegExp> = {
+  2: new RegExp(`^${PY_SPACE}([-+]?)(?:0[bB])?([01]+)${PY_SPACE}$`),
+  8: new RegExp(`^${PY_SPACE}([-+]?)(?:0[oO])?([0-7]+)${PY_SPACE}$`),
+  10: new RegExp(`^${PY_SPACE}([-+]?)([0-9]+)${PY_SPACE}$`),
+  16: new RegExp(`^${PY_SPACE}([-+]?)(?:0[xX])?([0-9a-fA-F]+)${PY_SPACE}$`),
+};
+
+function pythonInt(text: string, base: 2 | 8 | 10 | 16): number | undefined {
+  const m = PY_INT_RE[base]?.exec(text);
+  if (m === null || m === undefined) {
+    return undefined;
+  }
+  const n = Number.parseInt(m[2] ?? "", base);
+  return m[1] === "-" ? -n : n;
+}
+
+/** Python's `float(text)` over ASCII digits: decimal with an optional exponent, `inf`, `infinity`
+ * or `nan`, any case, after an optional sign. */
+const PY_FLOAT_RE = new RegExp(
+  `^${PY_SPACE}([-+]?)(?:((?:[0-9]+\\.?[0-9]*|\\.[0-9]+)(?:e[-+]?[0-9]+)?)|(inf|infinity)|(nan))${PY_SPACE}$`,
+  "i",
+);
+
+function pythonFloat(text: string): number | undefined {
+  const m = PY_FLOAT_RE.exec(text);
+  if (m === null) {
+    return undefined;
+  }
+  const n =
+    m[2] !== undefined ? Number(m[2]) : m[3] !== undefined ? Number.POSITIVE_INFINITY : Number.NaN;
+  return m[1] === "-" ? -n : n;
+}
+
+/** PyYAML's colon-sexagesimal base-60 place-value sum (`"1:30"` -> `90`), each part read by `part`. */
+function sexagesimal(
+  value: string,
+  part: (text: string) => number | undefined,
+): number | undefined {
   let base = 1;
   let out = 0;
-  for (const digit of digits) {
+  for (const text of value.split(":").reverse()) {
+    const digit = part(text);
+    if (digit === undefined) {
+      return undefined;
+    }
     out += digit * base;
     base *= 60;
   }
   return out;
 }
 
-function pyyamlConstructInt(data: string): number {
-  let value = data.replace(/_/g, "");
-  let sign = 1;
-  if (value[0] === "-") {
-    sign = -1;
+/** `value` with PyYAML's leading sign taken off, and that sign; `undefined` for empty text, where
+ * PyYAML's `value[0]` raises. */
+function pyyamlSign(value: string): [number, string] | undefined {
+  if (value === "") {
+    return undefined;
   }
-  if (value[0] === "+" || value[0] === "-") {
-    value = value.slice(1);
+  const sign = value[0] === "-" ? -1 : 1;
+  return [sign, value[0] === "+" || value[0] === "-" ? value.slice(1) : value];
+}
+
+/** PyYAML's `construct_yaml_int` (`yaml/constructor.py:237-263`), copied verbatim: strip `_`, take
+ * the sign, then dispatch on the `0b`/`0x`/leading-`0`/colon-sexagesimal/plain-decimal forms in that
+ * exact order (order matters here, unlike the resolve regex above, since these prefixes overlap
+ * textually -- `0b101` starts with `0` too), each read as Python's `int()` reads it; `undefined`
+ * where PyYAML raises. Returns a plain JS `number`: downstream code only ever calls
+ * {@link pyStr}/{@link pyTruthy}-equivalent checks or `pyEquals` on the result, never arithmetic
+ * that would need arbitrary precision. */
+function pyyamlConstructInt(data: string): number | undefined {
+  const signed = pyyamlSign(data.replace(/_/g, ""));
+  if (signed === undefined) {
+    return undefined;
   }
+  const [sign, value] = signed;
+  let n: number | undefined;
   if (value === "0") {
-    return 0;
+    n = 0;
+  } else if (value.startsWith("0b")) {
+    n = pythonInt(value.slice(2), 2);
+  } else if (value.startsWith("0x")) {
+    n = pythonInt(value.slice(2), 16);
+  } else if (value[0] === "0") {
+    n = pythonInt(value, 8);
+  } else if (value.includes(":")) {
+    n = sexagesimal(value, (part) => pythonInt(part, 10));
+  } else {
+    n = pythonInt(value, 10);
   }
-  if (value.startsWith("0b")) {
-    return sign * Number.parseInt(value.slice(2), 2);
-  }
-  if (value.startsWith("0x")) {
-    return sign * Number.parseInt(value.slice(2), 16);
-  }
-  if (value[0] === "0") {
-    return sign * Number.parseInt(value, 8);
-  }
-  if (value.includes(":")) {
-    return sign * sexagesimalToNumber(value);
-  }
-  return sign * Number.parseInt(value, 10);
+  return n === undefined ? undefined : n === 0 ? 0 : sign * n;
 }
 
 /** PyYAML's `construct_yaml_float` (`yaml/constructor.py:270-292`), copied verbatim: lower-case,
- * strip `_`, take the sign, then dispatch on `.inf`/`.nan`/colon-sexagesimal/plain-decimal. */
-function pyyamlConstructFloat(data: string): number {
-  let value = data.replace(/_/g, "").toLowerCase();
-  let sign = 1;
-  if (value[0] === "-") {
-    sign = -1;
+ * strip `_`, take the sign, then dispatch on `.inf`/`.nan`/colon-sexagesimal/plain-decimal, each
+ * read as Python's `float()` reads it; `undefined` where PyYAML raises. */
+function pyyamlConstructFloat(data: string): number | undefined {
+  const signed = pyyamlSign(data.replace(/_/g, "").toLowerCase());
+  if (signed === undefined) {
+    return undefined;
   }
-  if (value[0] === "+" || value[0] === "-") {
-    value = value.slice(1);
-  }
+  const [sign, value] = signed;
   if (value === ".inf") {
     return sign * Number.POSITIVE_INFINITY;
   }
   if (value === ".nan") {
     return Number.NaN;
   }
-  if (value.includes(":")) {
-    return sign * sexagesimalToNumber(value);
+  const n = value.includes(":") ? sexagesimal(value, pythonFloat) : pythonFloat(value);
+  return n === undefined ? undefined : sign * n;
+}
+
+/** `construct` refused: PyYAML raises, which `load_untrusted_yaml` refuses as a construct it cannot load. */
+function constructed<T>(value: T | undefined, data: string, tag: string): T {
+  if (value === undefined) {
+    throw new Error(`cannot construct ${tag} from ${pyRepr(data)}`);
   }
-  return sign * Number(value);
+  return value;
 }
 
 const pyyamlIntType = new YamlType("tag:yaml.org,2002:int", {
   kind: "scalar",
   resolve: (data: unknown) => typeof data === "string" && PYYAML_INT_RESOLVE_RE.test(data),
-  construct: pyyamlConstructInt,
+  construct: (data: string) => constructed(pyyamlConstructInt(data), data, "int"),
 });
 
 const pyyamlFloatType = new YamlType("tag:yaml.org,2002:float", {
   kind: "scalar",
   resolve: (data: unknown) => typeof data === "string" && PYYAML_FLOAT_RESOLVE_RE.test(data),
-  construct: pyyamlConstructFloat,
+  construct: (data: string) => constructed(pyyamlConstructFloat(data), data, "float"),
 });
+
+/** A tag the file writes on a scalar of any style (`!!int "10"`, `!!bool 'on'`, `!!null x`):
+ * `SafeLoader` constructs the text by that tag, never by its implicit resolvers, and refuses text the
+ * constructor cannot read. js-yaml looks an explicit tag up among these, after the implicit types of
+ * the same tag. */
+const PYYAML_EXPLICIT_SCALAR_TYPES = [
+  new YamlType("tag:yaml.org,2002:null", {
+    kind: "scalar",
+    resolve: () => true,
+    construct: () => null,
+  }),
+  new YamlType("tag:yaml.org,2002:bool", {
+    kind: "scalar",
+    resolve: (data: unknown) =>
+      typeof data === "string" && PYYAML_BOOL_WORDS.has(data.toLowerCase()),
+    construct: (data: string) => PYYAML_BOOL_TRUE.has(data.toLowerCase()),
+  }),
+  new YamlType("tag:yaml.org,2002:int", {
+    kind: "scalar",
+    resolve: (data: unknown) => typeof data === "string" && pyyamlConstructInt(data) !== undefined,
+    construct: (data: string) => constructed(pyyamlConstructInt(data), data, "int"),
+  }),
+  new YamlType("tag:yaml.org,2002:float", {
+    kind: "scalar",
+    resolve: (data: unknown) =>
+      typeof data === "string" && pyyamlConstructFloat(data) !== undefined,
+    construct: (data: string) => constructed(pyyamlConstructFloat(data), data, "float"),
+  }),
+  new YamlType("tag:yaml.org,2002:timestamp", {
+    kind: "scalar",
+    resolve: (data: unknown) => typeof data === "string",
+    construct: pyyamlConstructTimestamp,
+  }),
+];
+
+/** A `<<` merge scalar read anywhere but as a mapping key. */
+const PYYAML_MERGE_VALUE = Object.freeze({ pyyamlMergeValue: true });
+
+/** Whether `value` holds {@link PYYAML_MERGE_VALUE}; each shared (aliased) node is visited once. */
+function holdsMergeValue(value: unknown, seen = new Set<object>()): boolean {
+  if (value === PYYAML_MERGE_VALUE) {
+    return true;
+  }
+  if (typeof value !== "object" || value === null || seen.has(value)) {
+    return false;
+  }
+  seen.add(value);
+  return Object.values(value).some((child) => holdsMergeValue(child, seen));
+}
 
 /** `yaml.DEFAULT_SCHEMA`'s own compiled implicit type for `null`, unchanged -- js-yaml's package
  * `exports` field blocks a deep import of its internal `lib/type/*` modules, so this is the only
@@ -264,9 +410,15 @@ export const PYYAML_SAFE_SCHEMA = FAILSAFE_SCHEMA.extend({
     // `DEFAULT_SCHEMA` like the `null` type above, since js-yaml's own merge-key handling in
     // `storeMappingPair` triggers purely on this tag, keyed on the exact same `<<` scalar PyYAML
     // matches; an explicit key still overrides a merged-in one, since js-yaml applies the merged
-    // pairs before the node's own explicit pairs, matching `flatten_mapping`'s ordering.
-    defaultImplicit("tag:yaml.org,2002:merge"),
+    // pairs before the node's own explicit pairs, matching `flatten_mapping`'s ordering. Read as a
+    // value, the scalar is a marker {@link loadPyyaml} refuses, as SafeLoader has no constructor for it.
+    new YamlType("tag:yaml.org,2002:merge", {
+      kind: "scalar",
+      resolve: defaultImplicit("tag:yaml.org,2002:merge").resolve,
+      construct: () => PYYAML_MERGE_VALUE,
+    }),
   ],
+  explicit: PYYAML_EXPLICIT_SCALAR_TYPES,
 });
 
 /** PyYAML's `construct_yaml_timestamp` (`yaml/constructor.py:322-351`) plus Python's own
@@ -354,7 +506,11 @@ export function loadPyyaml(path: string, key: string, what: string, uniqueKeys =
     );
   }
   try {
-    return yamlLoad(text, { schema: PYYAML_SAFE_SCHEMA, json: !uniqueKeys });
+    const data = yamlLoad(text, { schema: PYYAML_SAFE_SCHEMA, json: !uniqueKeys });
+    if (holdsMergeValue(data)) {
+      throw new Error("could not determine a constructor for the tag 'tag:yaml.org,2002:merge'");
+    }
+    return data;
   } catch (error) {
     if (error instanceof RangeError || /exceeded maxDepth/.test((error as Error).message)) {
       // js-yaml caps nesting (and recurses per level), as PyYAML's composer hits its RecursionError.
