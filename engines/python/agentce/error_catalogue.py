@@ -157,6 +157,7 @@ _KINDS: dict[str, str] = {
     "verify.statement_unreadable": "error",
     "verify.statement_no_digest": "error",
     "verify.catalog_unsigned": "error",
+    "verify.catalog_signature_not_a_file": "error",
     "verify.catalog_signature_unreadable": "error",
     "verify.catalog_digest_mismatch": "error",
     "verify.release_envelope_unreadable": "error",
