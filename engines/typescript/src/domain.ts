@@ -9,7 +9,9 @@
 
 import { readFileSync } from "node:fs";
 import { load } from "js-yaml";
+import { InputError } from "./errors";
 import { pyStrip } from "./failOn";
+import { PYYAML_SAFE_SCHEMA } from "./readiness";
 
 export const DECISION_ROOT = "agentce:Decision";
 export const CONTEXT_ROOT = "agentce:ContextItem";
@@ -56,14 +58,14 @@ export function tokenCount(value: unknown): number | null {
   return count === null ? null : Math.min(count, TOKEN_CAP);
 }
 
-/** A declared budget limit: a non-negative number, a whole one for tokens; anything else is null, a
- * limit no usage can be shown to stay within. */
+/** A declared budget limit: a finite non-negative number, a whole one for tokens; anything else (Infinity
+ * and NaN included) is null, a limit no usage can be shown to stay within. */
 function limit(dimension: string, value: unknown): number | null {
   if (dimension === "tokens") {
     const tokens = wholeNumber(value);
     return tokens !== null && tokens <= MAX_COUNT ? tokens : null;
   }
-  return typeof value === "number" && value >= 0 ? value : null;
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 /** The budgets a scope declares, as (dimension, limit) pairs; a dimension left out declares no limit.
@@ -190,8 +192,20 @@ export class DomainBinding {
     return [];
   }
 
+  /** Reads the binding as Python's PyYAML `SafeLoader` types it (PYYAML_SAFE_SCHEMA), refusing a key written
+   * twice (no `json: true`) and any other YAML it cannot load with `input.domain_binding_invalid`. */
   static load(path: string): DomainBinding {
-    const data = load(readFileSync(path, "utf-8"));
+    const text = readFileSync(path, "utf-8");
+    let data: unknown;
+    try {
+      data = load(text, { schema: PYYAML_SAFE_SCHEMA });
+    } catch (error) {
+      throw new InputError(
+        "input.domain_binding_invalid",
+        `the domain binding at '${path}' carries YAML the engine refuses to load: ${(error as Error).message}.`,
+        "write each key once, and use only plain YAML scalars, mappings and sequences in the domain binding.",
+      );
+    }
     if (!isRecord(data)) {
       return DomainBinding.empty();
     }
