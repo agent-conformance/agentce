@@ -17,9 +17,9 @@
  * private seed is published: with no trust root no source signature counts, and the stream reads unsigned.
  */
 
-import { readFileSync } from "node:fs";
-import { confineToRoot, safeIsFile } from "./bundle";
+import { confineToRoot, readConfined, safeIsFile } from "./bundle";
 import { sha256Hex } from "./canonical";
+import { InputError } from "./errors";
 import { asParsed } from "./json";
 import { INTOTO_PAYLOAD_TYPE } from "./sign";
 import { compareInstants } from "./structural";
@@ -163,7 +163,7 @@ function isSigned(
 
 /**
  * The SHA-256 digests the in-toto Statement of a verified `sig_ref` envelope names as subjects; none when the file is
- * outside the bundle or unreadable, is not a DSSE envelope over an in-toto Statement, or verifies against no key in
+ * outside the bundle, unreadable or changed while read, is not a DSSE envelope over an in-toto Statement, or verifies against no key in
  * `trust`. A sig_ref is evidence content: it is confined to the bundle root, so a file outside it (reached literally
  * or through a symlink) never counts.
  */
@@ -176,7 +176,7 @@ function signedDigests(bundleRoot: string, sigRef: string, trust: TrustRoot): Re
   let statement: unknown;
   try {
     const envelope = parseVerifyInput(
-      readFileSync(path),
+      readConfined(bundleRoot, sigRef, path),
       "verify.envelope_malformed",
       "the signature envelope",
     );
@@ -190,7 +190,7 @@ function signedDigests(bundleRoot: string, sigRef: string, trust: TrustRoot): Re
       "the signed statement",
     );
   } catch (exc) {
-    if (exc instanceof VerifyRefusal || isErrnoError(exc)) {
+    if (exc instanceof VerifyRefusal || exc instanceof InputError || isErrnoError(exc)) {
       return none;
     }
     throw exc;

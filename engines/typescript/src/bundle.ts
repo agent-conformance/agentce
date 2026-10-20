@@ -7,24 +7,35 @@
  */
 
 import { createHash } from "node:crypto";
-import { lstatSync, readFileSync, readlinkSync, realpathSync, statSync } from "node:fs";
+import {
+  constants,
+  closeSync,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readFileSync,
+  readlinkSync,
+  realpathSync,
+  statSync,
+} from "node:fs";
 import { isAbsolute, posix, relative, sep } from "node:path";
 import { sha256Hex } from "./canonical";
 import { InputError, isPermissionError, readPermissionError, unreadableError } from "./errors";
 import { joinPath } from "./util";
-import { readUntrustedJsonFile } from "./verify";
+import { parseUntrustedJson } from "./verify";
 
 export interface Bundle {
   root: string;
   manifest: Record<string, unknown>;
   eventFiles: string[];
+  /** The bytes of each listed member (keyed by its path under `root`), exactly as `loadBundle` checked and hashed
+   * them: ingest uses these, never a second read of the same name (18.184f). */
+  contents: Map<string, Buffer>;
+  /** The same bytes keyed by each listed path as the manifest writes it (the coverage denominator's lookup). */
+  members: Map<string, Buffer>;
   sources: Set<string> | null;
   sourceClasses: Map<string, string> | null;
   digest: string;
-}
-
-function fileSha256Hex(path: string): string {
-  return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
 function normaliseDigest(raw: string): string {
@@ -166,6 +177,53 @@ export function permissionDenied(path: string): boolean {
   return false;
 }
 
+/** Test seams for 18.184f: `afterConfine` runs once a member's confinement check has passed and before it is
+ * opened, `afterCheck` once the open file has been checked again and before it is read. */
+export const bundleReadHooks: {
+  afterConfine?: (rel: string, member: string) => void;
+  afterCheck?: (rel: string, member: string) => void;
+} = {};
+
+function changedWhileRead(rel: string): InputError {
+  return new InputError(
+    "input.bundle_manifest_path",
+    `${rel} changed while it was being read: the file opened is not the one checked to be inside the bundle root.`,
+    "keep the bundle folder unchanged while the command reads it, then run the command again.",
+  );
+}
+
+/**
+ * The bytes of `member`, the path `confineToRoot` returned for `rel`, read through one open file, and only when,
+ * once that file is open, `rel` still resolves inside `root` to the very file opened (same device and inode). A
+ * member swapped between the confinement check and the read (for a link outside the bundle, or for any other file)
+ * is refused with `input.bundle_manifest_path` and its bytes are never used, as Python's `read_confined` (18.184f).
+ * An error from opening or reading propagates for the caller to report.
+ */
+export function readConfined(root: string, rel: string, member: string): Buffer {
+  bundleReadHooks.afterConfine?.(rel, member);
+  const fd = openSync(member, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
+  try {
+    const opened = fstatSync(fd, { bigint: true });
+    const again = confineToRoot(root, rel);
+    let same = false;
+    if (again !== null && opened.isFile()) {
+      try {
+        const now = statSync(again, { bigint: true });
+        same = now.dev === opened.dev && now.ino === opened.ino;
+      } catch {
+        same = false;
+      }
+    }
+    if (!same) {
+      throw changedWhileRead(rel);
+    }
+    bundleReadHooks.afterCheck?.(rel, member);
+    return readFileSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+}
+
 function safeMember(root: string, rel: string): string {
   const member = confineToRoot(root, rel);
   if (member === null) {
@@ -176,20 +234,6 @@ function safeMember(root: string, rel: string): string {
     );
   }
   return member;
-}
-
-/** The file paths the manifest lists, each checked against its sha256 by `loadBundle`. */
-export function listedPaths(bundle: Bundle): Set<string> {
-  const files = bundle.manifest.files;
-  const out = new Set<string>();
-  if (Array.isArray(files)) {
-    for (const entry of files) {
-      if (isRecord(entry) && typeof entry.path === "string") {
-        out.add(entry.path);
-      }
-    }
-  }
-  return out;
 }
 
 export function loadBundle(bundleDir: string): Bundle {
@@ -224,8 +268,11 @@ export function loadBundle(bundleDir: string): Bundle {
     // `parse_untrusted_json` and Java's `Bundle.load` now gets from `Verify.parseUntrustedJson`
     // (18.65). `keepNumberTokens` so a float survives to `digest`'s lazy canonicalize check instead
     // of being silently folded.
-    parsed = readUntrustedJsonFile(manifestPath, true);
-  } catch {
+    parsed = parseUntrustedJson(readConfined(bundleDir, "manifest.json", manifestPath), true);
+  } catch (err) {
+    if (err instanceof InputError) {
+      throw err;
+    }
     // A fixed message, not the parser's own text: the three engines' JSON readers each produce
     // different exception text for the same malformed input, which would make this refusal's
     // cause diverge across engines for no reason a reader could use (F3, 18.65).
@@ -254,6 +301,8 @@ export function loadBundle(bundleDir: string): Bundle {
   }
 
   const eventFiles: string[] = [];
+  const contents = new Map<string, Buffer>();
+  const members = new Map<string, Buffer>();
   for (const entry of files) {
     if (
       !isRecord(entry) ||
@@ -284,22 +333,24 @@ export function loadBundle(bundleDir: string): Bundle {
         "regenerate the bundle so its files match the manifest.",
       );
     }
-    let actual: string;
+    let data: Buffer;
     try {
-      actual = fileSha256Hex(member);
+      data = readConfined(bundleDir, rel, member);
     } catch (err) {
       if (isPermissionError(err)) {
         throw bundleUnreadable(bundleDir, rel);
       }
       throw err;
     }
-    if (actual !== normaliseDigest(entry.sha256)) {
+    if (createHash("sha256").update(data).digest("hex") !== normaliseDigest(entry.sha256)) {
       throw new InputError(
         "input.bundle_manifest_mismatch",
         `${rel} does not match its manifest SHA-256.`,
         "regenerate the bundle so its files match the manifest.",
       );
     }
+    contents.set(member, data);
+    members.set(rel, data);
     if (rel.startsWith("events/") && rel.endsWith(".jsonl")) {
       eventFiles.push(member);
     }
@@ -339,6 +390,8 @@ export function loadBundle(bundleDir: string): Bundle {
     root: bundleDir,
     manifest,
     eventFiles: eventFiles.sort(),
+    contents,
+    members,
     sources,
     sourceClasses: sourceClasses.size > 0 ? sourceClasses : null,
     get digest(): string {

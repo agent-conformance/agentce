@@ -139,7 +139,7 @@ public final class Conformance {
                 Integrity.verifyStreams(ingested.rawAccepted, bundle.manifest, bundle.root);
         DomainBinding domain = DomainBinding.load(proj.resolve("domain.linkml.yaml"));
         Profile profile = Profile.load(proj.resolve("applicability.yaml"));
-        ObjectNode coverage = Coverage.computeCoverage(ingested.accepted, profile, bundle.root, bundle.listedPaths());
+        ObjectNode coverage = Coverage.computeCoverage(ingested.accepted, profile, bundle.members);
         Applicability.resolve(profile, ingested.accepted, List.of());
         List<Assertions.Assertion> assertions = Assess.assessSubjects(
                 ingested.accepted, profile, cat.catalogs, domain, ingested.withheld,

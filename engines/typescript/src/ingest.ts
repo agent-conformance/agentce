@@ -18,7 +18,6 @@
  */
 
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
 import type { Bundle } from "./bundle";
 import { CanonicalizationError, canonicalString } from "./canonical";
 import { InputError } from "./errors";
@@ -272,7 +271,8 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
   const ownerRank = new Map<string, number>();
 
   for (const path of bundle.eventFiles) {
-    for (const rawLine of splitLines(readFileSync(path))) {
+    // The bytes load_bundle checked and hashed, never a second read of the name (18.184f).
+    for (const rawLine of splitLines(bundle.contents.get(path) as Buffer)) {
       let raw: string;
       try {
         raw = decodeUtf8Strict(rawLine);

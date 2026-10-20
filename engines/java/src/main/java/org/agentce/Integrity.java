@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -162,7 +161,7 @@ public final class Integrity {
 
     /**
      * The SHA-256 digests the in-toto Statement of a verified {@code sig_ref} envelope names as subjects; none when the
-     * file is outside the bundle or unreadable, is not a DSSE envelope over an in-toto Statement, or verifies against
+     * file is outside the bundle, unreadable or changed while read, is not a DSSE envelope over an in-toto Statement, or verifies against
      * no key in {@code trust}. A sig_ref is evidence content: it is confined to the bundle root, so a file outside it
      * (reached literally or through a symlink) never counts.
      */
@@ -174,7 +173,7 @@ public final class Integrity {
         JsonNode statement;
         try {
             JsonNode envelope = Verify.parseVerifyInput(
-                    Files.readAllBytes(path), "verify.envelope_malformed", "the signature envelope");
+                    Bundle.readConfined(bundleRoot, sigRef, path), "verify.envelope_malformed", "the signature envelope");
             Verify.VerifiedEnvelope verified = Verify.verifyEnvelope(envelope, trust);
             JsonNode payloadType = envelope.get("payloadType");
             if (!payloadType.textValue().equals(Sign.INTOTO_PAYLOAD_TYPE)) {
@@ -182,7 +181,7 @@ public final class Integrity {
             }
             statement = Verify.parseVerifyInput(
                     verified.payload(), "verify.statement_unreadable", "the signed statement");
-        } catch (IllegalArgumentException | IOException e) {
+        } catch (IllegalArgumentException | IOException | InputError e) {
             return Set.of();
         }
         JsonNode subjects = statement.isObject() ? statement.get("subject") : null;

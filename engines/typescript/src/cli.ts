@@ -31,7 +31,7 @@ import {
   evaluatedNothing,
 } from "./assess";
 import { computeBlindSpots } from "./blindSpots";
-import { confineToRoot, listedPaths, loadBundle } from "./bundle";
+import { confineToRoot, loadBundle } from "./bundle";
 import { DEFAULT_LENS, catalogsDir as bundledCatalogsDir, quickstartDir } from "./bundled";
 import { type Catalog, loadCatalog } from "./catalog";
 import { runEcs } from "./conformance";
@@ -1175,7 +1175,7 @@ function runAssess(options: AssessOptions): CommandResult {
   const graphTriples = store.tripleCount();
 
   // Stage 4: coverage and reconciliation against independent denominators.
-  const coverage = computeCoverage(ingested.accepted, profileObj, bundleDir, listedPaths(bundle));
+  const coverage = computeCoverage(ingested.accepted, profileObj, bundle.members);
   mkdirSync(out, { recursive: true });
   writingInto(out, OUT_DIR, () =>
     writeFile(

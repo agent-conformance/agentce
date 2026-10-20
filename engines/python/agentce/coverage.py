@@ -14,12 +14,11 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
+from collections.abc import Mapping
 from decimal import ROUND_HALF_EVEN, Decimal
-from pathlib import Path
 from typing import Any
 
 from . import signing
-from .bundle import confine_to_root, safe_is_file
 from .errors import InputError
 from .profile import CoverageDenominator, Profile, Subject
 
@@ -59,12 +58,11 @@ def _denominator_counts(
     denominator: CoverageDenominator,
     subject: Subject,
     by_source_type: dict[tuple[str, str], int],
-    bundle_root: Path | None,
-    listed: frozenset[str],
+    members: Mapping[str, bytes],
 ) -> dict[str, int]:
     """The denominator's counts for the types it covers (every type it counts when ``covers`` is empty): both its
     yardstick and its expected counts (SPEC §6.5)."""
-    counts = _declared_counts(denominator, subject, by_source_type, bundle_root, listed)
+    counts = _declared_counts(denominator, subject, by_source_type, members)
     return {
         t: n
         for t, n in counts.items()
@@ -76,34 +74,31 @@ def _declared_counts(
     denominator: CoverageDenominator,
     subject: Subject,
     by_source_type: dict[tuple[str, str], int],
-    bundle_root: Path | None,
-    listed: frozenset[str],
+    members: Mapping[str, bytes],
 ) -> dict[str, int]:
     if not _independent(denominator, subject):
         return {}
     if denominator.manifest:
-        if denominator.manifest not in listed:
+        raw = members.get(denominator.manifest)
+        if raw is None:
             # A file the bundle manifest does not list is outside the bundle digest: never read (SPEC §6.6).
             return {}
-        if bundle_root is not None:
-            path = confine_to_root(bundle_root, denominator.manifest)
-            if path is not None and safe_is_file(path):
-                raw = path.read_bytes()
-                # Counted on the bytes, not left to json's recursion limit, which differs by Python.
-                if signing._too_deep(raw):
-                    raise InputError(
-                        "input.coverage_denominator_manifest_invalid",
-                        f"the coverage denominator manifest at {str(path)!r} is nested too deeply "
-                        "to parse safely.",
-                        "flatten the denominator manifest's structure; it exceeds the engine's safe "
-                        "nesting depth.",
-                    )
-                data = json.loads(raw.decode("utf-8"))
-                # A root that is not an object declares no counts: fall through, as TypeScript and Java do.
-                if isinstance(data, dict):
-                    declared = data.get("counts") or data.get("expected") or {}
-                    if isinstance(declared, dict):
-                        return {str(k): int(v) for k, v in declared.items()}
+        # The bytes load_bundle checked and hashed, never a second read of the name (18.184f). Counted on the
+        # bytes, not left to json's recursion limit, which differs by Python.
+        if signing._too_deep(raw):
+            raise InputError(
+                "input.coverage_denominator_manifest_invalid",
+                f"the coverage denominator manifest {denominator.manifest!r} is nested too deeply "
+                "to parse safely.",
+                "flatten the denominator manifest's structure; it exceeds the engine's safe "
+                "nesting depth.",
+            )
+        data = json.loads(raw.decode("utf-8"))
+        # A root that is not an object declares no counts: fall through, as TypeScript and Java do.
+        if isinstance(data, dict):
+            declared = data.get("counts") or data.get("expected") or {}
+            if isinstance(declared, dict):
+                return {str(k): int(v) for k, v in declared.items()}
     # Otherwise count the denominator source's own ingested events, per type.
     counts: dict[str, int] = {}
     for (source, event_type), count in by_source_type.items():
@@ -115,12 +110,13 @@ def _declared_counts(
 def compute_coverage(
     events: list[dict[str, Any]],
     profile: Profile,
-    bundle_root: Path | None = None,
     *,
-    listed: frozenset[str] = frozenset(),
+    members: Mapping[str, bytes] | None = None,
 ) -> dict[str, Any]:
-    """Return the coverage.json structure for ``events`` under ``profile``. ``listed`` is the bundle manifest's file
-    paths: a denominator manifest is read only when listed there."""
+    """Return the coverage.json structure for ``events`` under ``profile``. ``members`` maps each file the bundle
+    manifest lists to the bytes :func:`~agentce.bundle.load_bundle` checked: a denominator manifest is taken from
+    there and only when listed."""
+    members = members or {}
     by_source_type: dict[tuple[str, str], int] = defaultdict(int)
     for event in events:
         by_source_type[(str(event.get("source", "")), event_type_of(event))] += 1
@@ -128,7 +124,7 @@ def compute_coverage(
     subjects_out: dict[str, Any] = {}
     for subject in profile.subjects:
         counts_by_denominator = [
-            (d, _denominator_counts(d, subject, by_source_type, bundle_root, listed))
+            (d, _denominator_counts(d, subject, by_source_type, members))
             for d in subject.coverage_denominators
         ]
         # A denominator's own records of a type it covers and counts are the yardstick, not captured operations. One

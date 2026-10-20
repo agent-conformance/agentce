@@ -2,10 +2,8 @@ package org.agentce;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.io.IOException;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -187,12 +185,8 @@ public final class Ingest {
         Map<String, Integer> ownerRank = new HashMap<>();
 
         for (Path path : bundle.eventFiles) {
-            byte[] content;
-            try {
-                content = Files.readAllBytes(path);
-            } catch (IOException e) {
-                throw new IllegalStateException("cannot read " + path + ": " + e.getMessage(), e);
-            }
+            // The bytes Bundle.load checked and hashed, never a second read of the name (18.184f).
+            byte[] content = bundle.contents.get(path);
             for (byte[] rawLine : splitLines(content)) {
                 String raw;
                 try {

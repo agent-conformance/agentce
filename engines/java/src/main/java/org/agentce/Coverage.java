@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.math.BigInteger;
-import java.nio.file.Path;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -93,9 +95,8 @@ public final class Coverage {
             Profile.CoverageDenominator denominator,
             Profile.Subject subject,
             Map<String, Map<String, Integer>> bySource,
-            Path bundleRoot,
-            Set<String> listed) {
-        Map<String, Integer> counts = declaredCounts(denominator, subject, bySource, bundleRoot, listed);
+            Map<String, byte[]> members) {
+        Map<String, Integer> counts = declaredCounts(denominator, subject, bySource, members);
         if (!denominator.covers.isEmpty()) {
             counts.keySet().retainAll(denominator.covers);
         }
@@ -106,33 +107,33 @@ public final class Coverage {
             Profile.CoverageDenominator denominator,
             Profile.Subject subject,
             Map<String, Map<String, Integer>> bySource,
-            Path bundleRoot,
-            Set<String> listed) {
+            Map<String, byte[]> members) {
         if (!independent(denominator, subject)) {
             return new LinkedHashMap<>();
         }
-        boolean hasManifest = denominator.manifest != null && !denominator.manifest.isEmpty();
-        if (hasManifest && !listed.contains(denominator.manifest)) {
-            // A file the bundle manifest does not list is outside the bundle digest: never read (SPEC §6.6).
-            return new LinkedHashMap<>();
-        }
-        if (hasManifest && bundleRoot != null) {
-            // The denominator's manifest path comes from the applicability profile: confine it to the
-            // bundle root the same way the primary manifest's own entries are, so it cannot escape (by
-            // '..', by an absolute path, or by a symlink) and read a file from outside into the report.
-            Path path = Bundle.confineToRoot(bundleRoot, denominator.manifest);
-            if (path != null && Bundle.safeIsFile(path)) {
-                JsonNode data = Json.parseFile(path);
-                if (data != null && data.isObject()) {
-                    JsonNode declared = firstNonEmpty(data.get("counts"), data.get("expected"));
-                    Map<String, Integer> out = new LinkedHashMap<>();
-                    var it = declared.fields();
-                    while (it.hasNext()) {
-                        var e = it.next();
-                        out.put(e.getKey(), (int) e.getValue().asDouble());
-                    }
-                    return out;
+        if (denominator.manifest != null && !denominator.manifest.isEmpty()) {
+            byte[] raw = members.get(denominator.manifest);
+            if (raw == null) {
+                // A file the bundle manifest does not list is outside the bundle digest: never read (SPEC §6.6).
+                return new LinkedHashMap<>();
+            }
+            // The bytes Bundle.load checked and hashed, never a second read of the name (18.184f).
+            JsonNode data;
+            try {
+                data = Json.parse(StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(raw)).toString());
+            } catch (CharacterCodingException e) {
+                throw new IllegalArgumentException(
+                        "cannot read JSON " + denominator.manifest + ": " + e.getMessage(), e);
+            }
+            if (data != null && data.isObject()) {
+                JsonNode declared = firstNonEmpty(data.get("counts"), data.get("expected"));
+                Map<String, Integer> out = new LinkedHashMap<>();
+                var it = declared.fields();
+                while (it.hasNext()) {
+                    var e = it.next();
+                    out.put(e.getKey(), (int) e.getValue().asDouble());
                 }
+                return out;
             }
         }
         Map<String, Integer> counts = new LinkedHashMap<>();
@@ -160,11 +161,12 @@ public final class Coverage {
     }
 
     /**
-     * Return the coverage.json structure for {@code events} under {@code profile}. {@code listed} is the bundle
-     * manifest's file paths: a denominator manifest is read only when listed there.
+     * Return the coverage.json structure for {@code events} under {@code profile}. {@code members} maps each file the
+     * bundle manifest lists to the bytes {@link Bundle#load} checked: a denominator manifest is taken from there and
+     * only when listed.
      */
     public static ObjectNode computeCoverage(
-            List<JsonNode> events, Profile profile, Path bundleRoot, Set<String> listed) {
+            List<JsonNode> events, Profile profile, Map<String, byte[]> members) {
         Map<String, Map<String, Integer>> bySource = new LinkedHashMap<>();
         for (JsonNode event : events) {
             bySource.computeIfAbsent(source(event), k -> new LinkedHashMap<>())
@@ -175,7 +177,7 @@ public final class Coverage {
         for (Profile.Subject subject : profile.subjects) {
             List<Map.Entry<Profile.CoverageDenominator, Map<String, Integer>>> countsByDenominator = new ArrayList<>();
             for (Profile.CoverageDenominator d : subject.coverageDenominators) {
-                countsByDenominator.add(Map.entry(d, denominatorCounts(d, subject, bySource, bundleRoot, listed)));
+                countsByDenominator.add(Map.entry(d, denominatorCounts(d, subject, bySource, members)));
             }
             // A denominator's own records of a type it covers and counts are the yardstick, not captured operations.
             // One that is not independent, or does not count a type, hides none of that type's events (SPEC §6.5).

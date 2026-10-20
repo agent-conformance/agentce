@@ -124,8 +124,8 @@ def ingest(
         # One line rule the three engines share (18.65): lines end at \n, \r\n or a lone \r
         # (`bytes.splitlines`), each line is strict UTF-8 on its own, and only JSON's own whitespace
         # is trimmed. A line that is not UTF-8 is quarantined like a line that is not JSON, instead
-        # of the whole file failing to decode.
-        for raw_line in path.read_bytes().splitlines():
+        # of the whole file failing to decode. The bytes are the ones load_bundle checked and hashed (18.184f).
+        for raw_line in bundle.contents[path].splitlines():
             try:
                 raw = raw_line.decode("utf-8")
             except UnicodeDecodeError:

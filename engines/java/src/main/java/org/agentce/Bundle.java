@@ -1,11 +1,15 @@
 package org.agentce;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,7 +19,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.BiConsumer;
 
 /**
  * Evidence bundle loading and manifest verification (SPEC §8.1, §5.4).
@@ -29,6 +35,13 @@ public final class Bundle {
     public final Path root;
     public final JsonNode manifest;
     public final List<Path> eventFiles;
+    /**
+     * The bytes of each listed member (keyed by its path under {@code root}), exactly as {@link #load} checked and
+     * hashed them: ingest uses these, never a second read of the same name (18.184f).
+     */
+    public final Map<Path, byte[]> contents;
+    /** The same bytes keyed by each listed path as the manifest writes it (the coverage denominator's lookup). */
+    public final Map<String, byte[]> members;
     public final Set<String> sources;
     public final Map<String, String> sourceClasses;
     private String digestCache;
@@ -37,11 +50,15 @@ public final class Bundle {
             Path root,
             JsonNode manifest,
             List<Path> eventFiles,
+            Map<Path, byte[]> contents,
+            Map<String, byte[]> members,
             Set<String> sources,
             Map<String, String> sourceClasses) {
         this.root = root;
         this.manifest = manifest;
         this.eventFiles = eventFiles;
+        this.contents = contents;
+        this.members = members;
         this.sources = sources;
         this.sourceClasses = sourceClasses;
     }
@@ -57,29 +74,6 @@ public final class Bundle {
             digestCache = "sha256:" + Canonical.sha256Hex(manifest);
         }
         return digestCache;
-    }
-
-    /** The file paths the manifest lists, each checked against its sha256 by {@link #load}. */
-    public Set<String> listedPaths() {
-        Set<String> out = new java.util.LinkedHashSet<>();
-        JsonNode files = manifest.get("files");
-        if (files != null && files.isArray()) {
-            for (JsonNode entry : files) {
-                JsonNode path = entry.isObject() ? entry.get("path") : null;
-                if (path != null && path.isTextual()) {
-                    out.add(path.textValue());
-                }
-            }
-        }
-        return out;
-    }
-
-    private static String fileSha256Hex(Path path) {
-        try {
-            return Canonical.sha256Hex(Files.readAllBytes(path));
-        } catch (IOException e) {
-            throw new IllegalStateException("cannot read " + path + ": " + e.getMessage(), e);
-        }
     }
 
     private static InputError bundleUnreadable(Path bundleDir, String rel) {
@@ -228,6 +222,79 @@ public final class Bundle {
         return current;
     }
 
+    /**
+     * Test seams for 18.184f: {@code afterConfine} runs once a member's confinement check has passed and before it
+     * is opened, {@code afterCheck} once the opened file has been checked and before it is read.
+     */
+    static BiConsumer<String, Path> afterConfine;
+    static BiConsumer<String, Path> afterCheck;
+
+    private static InputError changedWhileRead(String rel) {
+        return new InputError(
+                "input.bundle_manifest_path",
+                rel + " changed while it was being read: the file opened is not the one checked to be inside "
+                        + "the bundle root.",
+                "keep the bundle folder unchanged while the command reads it, then run the command again.");
+    }
+
+    /**
+     * The bytes of {@code member}, the path {@link #confineToRoot} returned for {@code rel}, read through one open
+     * file of the path it resolves to, and only when that path is still inside {@code root} and still the same file
+     * (file key) once the read is done, as Python's {@code read_confined} (18.184f). Java cannot ask which file an
+     * open channel names, so it opens the resolved path without following a final link and checks the path again
+     * after the read: a member swapped between the confinement check and the read (for a link outside the bundle,
+     * or for any other file) is refused with {@code input.bundle_manifest_path} and its bytes are never used. An
+     * {@link IOException} from opening or reading ({@link AccessDeniedException} included) propagates.
+     */
+    static byte[] readConfined(Path root, String rel, Path member) throws IOException {
+        if (afterConfine != null) {
+            afterConfine.accept(rel, member);
+        }
+        Path real;
+        Object key;
+        try {
+            real = member.toRealPath();
+            BasicFileAttributes attrs =
+                    Files.readAttributes(real, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            if (!attrs.isRegularFile()
+                    || confineToRoot(root, rel) == null
+                    || !real.startsWith(root.toRealPath())) {
+                throw changedWhileRead(rel);
+            }
+            key = attrs.fileKey();
+        } catch (AccessDeniedException e) {
+            throw e;
+        } catch (IOException e) {
+            throw changedWhileRead(rel);
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try (SeekableByteChannel channel =
+                Files.newByteChannel(real, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) {
+            if (afterCheck != null) {
+                afterCheck.accept(rel, member);
+            }
+            ByteBuffer buffer = ByteBuffer.allocate(65536);
+            while (channel.read(buffer) >= 0) {
+                out.write(buffer.array(), 0, buffer.position());
+                buffer.clear();
+            }
+        } catch (AccessDeniedException e) {
+            throw e;
+        } catch (IOException e) {
+            // A final link swapped in before the open (NOFOLLOW_LINKS refuses it) or a file that went away.
+            throw changedWhileRead(rel);
+        }
+        try {
+            Object after = Files.readAttributes(real, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS).fileKey();
+            if (!Objects.equals(after, key) || !member.toRealPath().equals(real) || confineToRoot(root, rel) == null) {
+                throw changedWhileRead(rel);
+            }
+        } catch (IOException e) {
+            throw changedWhileRead(rel);
+        }
+        return out.toByteArray();
+    }
+
     private static Path safeMember(Path root, String rel) {
         Path member = confineToRoot(root, rel);
         if (member == null) {
@@ -268,8 +335,10 @@ public final class Bundle {
         }
         JsonNode manifest;
         try {
-            manifest = Verify.readUntrustedJsonFile(manifestPath);
-        } catch (RuntimeException exc) {
+            manifest = Verify.parseUntrustedJson(readConfined(bundleDir, "manifest.json", manifestPath));
+        } catch (InputError exc) {
+            throw exc;
+        } catch (IOException | RuntimeException exc) {
             // A fixed message, not the parser's own text: Jackson's exception text would make this
             // refusal's cause diverge from the other two engines for the same malformed input, for no
             // reason a reader could use (F3, 18.65).
@@ -294,6 +363,8 @@ public final class Bundle {
         }
 
         List<Path> eventFiles = new ArrayList<>();
+        Map<Path, byte[]> contents = new HashMap<>();
+        Map<String, byte[]> members = new HashMap<>();
         for (JsonNode entry : files) {
             // A non-string path/sha256 folds into the same refusal as a missing one: Jackson's
             // asText(), Python's str() and JS's String() disagree on how to render an array,
@@ -323,12 +394,22 @@ public final class Bundle {
             if (cannotOpen(member)) {
                 throw bundleUnreadable(bundleDir, rel);
             }
-            if (!fileSha256Hex(member).equals(normaliseDigest(entry.get("sha256").asText()))) {
+            byte[] data;
+            try {
+                data = readConfined(bundleDir, rel, member);
+            } catch (AccessDeniedException e) {
+                throw bundleUnreadable(bundleDir, rel);
+            } catch (IOException e) {
+                throw new IllegalStateException("cannot read " + member + ": " + e.getMessage(), e);
+            }
+            if (!Canonical.sha256Hex(data).equals(normaliseDigest(entry.get("sha256").asText()))) {
                 throw new InputError(
                         "input.bundle_manifest_mismatch",
                         rel + " does not match its manifest SHA-256.",
                         "regenerate the bundle so its files match the manifest.");
             }
+            contents.put(member, data);
+            members.put(rel, data);
             if (rel.startsWith("events/") && rel.endsWith(".jsonl")) {
                 eventFiles.add(member);
             }
@@ -366,6 +447,8 @@ public final class Bundle {
                 bundleDir,
                 manifest,
                 eventFiles,
+                contents,
+                members,
                 sources,
                 sourceClasses.isEmpty() ? null : sourceClasses);
     }

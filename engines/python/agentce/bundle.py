@@ -10,10 +10,9 @@ from __future__ import annotations
 
 import errno
 import hashlib
-import json
 import os
-import shutil
-from dataclasses import dataclass
+import stat
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -24,17 +23,9 @@ from . import signing
 from .signing import parse_untrusted_json
 
 #: Ceiling on any single manifest-listed file's byte size, checked with `stat()` before the file is
-#: opened or hashed (SPEC §8.1) -- so a hostile bundle cannot force gigabytes to stream through
-#: `_sha256_hex` before any check has a chance to refuse it.
+#: opened or hashed (SPEC §8.1) -- so a hostile bundle cannot force gigabytes to be read before any check has a
+#: chance to refuse it.
 DEFAULT_MAX_MANIFEST_FILE_BYTES = 512 * 1024 * 1024
-
-
-def _sha256_hex(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(65536), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _normalise_digest(raw: str) -> str:
@@ -52,15 +43,13 @@ class Bundle:
     #: Declared trust class per source id, for sources whose manifest entry carries a ``class``
     #: (SPEC §6.4). Ingest quarantines an event whose ``agentcesourceclass`` differs (``class_mismatch``).
     source_classes: dict[str, str] | None = None
-
-    @property
-    def listed_paths(self) -> frozenset[str]:
-        """The file paths the manifest lists, each checked against its sha256 by :func:`load_bundle`."""
-        return frozenset(
-            str(entry["path"])
-            for entry in self.manifest.get("files", [])
-            if isinstance(entry, dict) and isinstance(entry.get("path"), str)
-        )
+    #: The bytes of manifest.json and of each listed member (keyed by its path under ``root``), exactly as
+    #: :func:`load_bundle` checked and hashed them: ingest and the copy for sharing use these, never a second read
+    #: of the same name, so a file changed after the check never reaches a report (18.184f).
+    manifest_bytes: bytes = b""
+    contents: dict[Path, bytes] = field(default_factory=dict)
+    #: The same bytes keyed by each listed path as the manifest writes it (the coverage denominator's lookup).
+    members: dict[str, bytes] = field(default_factory=dict)
 
     @property
     def digest(self) -> str:
@@ -125,6 +114,38 @@ def confine_to_root(root: Path, rel: str) -> Path | None:
     return candidate
 
 
+def _changed_while_read(rel: str) -> InputError:
+    return InputError(
+        "input.bundle_manifest_path",
+        f"{rel} changed while it was being read: the file opened is not the one checked to be inside "
+        "the bundle root.",
+        "keep the bundle folder unchanged while the command reads it, then run the command again.",
+    )
+
+
+def read_confined(
+    root: Path, rel: str, member: Path, limit: int | None = None
+) -> bytes:
+    """The bytes of ``member``, the path :func:`confine_to_root` returned for ``rel``, read through one open
+    file, and only when, once that file is open, ``rel`` still resolves inside ``root`` to the very file opened.
+    A member swapped between the confinement check and the read (for a link outside the bundle, or for any other
+    file) is refused with ``input.bundle_manifest_path`` and its bytes are never used (18.184f). At most
+    ``limit + 1`` bytes are read when ``limit`` is set, so the caller can refuse an oversize file. An ``OSError``
+    from opening or reading (``PermissionError`` included) propagates for the caller to report."""
+    with open(
+        os.open(member, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0)), "rb"
+    ) as handle:
+        opened = os.fstat(handle.fileno())
+        again = confine_to_root(root, rel)
+        try:
+            same = again is not None and os.path.samestat(os.stat(again), opened)
+        except (OSError, ValueError):
+            same = False
+        if not same or not stat.S_ISREG(opened.st_mode):
+            raise _changed_while_read(rel)
+        return handle.read() if limit is None else handle.read(limit + 1)
+
+
 def _meets_symlink_loop(resolved: Path) -> bool:
     """True when ``resolved`` still ends in a symlink loop. Python 3.12's ``resolve(strict=False)``
     raises on a loop; 3.13 and newer return the looping path unchanged, so ask the OS the same
@@ -149,26 +170,19 @@ def _safe_member(root: Path, rel: str) -> Path:
     return member
 
 
-def copy_bundle(src_root: Path, dst_root: Path) -> None:
-    """Copy exactly the files a bundle's own ``manifest.json`` lists (plus the manifest itself) into
-    ``dst_root``, each resolved through :func:`confine_to_root` first (SPEC §8.1's own bundle-safety
-    rule, reused here rather than a plain ``shutil.copytree``): a symlink that escapes ``src_root``, or
-    a file present on disk but not in the manifest, never reaches the copy. Does not itself verify the
-    bundle; call :func:`load_bundle` on ``dst_root`` afterwards to confirm the copy is faithful."""
-    manifest_path = src_root / "manifest.json"
-    manifest: dict[str, Any] = json.loads(manifest_path.read_text(encoding="utf-8"))
+def copy_bundle(loaded: Bundle, dst_root: Path) -> None:
+    """Write exactly the files ``loaded``'s own manifest lists (plus the manifest itself) into ``dst_root``, from
+    the bytes :func:`load_bundle` checked and hashed (SPEC §8.1's own bundle-safety rule, reused here rather than a
+    plain ``shutil.copytree``): a symlink that escapes the bundle, a file present on disk but not in the manifest,
+    or a file changed after the check never reaches the copy (18.184f). Call :func:`load_bundle` on ``dst_root``
+    afterwards to confirm the copy is faithful."""
     dst_root.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(manifest_path, dst_root / "manifest.json")
-    for entry in manifest.get("files", []):
-        if not isinstance(entry, dict) or "path" not in entry:
-            continue
+    (dst_root / "manifest.json").write_bytes(loaded.manifest_bytes)
+    for entry in loaded.manifest.get("files", []):
         rel = str(entry["path"])
-        src = confine_to_root(src_root, rel)
-        if src is None or not safe_is_file(src):
-            continue  # load_bundle on dst_root reports this the same way it reports any other gap
         dst = dst_root / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dst)
+        dst.write_bytes(loaded.members[rel])
 
 
 def load_bundle(bundle_dir: Path) -> Bundle:
@@ -190,7 +204,8 @@ def load_bundle(bundle_dir: Path) -> Bundle:
             "replace the manifest.json link with the manifest file itself, inside the bundle folder.",
         )
     try:
-        parsed = parse_untrusted_json(manifest_path.read_bytes())
+        manifest_bytes = read_confined(bundle_dir, "manifest.json", manifest_path)
+        parsed = parse_untrusted_json(manifest_bytes)
     except PermissionError as exc:
         raise _unreadable(bundle_dir, "manifest.json") from exc
     except (OSError, ValueError) as exc:
@@ -216,6 +231,8 @@ def load_bundle(bundle_dir: Path) -> Bundle:
         )
 
     event_files: list[Path] = []
+    contents: dict[Path, bytes] = {}
+    members: dict[str, bytes] = {}
     for entry in files:
         if (
             not isinstance(entry, dict)
@@ -254,6 +271,16 @@ def load_bundle(bundle_dir: Path) -> Bundle:
                 f"manifest lists {rel}, which could not be safely accessed.",
                 "regenerate the bundle so its files match the manifest.",
             ) from exc
+        data = b""
+        if size <= DEFAULT_MAX_MANIFEST_FILE_BYTES:
+            try:
+                data = read_confined(
+                    bundle_dir, rel, member, DEFAULT_MAX_MANIFEST_FILE_BYTES
+                )
+            except PermissionError as exc:
+                raise _unreadable(bundle_dir, rel) from exc
+            # A file that grew past the limit after the stat is refused the same way.
+            size = max(size, len(data))
         if size > DEFAULT_MAX_MANIFEST_FILE_BYTES:
             raise InputError(
                 "input.bundle_manifest_file_too_large",
@@ -262,16 +289,14 @@ def load_bundle(bundle_dir: Path) -> Bundle:
                 "split large evidence into more, smaller files, or reference bulk content by an "
                 "opaque locator instead of inlining it (SPEC R12).",
             )
-        try:
-            actual = _sha256_hex(member)
-        except PermissionError as exc:
-            raise _unreadable(bundle_dir, rel) from exc
-        if actual != _normalise_digest(entry["sha256"]):
+        if hashlib.sha256(data).hexdigest() != _normalise_digest(entry["sha256"]):
             raise InputError(
                 "input.bundle_manifest_mismatch",
                 f"{rel} does not match its manifest SHA-256.",
                 "regenerate the bundle so its files match the manifest.",
             )
+        contents[member] = data
+        members[rel] = data
         if rel.startswith("events/") and rel.endswith(".jsonl"):
             event_files.append(member)
 
@@ -303,4 +328,7 @@ def load_bundle(bundle_dir: Path) -> Bundle:
         event_files=tuple(sorted(event_files)),
         sources=sources,
         source_classes=source_classes or None,
+        manifest_bytes=manifest_bytes,
+        contents=contents,
+        members=members,
     )

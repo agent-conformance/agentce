@@ -1537,7 +1537,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     if package_for_sharing:
         bundle_out = out_dir / "bundle"
         shutil.rmtree(bundle_out, ignore_errors=True)
-        copy_bundle(loaded.root, bundle_out / "evidence")
+        copy_bundle(loaded, bundle_out / "evidence")
         shutil.copy2(profile, bundle_out / "applicability.yaml")
         if domain_path_early is not None:
             shutil.copy2(domain_path_early, bundle_out / "domain.linkml.yaml")
@@ -1581,9 +1581,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     graph_triples = graph_store.triple_count()
     graph_store.close()
     # Stage 4: coverage and reconciliation against independent denominators.
-    coverage = compute_coverage(
-        ingested.accepted, profile_obj, loaded.root, listed=loaded.listed_paths
-    )
+    coverage = compute_coverage(ingested.accepted, profile_obj, members=loaded.members)
     with writing_into(out, OUT_DIR):
         write_file(
             out_dir / "coverage.json", json.dumps(coverage, sort_keys=True, indent=2)

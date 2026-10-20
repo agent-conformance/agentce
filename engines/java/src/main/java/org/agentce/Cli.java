@@ -1207,8 +1207,7 @@ global options:
         int graphTriples = store.tripleCount();
 
         // Stage 4: coverage and reconciliation against independent denominators.
-        ObjectNode coverage = Coverage.computeCoverage(
-                ingested.accepted, profileObj, Paths.get(bundleDir), bundle.listedPaths());
+        ObjectNode coverage = Coverage.computeCoverage(ingested.accepted, profileObj, bundle.members);
         Outputs.writingInto(out.toString(), Outputs.OUT_DIR, () -> {
             Files.createDirectories(out);
             Outputs.writeFile(out.resolve("coverage.json"), Json.pretty(coverage) + "\n");

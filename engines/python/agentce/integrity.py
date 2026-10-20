@@ -24,7 +24,8 @@ from pathlib import Path
 from typing import Any
 
 from . import canonical, signing
-from .bundle import confine_to_root, safe_is_file
+from .bundle import confine_to_root, read_confined, safe_is_file
+from .errors import InputError
 from .structural import compare_instants
 
 GENESIS_PREV = "0" * 64
@@ -228,14 +229,16 @@ def _signed_digests(
     bundle_root: Path, sig_ref: str, trust: signing.TrustRoot
 ) -> frozenset[str]:
     """The SHA-256 digests the in-toto Statement of a verified ``sig_ref`` envelope names as subjects; none when the
-    file is outside the bundle or unreadable, is not a DSSE envelope over an in-toto Statement, or verifies against
+    file is outside the bundle, unreadable or changed while read, is not a DSSE envelope over an in-toto Statement, or verifies against
     no key in ``trust``."""
     path = confine_to_root(bundle_root, sig_ref)
     if path is None or not safe_is_file(path):
         return frozenset()
     try:
-        envelope = signing.read_verify_input(
-            path, "verify.envelope_malformed", "the signature envelope"
+        envelope = signing.parse_verify_input(
+            read_confined(bundle_root, sig_ref, path),
+            "verify.envelope_malformed",
+            "the signature envelope",
         )
         verified = signing.verify_envelope(envelope, trust)
         if envelope.get("payloadType") != signing.INTOTO_PAYLOAD_TYPE:
@@ -243,7 +246,7 @@ def _signed_digests(
         statement = signing.parse_verify_input(
             verified.payload, "verify.statement_unreadable", "the signed statement"
         )
-    except (signing.VerificationError, OSError):
+    except (signing.VerificationError, InputError, OSError):
         return frozenset()
     subjects = statement.get("subject") if isinstance(statement, dict) else None
     if not isinstance(subjects, list):

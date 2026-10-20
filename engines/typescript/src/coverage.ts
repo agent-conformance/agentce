@@ -9,8 +9,6 @@
  * integer arithmetic so it is cross-language identical.
  */
 
-import { readFileSync } from "node:fs";
-import { confineToRoot, safeIsFile } from "./bundle";
 import type { CoverageDenominator, Profile, Subject } from "./profile";
 import { byteCompare } from "./util";
 
@@ -73,10 +71,9 @@ function denominatorCounts(
   denominator: CoverageDenominator,
   subject: Subject,
   bySource: Map<string, Map<string, number>>,
-  bundleRoot: string | null,
-  listed: ReadonlySet<string>,
+  members: ReadonlyMap<string, Buffer>,
 ): Record<string, number> {
-  const counts = declaredCounts(denominator, subject, bySource, bundleRoot, listed);
+  const counts = declaredCounts(denominator, subject, bySource, members);
   const kept: Record<string, number> = {};
   for (const [type, count] of Object.entries(counts)) {
     if (denominator.covers.length === 0 || denominator.covers.includes(type)) {
@@ -90,31 +87,26 @@ function declaredCounts(
   denominator: CoverageDenominator,
   subject: Subject,
   bySource: Map<string, Map<string, number>>,
-  bundleRoot: string | null,
-  listed: ReadonlySet<string>,
+  members: ReadonlyMap<string, Buffer>,
 ): Record<string, number> {
   if (!independent(denominator, subject)) {
     return {};
   }
-  if (denominator.manifest && !listed.has(denominator.manifest)) {
-    // A file the bundle manifest does not list is outside the bundle digest: never read (SPEC §6.6).
-    return {};
-  }
-  if (denominator.manifest && bundleRoot !== null) {
-    // A denominator manifest is a bundle-adjacent reference: confine it to the bundle root so a
-    // path that escapes (literally or through a symlink) is not read at all, falling through to
-    // the source's own ingested counts exactly as a missing manifest does.
-    const confined = confineToRoot(bundleRoot, denominator.manifest);
-    if (confined !== null && safeIsFile(confined)) {
-      const data = JSON.parse(readFileSync(confined, "utf-8"));
-      if (isRecord(data)) {
-        const declared = firstNonEmpty(data.counts, data.expected);
-        const out: Record<string, number> = {};
-        for (const [key, val] of Object.entries(declared)) {
-          out[key] = Math.trunc(Number(val));
-        }
-        return out;
+  if (denominator.manifest) {
+    const raw = members.get(denominator.manifest);
+    if (raw === undefined) {
+      // A file the bundle manifest does not list is outside the bundle digest: never read (SPEC §6.6).
+      return {};
+    }
+    // The bytes loadBundle checked and hashed, never a second read of the name (18.184f).
+    const data = JSON.parse(raw.toString("utf-8"));
+    if (isRecord(data)) {
+      const declared = firstNonEmpty(data.counts, data.expected);
+      const out: Record<string, number> = {};
+      for (const [key, val] of Object.entries(declared)) {
+        out[key] = Math.trunc(Number(val));
       }
+      return out;
     }
   }
   // Otherwise count the denominator source's own ingested events, per type.
@@ -133,13 +125,12 @@ interface ExpectedEntry {
   denominators: string[];
 }
 
-/** Return the coverage.json structure for `events` under `profile`. `listed` is the bundle manifest's file paths:
- * a denominator manifest is read only when listed there. */
+/** Return the coverage.json structure for `events` under `profile`. `members` maps each file the bundle manifest
+ * lists to the bytes `loadBundle` checked: a denominator manifest is taken from there and only when listed. */
 export function computeCoverage(
   events: Event[],
   profile: Profile,
-  bundleRoot: string | null = null,
-  listed: ReadonlySet<string> = new Set(),
+  members: ReadonlyMap<string, Buffer> = new Map(),
 ): Record<string, unknown> {
   const bySource = new Map<string, Map<string, number>>();
   for (const event of events) {
@@ -156,7 +147,7 @@ export function computeCoverage(
   const subjectsOut: Record<string, unknown> = {};
   for (const subject of profile.subjects) {
     const countsByDenominator = subject.coverageDenominators.map(
-      (d) => [d, denominatorCounts(d, subject, bySource, bundleRoot, listed)] as const,
+      (d) => [d, denominatorCounts(d, subject, bySource, members)] as const,
     );
     // A denominator's own records of a type it covers and counts are the yardstick, not captured operations. One
     // that is not independent, or does not count a type, hides none of that type's events (SPEC §6.5).
