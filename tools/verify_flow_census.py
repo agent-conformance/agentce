@@ -2019,16 +2019,20 @@ INVENTORY_FLAGS: dict[str, tuple[str, ...] | str] = {
 
 #: Every read site reachable from `cmd_verify` (`surface_inventory`), keyed by function and the call
 #: as written, mapped to the census rows that mutate what it reads, or to a written disposition.
+#: The one open of manifest.json, every listed member and the event streams ingest reads from it (18.184f).
+_BUNDLE_READ = ("bundle-manifest", "bundle-files", "bundle-streams")
+
 INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.bundle._meets_symlink_loop: os.stat(resolved)": ("bundle-files",),
-    "agentce.bundle._sha256_hex: path.open('rb')": ("bundle-files",),
+    "agentce.bundle.read_confined: open(os.open(member, os.O_RDONLY | getattr(os, 'O_NONBLOCK', 0)))": _BUNDLE_READ,
+    "agentce.bundle.read_confined: os.open(member)": _BUNDLE_READ,
+    "agentce.bundle.read_confined: os.stat(again)": _BUNDLE_READ,
     "agentce.bundle.permission_denied: path.stat()": (
         "bundle-manifest",
         "bundle-files",
     ),
-    "agentce.bundle.load_bundle: manifest_path.read_bytes()": ("bundle-manifest",),
     "agentce.bundle.load_bundle: member.stat()": ("bundle-files",),
-    "agentce.bundle.load_bundle: parse_untrusted_json(manifest_path.read_bytes())": (
+    "agentce.bundle.load_bundle: parse_untrusted_json(manifest_bytes)": (
         "bundle-manifest",
     ),
     "agentce.commands._load_release_json: signing.read_verify_input(path)": (
@@ -2066,9 +2070,10 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
         "report-statement",
     ),
     "agentce.commands.cmd_verify: os.path.exists(release)": ("target-argument",),
-    "agentce.ingest.ingest: path.read_bytes()": ("bundle-streams",),
     "agentce.integrity._signed_digests: signing.parse_verify_input(verified.payload)": _SOURCE_SIG,
-    "agentce.integrity._signed_digests: signing.read_verify_input(path)": _SOURCE_SIG,
+    "agentce.integrity._signed_digests: signing.parse_verify_input(read_confined(bundle_root, sig_ref, path))": (
+        _SOURCE_SIG
+    ),
     "agentce.safe_json.load_json: json.loads(text)": ("bundle-streams",),
     "agentce.schema.evidence_schema: json.loads(text)": _PACKAGED,
     "agentce.schema.evidence_schema: resources.files('agentce.data')"
