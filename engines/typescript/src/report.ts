@@ -1383,6 +1383,9 @@ export interface WriteReportOptions {
   /** The already-linted register `applyDeviations` used (18.17a): OSCAL risks and the project view's
    * per-agent deviations read it. */
   deviations?: Record<string, unknown>[];
+  /** Each name and its bytes is written verbatim and its digest recorded in the manifest's `outputs`,
+   * as report.py's `extra_outputs` does, for the data files assess writes before the report (18.184e). */
+  extraOutputs?: Record<string, Buffer>;
 }
 
 function bareSubject(id: string): Subject {
@@ -1432,6 +1435,10 @@ export function writeReport(
   writeJson("assertions.json", assertions.map(assertionToJson));
   writeJson("activity.json", activity);
   writeJson("blind-spots.json", blindSpots);
+  for (const [name, data] of Object.entries(options.extraOutputs ?? {})) {
+    writeFile(joinPath(outDir, name), data);
+    outputs[name] = digestBytes(data);
+  }
 
   // 18.14 C3: every agent's records side by side (Hill 7) -- only when `profile` names more than
   // one subject; a single subject (or no `profile`) leaves every byte below unchanged.

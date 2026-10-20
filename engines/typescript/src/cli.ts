@@ -1268,6 +1268,17 @@ function runAssess(options: AssessOptions): CommandResult {
   const blindSpots = computeBlindSpots(evaluated, profileObj, catalogs, ingested.accepted);
   const applicabilityProfileDigest = digestOf(profilePath);
   const domainBindingDigest = domainPath !== undefined ? digestOf(domainPath) : undefined;
+  // The data files Stages 1/2/4/5 wrote above get a manifest-tracked digest too, as in
+  // commands/__init__.py: read back once, in this process, right after this run wrote them.
+  const extraOutputs: Record<string, Buffer> = {};
+  for (const artifact of [
+    "quarantine.jsonl",
+    "integrity.jsonl",
+    "coverage.json",
+    "applicability.jsonl",
+  ]) {
+    extraOutputs[artifact] = readFileSync(joinPath(out, artifact));
+  }
   writingInto(out, OUT_DIR, () =>
     writeReport(out, evaluated, {
       bundleDigest: bundle.digest,
@@ -1291,6 +1302,7 @@ function runAssess(options: AssessOptions): CommandResult {
       deviations,
       declaredSubjectIds,
       reportLanguage: language,
+      extraOutputs,
     }),
   );
   if (state !== null) {

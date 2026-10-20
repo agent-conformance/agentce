@@ -1490,6 +1490,22 @@ public final class Report {
             Profile profile, Set<String> declaredSubjectIds, List<JsonNode> events, List<String> limitations,
             String applicabilityProfileDigest, String domainBindingDigest, String deviationRegisterDigest,
             List<JsonNode> deviations) {
+        return writeReport(
+                outDir, assertions, bundleDigest, catalogs, operator, invocation, supersedes, reportLanguage,
+                catalogObjects, activity, blindSpots, profile, declaredSubjectIds, events, limitations,
+                applicabilityProfileDigest, domainBindingDigest, deviationRegisterDigest, deviations, Map.of());
+    }
+
+    /** As the nineteen-argument {@link #writeReport}, plus {@code extraOutputs}: each name and its bytes
+     * is written verbatim and its digest recorded in the manifest's {@code outputs}, as report.py's
+     * {@code extra_outputs} does, for the data files assess writes before the report (18.184e). */
+    public static ObjectNode writeReport(
+            Path outDir, List<Assertions.Assertion> assertions, String bundleDigest, List<String> catalogs,
+            String operator, List<String> invocation, List<String> supersedes, String reportLanguage,
+            List<Catalog> catalogObjects, ObjectNode activity, ObjectNode blindSpots,
+            Profile profile, Set<String> declaredSubjectIds, List<JsonNode> events, List<String> limitations,
+            String applicabilityProfileDigest, String domainBindingDigest, String deviationRegisterDigest,
+            List<JsonNode> deviations, Map<String, byte[]> extraOutputs) {
         Assertions.checkDc5(assertions);
         try {
             Files.createDirectories(outDir);
@@ -1504,6 +1520,10 @@ public final class Report {
             outputs.put("assertions.json", writeJson(outDir, "assertions.json", assertionsJson));
             outputs.put("activity.json", writeJson(outDir, "activity.json", activityNode));
             outputs.put("blind-spots.json", writeJson(outDir, "blind-spots.json", blindSpotsNode));
+            for (Map.Entry<String, byte[]> extra : extraOutputs.entrySet()) {
+                Outputs.writeFile(outDir.resolve(extra.getKey()), extra.getValue());
+                outputs.put(extra.getKey(), digestBytes(extra.getValue()));
+            }
 
             Map<String, Integer> counts = Assertions.aggregate(assertions);
 

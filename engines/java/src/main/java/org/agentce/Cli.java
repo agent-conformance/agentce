@@ -1297,14 +1297,21 @@ global options:
         String applicabilityProfileDigest = digestOf(Paths.get(profilePath));
         String domainBindingDigest = domainPath != null ? digestOf(Paths.get(domainPath)) : null;
         try {
+            // The data files Stages 1/2/4/5 wrote above get a manifest-tracked digest too, as in
+            // commands/__init__.py: read back once, in this process, right after this run wrote them.
+            Map<String, byte[]> extraOutputs = new LinkedHashMap<>();
+            for (String artifact : List.of("quarantine.jsonl", "integrity.jsonl", "coverage.json", "applicability.jsonl")) {
+                extraOutputs.put(artifact, Files.readAllBytes(out.resolve(artifact)));
+            }
             Report.writeReport(
                     out, evaluated, bundle.digest(), resolved.labels(),
                     // config.py's operator default (SPEC §8.4); agentce.toml is not read here (Python only).
                     operatorEnv != null ? operatorEnv : "unset",
                     invocation, supersedes, language, resolved.catalogs(), activity, blindSpots,
                     profileObj, null, ingested.accepted, limitations,
-                    applicabilityProfileDigest, domainBindingDigest, deviationRegisterDigest, deviations);
-        } catch (java.io.UncheckedIOException e) {
+                    applicabilityProfileDigest, domainBindingDigest, deviationRegisterDigest, deviations,
+                    extraOutputs);
+        } catch (IOException | java.io.UncheckedIOException e) {
             throw Outputs.unwritable(out.toString(), Outputs.OUT_DIR);
         }
         if (state != null) {
