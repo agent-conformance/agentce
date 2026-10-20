@@ -5,7 +5,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { DomainBinding, type TaskScope } from "./domain";
+import { CONTEXT_ROOT, DomainBinding, type TaskScope } from "./domain";
 import { InputError } from "./errors";
 
 test("task scope parsing", () => {
@@ -152,4 +152,43 @@ test("a key a << merge brings in may be written again (18.184g)", () => {
     "base: &b {task_type: a, allowed_tools: [x]}\ntask_scopes:\n  - {<<: *b, allowed_tools: [y]}\n",
   );
   assert.deepEqual(binding.taskScopes.get("a")?.[0].allowedTools, new Set(["y"]));
+});
+
+test("a YAML date is neither text nor a number, and an id renders as Python's str(date) (18.184g)", () => {
+  assert.deepEqual(scopeFromYaml("allowed_tools: [2026-01-01, x]").allowedTools, new Set(["x"]));
+  assert.deepEqual(
+    scopeFromYaml("budgets: {tokens: 2020-01-01, spend: 2026-01-01T10:00:00}").budgets,
+    [
+      ["tokens", null],
+      ["spend", null],
+    ],
+  );
+  assert.deepEqual(scopeFromYaml("budgets: 2026-01-01").budgets, [
+    ["tokens", null],
+    ["compute_seconds", null],
+    ["spend", null],
+  ]);
+  const malformed = loadText("task_scopes:\n  - {task_type: 2026-01-01}\n  - 2026-01-01\n");
+  assert.equal(malformed.taskScopes.size, 0);
+  assert.ok(malformed.taskScopesMalformed);
+  const ids = loadText(
+    "decision_types:\n  - {id: 2026-01-01, subclass_of: 2026-01-02T03:04:05Z, required_oversight_modality: 2026-01-03}\n" +
+      "context_classes:\n  - {id: 2026-01-01 10:00:00}\n",
+  );
+  assert.deepEqual(
+    [...ids.subclasses],
+    [
+      ["2026-01-01", "2026-01-02 03:04:05+00:00"],
+      ["2026-01-01 10:00:00", CONTEXT_ROOT],
+    ],
+  );
+  assert.equal(ids.requiredOversight.size, 0);
+});
+
+test("a limit past float range is unreadable (18.184g)", () => {
+  const huge = "9".repeat(400);
+  assert.deepEqual(scopeFromYaml(`budgets: {spend: ${huge}, compute_seconds: ${huge}}`).budgets, [
+    ["compute_seconds", null],
+    ["spend", null],
+  ]);
 });

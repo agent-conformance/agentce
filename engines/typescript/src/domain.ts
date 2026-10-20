@@ -8,13 +8,23 @@
  */
 
 import { pyStrip } from "./failOn";
-import { loadPyyaml } from "./readiness";
+import { isPyyamlTimestamp, loadPyyaml, pythonizeTimestamp } from "./readiness";
 
 export const DECISION_ROOT = "agentce:Decision";
 export const CONTEXT_ROOT = "agentce:ContextItem";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    !isPyyamlTimestamp(value)
+  );
+}
+
+/** Python's `str(value)` for a binding value used as a name: a YAML date renders as `str(date)` does. */
+function pyStrValue(value: unknown): string {
+  return isPyyamlTimestamp(value) ? pythonizeTimestamp(value.pyyamlTimestamp) : String(value);
 }
 
 /** The string members of a declared list; anything else declares none. */
@@ -128,10 +138,10 @@ export class DomainBinding {
       if (!isRecord(entry) || !("id" in entry)) {
         continue;
       }
-      const id = String(entry.id);
+      const id = pyStrValue(entry.id);
       binding.subclasses.set(
         id,
-        String("subclass_of" in entry ? entry.subclass_of : DECISION_ROOT),
+        pyStrValue("subclass_of" in entry ? entry.subclass_of : DECISION_ROOT),
       );
       if (entry.consequential) {
         binding.consequential.add(id);
@@ -145,8 +155,8 @@ export class DomainBinding {
     for (const entry of contextClasses) {
       if (isRecord(entry) && "id" in entry) {
         binding.subclasses.set(
-          String(entry.id),
-          String("subclass_of" in entry ? entry.subclass_of : CONTEXT_ROOT),
+          pyStrValue(entry.id),
+          pyStrValue("subclass_of" in entry ? entry.subclass_of : CONTEXT_ROOT),
         );
       }
     }
