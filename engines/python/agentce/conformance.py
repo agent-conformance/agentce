@@ -222,6 +222,7 @@ def run_ecs(
     identical = 0
     failures: list[dict[str, str]] = []
     summaries: list[dict[str, Any]] = []
+    out_raw = str(out_dir) if out_dir is not None else None
     for project in sorted(projects, key=lambda p: str(p["id"])):
         pid = str(project["id"])
         try:
@@ -230,7 +231,7 @@ def run_ecs(
                 project,
                 reports_root / pid,
                 catalogs,
-                str(out_dir) if out_dir is not None else None,
+                out_raw,
             )
             summaries.append(summary)
             identical += (
