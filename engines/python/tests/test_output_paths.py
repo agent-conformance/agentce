@@ -34,6 +34,7 @@ from agentce.outputs import (
     write_file,
     write_output,
 )
+from agentce.state import StateDir
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _QUICKSTART = _REPO_ROOT / "corpus" / "quickstart"
@@ -289,3 +290,81 @@ def test_catalog_sign_refuses_a_fifo_at_its_signature(
         ["catalog", "sign", str(catalog), "--key", _key(tmp_path), *force], capsys
     )
     assert (code, env["error"]["key"]) == (3, "catalog.sign_dir_unwritable")
+
+
+# 18.184c: one write strategy in every engine, a bounded-name sibling moved over the target.
+
+
+def test_a_hard_linked_target_keeps_its_other_name(tmp_path: Path) -> None:
+    outside = tmp_path / "outside.md"
+    outside.write_text("old\n")
+    target = tmp_path / "r.md"
+    os.link(outside, target)
+    write_file(target, "new\n")
+    assert (target.read_text(), outside.read_text()) == ("new\n", "old\n")
+
+
+def test_a_dangling_link_is_replaced_not_followed(tmp_path: Path) -> None:
+    away = tmp_path / "away" / "r.md"
+    away.parent.mkdir()
+    target = tmp_path / "r.md"
+    target.symlink_to(away)
+    write_file(target, "new\n")
+    assert not target.is_symlink() and target.read_text() == "new\n"
+    assert not away.exists()
+
+
+def test_the_mode_of_an_existing_target_is_kept(tmp_path: Path) -> None:
+    target = tmp_path / "r.md"
+    target.write_text("old\n")
+    target.chmod(0o640)
+    write_file(target, "new\n")
+    assert (target.stat().st_mode & 0o777, target.read_text()) == (0o640, "new\n")
+
+
+def test_a_255_byte_name_is_written(tmp_path: Path) -> None:
+    target = tmp_path / ("n" * 252 + ".md")
+    write_file(target, "new\n")
+    assert target.read_text() == "new\n"
+    assert [p.name for p in tmp_path.iterdir()] == [target.name]
+
+
+def test_a_writable_file_in_a_read_only_folder_is_refused(tmp_path: Path) -> None:
+    folder = tmp_path / "ro"
+    folder.mkdir()
+    (folder / "r.md").write_text("old\n")
+    folder.chmod(0o555)
+    try:
+        with pytest.raises(InputError) as exc:
+            write_output(str(folder / "r.md"), _FILE, "new\n")
+        assert exc.value.key == _FILE.key and UNWRITABLE in str(exc.value)
+        assert sorted(p.name for p in folder.iterdir()) == ["r.md"]
+        assert (folder / "r.md").read_text() == "old\n"
+    finally:
+        folder.chmod(0o755)
+
+
+@pytest.mark.parametrize("rel", ["nosub/../r.md", "nosub/..", "a/nosub/../b/r.md"])
+def test_a_path_through_a_missing_folder_is_refused_and_nothing_made(
+    tmp_path: Path, rel: str
+) -> None:
+    with pytest.raises(InputError) as exc:
+        write_output(str(tmp_path / rel), _FILE, "new\n")
+    assert exc.value.key == _FILE.key and UNREACHABLE in str(exc.value)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_path_through_an_existing_folder_is_written(tmp_path: Path) -> None:
+    (tmp_path / "sub").mkdir()
+    write_output(str(tmp_path / "sub/../r.md"), _FILE, "new\n")
+    assert (tmp_path / "r.md").read_text() == "new\n"
+
+
+def test_state_and_out_through_a_missing_folder_are_refused(tmp_path: Path) -> None:
+    with pytest.raises(InputError) as exc:
+        StateDir.ensure_writable(tmp_path / "nosub/../s")
+    assert exc.value.key == "input.state_dir_unwritable"
+    assert (
+        cli.main(["quickstart", "--out", str(tmp_path / "nosub/../q"), "--json"]) == 3
+    )
+    assert list(tmp_path.iterdir()) == []

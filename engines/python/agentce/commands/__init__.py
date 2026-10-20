@@ -74,8 +74,10 @@ from ..environment import inspect_environment
 from ..error_catalogue import MESSAGE_KEYS, render_errors_md
 from ..outputs import (
     OUT_DIR,
+    UNREACHABLE,
     OutputRole,
     check_output,
+    through_missing_folder,
     write_file,
     write_output,
     writing_into,
@@ -262,6 +264,8 @@ def _refuse_empty(
 
 
 def _refuse_empty_out(raw: str | None) -> None:
+    """The --out folder rule every command checks first: not empty, and not through a folder that
+    does not exist (``nosub/../out``), so a refusal creates nothing (18.184c)."""
     _refuse_empty(
         raw,
         key="input.out_dir_unwritable",
@@ -269,6 +273,12 @@ def _refuse_empty_out(raw: str | None) -> None:
         fix="choose a writable --out directory.",
         noun="directory",
     )
+    if raw is not None and through_missing_folder(Path(raw)):
+        raise InputError(
+            "input.out_dir_unwritable",
+            f"--out {raw!r} {UNREACHABLE}.",
+            "choose a writable --out directory.",
+        )
 
 
 #: The options a command writes to (18.180): each output is checked and written through one role.
@@ -1490,6 +1500,12 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     state_arg = _opt_str(ns, "state")
     if state_arg is not None:
         StateDir.ensure_writable(Path(state_arg))
+    # The file arguments read later are checked here too, so a run refused for one leaves --out
+    # empty (census odd-inputs line 46, 18.184c).
+    if domain_path_early is not None:
+        _require_file(domain_path_early, key="domain", what="the domain binding")
+    if deviations_path is not None:
+        _require_file(deviations_path, key="deviations", what="the deviation register")
     if package_for_sharing:
         _check_package_path_overlap(
             out_dir,

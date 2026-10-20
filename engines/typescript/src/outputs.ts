@@ -3,24 +3,31 @@
  * 3), ported from Python's `outputs.py`. Every output a command writes goes through one role: a target
  * that exists as the wrong type, a path that cannot be reached, or a folder that cannot be written is
  * refused under the role's key before anything is written, and a write that fails anyway is refused
- * under the same key. A file is opened non-blocking and checked on the open descriptor, so a FIFO is
- * never waited on (18.180).
+ * under the same key. A file is written to a fresh sibling with a bounded name and moved over its
+ * target, as in Python and Java: the target is never opened, so a FIFO is never waited on (18.180), a
+ * hard link's other name keeps its bytes, and a dangling link is replaced rather than followed out of
+ * the folder (18.184c).
  */
 
+import { randomBytes } from "node:crypto";
 import {
   constants,
   accessSync,
+  chmodSync,
   closeSync,
-  fstatSync,
   lstatSync,
   mkdirSync,
   openSync,
+  realpathSync,
+  renameSync,
   statSync,
+  unlinkSync,
   writeSync,
 } from "node:fs";
-import { dirname } from "node:path";
+import type { Stats } from "node:fs";
+import { basename, dirname } from "node:path";
 import { InputError } from "./errors";
-import { jsonlText, pyRepr } from "./util";
+import { joinPath, jsonlText, pyRepr } from "./util";
 
 export const NOT_A_FILE = "is not a regular file";
 export const NOT_A_DIRECTORY = "is not a directory";
@@ -90,9 +97,27 @@ function parents(path: string): string[] {
   }
 }
 
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/** `path` has a `..` right after a folder that does not exist (`nosub/../name`). The OS cannot
+ * resolve it, so it is refused rather than created, the same in every engine (18.184c). */
+export function throughMissingFolder(path: string): boolean {
+  return [path, ...parents(path)].some((p) => basename(p) === ".." && !isDirectory(dirname(p)));
+}
+
 /** A target that does not exist yet: its nearest existing ancestor must be a folder that can be
- * written and entered (missing folders between them are created). */
+ * written and entered (missing folders between them are created), and the path must not climb out
+ * of a folder that does not exist ({@link throughMissingFolder}). */
 function checkCreatable(path: string, role: OutputRole, raw: string): void {
+  if (throughMissingFolder(path)) {
+    throw refuse(role, raw, UNREACHABLE);
+  }
   for (const ancestor of parents(path)) {
     let isDir: boolean;
     try {
@@ -158,8 +183,10 @@ export function checkOutput(raw: string, role: OutputRole): string {
   return path;
 }
 
-/** Write `data` to `path`, opened non-blocking, so a FIFO fails the open instead of waiting for a
- * reader, and checked on the open descriptor before a byte is written. Throws the OS error
+/** Write `data` to `path` without opening it: an existing target must be a regular file that can be
+ * written, and the bytes go to a fresh sibling with a bounded name that is then moved over it, keeping
+ * the target's mode. A link to a regular file is followed, as an open would; a dangling link is
+ * replaced. `exclusive` creates a new file and never replaces one. Throws the OS error
  * (`NotRegularFile` for a target of the wrong type); callers key it under their role. */
 export function writeFile(
   path: string,
@@ -167,16 +194,50 @@ export function writeFile(
   options: { exclusive?: boolean; mode?: number } = {},
 ): void {
   const payload = typeof data === "string" ? Buffer.from(data, "utf-8") : data;
-  const flags =
-    constants.O_WRONLY |
-    constants.O_CREAT |
-    constants.O_NONBLOCK |
-    (options.exclusive === true ? constants.O_EXCL : constants.O_TRUNC);
-  const fd = openSync(path, flags, options.mode ?? 0o666);
+  const create = constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL;
+  if (options.exclusive === true) {
+    writeFd(openSync(path, create, options.mode ?? 0o666), payload);
+    return;
+  }
+  let target = path;
+  let keep: number | undefined;
+  let info: Stats | undefined;
   try {
-    if (!fstatSync(fd).isFile()) {
+    info = statSync(path);
+  } catch (err) {
+    if (errCode(err) !== "ENOENT") {
+      throw err;
+    }
+  }
+  if (info !== undefined) {
+    if (!info.isFile()) {
       throw new NotRegularFile(`${path} is not a regular file`);
     }
+    accessSync(path, constants.W_OK);
+    target = realpathSync.native(path);
+    keep = info.mode & 0o7777;
+  }
+  const sibling = joinPath(dirname(target), `.agentce-${randomBytes(8).toString("hex")}.tmp`);
+  const fd = openSync(sibling, create, options.mode ?? 0o666);
+  try {
+    writeFd(fd, payload);
+    if (keep !== undefined) {
+      chmodSync(sibling, keep);
+    }
+    renameSync(sibling, target);
+  } catch (err) {
+    try {
+      unlinkSync(sibling);
+    } catch {
+      // already moved or never written
+    }
+    throw err;
+  }
+}
+
+/** Write all of `payload` to `fd` and close it. */
+function writeFd(fd: number, payload: Buffer): void {
+  try {
     let offset = 0;
     while (offset < payload.length) {
       offset += writeSync(fd, payload, offset);

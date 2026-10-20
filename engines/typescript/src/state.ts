@@ -13,7 +13,8 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { InputError } from "./errors";
-import { byteCompare, joinPath, jsonStringifyAscii, sortKeysDeep } from "./util";
+import { throughMissingFolder } from "./outputs";
+import { byteCompare, joinPath, jsonStringifyAscii, pyRepr, sortKeysDeep } from "./util";
 
 export const STATE_VERSION = 1;
 const STATE_FILE = "state.json";
@@ -126,6 +127,13 @@ export class StateDir {
    * a real write. */
   static ensureWritable(path: string): void {
     const probe = joinPath(path, `.agentce-write-test-${process.pid}`);
+    if (throughMissingFolder(path)) {
+      throw new InputError(
+        "input.state_dir_unwritable",
+        `${pyRepr(path)}: No such file or directory`,
+        "choose a writable --state directory.",
+      );
+    }
     try {
       mkdirSync(path, { recursive: true });
       writeFileSync(probe, "");

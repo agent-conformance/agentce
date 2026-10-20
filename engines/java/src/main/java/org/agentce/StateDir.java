@@ -127,6 +127,12 @@ public final class StateDir {
      * {@code createDirectories} and only fail on a real write. */
     public static void ensureWritable(Path path) {
         Path probe = path.resolve(".agentce-write-test-" + ProcessHandle.current().pid());
+        if (Outputs.throughMissingFolder(path)) {
+            throw new InputError(
+                    "input.state_dir_unwritable",
+                    Readiness.pyRepr(path.toString()) + ": No such file or directory",
+                    "choose a writable --state directory.");
+        }
         try {
             Files.createDirectories(path);
             Files.write(probe, new byte[0]);

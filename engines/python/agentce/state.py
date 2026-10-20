@@ -18,6 +18,7 @@ the manifest carries the normative ``supersedes`` signal. This gap is logged for
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import os
@@ -28,6 +29,7 @@ from typing import Any
 from . import signing
 from .assertions import Assertion
 from .errors import InputError
+from .outputs import through_missing_folder
 
 STATE_VERSION = 1
 STATE_FILE = "state.json"
@@ -132,6 +134,12 @@ class StateDir:
         a directory that exists but lost its write bit after creation would pass `mkdir(exist_ok=True)`
         and only fail on a real write."""
         probe = path / f".agentce-write-test-{os.getpid()}"
+        if through_missing_folder(path):
+            raise InputError(
+                "input.state_dir_unwritable",
+                f"{str(path)!r}: {os.strerror(errno.ENOENT)}",
+                "choose a writable --state directory.",
+            )
         try:
             path.mkdir(parents=True, exist_ok=True)
             probe.write_bytes(b"")

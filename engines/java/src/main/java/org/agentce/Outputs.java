@@ -51,6 +51,8 @@ final class Outputs {
         }
     }
 
+    private static final java.security.SecureRandom RANDOM = new java.security.SecureRandom();
+
     private Outputs() {}
 
     private static InputError refuse(Role role, String raw, String reason) {
@@ -82,9 +84,37 @@ final class Outputs {
         return out;
     }
 
+    /** {@code path} has a {@code ..} right after a folder that does not exist ({@code nosub/../name}).
+     * The OS cannot resolve it, so it is refused rather than created, the same in every engine
+     * (18.184c). */
+    static boolean throughMissingFolder(String raw) {
+        try {
+            return throughMissingFolder(Paths.get(raw));
+        } catch (InvalidPathException e) {
+            return false;
+        }
+    }
+
+    static boolean throughMissingFolder(Path path) {
+        for (Path p = path; p != null; p = p.getParent()) {
+            Path name = p.getFileName();
+            if (name != null && name.toString().equals("..")) {
+                Path parent = p.getParent();
+                if (!Files.isDirectory(parent != null ? parent : Paths.get("."))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     /** A target that does not exist yet: its nearest existing ancestor must be a folder that can be
-     * written and entered (missing folders between them are created). */
+     * written and entered (missing folders between them are created), and the path must not climb out
+     * of a folder that does not exist ({@link #throughMissingFolder}). */
     private static void checkCreatable(Path path, Role role, String raw) {
+        if (throughMissingFolder(path)) {
+            throw refuse(role, raw, UNREACHABLE);
+        }
         for (Path ancestor : parents(path)) {
             BasicFileAttributes info;
             try {
@@ -165,7 +195,8 @@ final class Outputs {
             // absent: the move below creates it
         }
         Path parent = target.toAbsolutePath().getParent();
-        Path sibling = parent.resolve("." + target.getFileName() + "." + java.util.UUID.randomUUID() + ".tmp");
+        // A bounded name: a 255-byte target still gets a sibling (18.184c).
+        Path sibling = parent.resolve(".agentce-" + Long.toHexString(RANDOM.nextLong() | Long.MIN_VALUE) + ".tmp");
         Files.createFile(sibling);
         try {
             if (mode != null) {

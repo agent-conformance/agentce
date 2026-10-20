@@ -895,9 +895,15 @@ global options:
         }
     }
 
-    /** Python's {@code _refuse_empty_out}. */
+    /** Python's {@code _refuse_empty_out}: not empty, and not through a folder that does not exist
+     * ({@code nosub/../out}), so a refusal creates nothing (18.184c). */
     private static void refuseEmptyOut(String out) {
         refuseEmpty(out, "input.out_dir_unwritable", "--out", "choose a writable --out directory.", "directory");
+        if (out != null && Outputs.throughMissingFolder(out)) {
+            throw new InputError("input.out_dir_unwritable",
+                    "--out " + Readiness.pyRepr(out) + " " + Outputs.UNREACHABLE + ".",
+                    "choose a writable --out directory.");
+        }
     }
 
     /** {@code agentce conformance run}: reads its argv only through {@link #CONFORMANCE_GRAMMAR}, then makes
@@ -1171,6 +1177,14 @@ global options:
         Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());
         Resolved resolved = resolveCatalogs(
                 options.catalog(), profileObj, options.catalogDirs(), trust, options.allowUnverified());
+        // The file arguments read later are checked here too, so a run refused for one leaves --out
+        // empty (census odd-inputs line 46, 18.184c).
+        if (options.domain() != null) {
+            requireFile(options.domain(), "domain", "the domain binding");
+        }
+        if (options.deviations() != null) {
+            requireFile(options.deviations(), "deviations", "the deviation register");
+        }
 
         // Stage 1: ingest and validate. A missing/mismatching manifest aborts with exit 3.
         Bundle bundle = Bundle.load(Paths.get(bundleDir));

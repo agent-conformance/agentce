@@ -63,7 +63,9 @@ import { installedNoMl } from "./noMl";
 import {
   OUT_DIR,
   type OutputRole,
+  UNREACHABLE,
   checkOutput,
+  throughMissingFolder,
   writeFile,
   writeJsonl,
   writeOutput,
@@ -777,7 +779,8 @@ function refuseEmpty(
   }
 }
 
-/** Python's `commands._refuse_empty_out`. */
+/** Python's `commands._refuse_empty_out`: not empty, and not through a folder that does not exist
+ * (`nosub/../out`), so a refusal creates nothing (18.184c). */
 function refuseEmptyOut(out: string | undefined): void {
   refuseEmpty(
     out,
@@ -786,6 +789,13 @@ function refuseEmptyOut(out: string | undefined): void {
     "choose a writable --out directory.",
     "directory",
   );
+  if (out !== undefined && throughMissingFolder(out)) {
+    throw new InputError(
+      "input.out_dir_unwritable",
+      `--out ${pyRepr(out)} ${UNREACHABLE}.`,
+      "choose a writable --out directory.",
+    );
+  }
 }
 
 /** `agentce conformance run`, read from its grammar's scan alone. An empty --engine, --corpus or
@@ -1127,6 +1137,14 @@ function runAssess(options: AssessOptions): CommandResult {
     trust,
     options.allowUnverified,
   );
+  // The file arguments read later are checked here too, so a run refused for one leaves --out
+  // empty (census odd-inputs line 46, 18.184c).
+  if (options.domain !== undefined) {
+    requireFile(options.domain, "domain", "the domain binding");
+  }
+  if (options.deviations !== undefined) {
+    requireFile(options.deviations, "deviations", "the deviation register");
+  }
   if (scanned !== undefined) {
     scanned.write(out, declared === undefined);
     limitations.push(RECORDS_LIMITATION);
