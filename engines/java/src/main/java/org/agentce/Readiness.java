@@ -771,15 +771,9 @@ public final class Readiness {
             throw new UncheckedIOException(e);
         }
         try {
-            LoaderOptions options = new LoaderOptions();
-            options.setNestingDepthLimit(DEVIATION_REGISTER_MAX_DEPTH);
-            Node root = pyyamlComposer(options).compose(new StringReader(text));
-            if (root != null && uniqueKeys) {
-                rejectRepeatedKeys(root);
-            }
-            return root == null ? null : composeValue(root);
+            return composePyyaml(text, uniqueKeys);
         } catch (StackOverflowError | RuntimeException e) {
-            if (e instanceof StackOverflowError || String.valueOf(e.getMessage()).contains("Nesting Depth exceeded")) {
+            if (nestedTooDeeply(e)) {
                 // SnakeYAML caps nesting (and composeValue recurses per level), as PyYAML's composer
                 // hits its RecursionError.
                 throw new InputError(
@@ -793,6 +787,24 @@ public final class Readiness {
                     "remove custom tags and aliases from " + what + "; only plain YAML scalars, "
                             + "mappings, and sequences are accepted.");
         }
+    }
+
+    /** {@code text} read as {@link #loadPyyaml} reads a file, its errors left to the caller: a {@link
+     * StackOverflowError} or a {@link RuntimeException} ({@link #nestedTooDeeply} tells the depth cap apart). */
+    static Object composePyyaml(String text, boolean uniqueKeys) {
+        LoaderOptions options = new LoaderOptions();
+        options.setNestingDepthLimit(DEVIATION_REGISTER_MAX_DEPTH);
+        Node root = pyyamlComposer(options).compose(new StringReader(text));
+        if (root != null && uniqueKeys) {
+            rejectRepeatedKeys(root);
+        }
+        return root == null ? null : composeValue(root);
+    }
+
+    /** Whether {@code e}, thrown by {@link #composePyyaml}, is SnakeYAML's nesting cap or the recursion it
+     * guards (composeValue recurses per level), as PyYAML's composer hits its RecursionError. */
+    static boolean nestedTooDeeply(Throwable e) {
+        return e instanceof StackOverflowError || String.valueOf(e.getMessage()).contains("Nesting Depth exceeded");
     }
 
     private static void rejectRepeatedKeys(Node node) {

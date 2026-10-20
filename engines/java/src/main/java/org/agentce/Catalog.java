@@ -427,19 +427,47 @@ public final class Catalog {
         }
     }
 
-    /** A catalog file's bytes as text: bytes that are not UTF-8 are refused as input.catalog_unreadable,
-     * as a file that cannot be read is (18.168). */
+    /** A catalog file's bytes as text; bytes that are not UTF-8 are refused naming the file (18.184i). */
     private static String text(CatalogFiles files, String rel) {
         try {
             return Verify.decodeStrict(files.files().get(rel)).toString();
         } catch (CharacterCodingException e) {
-            throw Verify.catalogUnreadable(files.root(), e);
+            throw fileUnloadable(files.root(), rel, "is not valid UTF-8");
         }
     }
 
-    /** A catalog file read as YAML (one that does not parse throws, as before). */
-    private static JsonNode readYaml(CatalogFiles files, String rel) {
-        return Yaml.parse(text(files, rel), files.root().resolve(rel));
+    /** {@code catalog.yaml} or a control file as one YAML mapping (18.184i): checked as Python's unique-key
+     * {@code SafeLoader} reads it ({@link Readiness#composePyyaml}), so a key written twice, YAML the engine
+     * refuses to load, or anything but one mapping (an empty file included) is refused naming the file, never
+     * read with its last value, as nothing, or skipped. The values are then read with Jackson, as before. */
+    private static JsonNode readMapping(CatalogFiles files, String rel) {
+        String text = text(files, rel);
+        JsonNode data;
+        try {
+            Readiness.composePyyaml(text, true);
+            data = Yaml.parse(text, files.root().resolve(rel));
+        } catch (StackOverflowError | RuntimeException e) {
+            throw fileUnloadable(
+                    files.root(),
+                    rel,
+                    Readiness.nestedTooDeeply(e)
+                            ? "is nested too deeply to read safely"
+                            : "is not YAML the engine can load: " + e.getMessage());
+        }
+        if (data == null || !data.isObject()) {
+            throw fileUnloadable(files.root(), rel, "does not hold one YAML mapping");
+        }
+        return data;
+    }
+
+    /** input.catalog_unreadable for a catalog file that was read but cannot be loaded (Python's
+     * {@code catalog_file_unloadable}, 18.184i). {@code problem} completes "<rel> ...". */
+    private static InputError fileUnloadable(Path dir, String rel, String problem) {
+        return new InputError(
+                "input.catalog_unreadable",
+                "the catalog directory " + dir + " holds a file that cannot be loaded: " + rel + " " + problem + ".",
+                "fix " + rel + " so it is UTF-8 text holding one YAML mapping with each key written once, or ask the "
+                        + "catalog's publisher for a corrected copy, then re-run.");
     }
 
     /** The covered {@code controls/<name>.yaml} files, one level deep as the listing always was, sorted. */
@@ -486,17 +514,12 @@ public final class Catalog {
         } catch (IllegalStateException e) {
             throw Verify.catalogUnreadable(directory, e);
         }
-        JsonNode meta = readYaml(files, "catalog.yaml");
-        JsonNode metaRecord = meta != null && meta.isObject() ? meta : Json.nodes().objectNode();
+        JsonNode metaRecord = readMapping(files, "catalog.yaml");
         List<ControlSpec> controls = new ArrayList<>();
         Map<String, Psp.Shape> shapes = new LinkedHashMap<>();
         Map<String, String> evidenceShapeIris = new LinkedHashMap<>();
         for (String rel : controlFiles(files.files().keySet())) {
-            JsonNode data = readYaml(files, rel);
-            if (data == null || !data.isObject()) {
-                continue;
-            }
-            ControlSpec control = controlFromDict(data);
+            ControlSpec control = controlFromDict(readMapping(files, rel));
             controls.add(control);
             if (control.shapePath != null) {
                 if (!files.files().containsKey(control.shapePath)) {

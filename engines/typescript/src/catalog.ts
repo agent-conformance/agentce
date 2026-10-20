@@ -10,11 +10,12 @@
 import { lstatSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { load } from "js-yaml";
 import { errorCause, errorFix } from "./errorCatalogue";
-import { AgentceError, InputError, catalogUnreadable } from "./errors";
+import { AgentceError, InputError, catalogFileUnloadable, catalogUnreadable } from "./errors";
 import { type Shape, parseShapesTtl } from "./psp";
+import { pyyamlLoad } from "./readiness";
 import { insideFolder, isFileFollowingLinks } from "./report";
 import { SOURCE_CLASS_FROM, SOURCE_CLASS_RANK } from "./sourceClass";
-import { byteCompare, formatTemplate, joinPath } from "./util";
+import { byteCompare, decodeUtf8Strict, formatTemplate, joinPath } from "./util";
 import { type CatalogFiles, readCatalogFiles } from "./verify";
 
 const EVIDENCE_SHAPE_UNRESOLVED = "catalog.evidence_shape.unresolved";
@@ -261,9 +262,8 @@ function loadEvidenceShape(
   control: ControlSpec,
 ): [string, Map<string, Shape>] {
   const path = control.evidenceShapePath ?? "";
-  const bytes = files.files.get(path);
-  const inside = bytes !== undefined && fileInside(files.root, path) !== null;
-  const loaded = inside ? parseShapesTtl(bytes.toString("utf-8"), path) : new Map<string, Shape>();
+  const inside = files.files.has(path) && fileInside(files.root, path) !== null;
+  const loaded = inside ? parseShapesTtl(catalogText(files, path), path) : new Map<string, Shape>();
   const targeted = [...loaded].filter(([, shape]) => hasTarget(shape)).map(([iri]) => iri);
   if (targeted.length !== 1) {
     throw refuseUncovered(EVIDENCE_SHAPE_UNRESOLVED, control, path);
@@ -301,11 +301,48 @@ function isPresentButNotAFile(path: string): boolean {
   return !isFileFollowingLinks(path);
 }
 
+/** A catalog file's covered bytes as text; bytes that are not UTF-8 are refused naming the file, never read
+ * with U+FFFD (18.184i). */
+function catalogText(files: CatalogFiles, rel: string): string {
+  try {
+    return decodeUtf8Strict(files.files.get(rel) as Buffer);
+  } catch {
+    throw catalogFileUnloadable(files.root, rel, "is not valid UTF-8");
+  }
+}
+
+/** `catalog.yaml` or a control file as one YAML mapping (18.184i): checked as Python's unique-key `SafeLoader`
+ * reads it, so a key written twice, YAML the engine refuses to load, or anything but one mapping (an empty file
+ * included) is refused naming the file, never read with its last value, as nothing, or skipped. The values are
+ * then read with js-yaml's own load, as before. */
+function catalogMapping(files: CatalogFiles, rel: string): Record<string, unknown> {
+  const text = catalogText(files, rel);
+  let data: unknown;
+  try {
+    pyyamlLoad(text, true);
+    data = load(text);
+  } catch (error) {
+    // js-yaml caps nesting (and recurses per level), as PyYAML's composer hits its RecursionError.
+    const deep = error instanceof RangeError || /exceeded maxDepth/.test((error as Error).message);
+    throw catalogFileUnloadable(
+      files.root,
+      rel,
+      deep
+        ? "is nested too deeply to read safely"
+        : `is not YAML the engine can load: ${(error as Error).message}`,
+    );
+  }
+  if (!isRecord(data)) {
+    throw catalogFileUnloadable(files.root, rel, "does not hold one YAML mapping");
+  }
+  return data;
+}
+
 function loadCovered(directory: string): Catalog {
   // catalog.yaml first, as before: a folder without one is refused naming it, and one that is there
   // but is not a regular file (a FIFO would block the read) is refused unopened (18.181). Every covered
   // file is then read once (18.171) and kept as `files`, which the signature check and provenance
-  // digest read.
+  // digest read; catalog.yaml is parsed after the walk, as Python parses it.
   const metaPath = joinPath(directory, "catalog.yaml");
   if (isPresentButNotAFile(metaPath)) {
     throw Object.assign(new Error("not a regular file: catalog.yaml"), {
@@ -313,26 +350,22 @@ function loadCovered(directory: string): Catalog {
       path: metaPath,
     });
   }
-  const metaBytes = readFileSync(metaPath);
-  const meta = load(metaBytes.toString("utf-8"));
-  const metaRecord = isRecord(meta) ? meta : {};
+  const files = readCatalogFiles(directory, new Map([["catalog.yaml", readFileSync(metaPath)]]));
+  const meta = catalogMapping(files, "catalog.yaml");
   const controls: ControlSpec[] = [];
   const shapes = new Map<string, Shape>();
   const evidenceShapeIris = new Map<string, string>();
-  const files = readCatalogFiles(directory, new Map([["catalog.yaml", metaBytes]]));
-  const text = (rel: string): string => (files.files.get(rel) as Buffer).toString("utf-8");
   for (const rel of controlFiles(files.files.keys())) {
-    const data = load(text(rel));
-    if (!isRecord(data)) {
-      continue;
-    }
-    const control = controlFromDict(data);
+    const control = controlFromDict(catalogMapping(files, rel));
     controls.push(control);
     if (control.shapePath !== null) {
       if (!files.files.has(control.shapePath)) {
         throw refuseUncovered(SHAPE_UNRESOLVED, control, control.shapePath);
       }
-      for (const [iri, shape] of parseShapesTtl(text(control.shapePath), control.shapePath)) {
+      for (const [iri, shape] of parseShapesTtl(
+        catalogText(files, control.shapePath),
+        control.shapePath,
+      )) {
         shapes.set(iri, shape);
       }
     }
@@ -345,8 +378,8 @@ function loadCovered(directory: string): Catalog {
     }
   }
   return {
-    id: String(metaRecord.id ?? ""),
-    version: String(metaRecord.version ?? ""),
+    id: String(meta.id ?? ""),
+    version: String(meta.version ?? ""),
     directory,
     controls,
     shapes,

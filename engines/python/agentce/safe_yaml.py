@@ -159,6 +159,12 @@ def _pythonize_timestamp(raw: str) -> str:
     return out
 
 
+def load_unique_keys(text: str) -> Any:
+    """``text`` read as :func:`load_untrusted_yaml` reads a file with ``unique_keys``; its ``yaml.YAMLError`` and
+    ``RecursionError`` are the caller's to report."""
+    return yaml.load(text, Loader=_UniqueKeySafeLoader)
+
+
 def load_untrusted_yaml(
     path: Path, *, key: str, what: str, unique_keys: bool = False
 ) -> Any:

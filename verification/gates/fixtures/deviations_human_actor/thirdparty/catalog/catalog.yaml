@@ -1,0 +1,4 @@
+# A third-party catalog for the deviations human-actor gate (verification/gates/deviations_parity.sh).
+id: deviations-human-actor-thirdparty
+version: "1"
+title: Deviations human-actor fixture (thirdparty)

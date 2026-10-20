@@ -28,10 +28,11 @@ import yaml
 from . import signing
 from .domain import DomainBinding
 from .error_catalogue import MESSAGE_KEYS
-from .errors import InputError, catalog_unreadable
+from .errors import InputError, catalog_file_unloadable, catalog_unreadable
 from .graph import build_graph
 from .i18n_format import format_message
 from .psp import PropertyShape, Shape, parse_shapes_ttl
+from .safe_yaml import load_unique_keys
 from .source_class import SOURCE_CLASS_FROM, SOURCE_CLASS_RANK
 from .structural import evaluate_control, evaluate_shape
 
@@ -290,7 +291,7 @@ def _load_evidence_shape(
     inside = path in files.files and signing.inside_folder(
         files.root, files.root / path
     )
-    loaded = parse_shapes_ttl(files.text(path), path) if inside else {}
+    loaded = parse_shapes_ttl(_text(files, path), path) if inside else {}
     targeted = [iri for iri, shape in loaded.items() if shape.has_target]
     if len(targeted) != 1:
         raise _refuse_uncovered(_EVIDENCE_SHAPE_UNRESOLVED, control_id, path)
@@ -320,21 +321,49 @@ def load_catalog(directory: Path) -> Catalog:
         raise catalog_unreadable(directory, exc) from exc
 
 
+def _text(files: signing.CatalogFiles, rel: str) -> str:
+    """A catalog file's covered bytes as text; bytes that are not UTF-8 are refused naming the file (18.184i)."""
+    try:
+        return files.text(rel)
+    except UnicodeDecodeError as exc:
+        raise catalog_file_unloadable(files.root, rel, "is not valid UTF-8") from exc
+
+
+def _yaml_mapping(files: signing.CatalogFiles, rel: str) -> dict[str, Any]:
+    """``catalog.yaml`` or a control file as one YAML mapping, read as `load_untrusted_yaml` reads with
+    ``unique_keys`` (18.184i): a key written twice, YAML the engine refuses to load, or anything but one mapping (an
+    empty file included) is refused naming the file, never read with its last value, as nothing, or skipped."""
+    text = _text(files, rel)
+    try:
+        data = load_unique_keys(text)
+    except yaml.YAMLError as exc:
+        raise catalog_file_unloadable(
+            files.root, rel, f"is not YAML the engine can load: {exc}"
+        ) from exc
+    except RecursionError as exc:
+        raise catalog_file_unloadable(
+            files.root, rel, "is nested too deeply to read safely"
+        ) from exc
+    if not isinstance(data, dict):
+        raise catalog_file_unloadable(files.root, rel, "does not hold one YAML mapping")
+    return data
+
+
 def _load_catalog(directory: Path) -> Catalog:
     # catalog.yaml first, as before: a folder without one is refused naming it, and one that is there
     # but is not a regular file (a FIFO would block the read) is refused unopened (18.181).
     meta_path = directory / "catalog.yaml"
     if not signing.is_regular_file(meta_path) and os.path.lexists(meta_path):
         raise OSError(errno.EINVAL, "not a regular file", str(meta_path))
-    meta_bytes = meta_path.read_bytes()
-    meta = yaml.safe_load(meta_bytes.decode("utf-8")) or {}
-    files = signing.read_catalog_files(directory, first={"catalog.yaml": meta_bytes})
+    files = signing.read_catalog_files(
+        directory, first={"catalog.yaml": meta_path.read_bytes()}
+    )
+    meta = _yaml_mapping(files, "catalog.yaml")
     controls: list[ControlSpec] = []
     shapes: dict[str, Shape] = {}
     evidence_shape_iris: dict[str, str] = {}
     for rel in _control_files(files.files):
-        data = yaml.safe_load(files.text(rel))
-        control = _control_from_dict(data)
+        control = _control_from_dict(_yaml_mapping(files, rel))
         controls.append(control)
         if control.shape_path is not None:
             if control.shape_path not in files.files:
@@ -342,7 +371,7 @@ def _load_catalog(directory: Path) -> Catalog:
                     _SHAPE_UNRESOLVED, control.id, control.shape_path
                 )
             shapes.update(
-                parse_shapes_ttl(files.text(control.shape_path), control.shape_path)
+                parse_shapes_ttl(_text(files, control.shape_path), control.shape_path)
             )
         if control.evidence_shape_path is not None:
             iri, loaded = _load_evidence_shape(
@@ -636,7 +665,7 @@ def _lint_loaded(
     # The bytes the load read (18.171): what is linted is what the provenance digest covers.
     files = catalog.files
     assert files is not None
-    meta = yaml.safe_load(files.text("catalog.yaml")) or {}
+    meta = _yaml_mapping(files, "catalog.yaml")
     if require_provenance:
         # A catalog published with provenance is the folder handed over: a file linked from outside
         # it would not travel with it (18.181).
@@ -654,7 +683,7 @@ def _lint_loaded(
 
     domain = _load_test_domain(directory)
     for rel in _control_files(files.files):
-        data = yaml.safe_load(files.text(rel))
+        data = _yaml_mapping(files, rel)
         try:
             jsonschema.validate(data, schema)
         except jsonschema.ValidationError as exc:

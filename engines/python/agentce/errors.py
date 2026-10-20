@@ -79,6 +79,17 @@ def unreadable_rel(root: Path, exc: BaseException) -> str:
     return "" if rel == "." else rel
 
 
+def catalog_file_unloadable(catalog_dir: Path, rel: str, problem: str) -> InputError:
+    """input.catalog_unreadable for a catalog file that was read but cannot be loaded (18.184i): not UTF-8, YAML the
+    engine refuses (a key written twice included), or not one mapping. ``problem`` completes "<rel> ..."."""
+    return InputError(
+        "input.catalog_unreadable",
+        f"the catalog directory {catalog_dir} holds a file that cannot be loaded: {rel} {problem}.",
+        f"fix {rel} so it is UTF-8 text holding one YAML mapping with each key written once, or ask the "
+        "catalog's publisher for a corrected copy, then re-run.",
+    )
+
+
 def catalog_unreadable(catalog_dir: Path, exc: BaseException) -> UnreadableError:
     """input.catalog_unreadable, naming the unreadable file or folder in ``catalog_dir`` (18.68)."""
     return UnreadableError(
