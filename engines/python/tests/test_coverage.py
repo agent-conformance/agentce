@@ -55,6 +55,10 @@ def profile_with_denominator(covers: list[str] | None = None) -> Profile:
     )
 
 
+def _members(root: Path, rel: str) -> dict[str, bytes]:
+    return {rel: (root / rel).read_bytes()}
+
+
 def test_covered_when_observed_meets_expected() -> None:
     events = [event(i, "urn:src:gw", "ToolCall") for i in range(3)]
     events += [event(10 + i, "urn:src:egress", "ToolCall") for i in range(3)]
@@ -143,7 +147,7 @@ def test_expected_from_source_manifest(tmp_path: Path) -> None:
     )
     events = [event(i, "urn:src:gw", "ToolCall") for i in range(4)]
     tool = compute_coverage(
-        events, profile, tmp_path, listed=frozenset({"reference/egress.json"})
+        events, profile, members=_members(tmp_path, "reference/egress.json")
     )["subjects"][SUBJECT]["event_types"]["ToolCall"]
     assert tool["expected"] == 4
     assert tool["status"] == STATUS_COVERED
@@ -184,7 +188,7 @@ def test_manifest_denominator_own_records_are_not_captured(tmp_path: Path) -> No
     events += [event(10 + i, "urn:src:egress", "ToolCall") for i in range(2)]
     events.append(event(20, "urn:src:egress", "SessionStart"))
     types = compute_coverage(
-        events, profile, tmp_path, listed=frozenset({"reference/egress.json"})
+        events, profile, members=_members(tmp_path, "reference/egress.json")
     )["subjects"][SUBJECT]["event_types"]
     assert (types["ToolCall"]["observed"], types["ToolCall"]["expected"]) == (1, 2)
     assert types["ToolCall"]["status"] == STATUS_BELOW

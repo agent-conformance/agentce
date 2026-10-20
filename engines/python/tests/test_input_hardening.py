@@ -372,10 +372,15 @@ def test_fuzz_symlink_chain_variants_all_escape_refused(tmp_path: Path) -> None:
         assert excinfo.value.key == "input.bundle_manifest_path"
 
 
-# A subject with no declared evidence sources, so every test denominator is independent, and the bundle
-# manifest's listing of the denominator manifests these tests write (an unlisted one is never read).
+# A subject with no declared evidence sources, so every test denominator is independent.
 _SUBJECT = Subject(id="urn:agentce:subject:test")
-_LISTED = frozenset({"reference/counts.json", "../secret.json"})
+
+
+def _members(bundle_root: Path) -> dict[str, bytes]:
+    """The checked bytes load_bundle would hand coverage for a bundle listing reference/counts.json: a path that
+    escapes the root never gets this far, since load_bundle refuses it (18.184f)."""
+    counts = bundle_root / "reference" / "counts.json"
+    return {"reference/counts.json": counts.read_bytes()} if counts.is_file() else {}
 
 
 # --- Path confinement for the other bundle-adjacent refs: a coverage-denominator manifest and an
@@ -397,7 +402,7 @@ def test_coverage_denominator_manifest_escaping_root_is_not_read(
         covers=["ToolCall"],
         manifest="../secret.json",
     )
-    counts = _denominator_counts(denominator, _SUBJECT, {}, bundle_root, _LISTED)
+    counts = _denominator_counts(denominator, _SUBJECT, {}, _members(bundle_root))
     assert counts == {}
 
 
@@ -413,7 +418,7 @@ def test_coverage_denominator_manifest_inside_root_is_read(tmp_path: Path) -> No
         covers=["ToolCall"],
         manifest="reference/counts.json",
     )
-    counts = _denominator_counts(denominator, _SUBJECT, {}, bundle_root, _LISTED)
+    counts = _denominator_counts(denominator, _SUBJECT, {}, _members(bundle_root))
     assert counts == {"ToolCall": 7}
 
 
@@ -519,7 +524,7 @@ def test_coverage_denominator_manifest_past_the_depth_limit_is_refused(
         manifest="reference/counts.json",
     )
     with pytest.raises(InputError) as excinfo:
-        _denominator_counts(denominator, _SUBJECT, {}, bundle_root, _LISTED)
+        _denominator_counts(denominator, _SUBJECT, {}, _members(bundle_root))
     assert excinfo.value.key == "input.coverage_denominator_manifest_invalid"
 
 
@@ -541,7 +546,7 @@ def test_coverage_denominator_manifest_that_is_not_an_object_counts_the_source(
         ("urn:src:other", "ToolCall"): 9,
     }
     assert _denominator_counts(
-        denominator, _SUBJECT, by_source_type, bundle_root, _LISTED
+        denominator, _SUBJECT, by_source_type, _members(bundle_root)
     ) == {"ToolCall": 3}
 
 
@@ -562,5 +567,5 @@ def test_coverage_denominator_manifest_with_deep_json_is_refused(
         manifest="reference/counts.json",
     )
     with pytest.raises(InputError) as excinfo:
-        _denominator_counts(denominator, _SUBJECT, {}, bundle_root, _LISTED)
+        _denominator_counts(denominator, _SUBJECT, {}, _members(bundle_root))
     assert excinfo.value.key == "input.coverage_denominator_manifest_invalid"

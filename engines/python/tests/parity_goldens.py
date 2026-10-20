@@ -84,8 +84,11 @@ def coverage_golden(testdata: Path) -> dict[str, Any]:
     return compute_coverage(
         fixture["events"],
         Profile.from_dict(fixture["profile"]),
-        testdata / "coverage-bundle",
-        listed=frozenset({"reference/prov-counts.json"}),
+        members={
+            "reference/prov-counts.json": (
+                testdata / "coverage-bundle" / "reference" / "prov-counts.json"
+            ).read_bytes()
+        },
     )
 
 

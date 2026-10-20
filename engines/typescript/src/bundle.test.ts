@@ -12,6 +12,7 @@ import { createHash } from "node:crypto";
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   renameSync,
   rmSync,
   symlinkSync,
@@ -21,8 +22,9 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { confineToRoot, loadBundle, safeIsFile } from "./bundle";
+import { bundleReadHooks, confineToRoot, loadBundle, readConfined, safeIsFile } from "./bundle";
 import { AgentceError } from "./errors";
+import { ingest } from "./ingest";
 
 interface ManifestEntry {
   path: string;
@@ -250,5 +252,77 @@ test("a manifest.json that is a dangling link is still missing", () => {
       inputErrorKey(() => loadBundle(placeManifest(dir, "dangling"))),
       "input.bundle_manifest_missing",
     );
+  });
+});
+
+/** Swap `target` for a link to an outside copy of its own bytes at the `when` seam, once (18.184f). */
+function swapAt(when: "afterConfine" | "afterCheck", target: string, outside: string): string[] {
+  const swapped: string[] = [];
+  bundleReadHooks[when] = (rel, member) => {
+    if (rel === target && swapped.length === 0) {
+      writeFileSync(outside, readFileSync(member));
+      unlinkSync(member);
+      symlinkSync(outside, member);
+      swapped.push(rel);
+    }
+  };
+  return swapped;
+}
+
+test("bundle member swapped after confinement", () => {
+  const event = '{"id":"e1"}\n';
+  const fresh = (dir: string, name: string): string => {
+    const root = join(dir, name);
+    mkdirSync(join(root, "events"), { recursive: true });
+    writeFileSync(join(root, "events", "a.jsonl"), event, "utf-8");
+    writeManifest(root, [{ path: "events/a.jsonl", sha256: sha256File(event) }]);
+    return root;
+  };
+  withTempDir((dir) => {
+    try {
+      // Swapped after the check and before the open: refused, for a member and for manifest.json alike.
+      for (const target of ["events/a.jsonl", "manifest.json"]) {
+        const root = fresh(dir, `b-${target.replace("/", "-")}`);
+        const swapped = swapAt(
+          "afterConfine",
+          target,
+          join(dir, `outside-${target.replace("/", "-")}`),
+        );
+        let message = "";
+        assert.equal(
+          inputErrorKey(() => {
+            try {
+              loadBundle(root);
+            } catch (exc) {
+              message = String((exc as Error).message);
+              throw exc;
+            }
+          }),
+          "input.bundle_manifest_path",
+        );
+        assert.deepEqual(swapped, [target]);
+        assert.match(message, new RegExp(`${target} changed while it was being read`));
+        bundleReadHooks.afterConfine = undefined;
+      }
+      // Swapped once the open file is checked: the bytes come from the checked file, never the outside one.
+      const root = fresh(dir, "b-after-check");
+      writeFileSync(join(dir, "elsewhere"), "outside bytes\n", "utf-8");
+      bundleReadHooks.afterCheck = (rel, member) => {
+        unlinkSync(member);
+        symlinkSync(join(dir, "elsewhere"), member);
+      };
+      const member = join(root, "events", "a.jsonl");
+      assert.equal(readConfined(root, "events/a.jsonl", member).toString("utf-8"), event);
+      bundleReadHooks.afterCheck = undefined;
+      // A member rewritten after loadBundle never reaches ingest: it reads the checked bytes.
+      const again = fresh(dir, "b-loaded");
+      const loaded = loadBundle(again);
+      const before = JSON.stringify(ingest(loaded));
+      writeFileSync(join(again, "events", "a.jsonl"), "not json\n", "utf-8");
+      assert.equal(JSON.stringify(ingest(loaded)), before);
+    } finally {
+      bundleReadHooks.afterConfine = undefined;
+      bundleReadHooks.afterCheck = undefined;
+    }
   });
 });

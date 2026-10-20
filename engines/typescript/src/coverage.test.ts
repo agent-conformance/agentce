@@ -8,15 +8,30 @@
  */
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { confineToRoot, loadBundle, safeIsFile } from "./bundle";
 import { canonicalString } from "./canonical";
 import { computeCoverage } from "./coverage";
 import { profileFromDict } from "./profile";
 
 const TESTDATA = join(__dirname, "..", "testdata");
+
+/** The checked bytes loadBundle hands coverage for the listed paths that stay inside `root` (loadBundle refuses a
+ * bundle with one that escapes, so its bytes never reach coverage: 18.184f). */
+function membersOf(root: string, listed: string[]): Map<string, Buffer> {
+  const out = new Map<string, Buffer>();
+  for (const rel of listed) {
+    const member = confineToRoot(root, rel);
+    if (member !== null && safeIsFile(member)) {
+      out.set(rel, readFileSync(member));
+    }
+  }
+  return out;
+}
 
 test("coverage reconciliation matches the Python reference golden", () => {
   const fixture = JSON.parse(readFileSync(join(TESTDATA, "coverage-fixture.json"), "utf-8"));
@@ -25,8 +40,7 @@ test("coverage reconciliation matches the Python reference golden", () => {
   const result = computeCoverage(
     fixture.events,
     profile,
-    join(TESTDATA, "coverage-bundle"),
-    new Set(["reference/prov-counts.json"]),
+    membersOf(join(TESTDATA, "coverage-bundle"), ["reference/prov-counts.json"]),
   );
   assert.equal(canonicalString(result), canonicalString(golden));
 });
@@ -44,7 +58,7 @@ const EVENTS: Array<Record<string, unknown>> = [
 ];
 
 /** The bundle manifest lists the denominator manifest, so its counts may be read (SPEC §6.5). */
-const LISTED: ReadonlySet<string> = new Set(["reference/counts.json"]);
+const LISTED = ["reference/counts.json"];
 
 function profileWithManifest(manifest: string) {
   return profileFromDict({
@@ -84,10 +98,10 @@ test("a denominator manifest escaping the bundle root with '..' is not read", ()
     const result = computeCoverage(
       EVENTS,
       profileWithManifest("../secret.json"),
-      root,
-      new Set(["../secret.json"]),
+      membersOf(root, ["../secret.json"]),
     );
-    assert.equal(expectedToolCalls(result), 2); // the source's own ingested events, not the escape
+    // Never among the checked members (loadBundle refuses the bundle), so nothing is expected from it.
+    assert.equal(expectedToolCalls(result), null);
   });
 });
 
@@ -100,10 +114,9 @@ test("a denominator manifest whose symlink escapes the bundle root is not read",
     const result = computeCoverage(
       EVENTS,
       profileWithManifest("reference/counts.json"),
-      root,
-      LISTED,
+      membersOf(root, LISTED),
     );
-    assert.equal(expectedToolCalls(result), 2);
+    assert.equal(expectedToolCalls(result), null);
   });
 });
 
@@ -114,8 +127,7 @@ test("a denominator manifest inside the bundle root is still read", () => {
     const result = computeCoverage(
       EVENTS,
       profileWithManifest("reference/counts.json"),
-      root,
-      LISTED,
+      membersOf(root, LISTED),
     );
     assert.equal(expectedToolCalls(result), 7);
   });
@@ -130,8 +142,7 @@ test("a denominator manifest that is a symlink inside the bundle root is still r
     const result = computeCoverage(
       EVENTS,
       profileWithManifest("reference/counts.json"),
-      root,
-      LISTED,
+      membersOf(root, LISTED),
     );
     assert.equal(expectedToolCalls(result), 5);
   });
@@ -148,8 +159,7 @@ test("a manifest-reading denominator's own records of a type it counts are never
     const result = computeCoverage(
       events,
       profileWithManifest("reference/counts.json"),
-      root,
-      LISTED,
+      membersOf(root, LISTED),
     );
     const subjects = result.subjects as Record<
       string,
@@ -190,4 +200,47 @@ test("a self-counting denominator hides only the types it covers", () => {
   assert.equal(subject?.event_types.SessionStart?.observed, 1);
   assert.equal(subject?.event_types.SessionStart?.status, "unknown");
   assert.equal(subject?.coverage_status, "unknown");
+});
+
+test("coverage denominator rewritten after load counts the checked bytes", () => {
+  withTempBundle((dir) => {
+    const root = join(dir, "b");
+    const checked = '{"counts": {"ToolCall": 1}}';
+    mkdirSync(join(root, "reference"), { recursive: true });
+    writeFileSync(join(root, "reference", "counts.json"), checked, "utf-8");
+    writeFileSync(
+      join(root, "manifest.json"),
+      JSON.stringify({
+        files: [
+          {
+            path: "reference/counts.json",
+            sha256: createHash("sha256").update(checked).digest("hex"),
+          },
+        ],
+      }),
+      "utf-8",
+    );
+    const loaded = loadBundle(root);
+    writeFileSync(join(root, "reference", "counts.json"), '{"counts": {"ToolCall": 999}}', "utf-8");
+    const profile = profileFromDict({
+      subjects: [
+        {
+          id: "subj-A",
+          coverage_denominators: [
+            {
+              kind: "registry",
+              source: "urn:src:egress",
+              covers: ["ToolCall"],
+              manifest: "reference/counts.json",
+            },
+          ],
+        },
+      ],
+    });
+    const subjects = computeCoverage([], profile, loaded.members).subjects as Record<
+      string,
+      { event_types: Record<string, { expected: unknown }> }
+    >;
+    assert.equal(subjects["subj-A"]?.event_types.ToolCall?.expected, 1);
+  });
 });
