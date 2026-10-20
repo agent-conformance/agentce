@@ -640,7 +640,16 @@ export function verifyCatalog(
     sigIsFile = false;
   }
   if (!sigIsFile) {
-    return fail(refusal("verify.catalog_unsigned"));
+    // There but not a file once links are followed (a FIFO, a folder, a dangling link): unsigned, never "absent".
+    let present = true;
+    try {
+      lstatSync(sigPath);
+    } catch {
+      present = false;
+    }
+    return fail(
+      refusal(present ? "verify.catalog_signature_not_a_file" : "verify.catalog_unsigned"),
+    );
   }
   if (files.linksOut.size > 0) {
     // A signed catalog is one folder of files (18.181): bytes behind a link do not travel with it.

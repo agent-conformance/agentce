@@ -11,6 +11,7 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
@@ -700,7 +701,13 @@ public final class Verify {
         String digest = files.digest(Set.of());
         Path sigPath = dir.resolve(CATALOG_SIGNATURE_NAME);
         if (!Files.isRegularFile(sigPath)) {
-            return catalogSoftFail(digest, refusal("verify.catalog_unsigned"));
+            // There but not a file once links are followed (a FIFO, a folder, a dangling link): unsigned, never "absent".
+            return catalogSoftFail(
+                    digest,
+                    refusal(
+                            Files.exists(sigPath, LinkOption.NOFOLLOW_LINKS)
+                                    ? "verify.catalog_signature_not_a_file"
+                                    : "verify.catalog_unsigned"));
         }
         if (!files.linksOut().isEmpty()) {
             // A signed catalog is one folder of files (18.181): bytes behind a link do not travel with it.

@@ -895,7 +895,12 @@ def verify_catalog_directory(source: Path | CatalogFiles, trust: TrustRoot) -> V
     recomputed = files.digest()
     sig_path = directory / CATALOG_SIGNATURE_NAME
     if not is_regular_file(sig_path):
-        raise UnsignedError.refusal("verify.catalog_unsigned")
+        # There but not a file once links are followed (a FIFO, a folder, a dangling link): unsigned, never "absent".
+        raise UnsignedError.refusal(
+            "verify.catalog_signature_not_a_file"
+            if os.path.lexists(sig_path)
+            else "verify.catalog_unsigned"
+        )
     if files.links_out:
         # A signed catalog is one folder of files (18.181): bytes behind a link do not travel with it.
         raise VerificationError.refusal(

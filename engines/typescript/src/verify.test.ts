@@ -4,6 +4,7 @@
  */
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { sign as cryptoSign, verify as cryptoVerify, generateKeyPairSync } from "node:crypto";
 import {
   chmodSync,
@@ -363,6 +364,33 @@ test("verifyCatalog soft-fails with the exact unsigned sentence when catalog.sig
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+for (const kind of ["fifo", "folder", "dangling link"]) {
+  test(`verifyCatalog names a catalog.sig.json that is a ${kind} and never calls it absent (18.184i)`, () => {
+    const fixture = kmsFixture();
+    const dir = catalogDirWith({ "rule.yaml": "x: 1\n" });
+    const sig = join(dir, "catalog.sig.json");
+    try {
+      if (kind === "fifo") {
+        execFileSync("mkfifo", [sig]);
+      } else if (kind === "folder") {
+        mkdirSync(sig);
+      } else {
+        symlinkSync(join(dir, "nowhere.json"), sig);
+      }
+      const result = verifyCatalog(dir, fixture.trust);
+      assert.equal(result.verified, false);
+      assert.deepEqual(result.reason_keys, ["verify.catalog_signature_not_a_file"]);
+      assert.equal(
+        result.reason,
+        "unsigned: catalog.sig.json is there but is not a regular file (a FIFO, a folder or a broken link), " +
+          "so there is no signature to read (SPEC §8.7).",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
 
 test("verifyCatalog soft-fails on unparseable catalog.sig.json with the fixed text", () => {
   const fixture = kmsFixture();

@@ -472,6 +472,27 @@ class VerifyTest {
                 result.get("reason").asText());
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"fifo", "folder", "dangling"})
+    void verifyCatalogNamesASignatureThatIsNotAFileAndNeverCallsItAbsent(String kind, @TempDir Path dir)
+            throws Exception {
+        KmsFixture fixture = kmsFixture("test-identity");
+        catalogDirWith(dir, "rule.yaml", "x: 1\n");
+        Path sig = dir.resolve("catalog.sig.json");
+        switch (kind) {
+            case "fifo" -> assertEquals(0, new ProcessBuilder("mkfifo", sig.toString()).start().waitFor());
+            case "folder" -> Files.createDirectory(sig);
+            default -> Files.createSymbolicLink(sig, dir.resolve("nowhere.json"));
+        }
+        ObjectNode result = Verify.verifyCatalog(dir, fixture.trust());
+        assertFalse(result.get("verified").asBoolean());
+        assertEquals("verify.catalog_signature_not_a_file", result.get("reason_keys").get(0).asText());
+        assertEquals(
+                "unsigned: catalog.sig.json is there but is not a regular file (a FIFO, a folder or a broken link), "
+                        + "so there is no signature to read (SPEC §8.7).",
+                result.get("reason").asText());
+    }
+
     @Test
     void verifyCatalogSoftFailsOnUnparseableCatalogSigJson(@TempDir Path dir) throws Exception {
         KmsFixture fixture = kmsFixture("test-identity");
