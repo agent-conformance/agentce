@@ -2073,7 +2073,7 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.schema.evidence_schema: json.loads(text)": _PACKAGED,
     "agentce.schema.evidence_schema: resources.files('agentce.data')"
     ".joinpath('agentce-evidence.schema.json').read_text()": _PACKAGED,
-    "agentce.signing._mode_matches: path.stat()": (
+    "agentce.signing._mode_matches: os.stat(path)": (
         "manifest-file",
         "signatures-file",
         "report-claim",
