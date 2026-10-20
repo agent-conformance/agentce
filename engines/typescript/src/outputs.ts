@@ -58,7 +58,7 @@ export class NotRegularFile extends Error {
   readonly code = "ENOTREG";
 }
 
-function refuse(role: OutputRole, raw: string, reason: string): InputError {
+export function refuse(role: OutputRole, raw: string, reason: string): InputError {
   return new InputError(role.key, `${role.flag} ${pyRepr(raw)} ${reason}.`, role.fix);
 }
 

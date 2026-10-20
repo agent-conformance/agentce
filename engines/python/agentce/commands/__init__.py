@@ -77,6 +77,7 @@ from ..outputs import (
     UNREACHABLE,
     OutputRole,
     check_output,
+    refuse,
     through_missing_folder,
     write_file,
     write_output,
@@ -274,11 +275,7 @@ def _refuse_empty_out(raw: str | None) -> None:
         noun="directory",
     )
     if raw is not None and through_missing_folder(Path(raw)):
-        raise InputError(
-            "input.out_dir_unwritable",
-            f"--out {raw!r} {UNREACHABLE}.",
-            "choose a writable --out directory.",
-        )
+        raise refuse(OUT_DIR, raw, UNREACHABLE)
 
 
 #: The options a command writes to (18.180): each output is checked and written through one role.
@@ -1502,10 +1499,16 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         StateDir.ensure_writable(Path(state_arg))
     # The file arguments read later are checked here too, so a run refused for one leaves --out
     # empty (census odd-inputs line 46, 18.184c).
-    if domain_path_early is not None:
+    domain_file = (
         _require_file(domain_path_early, key="domain", what="the domain binding")
-    if deviations_path is not None:
+        if domain_path_early is not None
+        else None
+    )
+    deviation_file = (
         _require_file(deviations_path, key="deviations", what="the deviation register")
+        if deviations_path is not None
+        else None
+    )
     if package_for_sharing:
         _check_package_path_overlap(
             out_dir,
@@ -1567,10 +1570,8 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     # Stage 3: build the provenance graph into the on-disk store (ADR-0001).
     domain_path = _opt_str(ns, "domain")
     domain = (
-        DomainBinding.load(
-            _require_file(domain_path, key="domain", what="the domain binding")
-        )
-        if domain_path is not None
+        DomainBinding.load(domain_file)
+        if domain_file is not None
         else DomainBinding.empty()
     )
     graph_path = out_dir / "graph.sqlite"
@@ -1623,10 +1624,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     # are what everything downstream (state, manifest, claim, every rendering) sees.
     deviations: list[dict[str, Any]] = []
     deviation_register_digest: str | None = None
-    if deviations_path is not None:
-        deviation_file = _require_file(
-            deviations_path, key="deviations", what="the deviation register"
-        )
+    if deviation_file is not None:
         deviations = _load_deviation_register(deviation_file)
         outcomes_by_control: dict[str, set[str]] = {}
         for a in evaluated:

@@ -65,6 +65,7 @@ import {
   type OutputRole,
   UNREACHABLE,
   checkOutput,
+  refuse,
   throughMissingFolder,
   writeFile,
   writeJsonl,
@@ -790,11 +791,7 @@ function refuseEmptyOut(out: string | undefined): void {
     "directory",
   );
   if (out !== undefined && throughMissingFolder(out)) {
-    throw new InputError(
-      "input.out_dir_unwritable",
-      `--out ${pyRepr(out)} ${UNREACHABLE}.`,
-      "choose a writable --out directory.",
-    );
+    throw refuse(OUT_DIR, out, UNREACHABLE);
   }
 }
 
@@ -1139,12 +1136,14 @@ function runAssess(options: AssessOptions): CommandResult {
   );
   // The file arguments read later are checked here too, so a run refused for one leaves --out
   // empty (census odd-inputs line 46, 18.184c).
-  if (options.domain !== undefined) {
-    requireFile(options.domain, "domain", "the domain binding");
-  }
-  if (options.deviations !== undefined) {
-    requireFile(options.deviations, "deviations", "the deviation register");
-  }
+  const domainPath =
+    options.domain !== undefined
+      ? requireFile(options.domain, "domain", "the domain binding")
+      : undefined;
+  const deviationFile =
+    options.deviations !== undefined
+      ? requireFile(options.deviations, "deviations", "the deviation register")
+      : undefined;
   if (scanned !== undefined) {
     scanned.write(out, declared === undefined);
     limitations.push(RECORDS_LIMITATION);
@@ -1170,10 +1169,6 @@ function runAssess(options: AssessOptions): CommandResult {
   );
 
   // Stage 3: build the provenance graph (in-memory store; ADR-0001's TypeScript variant).
-  const domainPath =
-    options.domain !== undefined
-      ? requireFile(options.domain, "domain", "the domain binding")
-      : undefined;
   const domain = domainPath !== undefined ? DomainBinding.load(domainPath) : DomainBinding.empty();
   const store = new GraphStore();
   buildGraph(ingested.accepted, { domain, store });
@@ -1227,8 +1222,7 @@ function runAssess(options: AssessOptions): CommandResult {
   // expired-and-ignored limitations.
   let deviations: Record<string, unknown>[] | undefined;
   let deviationRegisterDigest: string | undefined;
-  if (options.deviations !== undefined) {
-    const deviationFile = requireFile(options.deviations, "deviations", "the deviation register");
+  if (deviationFile !== undefined) {
     deviations = loadDeviationRegister(deviationFile);
     const outcomesByControl = new Map<string, Set<string>>();
     for (const a of evaluated) {

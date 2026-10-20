@@ -55,7 +55,7 @@ final class Outputs {
 
     private Outputs() {}
 
-    private static InputError refuse(Role role, String raw, String reason) {
+    static InputError refuse(Role role, String raw, String reason) {
         return new InputError(role.key(), role.flag() + " " + Readiness.pyRepr(raw) + " " + reason + ".", role.fix());
     }
 

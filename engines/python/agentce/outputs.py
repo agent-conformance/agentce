@@ -44,7 +44,7 @@ OUT_DIR = OutputRole(
 )
 
 
-def _refuse(role: OutputRole, raw: str, reason: str) -> InputError:
+def refuse(role: OutputRole, raw: str, reason: str) -> InputError:
     return InputError(role.key, f"{role.flag} {raw!r} {reason}.", role.fix)
 
 
@@ -61,20 +61,20 @@ def _check_creatable(path: Path, role: OutputRole, raw: str) -> None:
     written and entered (missing folders between them are created), and the path must not climb
     out of a folder that does not exist (``through_missing_folder``)."""
     if through_missing_folder(path):
-        raise _refuse(role, raw, UNREACHABLE)
+        raise refuse(role, raw, UNREACHABLE)
     for ancestor in path.parents:
         try:
             info = os.stat(ancestor)
         except FileNotFoundError:
             if os.path.islink(ancestor):
-                raise _refuse(role, raw, UNREACHABLE) from None
+                raise refuse(role, raw, UNREACHABLE) from None
             continue
         except OSError as exc:
-            raise _refuse(role, raw, UNREACHABLE) from exc
+            raise refuse(role, raw, UNREACHABLE) from exc
         if not stat.S_ISDIR(info.st_mode):
-            raise _refuse(role, raw, UNREACHABLE)
+            raise refuse(role, raw, UNREACHABLE)
         if not os.access(ancestor, os.W_OK | os.X_OK):
-            raise _refuse(role, raw, UNWRITABLE)
+            raise refuse(role, raw, UNWRITABLE)
         return
 
 
@@ -86,21 +86,21 @@ def check_output(raw: str, role: OutputRole) -> Path:
         info = os.stat(path)
     except FileNotFoundError:
         if os.path.islink(path):
-            raise _refuse(role, raw, DANGLING) from None
+            raise refuse(role, raw, DANGLING) from None
         _check_creatable(path, role, raw)
         return path
     except OSError as exc:
-        raise _refuse(role, raw, UNREACHABLE) from exc
+        raise refuse(role, raw, UNREACHABLE) from exc
     if role.directory:
         if not stat.S_ISDIR(info.st_mode):
-            raise _refuse(role, raw, NOT_A_DIRECTORY)
+            raise refuse(role, raw, NOT_A_DIRECTORY)
         if not os.access(path, os.W_OK | os.X_OK):
-            raise _refuse(role, raw, UNWRITABLE)
+            raise refuse(role, raw, UNWRITABLE)
     else:
         if not stat.S_ISREG(info.st_mode):
-            raise _refuse(role, raw, NOT_A_FILE)
+            raise refuse(role, raw, NOT_A_FILE)
         if not os.access(path, os.W_OK):
-            raise _refuse(role, raw, UNWRITABLE)
+            raise refuse(role, raw, UNWRITABLE)
     return path
 
 
@@ -129,7 +129,7 @@ def write_file(
             os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | cloexec, mode), payload
         )
         return
-    target = Path(path)
+    target = path
     keep: int | None = None
     try:
         info = os.stat(path)
@@ -179,9 +179,9 @@ def write_output(
         path.parent.mkdir(parents=True, exist_ok=True)
         write_file(path, data, exclusive=exclusive, mode=mode)
     except NotRegularFile as exc:
-        raise _refuse(role, raw, NOT_A_FILE) from exc
+        raise refuse(role, raw, NOT_A_FILE) from exc
     except OSError as exc:
-        raise _refuse(role, raw, UNWRITABLE) from exc
+        raise refuse(role, raw, UNWRITABLE) from exc
     return path
 
 
@@ -193,4 +193,4 @@ def writing_into(raw: str, role: OutputRole) -> Iterator[Path]:
     try:
         yield path
     except OSError as exc:
-        raise _refuse(role, raw, UNWRITABLE) from exc
+        raise refuse(role, raw, UNWRITABLE) from exc

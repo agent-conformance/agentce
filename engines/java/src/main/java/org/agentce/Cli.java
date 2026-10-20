@@ -900,9 +900,7 @@ global options:
     private static void refuseEmptyOut(String out) {
         refuseEmpty(out, "input.out_dir_unwritable", "--out", "choose a writable --out directory.", "directory");
         if (out != null && Outputs.throughMissingFolder(out)) {
-            throw new InputError("input.out_dir_unwritable",
-                    "--out " + Readiness.pyRepr(out) + " " + Outputs.UNREACHABLE + ".",
-                    "choose a writable --out directory.");
+            throw Outputs.refuse(Outputs.OUT_DIR, out, Outputs.UNREACHABLE);
         }
     }
 
@@ -1179,12 +1177,12 @@ global options:
                 options.catalog(), profileObj, options.catalogDirs(), trust, options.allowUnverified());
         // The file arguments read later are checked here too, so a run refused for one leaves --out
         // empty (census odd-inputs line 46, 18.184c).
-        if (options.domain() != null) {
-            requireFile(options.domain(), "domain", "the domain binding");
-        }
-        if (options.deviations() != null) {
-            requireFile(options.deviations(), "deviations", "the deviation register");
-        }
+        String domainPath = options.domain() != null
+                ? requireFile(options.domain(), "domain", "the domain binding")
+                : null;
+        String deviationsFile = options.deviations() != null
+                ? requireFile(options.deviations(), "deviations", "the deviation register")
+                : null;
 
         // Stage 1: ingest and validate. A missing/mismatching manifest aborts with exit 3.
         Bundle bundle = Bundle.load(Paths.get(bundleDir));
@@ -1204,9 +1202,6 @@ global options:
         Outputs.writingInto(out.toString(), Outputs.OUT_DIR, () -> writeJsonl(integrityNodes, out.resolve("integrity.jsonl")));
 
         // Stage 3: build the provenance graph (in-memory store).
-        String domainPath = options.domain() != null
-                ? requireFile(options.domain(), "domain", "the domain binding")
-                : null;
         DomainBinding domain = domainPath != null ? DomainBinding.load(Paths.get(domainPath)) : DomainBinding.empty();
         GraphStore store = Graph.buildGraph(ingested.accepted, domain);
         int graphTriples = store.tripleCount();
@@ -1256,8 +1251,8 @@ global options:
         List<String> limitations = new ArrayList<>(resolved.limitations());
         List<JsonNode> deviations = null;
         String deviationRegisterDigest = null;
-        if (options.deviations() != null) {
-            Path deviationFile = Paths.get(requireFile(options.deviations(), "deviations", "the deviation register"));
+        if (deviationsFile != null) {
+            Path deviationFile = Paths.get(deviationsFile);
             deviations = Readiness.loadDeviationRegister(deviationFile);
             Map<String, Set<String>> outcomesByControl = new LinkedHashMap<>();
             for (Assertions.Assertion a : evaluated) {
