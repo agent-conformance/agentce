@@ -230,3 +230,42 @@ def test_merge_key_may_be_written_again(tmp_path: Path) -> None:
         "base: &b {task_type: a, allowed_tools: [x]}\ntask_scopes:\n  - {<<: *b, allowed_tools: [y]}\n",
     )
     assert binding.task_scopes["a"][0].allowed_tools == frozenset({"y"})
+
+
+def test_yaml_dates_are_neither_text_nor_numbers(tmp_path: Path) -> None:
+    """A YAML date names no tool, sets no limit and no task type, and renders as str(date) where an id is read
+    (18.184g: the reference the TypeScript and Java readers match)."""
+    assert _scope_from_yaml(
+        tmp_path, "allowed_tools: [2026-01-01, x]"
+    ).allowed_tools == {"x"}
+    assert _scope_from_yaml(
+        tmp_path, "budgets: {tokens: 2020-01-01, spend: 2026-01-01T10:00:00}"
+    ).budgets == (("tokens", None), ("spend", None))
+    assert _scope_from_yaml(tmp_path, "budgets: 2026-01-01").budgets == (
+        ("tokens", None),
+        ("compute_seconds", None),
+        ("spend", None),
+    )
+    malformed = _load_text(
+        tmp_path, "task_scopes:\n  - {task_type: 2026-01-01}\n  - 2026-01-01\n"
+    )
+    assert malformed.task_scopes == {} and malformed.task_scopes_malformed
+    ids = _load_text(
+        tmp_path,
+        "decision_types:\n  - {id: 2026-01-01, subclass_of: 2026-01-02T03:04:05Z,"
+        " required_oversight_modality: 2026-01-03}\n"
+        "context_classes:\n  - {id: 2026-01-01 10:00:00}\n",
+    )
+    assert ids.subclasses == {
+        "2026-01-01": "2026-01-02 03:04:05+00:00",
+        "2026-01-01 10:00:00": CONTEXT_ROOT,
+    }
+    assert ids.required_oversight == {}
+
+
+def test_limit_past_float_range_is_unreadable(tmp_path: Path) -> None:
+    """A 400-digit limit is unreadable, as TypeScript and Java read it (infinity), never a crash (18.184g)."""
+    huge = "9" * 400
+    assert _scope_from_yaml(
+        tmp_path, f"budgets: {{spend: {huge}, compute_seconds: {huge}}}"
+    ).budgets == (("compute_seconds", None), ("spend", None))

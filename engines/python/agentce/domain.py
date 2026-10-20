@@ -71,7 +71,13 @@ def _limit(dimension: str, value: Any) -> int | float | None:
         return limit if limit is not None and limit <= MAX_COUNT else None
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
-    return value if math.isfinite(value) and value >= 0 else None
+    try:
+        finite = math.isfinite(value)
+    except (
+        OverflowError
+    ):  # an int past float range: the TypeScript and Java readers hold it as infinity
+        finite = False
+    return value if finite and value >= 0 else None
 
 
 def _budgets(value: Any) -> tuple[tuple[str, int | float | None], ...]:
