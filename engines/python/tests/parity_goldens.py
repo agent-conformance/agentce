@@ -9,7 +9,9 @@ map with the committed files byte for byte and writes nothing; VG-ENGINE-GOLDENS
 
 from __future__ import annotations
 
+import datetime
 import json
+import math
 import sys
 import tempfile
 from collections.abc import Callable
@@ -19,9 +21,11 @@ from typing import Any
 from agentce.applicability import ControlMeta, resolve
 from agentce.coverage import compute_coverage
 from agentce.domain import DomainBinding
+from agentce.errors import InputError
 from agentce.graph import build_graph
 from agentce.integrity import verify_bundle
 from agentce.profile import Profile
+from agentce.safe_yaml import load_untrusted_yaml
 from agentce.state import StateDir
 
 Dump = Callable[[object], str]
@@ -131,6 +135,189 @@ def state_golden(testdata: Path) -> dict[str, Any]:
     }
 
 
+#: The YAML node forms table (18.184k): tags x scalar styles x values, each read as a mapping value and a block
+#: sequence entry, then key kinds, merges and nesting inside task_scopes and budgets. Digits are Unicode 15.0 or
+#: older (D3); a reading with a non-string key is out (D2) and the producer refuses to write one.
+NODE_TAGS: tuple[str, ...] = (
+    *("", "!", "!<!>", "!!str", "!!int", "!!float", "!!bool", "!!null", "!!merge"),
+    "!<tag:yaml.org,2002:merge>",
+)
+NODE_VALUES: tuple[str, ...] = (
+    *(
+        "yes",
+        "on",
+        "10",
+        "010",
+        "0x10",
+        "1e1",
+        "1.5",
+        ".inf",
+        "null",
+        "~",
+        "",
+        "2026-01-02",
+    ),
+    *(
+        "lookup",
+        "=",
+        "<<",
+        "\u0661\u0662",
+        "\uff11",
+        "1\u0661",
+        "\u00b2",
+        "\U0001d7cf\U0001d7d0",
+    ),
+)
+KEY_FORMS = {
+    "flow_seq": "{[K]: V}",
+    "flow_map": "{{K: 1}: V}",
+    "explicit_flow_seq": "? [K]\n: V",
+    "explicit_block_seq": "? - K\n: V",
+    "explicit_flow_map": "? {K: 1}\n: V",
+    "explicit_block_map": "? K: 1\n: V",
+    "explicit_in_flow_map": "{? [K] : V}",
+    "explicit_in_flow_seq": "[? [K] : V]",
+    "flow_pair_in_seq": "[[K]: V]",
+    "multiline_flow_key": "? [K,\n   K2]\n: V",
+    "spaces_before_colon": "[K]   : V",
+    "comment_before_colon": "? [K] # c\n: V",
+    "blank_line_before_colon": "? [K]\n\n: V",
+    "comment_line_before_colon": "? [K]\n# c\n: V",
+    "anchored_key": "? &k [K]\n: V",
+    "alias_seq_key": "x: &s [K]\n*s : V",
+    "alias_map_key": "x: &m {K: 1}\n*m : V",
+    "tagged_seq_key": "!!seq [K]: V",
+    "explicit_no_value": "? [K]",
+    "explicit_scalar": "? K\n: V",
+    "explicit_scalar_no_value": "? K\nb: V",
+    "colon_plain_key": "a:\n  - x\n:b: V",
+    "flow_seq_colon_text": "a: [x, ':y']\nb: V",
+    "json_like": '{"K":[1],"b":V}',
+    "empty_value": "K:\nb: V",
+    "eq_key": "=: V",
+}
+MERGE_FORMS = {
+    "one": "b: {<<: {t: 1}}",
+    "two_keys": "b: {<<: {t: 1000}, <<: {t: 10}}",
+    "two_keys_block": "b:\n  <<: {t: 1000}\n  <<: {t: 10}",
+    "beside_tagged": "b: {<<: {t: 1}, !!merge x: {t: 2}}",
+    "seq_first_wins": "b: {<<: [{t: 1}, {t: 2}]}",
+    "explicit_after": "b: {<<: {t: 1}, t: 2}",
+    "explicit_before": "b: {t: 2, <<: {t: 1}}",
+    "anchor": "a: &a {t: 1, u: 2}\nb: {<<: *a, u: 3}",
+    "quoted_key": 'b: {"<<": 1}',
+    "value": "b: <<",
+    "seq_value": "b: [<<]",
+    "nonspecific_key": "b: {! <<: {t: 1}}",
+    "tagged_foo": "b: {!!merge foo: {t: 1}}",
+    "tagged_quoted": 'b: {!!merge "<<": {t: 1}}',
+    "scalar_source": "b: {<<: 1}",
+    "repeat_after_merge": "b: {<<: {t: 1}, t: 2, t: 3}",
+}
+
+
+def _node_scalar(tag: str, style: str, value: str, indent: str) -> str | None:
+    if style == "plain":
+        text = value
+    elif style == "single":
+        text = f"'{value}'"
+    elif style == "double":
+        text = f'"{value}"'
+    else:
+        text = f"|\n{indent}  {value}" if value else "|"
+    return f"{tag} {text}".strip() if tag else text
+
+
+def _node_form_cases() -> dict[str, str]:
+    cases: dict[str, str] = {}
+    for tag in NODE_TAGS:
+        for style in ("plain", "single", "double", "literal"):
+            for index, value in enumerate(NODE_VALUES):
+                name = f"scalar.{tag or 'none'}.{style}.{index}"
+                cases[f"{name}.value"] = f"v: {_node_scalar(tag, style, value, '')}\n"
+                cases[f"{name}.entry"] = (
+                    f"v:\n  - {_node_scalar(tag, style, value, '  ')}\n"
+                )
+    for tag in NODE_TAGS:
+        for value in ("yes", "10", "5", "lookup", "1.5"):
+            tagged = f"{tag} {value}" if tag else value
+            cases[f"nested.{tag or 'none'}.{value}"] = (
+                "task_scopes:\n"
+                f"  - {{task_type: t, allowed_tools: [{tagged}], budgets: {{tokens: {tagged}, spend: {tagged}}}}}\n"
+                f"budgets:\n  tokens: {tagged}\n  spend: {tagged}\n"
+            )
+    for name, form in KEY_FORMS.items():
+        cases[f"key.{name}"] = (
+            form.replace("K2", "b").replace("K", "a").replace("V", "1") + "\n"
+        )
+        scope = (
+            form.replace("K2", "lookup")
+            .replace("K", "allowed_tools")
+            .replace("V", '["yes"]')
+        )
+        cases[f"key.{name}.task_scopes"] = (
+            "task_scopes:\n  - " + scope.replace("\n", "\n    ") + "\n"
+        )
+    for name, form in MERGE_FORMS.items():
+        cases[f"merge.{name}"] = form + "\n"
+        budgets = form.replace("b:", "budgets:", 1).replace("t:", "tokens:")
+        cases[f"merge.{name}.budgets"] = (
+            "task_scopes:\n  - task_type: x\n    "
+            + budgets.replace("\n", "\n    ")
+            + "\n"
+        )
+    return cases
+
+
+def _node_reading(value: Any) -> Any:
+    """Python's reading of one node, by type: numbers by value (the TypeScript port has one number type)."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return {"b": value}
+    if isinstance(value, (int, float)):
+        number = float(value)
+        if math.isnan(number) or math.isinf(number):
+            return {"n": str(number)}
+        return {"n": number}
+    if isinstance(value, str):
+        return {"s": value}
+    if isinstance(value, (datetime.date, datetime.datetime)):
+        return {"ts": str(value)}
+    if isinstance(value, list):
+        return {"seq": [_node_reading(item) for item in value]}
+    if isinstance(value, dict):
+        if not all(isinstance(key, str) for key in value):
+            raise ValueError(
+                f"a non-string key is out of the node-forms table (D2): {value!r}"
+            )
+        return {"map": [[key, _node_reading(value[key])] for key in sorted(value)]}
+    raise ValueError(f"no node reading for {value!r}")
+
+
+def yaml_node_forms_golden() -> list[dict[str, Any]]:
+    """Each node form's YAML and Python's reading of it through the domain binding's loader, or the key it is
+    refused under (SPEC §7.4; 18.184k): the TypeScript and Java readers must read every case the same way."""
+    rows: list[dict[str, Any]] = []
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "domain.yaml"
+        for name, text in _node_form_cases().items():
+            path.write_text(text, encoding="utf-8")
+            try:
+                reading = _node_reading(
+                    load_untrusted_yaml(
+                        path,
+                        key="input.domain_binding_invalid",
+                        what="the domain binding",
+                        unique_keys=True,
+                    )
+                )
+            except InputError as error:
+                reading = {"refused": error.key}
+            rows.append({"name": name, "yaml": text, "reads": reading})
+    return rows
+
+
 def shared_goldens(testdata: Path, dump: Dump) -> dict[str, str]:
     return {
         "graph-golden.txt": graph_golden(testdata),
@@ -138,6 +325,7 @@ def shared_goldens(testdata: Path, dump: Dump) -> dict[str, str]:
         "coverage-golden.json": dump(coverage_golden(testdata)),
         "integrity-golden.json": dump(integrity_golden(testdata)),
         "state-golden.json": dump(state_golden(testdata)),
+        "yaml-node-forms-golden.json": dump(yaml_node_forms_golden()),
     }
 
 
