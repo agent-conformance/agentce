@@ -101,6 +101,25 @@ each.
   the loader refuses it with the same key, so a bundle's list of files always travels with the bundle
   folder. Checked by `engines/python/tests/test_bundle.py` and the bundle-manifest checks in
   `engines/python/tests/test_input_hardening.py`.
+- **A member swapped between the check and the read.** Each engine reads `manifest.json` and every
+  listed member once, through one open file. It uses those bytes for the digest check, for ingest,
+  for a coverage denominator manifest the bundle lists and, in Python, for the copy
+  `--package-for-sharing` writes, and never opens the same name a second time. Once the file is
+  open, the engine checks that the path still resolves inside the bundle to that same file. If
+  someone swaps a member after the confinement check, for a link to a file outside the bundle or for
+  any other file, the run stops with `input.bundle_manifest_path` ("<path> changed while it was
+  being read") and exit `3`. A member rewritten after the check changes nothing: the report is
+  built from the bytes that were hashed. An integrity block's `sig_ref` is read through the same
+  one-open check. Python and TypeScript compare the open file's device and inode with the path's.
+  Java can't ask which file an open channel names, so it opens the resolved path without following
+  a final link, then checks the path and its file key again after the read and refuses on any
+  change. That leaves one window, in Java only: a folder inside the bundle swapped for a link to a
+  folder outside it after the check, then swapped back before the read ends. Java then reads the
+  outside bytes. For a listed member they reach a report only if their SHA-256 matches the one the
+  manifest lists, which means they are the listed bytes. A `sig_ref` read that way still has to
+  verify against a trusted key. Checked by `test_bundle.py`, `bundle.test.ts` ("bundle member
+  swapped after confinement"), `BundleMemberSwapTest` and the odd-inputs matrix cell
+  `race.assess.bundle.member_path.reopen_by_name`.
 - **Structural depth limits.** `Profile.load`/`DomainBinding.load` (`safe_yaml.py`) and per-event JSON
   parsing (`ingest.py`) each catch the `RecursionError` a pathologically deep -- but small-byte --
   nested structure raises, and refuse it with a specific, named `input.*` key (`input.profile_invalid`,
