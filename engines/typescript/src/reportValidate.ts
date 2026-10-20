@@ -54,7 +54,7 @@ const OPTIONAL_ARTIFACTS = [
 /** The data files every assess run writes and records in manifest.json's outputs, beside the
  * schema-checked artifacts: required when the manifest recorded them, and parsed when present;
  * matches Python's `_REPORT_DATA_FILES` (18.167). */
-const REPORT_DATA_FILES = [
+export const REPORT_DATA_FILES = [
   "integrity.jsonl",
   "coverage.json",
   "applicability.jsonl",

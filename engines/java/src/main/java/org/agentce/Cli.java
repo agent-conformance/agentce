@@ -1300,7 +1300,7 @@ global options:
             // The data files Stages 1/2/4/5 wrote above get a manifest-tracked digest too, as in
             // commands/__init__.py: read back once, in this process, right after this run wrote them.
             Map<String, byte[]> extraOutputs = new LinkedHashMap<>();
-            for (String artifact : List.of("quarantine.jsonl", "integrity.jsonl", "coverage.json", "applicability.jsonl")) {
+            for (String artifact : ReportValidate.REPORT_DATA_FILES) {
                 extraOutputs.put(artifact, Files.readAllBytes(out.resolve(artifact)));
             }
             Report.writeReport(

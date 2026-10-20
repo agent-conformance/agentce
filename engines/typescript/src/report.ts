@@ -1413,16 +1413,13 @@ export function writeReport(
   mkdirSync(outDir, { recursive: true });
   const outputs: Record<string, string> = {};
 
-  const writeJson = (name: string, obj: unknown): void => {
-    const data = canonicalize(obj);
+  const writeBytes = (name: string, data: Buffer): void => {
     writeFile(joinPath(outDir, name), data);
     outputs[name] = digestBytes(data);
   };
-  const writeTextFile = (name: string, text: string): void => {
-    const data = Buffer.from(text, "utf-8");
-    writeFile(joinPath(outDir, name), data);
-    outputs[name] = digestBytes(data);
-  };
+  const writeJson = (name: string, obj: unknown): void => writeBytes(name, canonicalize(obj));
+  const writeTextFile = (name: string, text: string): void =>
+    writeBytes(name, Buffer.from(text, "utf-8"));
 
   const language = options.reportLanguage ?? DEFAULT_LANGUAGE;
   const counts = aggregate(assertions);
@@ -1436,8 +1433,7 @@ export function writeReport(
   writeJson("activity.json", activity);
   writeJson("blind-spots.json", blindSpots);
   for (const [name, data] of Object.entries(options.extraOutputs ?? {})) {
-    writeFile(joinPath(outDir, name), data);
-    outputs[name] = digestBytes(data);
+    writeBytes(name, data);
   }
 
   // 18.14 C3: every agent's records side by side (Hill 7) -- only when `profile` names more than

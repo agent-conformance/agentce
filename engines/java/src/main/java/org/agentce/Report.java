@@ -1476,29 +1476,15 @@ public final class Report {
         return writeReport(
                 outDir, assertions, bundleDigest, catalogs, operator, invocation, supersedes, reportLanguage,
                 catalogObjects, activity, blindSpots, profile, declaredSubjectIds, events, limitations,
-                applicabilityProfileDigest, domainBindingDigest, null, null);
+                applicabilityProfileDigest, domainBindingDigest, null, null, Map.of());
     }
 
     /** As the seventeen-argument {@link #writeReport}, plus the {@code --deviations} register (18.17a):
      * its digest goes to the manifest, and the already-linted entries {@link Assess#applyDeviations}
      * used feed the OSCAL risks and the project view's per-agent deviations. Both are {@code null} when
-     * no register was given, so such a run's outputs stay byte-identical. */
-    public static ObjectNode writeReport(
-            Path outDir, List<Assertions.Assertion> assertions, String bundleDigest, List<String> catalogs,
-            String operator, List<String> invocation, List<String> supersedes, String reportLanguage,
-            List<Catalog> catalogObjects, ObjectNode activity, ObjectNode blindSpots,
-            Profile profile, Set<String> declaredSubjectIds, List<JsonNode> events, List<String> limitations,
-            String applicabilityProfileDigest, String domainBindingDigest, String deviationRegisterDigest,
-            List<JsonNode> deviations) {
-        return writeReport(
-                outDir, assertions, bundleDigest, catalogs, operator, invocation, supersedes, reportLanguage,
-                catalogObjects, activity, blindSpots, profile, declaredSubjectIds, events, limitations,
-                applicabilityProfileDigest, domainBindingDigest, deviationRegisterDigest, deviations, Map.of());
-    }
-
-    /** As the nineteen-argument {@link #writeReport}, plus {@code extraOutputs}: each name and its bytes
-     * is written verbatim and its digest recorded in the manifest's {@code outputs}, as report.py's
-     * {@code extra_outputs} does, for the data files assess writes before the report (18.184e). */
+     * no register was given, so such a run's outputs stay byte-identical. {@code extraOutputs}: each name
+     * and its bytes is written verbatim and its digest recorded in the manifest's {@code outputs}, as
+     * report.py's {@code extra_outputs} does, for the data files assess writes before the report (18.184e). */
     public static ObjectNode writeReport(
             Path outDir, List<Assertions.Assertion> assertions, String bundleDigest, List<String> catalogs,
             String operator, List<String> invocation, List<String> supersedes, String reportLanguage,
@@ -1521,8 +1507,7 @@ public final class Report {
             outputs.put("activity.json", writeJson(outDir, "activity.json", activityNode));
             outputs.put("blind-spots.json", writeJson(outDir, "blind-spots.json", blindSpotsNode));
             for (Map.Entry<String, byte[]> extra : extraOutputs.entrySet()) {
-                Outputs.writeFile(outDir.resolve(extra.getKey()), extra.getValue());
-                outputs.put(extra.getKey(), digestBytes(extra.getValue()));
+                outputs.put(extra.getKey(), writeBytes(outDir, extra.getKey(), extra.getValue()));
             }
 
             Map<String, Integer> counts = Assertions.aggregate(assertions);
@@ -1735,13 +1720,14 @@ public final class Report {
     }
 
     private static String writeJson(Path outDir, String name, JsonNode obj) throws IOException {
-        byte[] data = Canonical.canonicalize(obj);
-        Outputs.writeFile(outDir.resolve(name), data);
-        return digestBytes(data);
+        return writeBytes(outDir, name, Canonical.canonicalize(obj));
     }
 
     private static String writeText(Path outDir, String name, String text) throws IOException {
-        byte[] data = text.getBytes(StandardCharsets.UTF_8);
+        return writeBytes(outDir, name, text.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String writeBytes(Path outDir, String name, byte[] data) throws IOException {
         Outputs.writeFile(outDir.resolve(name), data);
         return digestBytes(data);
     }

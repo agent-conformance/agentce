@@ -90,7 +90,7 @@ public final class ReportValidate {
     /** The data files every assess run writes and records in manifest.json's outputs, beside the
      * schema-checked artifacts: required when the manifest recorded them, and parsed when present;
      * matches Python's {@code _REPORT_DATA_FILES} (18.167). */
-    private static final List<String> REPORT_DATA_FILES =
+    static final List<String> REPORT_DATA_FILES =
             List.of("integrity.jsonl", "coverage.json", "applicability.jsonl", "quarantine.jsonl");
 
     private static final List<String> CSV_COLUMNS =

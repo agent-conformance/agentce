@@ -104,7 +104,7 @@ import {
   renderSarif,
   writeReport,
 } from "./report";
-import { validateReport } from "./reportValidate";
+import { REPORT_DATA_FILES, validateReport } from "./reportValidate";
 import { CommandResult } from "./result";
 import { INTOTO_STATEMENT_TYPE, KmsSigner, type Signer, signStatement, signSubjects } from "./sign";
 import { StateDir, windowEnd } from "./state";
@@ -1271,12 +1271,7 @@ function runAssess(options: AssessOptions): CommandResult {
   // The data files Stages 1/2/4/5 wrote above get a manifest-tracked digest too, as in
   // commands/__init__.py: read back once, in this process, right after this run wrote them.
   const extraOutputs: Record<string, Buffer> = {};
-  for (const artifact of [
-    "quarantine.jsonl",
-    "integrity.jsonl",
-    "coverage.json",
-    "applicability.jsonl",
-  ]) {
+  for (const artifact of REPORT_DATA_FILES) {
     extraOutputs[artifact] = readFileSync(joinPath(out, artifact));
   }
   writingInto(out, OUT_DIR, () =>
