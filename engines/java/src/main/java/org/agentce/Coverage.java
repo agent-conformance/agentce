@@ -4,9 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -120,7 +118,7 @@ public final class Coverage {
             // The bytes Bundle.load checked and hashed, never a second read of the name (18.184f).
             JsonNode data;
             try {
-                data = Json.parse(StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(raw)).toString());
+                data = Json.parse(Verify.decodeStrict(raw).toString());
             } catch (CharacterCodingException e) {
                 throw new IllegalArgumentException(
                         "cannot read JSON " + denominator.manifest + ": " + e.getMessage(), e);

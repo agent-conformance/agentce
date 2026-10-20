@@ -1,9 +1,8 @@
 package org.agentce;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
@@ -267,17 +266,13 @@ public final class Bundle {
         } catch (IOException e) {
             throw changedWhileRead(rel);
         }
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] data;
         try (SeekableByteChannel channel =
                 Files.newByteChannel(real, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) {
             if (afterCheck != null) {
                 afterCheck.accept(rel, member);
             }
-            ByteBuffer buffer = ByteBuffer.allocate(65536);
-            while (channel.read(buffer) >= 0) {
-                out.write(buffer.array(), 0, buffer.position());
-                buffer.clear();
-            }
+            data = Channels.newInputStream(channel).readAllBytes();
         } catch (AccessDeniedException e) {
             throw e;
         } catch (IOException e) {
@@ -292,7 +287,7 @@ public final class Bundle {
         } catch (IOException e) {
             throw changedWhileRead(rel);
         }
-        return out.toByteArray();
+        return data;
     }
 
     private static Path safeMember(Path root, String rel) {
