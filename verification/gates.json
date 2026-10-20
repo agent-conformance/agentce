@@ -2569,8 +2569,8 @@
         {
           "description": "TypeScript: the unreadable classification removed from loadBundle's member hash read, so an unreadable stream file crashes as internal.unexpected",
           "file": "engines/typescript/src/bundle.ts",
-          "search": "      actual = fileSha256Hex(member);\n    } catch (err) {\n      if (isPermissionError(err)) {\n        throw bundleUnreadable(bundleDir, rel);\n      }\n      throw err;\n",
-          "replace": "      actual = fileSha256Hex(member);\n    } catch (err) {\n      throw err;\n"
+          "search": "      data = readConfined(bundleDir, rel, member);\n    } catch (err) {\n      if (isPermissionError(err)) {\n        throw bundleUnreadable(bundleDir, rel);\n      }\n      throw err;\n",
+          "replace": "      data = readConfined(bundleDir, rel, member);\n    } catch (err) {\n      throw err;\n"
         },
         {
           "description": "Java: verifyCertificate always refuses, so a validly certificate-signed release does not verify",
@@ -3840,22 +3840,22 @@
           "replace": "    static final Set<String> COVERAGE_FAMILIES = Set.of();\n"
         },
         {
-          "description": "Python reads a denominator manifest the bundle manifest does not list",
-          "file": "engines/python/agentce/coverage.py",
-          "search": "        if denominator.manifest not in listed:\n",
-          "replace": "        if listed is None:\n"
+          "description": "Python's bundle loader hands coverage every file in the bundle folder, so a denominator manifest the bundle manifest does not list is read",
+          "file": "engines/python/agentce/bundle.py",
+          "search": "    sources: frozenset[str] | None = None\n",
+          "replace": "    for extra in Path(bundle_dir).rglob(\"*\"):\n        if extra.is_file():\n            members.setdefault(extra.relative_to(bundle_dir).as_posix(), extra.read_bytes())\n    sources: frozenset[str] | None = None\n"
         },
         {
-          "description": "TypeScript reads a denominator manifest the bundle manifest does not list",
-          "file": "engines/typescript/src/coverage.ts",
-          "search": "  if (denominator.manifest && !listed.has(denominator.manifest)) {\n",
-          "replace": "  if (denominator.manifest && listed.size < 0) {\n"
+          "description": "TypeScript's bundle loader hands coverage every file in the bundle folder, so a denominator manifest the bundle manifest does not list is read",
+          "file": "engines/typescript/src/bundle.ts",
+          "search": "  let sources: Set<string> | null = null;\n",
+          "replace": "  for (const extra of process.getBuiltinModule(\"node:fs\").readdirSync(bundleDir, { recursive: true }) as string[]) {\n    const key = extra.split(sep).join(\"/\");\n    if (statSync(joinPath(bundleDir, extra)).isFile() && !members.has(key)) {\n      members.set(key, readFileSync(joinPath(bundleDir, extra)));\n    }\n  }\n  let sources: Set<string> | null = null;\n"
         },
         {
-          "description": "Java reads a denominator manifest the bundle manifest does not list",
-          "file": "engines/java/src/main/java/org/agentce/Coverage.java",
-          "search": "        if (hasManifest && !listed.contains(denominator.manifest)) {\n",
-          "replace": "        if (hasManifest && listed == null) {\n"
+          "description": "Java's bundle loader hands coverage every file in the bundle folder, so a denominator manifest the bundle manifest does not list is read",
+          "file": "engines/java/src/main/java/org/agentce/Bundle.java",
+          "search": "        eventFiles.sort(java.util.Comparator.comparing(Path::toString));\n",
+          "replace": "        try (var walk = Files.walk(bundleDir)) {\n            for (Path extra : (Iterable<Path>) walk.filter(Files::isRegularFile)::iterator) {\n                members.putIfAbsent(bundleDir.relativize(extra).toString().replace('\\\\', '/'), Files.readAllBytes(extra));\n            }\n        } catch (IOException e) {\n            throw new java.io.UncheckedIOException(e);\n        }\n        eventFiles.sort(java.util.Comparator.comparing(Path::toString));\n"
         },
         {
           "description": "Python takes a denominator naming one of the subject's own evidence sources as independent",
