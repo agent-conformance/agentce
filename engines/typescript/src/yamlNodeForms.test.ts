@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { InputError } from "./errors";
 import { isPyyamlTimestamp, loadPyyaml, pythonizeTimestamp } from "./readiness";
+import { byteCompare } from "./util";
 
 const TESTDATA = join(__dirname, "..", "testdata");
 
@@ -23,7 +24,7 @@ interface NodeFormCase {
   readonly reads: unknown;
 }
 
-/** A reading encoded as the golden encodes Python's: numbers by value, keys sorted. */
+/** A reading encoded as the golden encodes Python's: numbers by value, keys in code point order. */
 function reading(value: unknown): unknown {
   if (value === null || value === undefined) {
     return null;
@@ -46,7 +47,7 @@ function reading(value: unknown): unknown {
     return { seq: value.map(reading) };
   }
   if (typeof value === "object") {
-    const keys = Object.keys(value).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    const keys = Object.keys(value).sort(byteCompare);
     return { map: keys.map((key) => [key, reading((value as Record<string, unknown>)[key])]) };
   }
   return { other: String(value) };

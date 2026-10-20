@@ -140,6 +140,7 @@ def state_golden(testdata: Path) -> dict[str, Any]:
 #: older (D3); a reading with a non-string key is out (D2) and the producer refuses to write one.
 NODE_TAGS: tuple[str, ...] = (
     *("", "!", "!<!>", "!!str", "!!int", "!!float", "!!bool", "!!null", "!!merge"),
+    "!!timestamp",
     "!<tag:yaml.org,2002:merge>",
 )
 NODE_VALUES: tuple[str, ...] = (
@@ -188,6 +189,8 @@ KEY_FORMS = {
     "alias_map_key": "x: &m {K: 1}\n*m : V",
     "tagged_seq_key": "!!seq [K]: V",
     "explicit_no_value": "? [K]",
+    "explicit_comment_no_value": "? # c\n  [K]",
+    "explicit_on_next_line": "?\n  [K]\n: V",
     "explicit_scalar": "? K\n: V",
     "explicit_scalar_no_value": "? K\nb: V",
     "colon_plain_key": "a:\n  - x\n:b: V",

@@ -17662,6 +17662,2566 @@
     }
   },
   {
+    "name": "scalar.!!timestamp.plain.0.value",
+    "yaml": "v: !!timestamp yes\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "yes"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.0.entry",
+    "yaml": "v:\n  - !!timestamp yes\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "yes"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.1.value",
+    "yaml": "v: !!timestamp on\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "on"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.1.entry",
+    "yaml": "v:\n  - !!timestamp on\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "on"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.2.value",
+    "yaml": "v: !!timestamp 10\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "10"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.2.entry",
+    "yaml": "v:\n  - !!timestamp 10\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "10"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.3.value",
+    "yaml": "v: !!timestamp 010\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "010"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.3.entry",
+    "yaml": "v:\n  - !!timestamp 010\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "010"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.4.value",
+    "yaml": "v: !!timestamp 0x10\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "0x10"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.4.entry",
+    "yaml": "v:\n  - !!timestamp 0x10\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "0x10"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.5.value",
+    "yaml": "v: !!timestamp 1e1\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "1e1"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.5.entry",
+    "yaml": "v:\n  - !!timestamp 1e1\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "1e1"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.6.value",
+    "yaml": "v: !!timestamp 1.5\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "1.5"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.6.entry",
+    "yaml": "v:\n  - !!timestamp 1.5\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "1.5"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.7.value",
+    "yaml": "v: !!timestamp .inf\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": ".inf"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.7.entry",
+    "yaml": "v:\n  - !!timestamp .inf\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": ".inf"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.8.value",
+    "yaml": "v: !!timestamp null\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "null"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.8.entry",
+    "yaml": "v:\n  - !!timestamp null\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "null"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.9.value",
+    "yaml": "v: !!timestamp ~\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "~"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.9.entry",
+    "yaml": "v:\n  - !!timestamp ~\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "~"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.10.value",
+    "yaml": "v: !!timestamp\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": ""
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.10.entry",
+    "yaml": "v:\n  - !!timestamp\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": ""
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.11.value",
+    "yaml": "v: !!timestamp 2026-01-02\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "ts": "2026-01-02"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.11.entry",
+    "yaml": "v:\n  - !!timestamp 2026-01-02\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "ts": "2026-01-02"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.12.value",
+    "yaml": "v: !!timestamp lookup\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "lookup"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.12.entry",
+    "yaml": "v:\n  - !!timestamp lookup\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "lookup"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.13.value",
+    "yaml": "v: !!timestamp =\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "="
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.13.entry",
+    "yaml": "v:\n  - !!timestamp =\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "="
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.14.value",
+    "yaml": "v: !!timestamp <<\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "<<"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.14.entry",
+    "yaml": "v:\n  - !!timestamp <<\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "<<"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.15.value",
+    "yaml": "v: !!timestamp \u0661\u0662\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "\u0661\u0662"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.15.entry",
+    "yaml": "v:\n  - !!timestamp \u0661\u0662\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "\u0661\u0662"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.16.value",
+    "yaml": "v: !!timestamp \uff11\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "\uff11"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.16.entry",
+    "yaml": "v:\n  - !!timestamp \uff11\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "\uff11"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.17.value",
+    "yaml": "v: !!timestamp 1\u0661\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "1\u0661"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.17.entry",
+    "yaml": "v:\n  - !!timestamp 1\u0661\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "1\u0661"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.18.value",
+    "yaml": "v: !!timestamp \u00b2\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "\u00b2"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.18.entry",
+    "yaml": "v:\n  - !!timestamp \u00b2\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "\u00b2"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.19.value",
+    "yaml": "v: !!timestamp \ud835\udfcf\ud835\udfd0\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "\ud835\udfcf\ud835\udfd0"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.plain.19.entry",
+    "yaml": "v:\n  - !!timestamp \ud835\udfcf\ud835\udfd0\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "\ud835\udfcf\ud835\udfd0"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.0.value",
+    "yaml": "v: !!timestamp 'yes'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "yes"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.0.entry",
+    "yaml": "v:\n  - !!timestamp 'yes'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "yes"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.1.value",
+    "yaml": "v: !!timestamp 'on'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "on"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.1.entry",
+    "yaml": "v:\n  - !!timestamp 'on'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "on"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.2.value",
+    "yaml": "v: !!timestamp '10'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "10"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.2.entry",
+    "yaml": "v:\n  - !!timestamp '10'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "10"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.3.value",
+    "yaml": "v: !!timestamp '010'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "010"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.3.entry",
+    "yaml": "v:\n  - !!timestamp '010'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "010"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.4.value",
+    "yaml": "v: !!timestamp '0x10'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "0x10"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.4.entry",
+    "yaml": "v:\n  - !!timestamp '0x10'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "0x10"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.5.value",
+    "yaml": "v: !!timestamp '1e1'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "1e1"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.5.entry",
+    "yaml": "v:\n  - !!timestamp '1e1'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "1e1"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.6.value",
+    "yaml": "v: !!timestamp '1.5'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "1.5"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.6.entry",
+    "yaml": "v:\n  - !!timestamp '1.5'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "1.5"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.7.value",
+    "yaml": "v: !!timestamp '.inf'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": ".inf"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.7.entry",
+    "yaml": "v:\n  - !!timestamp '.inf'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": ".inf"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.8.value",
+    "yaml": "v: !!timestamp 'null'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "null"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.8.entry",
+    "yaml": "v:\n  - !!timestamp 'null'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "null"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.9.value",
+    "yaml": "v: !!timestamp '~'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "~"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.9.entry",
+    "yaml": "v:\n  - !!timestamp '~'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "~"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.10.value",
+    "yaml": "v: !!timestamp ''\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": ""
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.10.entry",
+    "yaml": "v:\n  - !!timestamp ''\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": ""
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.11.value",
+    "yaml": "v: !!timestamp '2026-01-02'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "ts": "2026-01-02"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.11.entry",
+    "yaml": "v:\n  - !!timestamp '2026-01-02'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "ts": "2026-01-02"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.12.value",
+    "yaml": "v: !!timestamp 'lookup'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "lookup"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.12.entry",
+    "yaml": "v:\n  - !!timestamp 'lookup'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "lookup"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.13.value",
+    "yaml": "v: !!timestamp '='\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "="
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.13.entry",
+    "yaml": "v:\n  - !!timestamp '='\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "="
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.14.value",
+    "yaml": "v: !!timestamp '<<'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "<<"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.14.entry",
+    "yaml": "v:\n  - !!timestamp '<<'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "<<"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.15.value",
+    "yaml": "v: !!timestamp '\u0661\u0662'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "\u0661\u0662"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.15.entry",
+    "yaml": "v:\n  - !!timestamp '\u0661\u0662'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "\u0661\u0662"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.16.value",
+    "yaml": "v: !!timestamp '\uff11'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "\uff11"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.16.entry",
+    "yaml": "v:\n  - !!timestamp '\uff11'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "\uff11"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.17.value",
+    "yaml": "v: !!timestamp '1\u0661'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "1\u0661"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.17.entry",
+    "yaml": "v:\n  - !!timestamp '1\u0661'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "1\u0661"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.18.value",
+    "yaml": "v: !!timestamp '\u00b2'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "\u00b2"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.18.entry",
+    "yaml": "v:\n  - !!timestamp '\u00b2'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "\u00b2"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.19.value",
+    "yaml": "v: !!timestamp '\ud835\udfcf\ud835\udfd0'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "\ud835\udfcf\ud835\udfd0"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.single.19.entry",
+    "yaml": "v:\n  - !!timestamp '\ud835\udfcf\ud835\udfd0'\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "\ud835\udfcf\ud835\udfd0"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.0.value",
+    "yaml": "v: !!timestamp \"yes\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "yes"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.0.entry",
+    "yaml": "v:\n  - !!timestamp \"yes\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "yes"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.1.value",
+    "yaml": "v: !!timestamp \"on\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "on"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.1.entry",
+    "yaml": "v:\n  - !!timestamp \"on\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "on"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.2.value",
+    "yaml": "v: !!timestamp \"10\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "10"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.2.entry",
+    "yaml": "v:\n  - !!timestamp \"10\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "10"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.3.value",
+    "yaml": "v: !!timestamp \"010\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "010"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.3.entry",
+    "yaml": "v:\n  - !!timestamp \"010\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "010"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.4.value",
+    "yaml": "v: !!timestamp \"0x10\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "0x10"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.4.entry",
+    "yaml": "v:\n  - !!timestamp \"0x10\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "0x10"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.5.value",
+    "yaml": "v: !!timestamp \"1e1\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "1e1"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.5.entry",
+    "yaml": "v:\n  - !!timestamp \"1e1\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "1e1"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.6.value",
+    "yaml": "v: !!timestamp \"1.5\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "1.5"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.6.entry",
+    "yaml": "v:\n  - !!timestamp \"1.5\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "1.5"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.7.value",
+    "yaml": "v: !!timestamp \".inf\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": ".inf"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.7.entry",
+    "yaml": "v:\n  - !!timestamp \".inf\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": ".inf"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.8.value",
+    "yaml": "v: !!timestamp \"null\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "null"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.8.entry",
+    "yaml": "v:\n  - !!timestamp \"null\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "null"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.9.value",
+    "yaml": "v: !!timestamp \"~\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "~"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.9.entry",
+    "yaml": "v:\n  - !!timestamp \"~\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "~"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.10.value",
+    "yaml": "v: !!timestamp \"\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": ""
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.10.entry",
+    "yaml": "v:\n  - !!timestamp \"\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": ""
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.11.value",
+    "yaml": "v: !!timestamp \"2026-01-02\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "ts": "2026-01-02"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.11.entry",
+    "yaml": "v:\n  - !!timestamp \"2026-01-02\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "ts": "2026-01-02"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.12.value",
+    "yaml": "v: !!timestamp \"lookup\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "lookup"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.12.entry",
+    "yaml": "v:\n  - !!timestamp \"lookup\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "lookup"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.13.value",
+    "yaml": "v: !!timestamp \"=\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "="
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.13.entry",
+    "yaml": "v:\n  - !!timestamp \"=\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "="
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.14.value",
+    "yaml": "v: !!timestamp \"<<\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "<<"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.14.entry",
+    "yaml": "v:\n  - !!timestamp \"<<\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "<<"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.15.value",
+    "yaml": "v: !!timestamp \"\u0661\u0662\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "\u0661\u0662"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.15.entry",
+    "yaml": "v:\n  - !!timestamp \"\u0661\u0662\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "\u0661\u0662"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.16.value",
+    "yaml": "v: !!timestamp \"\uff11\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "\uff11"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.16.entry",
+    "yaml": "v:\n  - !!timestamp \"\uff11\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "\uff11"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.17.value",
+    "yaml": "v: !!timestamp \"1\u0661\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "1\u0661"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.17.entry",
+    "yaml": "v:\n  - !!timestamp \"1\u0661\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "1\u0661"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.18.value",
+    "yaml": "v: !!timestamp \"\u00b2\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "\u00b2"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.18.entry",
+    "yaml": "v:\n  - !!timestamp \"\u00b2\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "\u00b2"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.19.value",
+    "yaml": "v: !!timestamp \"\ud835\udfcf\ud835\udfd0\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "\ud835\udfcf\ud835\udfd0"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.double.19.entry",
+    "yaml": "v:\n  - !!timestamp \"\ud835\udfcf\ud835\udfd0\"\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "\ud835\udfcf\ud835\udfd0"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.0.value",
+    "yaml": "v: !!timestamp |\n  yes\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "yes\n"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.0.entry",
+    "yaml": "v:\n  - !!timestamp |\n    yes\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "yes\n"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.1.value",
+    "yaml": "v: !!timestamp |\n  on\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "on\n"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.1.entry",
+    "yaml": "v:\n  - !!timestamp |\n    on\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "on\n"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.2.value",
+    "yaml": "v: !!timestamp |\n  10\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "10\n"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.2.entry",
+    "yaml": "v:\n  - !!timestamp |\n    10\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "10\n"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.3.value",
+    "yaml": "v: !!timestamp |\n  010\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "010\n"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.3.entry",
+    "yaml": "v:\n  - !!timestamp |\n    010\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "010\n"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.4.value",
+    "yaml": "v: !!timestamp |\n  0x10\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "0x10\n"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.4.entry",
+    "yaml": "v:\n  - !!timestamp |\n    0x10\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "0x10\n"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.5.value",
+    "yaml": "v: !!timestamp |\n  1e1\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "1e1\n"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.5.entry",
+    "yaml": "v:\n  - !!timestamp |\n    1e1\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "1e1\n"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.6.value",
+    "yaml": "v: !!timestamp |\n  1.5\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "1.5\n"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.6.entry",
+    "yaml": "v:\n  - !!timestamp |\n    1.5\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "1.5\n"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.7.value",
+    "yaml": "v: !!timestamp |\n  .inf\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": ".inf\n"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.7.entry",
+    "yaml": "v:\n  - !!timestamp |\n    .inf\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": ".inf\n"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.8.value",
+    "yaml": "v: !!timestamp |\n  null\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "null\n"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.8.entry",
+    "yaml": "v:\n  - !!timestamp |\n    null\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "null\n"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.9.value",
+    "yaml": "v: !!timestamp |\n  ~\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "~\n"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.9.entry",
+    "yaml": "v:\n  - !!timestamp |\n    ~\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "~\n"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.10.value",
+    "yaml": "v: !!timestamp |\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": ""
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.10.entry",
+    "yaml": "v:\n  - !!timestamp |\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": ""
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.11.value",
+    "yaml": "v: !!timestamp |\n  2026-01-02\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "ts": "2026-01-02"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.11.entry",
+    "yaml": "v:\n  - !!timestamp |\n    2026-01-02\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "ts": "2026-01-02"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.12.value",
+    "yaml": "v: !!timestamp |\n  lookup\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "lookup\n"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.12.entry",
+    "yaml": "v:\n  - !!timestamp |\n    lookup\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "lookup\n"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.13.value",
+    "yaml": "v: !!timestamp |\n  =\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "=\n"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.13.entry",
+    "yaml": "v:\n  - !!timestamp |\n    =\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "=\n"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.14.value",
+    "yaml": "v: !!timestamp |\n  <<\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "<<\n"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.14.entry",
+    "yaml": "v:\n  - !!timestamp |\n    <<\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "<<\n"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.15.value",
+    "yaml": "v: !!timestamp |\n  \u0661\u0662\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "\u0661\u0662\n"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.15.entry",
+    "yaml": "v:\n  - !!timestamp |\n    \u0661\u0662\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "\u0661\u0662\n"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.16.value",
+    "yaml": "v: !!timestamp |\n  \uff11\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "\uff11\n"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.16.entry",
+    "yaml": "v:\n  - !!timestamp |\n    \uff11\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "\uff11\n"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.17.value",
+    "yaml": "v: !!timestamp |\n  1\u0661\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "1\u0661\n"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.17.entry",
+    "yaml": "v:\n  - !!timestamp |\n    1\u0661\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "1\u0661\n"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.18.value",
+    "yaml": "v: !!timestamp |\n  \u00b2\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "\u00b2\n"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.18.entry",
+    "yaml": "v:\n  - !!timestamp |\n    \u00b2\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "\u00b2\n"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.19.value",
+    "yaml": "v: !!timestamp |\n  \ud835\udfcf\ud835\udfd0\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "s": "\ud835\udfcf\ud835\udfd0\n"
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "scalar.!!timestamp.literal.19.entry",
+    "yaml": "v:\n  - !!timestamp |\n    \ud835\udfcf\ud835\udfd0\n",
+    "reads": {
+      "map": [
+        [
+          "v",
+          {
+            "seq": [
+              {
+                "s": "\ud835\udfcf\ud835\udfd0\n"
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
     "name": "scalar.!<tag:yaml.org,2002:merge>.plain.0.value",
     "yaml": "v: !<tag:yaml.org,2002:merge> yes\n",
     "reads": {
@@ -21093,6 +23653,371 @@
     }
   },
   {
+    "name": "nested.!!timestamp.yes",
+    "yaml": "task_scopes:\n  - {task_type: t, allowed_tools: [!!timestamp yes], budgets: {tokens: !!timestamp yes, spend: !!timestamp yes}}\nbudgets:\n  tokens: !!timestamp yes\n  spend: !!timestamp yes\n",
+    "reads": {
+      "map": [
+        [
+          "budgets",
+          {
+            "map": [
+              [
+                "spend",
+                {
+                  "s": "yes"
+                }
+              ],
+              [
+                "tokens",
+                {
+                  "s": "yes"
+                }
+              ]
+            ]
+          }
+        ],
+        [
+          "task_scopes",
+          {
+            "seq": [
+              {
+                "map": [
+                  [
+                    "allowed_tools",
+                    {
+                      "seq": [
+                        {
+                          "s": "yes"
+                        }
+                      ]
+                    }
+                  ],
+                  [
+                    "budgets",
+                    {
+                      "map": [
+                        [
+                          "spend",
+                          {
+                            "s": "yes"
+                          }
+                        ],
+                        [
+                          "tokens",
+                          {
+                            "s": "yes"
+                          }
+                        ]
+                      ]
+                    }
+                  ],
+                  [
+                    "task_type",
+                    {
+                      "s": "t"
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "nested.!!timestamp.10",
+    "yaml": "task_scopes:\n  - {task_type: t, allowed_tools: [!!timestamp 10], budgets: {tokens: !!timestamp 10, spend: !!timestamp 10}}\nbudgets:\n  tokens: !!timestamp 10\n  spend: !!timestamp 10\n",
+    "reads": {
+      "map": [
+        [
+          "budgets",
+          {
+            "map": [
+              [
+                "spend",
+                {
+                  "s": "10"
+                }
+              ],
+              [
+                "tokens",
+                {
+                  "s": "10"
+                }
+              ]
+            ]
+          }
+        ],
+        [
+          "task_scopes",
+          {
+            "seq": [
+              {
+                "map": [
+                  [
+                    "allowed_tools",
+                    {
+                      "seq": [
+                        {
+                          "s": "10"
+                        }
+                      ]
+                    }
+                  ],
+                  [
+                    "budgets",
+                    {
+                      "map": [
+                        [
+                          "spend",
+                          {
+                            "s": "10"
+                          }
+                        ],
+                        [
+                          "tokens",
+                          {
+                            "s": "10"
+                          }
+                        ]
+                      ]
+                    }
+                  ],
+                  [
+                    "task_type",
+                    {
+                      "s": "t"
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "nested.!!timestamp.5",
+    "yaml": "task_scopes:\n  - {task_type: t, allowed_tools: [!!timestamp 5], budgets: {tokens: !!timestamp 5, spend: !!timestamp 5}}\nbudgets:\n  tokens: !!timestamp 5\n  spend: !!timestamp 5\n",
+    "reads": {
+      "map": [
+        [
+          "budgets",
+          {
+            "map": [
+              [
+                "spend",
+                {
+                  "s": "5"
+                }
+              ],
+              [
+                "tokens",
+                {
+                  "s": "5"
+                }
+              ]
+            ]
+          }
+        ],
+        [
+          "task_scopes",
+          {
+            "seq": [
+              {
+                "map": [
+                  [
+                    "allowed_tools",
+                    {
+                      "seq": [
+                        {
+                          "s": "5"
+                        }
+                      ]
+                    }
+                  ],
+                  [
+                    "budgets",
+                    {
+                      "map": [
+                        [
+                          "spend",
+                          {
+                            "s": "5"
+                          }
+                        ],
+                        [
+                          "tokens",
+                          {
+                            "s": "5"
+                          }
+                        ]
+                      ]
+                    }
+                  ],
+                  [
+                    "task_type",
+                    {
+                      "s": "t"
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "nested.!!timestamp.lookup",
+    "yaml": "task_scopes:\n  - {task_type: t, allowed_tools: [!!timestamp lookup], budgets: {tokens: !!timestamp lookup, spend: !!timestamp lookup}}\nbudgets:\n  tokens: !!timestamp lookup\n  spend: !!timestamp lookup\n",
+    "reads": {
+      "map": [
+        [
+          "budgets",
+          {
+            "map": [
+              [
+                "spend",
+                {
+                  "s": "lookup"
+                }
+              ],
+              [
+                "tokens",
+                {
+                  "s": "lookup"
+                }
+              ]
+            ]
+          }
+        ],
+        [
+          "task_scopes",
+          {
+            "seq": [
+              {
+                "map": [
+                  [
+                    "allowed_tools",
+                    {
+                      "seq": [
+                        {
+                          "s": "lookup"
+                        }
+                      ]
+                    }
+                  ],
+                  [
+                    "budgets",
+                    {
+                      "map": [
+                        [
+                          "spend",
+                          {
+                            "s": "lookup"
+                          }
+                        ],
+                        [
+                          "tokens",
+                          {
+                            "s": "lookup"
+                          }
+                        ]
+                      ]
+                    }
+                  ],
+                  [
+                    "task_type",
+                    {
+                      "s": "t"
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "name": "nested.!!timestamp.1.5",
+    "yaml": "task_scopes:\n  - {task_type: t, allowed_tools: [!!timestamp 1.5], budgets: {tokens: !!timestamp 1.5, spend: !!timestamp 1.5}}\nbudgets:\n  tokens: !!timestamp 1.5\n  spend: !!timestamp 1.5\n",
+    "reads": {
+      "map": [
+        [
+          "budgets",
+          {
+            "map": [
+              [
+                "spend",
+                {
+                  "s": "1.5"
+                }
+              ],
+              [
+                "tokens",
+                {
+                  "s": "1.5"
+                }
+              ]
+            ]
+          }
+        ],
+        [
+          "task_scopes",
+          {
+            "seq": [
+              {
+                "map": [
+                  [
+                    "allowed_tools",
+                    {
+                      "seq": [
+                        {
+                          "s": "1.5"
+                        }
+                      ]
+                    }
+                  ],
+                  [
+                    "budgets",
+                    {
+                      "map": [
+                        [
+                          "spend",
+                          {
+                            "s": "1.5"
+                          }
+                        ],
+                        [
+                          "tokens",
+                          {
+                            "s": "1.5"
+                          }
+                        ]
+                      ]
+                    }
+                  ],
+                  [
+                    "task_type",
+                    {
+                      "s": "t"
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  },
+  {
     "name": "nested.!<tag:yaml.org,2002:merge>.yes",
     "yaml": "task_scopes:\n  - {task_type: t, allowed_tools: [!<tag:yaml.org,2002:merge> yes], budgets: {tokens: !<tag:yaml.org,2002:merge> yes, spend: !<tag:yaml.org,2002:merge> yes}}\nbudgets:\n  tokens: !<tag:yaml.org,2002:merge> yes\n  spend: !<tag:yaml.org,2002:merge> yes\n",
     "reads": {
@@ -21389,6 +24314,34 @@
   {
     "name": "key.explicit_no_value.task_scopes",
     "yaml": "task_scopes:\n  - ? [allowed_tools]\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.explicit_comment_no_value",
+    "yaml": "? # c\n  [a]\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.explicit_comment_no_value.task_scopes",
+    "yaml": "task_scopes:\n  - ? # c\n      [allowed_tools]\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.explicit_on_next_line",
+    "yaml": "?\n  [a]\n: 1\n",
+    "reads": {
+      "refused": "input.domain_binding_invalid"
+    }
+  },
+  {
+    "name": "key.explicit_on_next_line.task_scopes",
+    "yaml": "task_scopes:\n  - ?\n      [allowed_tools]\n    : [\"yes\"]\n",
     "reads": {
       "refused": "input.domain_binding_invalid"
     }

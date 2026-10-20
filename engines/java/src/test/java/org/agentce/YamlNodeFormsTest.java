@@ -35,7 +35,7 @@ class YamlNodeFormsTest {
             ? Double.compare(a.doubleValue(), b.doubleValue())
             : a.equals(b) ? 0 : 1;
 
-    /** A reading encoded as the golden encodes Python's: numbers by value, keys sorted. */
+    /** A reading encoded as the golden encodes Python's: numbers by value, keys in code point order. */
     private static JsonNode reading(JsonNode value) {
         ObjectNode out = F.objectNode();
         if (value.isNull()) {
@@ -59,7 +59,7 @@ class YamlNodeFormsTest {
             ArrayNode seq = out.putArray("seq");
             value.forEach(item -> seq.add(reading(item)));
         } else {
-            TreeMap<String, JsonNode> sorted = new TreeMap<>();
+            TreeMap<String, JsonNode> sorted = new TreeMap<>(Json::byteCompare);
             value.fields().forEachRemaining(e -> sorted.put(e.getKey(), e.getValue()));
             ArrayNode map = out.putArray("map");
             sorted.forEach((k, v) -> map.addArray().add(k).add(reading(v)));
