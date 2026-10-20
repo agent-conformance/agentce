@@ -192,3 +192,16 @@ test("a limit past float range is unreadable (18.184g)", () => {
     ["spend", null],
   ]);
 });
+
+test("a tag the file writes decides the type, quoted or not (18.184g; a quoted !!float is a census line)", () => {
+  assert.deepEqual(
+    scopeFromYaml(
+      `allowed_tools: [!!bool "yes", !!bool "true", !!bool 'on', !!int "7", !!str 7, !!str yes, x]`,
+    ).allowedTools,
+    new Set(["7", "yes", "x"]),
+  );
+  assert.deepEqual(scopeFromYaml(`budgets: {tokens: !!str 1000, spend: !!int "10"}`).budgets, [
+    ["tokens", null],
+    ["spend", 10],
+  ]);
+});

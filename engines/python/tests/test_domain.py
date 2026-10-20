@@ -269,3 +269,17 @@ def test_limit_past_float_range_is_unreadable(tmp_path: Path) -> None:
     assert _scope_from_yaml(
         tmp_path, f"budgets: {{spend: {huge}, compute_seconds: {huge}}}"
     ).budgets == (("compute_seconds", None), ("spend", None))
+
+
+def test_explicit_tags_construct_as_safe_loader_does(tmp_path: Path) -> None:
+    """A tag the file writes decides the type, quoted or not (18.184g): the reference Java and TypeScript match."""
+    scope = _scope_from_yaml(
+        tmp_path,
+        'allowed_tools: [!!bool "yes", !!bool "true", !!bool \'on\', !!int "7", !!float "1.5",'
+        " !!str 7, !!str yes, x]",
+    )
+    assert scope.allowed_tools == {"7", "x", "yes"}
+    assert _scope_from_yaml(
+        tmp_path,
+        'budgets: {tokens: !!str 1000, spend: !!int "10", compute_seconds: !!float "5"}',
+    ).budgets == (("tokens", None), ("compute_seconds", 5.0), ("spend", 10))
