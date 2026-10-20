@@ -96,6 +96,14 @@ export function isPyyamlTimestamp(value: unknown): value is PyyamlTimestamp {
   return isRecord(value) && typeof value.pyyamlTimestamp === "string";
 }
 
+const NULL_TAG = "tag:yaml.org,2002:null";
+const BOOL_TAG = "tag:yaml.org,2002:bool";
+const INT_TAG = "tag:yaml.org,2002:int";
+const FLOAT_TAG = "tag:yaml.org,2002:float";
+const TIMESTAMP_TAG = "tag:yaml.org,2002:timestamp";
+const MERGE_TAG = "tag:yaml.org,2002:merge";
+const VALUE_TAG = "tag:yaml.org,2002:value";
+
 /** PyYAML's own `Resolver`, `tag:yaml.org,2002:bool` implicit-resolution regex (`yaml/resolver.py`),
  * copied verbatim (stripped of `re.X`'s insignificant whitespace). */
 const PYYAML_BOOL_RESOLVE_RE =
@@ -123,18 +131,20 @@ const PYYAML_TIMESTAMP_FIELDS_RE =
 /** `construct_yaml_bool`'s whole table: any other word under `!!bool` is refused. */
 const PYYAML_BOOL_WORDS = new Set([...PYYAML_BOOL_TRUE, "no", "false", "off"]);
 
-const pyyamlBoolType = new YamlType("tag:yaml.org,2002:bool", {
+/** PyYAML's `construct_yaml_bool`: a word of its table, any case, or refused (a `! |` block's `yes\n` too). */
+function pyyamlConstructBool(data: string): boolean {
+  const word = data.toLowerCase();
+  return constructed(
+    PYYAML_BOOL_WORDS.has(word) ? PYYAML_BOOL_TRUE.has(word) : undefined,
+    data,
+    "bool",
+  );
+}
+
+const pyyamlBoolType = new YamlType(BOOL_TAG, {
   kind: "scalar",
   resolve: (data: unknown) => typeof data === "string" && PYYAML_BOOL_RESOLVE_RE.test(data),
-  // Text other than the words reaches here only as a `! |` block's `yes\n`, which PyYAML resolves and cannot build.
-  construct: (data: string) =>
-    constructed(
-      PYYAML_BOOL_WORDS.has(data.toLowerCase())
-        ? PYYAML_BOOL_TRUE.has(data.toLowerCase())
-        : undefined,
-      data,
-      "bool",
-    ),
+  construct: pyyamlConstructBool,
 });
 
 /** Whether `construct_yaml_timestamp` builds a `date`/`datetime` from `raw`: its fields match and lie
@@ -161,9 +171,11 @@ function isPyyamlCalendarTimestamp(raw: string): boolean {
 }
 
 /** A timestamp scalar as `load_untrusted_yaml` reads it: a date marker, or the text when no date can be built. */
-function pyyamlConstructTimestamp(data: string): PyyamlTimestamp | string {
+function pyyamlConstructTimestamp(text: string): PyyamlTimestamp | string {
+  // The timestamp regex ends in Python's `$`, which also matches before one trailing newline (a `|` block).
+  const data = text.endsWith("\n") ? text.slice(0, -1) : text;
   if (!isPyyamlCalendarTimestamp(data)) {
-    return pythonizeTimestamp(data);
+    return pythonizeTimestamp(text);
   }
   // Written as a mapping key, js-yaml names the key by the marker's own string tag and `toString`,
   // so two dates stay two keys (Python keeps both `date` keys) and neither equals a string key, as
@@ -177,7 +189,7 @@ function pyyamlConstructTimestamp(data: string): PyyamlTimestamp | string {
   );
 }
 
-const pyyamlTimestampType = new YamlType("tag:yaml.org,2002:timestamp", {
+const pyyamlTimestampType = new YamlType(TIMESTAMP_TAG, {
   kind: "scalar",
   resolve: (data: unknown) => typeof data === "string" && PYYAML_TIMESTAMP_RESOLVE_RE.test(data),
   construct: pyyamlConstructTimestamp,
@@ -207,13 +219,19 @@ const PY_SPACE =
  * `float()` read it first; other characters, `²` among them, are kept. Unicode lays each script's digits out
  * as one run from 0 to 9, so a digit's value is its distance from the run's start, mod 10. */
 function asciiDigits(text: string): string {
-  return text.replace(/\p{Nd}/gu, (digit) => {
-    let start = digit.codePointAt(0) ?? 0;
-    while (/\p{Nd}/u.test(String.fromCodePoint(start - 1))) {
-      start -= 1;
-    }
-    return String(((digit.codePointAt(0) ?? 0) - start) % 10);
-  });
+  return NON_ASCII_DIGIT_RE.test(text) ? text.replace(NON_ASCII_DIGITS_RE, asciiDigit) : text;
+}
+
+const NON_ASCII_DIGIT_RE = /(?![0-9])\p{Nd}/u;
+const NON_ASCII_DIGITS_RE = /(?![0-9])\p{Nd}/gu;
+
+function asciiDigit(digit: string): string {
+  const point = digit.codePointAt(0) ?? 0;
+  let start = point;
+  while (NON_ASCII_DIGIT_RE.test(String.fromCodePoint(start - 1))) {
+    start -= 1;
+  }
+  return String((point - start) % 10);
 }
 
 /** Python's `int(text, base)`, after {@link asciiDigits}: an optional sign, the base's own optional prefix,
@@ -336,52 +354,48 @@ function constructed<T>(value: T | undefined, data: string, tag: string): T {
   return value;
 }
 
-const pyyamlIntType = new YamlType("tag:yaml.org,2002:int", {
+const pyyamlIntType = new YamlType(INT_TAG, {
   kind: "scalar",
   resolve: (data: unknown) => typeof data === "string" && PYYAML_INT_RESOLVE_RE.test(data),
   construct: (data: string) => constructed(pyyamlConstructInt(data), data, "int"),
 });
 
-const pyyamlFloatType = new YamlType("tag:yaml.org,2002:float", {
+const pyyamlFloatType = new YamlType(FLOAT_TAG, {
   kind: "scalar",
   resolve: (data: unknown) => typeof data === "string" && PYYAML_FLOAT_RESOLVE_RE.test(data),
   construct: (data: string) => constructed(pyyamlConstructFloat(data), data, "float"),
 });
-
-const MERGE_TAG = "tag:yaml.org,2002:merge";
-const TIMESTAMP_TAG = "tag:yaml.org,2002:timestamp";
-const NULL_TAG = "tag:yaml.org,2002:null";
 
 /** A tag the file writes on a scalar of any style (`!!int "10"`, `!!bool 'on'`, `!!null x`):
  * `SafeLoader` constructs the text by that tag, never by its implicit resolvers, and refuses text the
  * constructor cannot read. js-yaml looks an explicit tag up among these, after the implicit types of
  * the same tag. */
 const PYYAML_EXPLICIT_SCALAR_TYPES = [
-  new YamlType("tag:yaml.org,2002:null", {
+  new YamlType(NULL_TAG, {
     kind: "scalar",
     resolve: () => true,
     construct: () => null,
   }),
-  new YamlType("tag:yaml.org,2002:bool", {
+  new YamlType(BOOL_TAG, {
     kind: "scalar",
-    resolve: (data: unknown) =>
-      typeof data === "string" && PYYAML_BOOL_WORDS.has(data.toLowerCase()),
-    construct: (data: string) => PYYAML_BOOL_TRUE.has(data.toLowerCase()),
+    resolve: (data: unknown) => typeof data === "string",
+    construct: pyyamlConstructBool,
   }),
-  new YamlType("tag:yaml.org,2002:int", {
+  new YamlType(INT_TAG, {
     kind: "scalar",
     resolve: (data: unknown) => typeof data === "string",
     construct: (data: string) => constructed(pyyamlConstructInt(data), data, "int"),
   }),
-  new YamlType("tag:yaml.org,2002:float", {
+  new YamlType(FLOAT_TAG, {
     kind: "scalar",
     resolve: (data: unknown) => typeof data === "string",
     construct: (data: string) => constructed(pyyamlConstructFloat(data), data, "float"),
   }),
-  new YamlType("tag:yaml.org,2002:timestamp", {
+  new YamlType(TIMESTAMP_TAG, {
     kind: "scalar",
-    resolve: (data: unknown) => typeof data === "string",
-    construct: pyyamlConstructTimestamp,
+    // An empty `!!timestamp` node is the empty text, which no date matches.
+    resolve: (data: unknown) => data === null || typeof data === "string",
+    construct: (data: string | null) => pyyamlConstructTimestamp(data ?? ""),
   }),
   // `!!merge foo` is a merge key whatever its text, as SafeLoader's flatten_mapping reads the tag alone.
   new YamlType(MERGE_TAG, {
@@ -435,7 +449,7 @@ function defaultImplicit(tag: string): YamlType {
  * `catalog.ts`'s YAML `load` calls elsewhere in this engine are untouched. */
 export const PYYAML_SAFE_SCHEMA = FAILSAFE_SCHEMA.extend({
   implicit: [
-    defaultImplicit("tag:yaml.org,2002:null"),
+    defaultImplicit(NULL_TAG),
     pyyamlBoolType,
     pyyamlIntType,
     pyyamlFloatType,
@@ -453,11 +467,11 @@ export const PYYAML_SAFE_SCHEMA = FAILSAFE_SCHEMA.extend({
       construct: () => PYYAML_MERGE_VALUE,
     }),
     // YAML 1.1's `=` value type: PyYAML resolves a plain `=` to it and SafeLoader cannot construct it.
-    new YamlType("tag:yaml.org,2002:value", {
+    new YamlType(VALUE_TAG, {
       kind: "scalar",
       resolve: (data: unknown) => data === "=",
       construct: () => {
-        throw new Error("could not determine a constructor for the tag 'tag:yaml.org,2002:value'");
+        throw new Error(`could not determine a constructor for the tag '${VALUE_TAG}'`);
       },
     }),
   ],
@@ -531,120 +545,134 @@ export function normalizeDeviationDates(
 
 /** js-yaml's composer state as its `listener` option sees each node close (js-yaml 4.3.2 `lib/loader.js`). */
 interface ComposerState {
-  kind: string | null;
+  readonly input: string;
+  readonly position: number;
   tag: string | null;
-  anchor: string | null;
+  readonly anchor: string | null;
+  kind: string | null;
   result: unknown;
   readonly implicitTypes: CompiledType[];
   readonly anchorMap: Record<string, unknown>;
 }
 
-function unhashableKey(): never {
-  throw new YAMLException("while constructing a mapping: found unhashable key");
+/** Whether `text` from `position` on, past spaces, line breaks and comments, opens with the `:` of a mapping value:
+ * one followed by a space, a line break, the end, or a flow indicator, or written right after a flow collection. */
+function valueIndicatorFollows(text: string, position: number): boolean {
+  let at = position;
+  while (at < text.length) {
+    const ch = text[at];
+    if (ch === " " || ch === "\t" || ch === "\r" || ch === "\n") {
+      at += 1;
+    } else if (ch === "#" && (at === 0 || /\s/.test(text[at - 1] ?? ""))) {
+      const end = text.indexOf("\n", at);
+      at = end === -1 ? text.length : end;
+    } else {
+      break;
+    }
+  }
+  if (text[at] !== ":") {
+    return false;
+  }
+  const after = text[at + 1];
+  return (
+    after === undefined ||
+    /[\s,[\]{}]/.test(after) ||
+    (at === position && (text[at - 1] === "]" || text[at - 1] === "}"))
+  );
 }
 
-/** What `Array.prototype.slice` builds from a sequence tagged by {@link PyyamlComposer}: js-yaml copies a sequence
- * key before it names the key by `String()`, and this copy refuses to be named. */
-class UnhashableKeySequence extends Array<unknown> {
-  [Symbol.toPrimitive](): never {
-    return unhashableKey();
+/** Whether the text before `position`, past spaces, line breaks and comments, ends in the `?` of an explicit key. */
+function explicitKeyPrecedes(text: string, position: number): boolean {
+  let end = position;
+  while (end > 0) {
+    const lineStart = text.lastIndexOf("\n", end - 1) + 1;
+    const line = text
+      .slice(lineStart, end)
+      .replace(/(^|\s)#.*$/, "")
+      .trimEnd();
+    if (line !== "") {
+      return (
+        line.endsWith("?") && (line.length === 1 || /[\s,[{]/.test(line[line.length - 2] ?? ""))
+      );
+    }
+    end = lineStart - 1;
   }
+  return false;
 }
 
 /** The PyYAML node rules js-yaml's composer does not follow, applied as each node closes (its `listener` option):
- * a scalar tagged `!` resolves as if untagged whatever its quoting; a sequence or mapping refuses to be read as a
- * mapping key, as PyYAML cannot hash it; with `uniqueKeys`, a mapping that writes `<<` twice is refused. */
+ * a scalar tagged `!` resolves as if untagged whatever its quoting; a sequence or mapping read as a mapping key is
+ * refused, as PyYAML cannot hash it (js-yaml would name it by its text); with `uniqueKeys`, a mapping that writes
+ * `<<` twice is refused. */
 class PyyamlComposer {
-  /** Per open node, how many merge keys closed directly inside it. */
-  private readonly merges: number[] = [];
-  /** Every collection tagged during the load, untagged by {@link release}. */
-  private readonly tagged: object[] = [];
+  /** Per open node: whether a merge key has closed directly inside it, and whether it is an explicit `?` key. */
+  private readonly open: { merged: boolean; explicitKey: boolean }[] = [];
 
   constructor(private readonly uniqueKeys: boolean) {}
 
   readonly listener = (event: string, composer: unknown): void => {
     const state = composer as ComposerState;
     if (event === "open") {
-      this.merges.push(0);
+      this.open.push({
+        merged: false,
+        explicitKey: explicitKeyPrecedes(state.input, state.position),
+      });
       return;
     }
-    this.merges.pop();
+    const node = this.open.pop();
     if (state.tag === "!" && state.kind === "scalar" && typeof state.result === "string") {
-      this.resolveNonSpecific(state);
+      resolveNonSpecific(state);
     }
-    if (state.tag === MERGE_TAG && this.uniqueKeys && this.merges.length > 0) {
-      const parent = this.merges.length - 1;
-      this.merges[parent] = (this.merges[parent] ?? 0) + 1;
-      if ((this.merges[parent] ?? 0) > 1) {
+    const parent = this.open.at(-1);
+    if (state.tag === MERGE_TAG && this.uniqueKeys && parent !== undefined) {
+      if (parent.merged) {
         // `<<` is a key too: which of two merges wins is never read (18.184k D1).
         throw new YAMLException("while constructing a mapping: found the merge key '<<' twice");
       }
+      parent.merged = true;
     }
     const result = state.result;
     if (
-      (state.kind === "sequence" || state.kind === "mapping") &&
       typeof result === "object" &&
-      result !== null
+      result !== null &&
+      result !== PYYAML_MERGE_VALUE &&
+      !isPyyamlTimestamp(result) &&
+      (node?.explicitKey === true || valueIndicatorFollows(state.input, state.position))
     ) {
-      this.tagCollection(result);
+      throw new YAMLException("while constructing a mapping: found unhashable key");
     }
   };
+}
 
-  /** PyYAML resolves a `!` scalar by the implicit resolvers; their regexes end in Python's `$`, which also matches
-   * before one trailing newline (a `! |` block), while the constructors read the whole text. */
-  private resolveNonSpecific(state: ComposerState): void {
-    const text = state.result as string;
-    const resolved = text.endsWith("\n") ? text.slice(0, -1) : text;
-    // PyYAML's null resolver also takes empty text, which js-yaml's null type leaves to an empty node.
-    const type = state.implicitTypes.find((candidate) =>
-      candidate.resolve(resolved === "" && candidate.tag === NULL_TAG ? null : resolved),
-    );
-    if (type !== undefined) {
-      state.result = type.construct(type.tag === TIMESTAMP_TAG ? resolved : text);
-    }
-    // A merge key keeps its tag for the mapping; any other tag is cleared, so no enclosing close constructs it again.
-    state.tag = type?.tag === MERGE_TAG ? MERGE_TAG : null;
-    if (state.anchor !== null) {
-      state.anchorMap[state.anchor] = state.result;
-    }
+/** PyYAML resolves a `!` scalar by the implicit resolvers; their regexes end in Python's `$`, which also matches
+ * before one trailing newline (a `! |` block), while the constructors read the whole text. */
+function resolveNonSpecific(state: ComposerState): void {
+  const text = state.result as string;
+  const resolved = text.endsWith("\n") ? text.slice(0, -1) : text;
+  // PyYAML's null resolver also takes empty text, which js-yaml's null type leaves to an empty node.
+  const type = state.implicitTypes.find((candidate) =>
+    candidate.resolve(resolved === "" && candidate.tag === NULL_TAG ? null : resolved),
+  );
+  if (type !== undefined) {
+    state.result = type.construct(text);
   }
-
-  private tagCollection(collection: object): void {
-    if (Object.hasOwn(collection, Symbol.toPrimitive)) {
-      return;
-    }
-    const hidden = { configurable: true, enumerable: false, writable: true };
-    Object.defineProperty(collection, Symbol.toPrimitive, { ...hidden, value: unhashableKey });
-    if (Array.isArray(collection)) {
-      Object.defineProperty(collection, "constructor", { ...hidden, value: UnhashableKeySequence });
-    } else {
-      // js-yaml names a plain-object key "[object Object]" without asking it; a tag of its own makes it ask.
-      Object.defineProperty(collection, Symbol.toStringTag, { ...hidden, value: "PyyamlMapping" });
-    }
-    this.tagged.push(collection);
-  }
-
-  /** Untags every collection, so the loaded value holds plain arrays and objects again. */
-  release(): void {
-    for (const collection of this.tagged) {
-      for (const field of [Symbol.toPrimitive, Symbol.toStringTag, "constructor"]) {
-        Reflect.deleteProperty(collection, field);
-      }
-    }
+  // A merge key keeps its tag for the mapping; any other tag is cleared, so no enclosing close constructs it again.
+  state.tag = type?.tag === MERGE_TAG ? MERGE_TAG : null;
+  if (state.anchor !== null) {
+    state.anchorMap[state.anchor] = state.result;
   }
 }
 
 /** `text` read with {@link PYYAML_SAFE_SCHEMA}: every load with that schema goes through here, so a `<<`
- * read as a value is refused as SafeLoader refuses it, and {@link PyyamlComposer}'s node rules apply. `json` keeps
- * the last of a repeated key; without it a repeated key, `<<` included, is refused. */
-export function pyyamlLoad(text: string, json = true): unknown {
-  const composer = new PyyamlComposer(!json);
-  let data: unknown;
-  try {
-    data = yamlLoad(text, { schema: PYYAML_SAFE_SCHEMA, json, listener: composer.listener });
-  } finally {
-    composer.release();
-  }
+ * read as a value is refused as SafeLoader refuses it, and {@link PyyamlComposer}'s node rules apply. A repeated key
+ * keeps its last value; with `uniqueKeys` it is refused, `<<` included. */
+export function pyyamlLoad(text: string, uniqueKeys = false): unknown {
+  const composer = new PyyamlComposer(uniqueKeys);
+  const data = yamlLoad(text, {
+    schema: PYYAML_SAFE_SCHEMA,
+    json: !uniqueKeys,
+    listener: composer.listener,
+  });
   if (holdsMergeValue(data)) {
     throw new YAMLException(
       "could not determine a constructor for the tag 'tag:yaml.org,2002:merge'",
@@ -673,7 +701,7 @@ export function loadPyyaml(path: string, key: string, what: string, uniqueKeys =
     );
   }
   try {
-    return pyyamlLoad(text, !uniqueKeys);
+    return pyyamlLoad(text, uniqueKeys);
   } catch (error) {
     if (error instanceof RangeError || /exceeded maxDepth/.test((error as Error).message)) {
       // js-yaml caps nesting (and recurses per level), as PyYAML's composer hits its RecursionError.

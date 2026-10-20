@@ -332,6 +332,9 @@ public final class Readiness {
     /** {@code text} with each Unicode decimal digit ({@code ١}, {@code １}, {@code 𝟏}) written as its ASCII digit, as
      * Python's {@code int()} and {@code float()} read it first; other characters, {@code ²} among them, are kept. */
     private static String asciiDigits(String text) {
+        if (text.chars().allMatch(c -> c < 0x80)) {
+            return text;
+        }
         StringBuilder out = new StringBuilder(text.length());
         text.codePoints().forEach(cp -> {
             if (Character.getType(cp) == Character.DECIMAL_DIGIT_NUMBER) {
@@ -475,7 +478,7 @@ public final class Readiness {
             if (tag.equals(Tag.TIMESTAMP)) {
                 // A date construct_yaml_timestamp cannot build stays text, as load_untrusted_yaml keeps it; its regex
                 // ends in `$`, so a `! |` block's trailing newline is not part of the date.
-                String stamp = implicit ? withoutTrailingNewline(text) : text;
+                String stamp = withoutTrailingNewline(text);
                 return isPyyamlCalendarTimestamp(stamp) ? new PyyamlTimestamp(stamp) : pythonizeTimestamp(text);
             }
             String lower = text.toLowerCase(Locale.ROOT);
