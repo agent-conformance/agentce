@@ -246,12 +246,26 @@ public final class Readiness {
      * constructs the second by its tag. */
     private static final String IMPLICIT_TAG_PREFIX = "tag:agentce.org,implicit:";
 
+    /** YAML 1.1's {@code =} value type, which PyYAML's resolver tags and {@code SafeLoader} cannot construct. */
+    private static final Tag PYYAML_VALUE_TAG = new Tag("tag:yaml.org,2002:value");
+
     private static final class ImplicitMarkingResolver extends Resolver {
         @Override
         public Tag resolve(NodeId kind, String value, boolean implicit) {
-            Tag tag = super.resolve(kind, value, implicit);
-            return kind == NodeId.scalar && implicit ? new Tag(IMPLICIT_TAG_PREFIX + tag.getValue()) : tag;
+            if (kind != NodeId.scalar || !implicit) {
+                return super.resolve(kind, value, implicit);
+            }
+            // PyYAML's resolver regexes end in Python's `$`, which also matches before one trailing newline (a
+            // `! |` block scalar), and it resolves a plain `=` as the value type.
+            String resolved = withoutTrailingNewline(value);
+            Tag tag = resolved.equals("=") ? PYYAML_VALUE_TAG : super.resolve(kind, resolved, true);
+            return new Tag(IMPLICIT_TAG_PREFIX + tag.getValue());
         }
+    }
+
+    /** {@code text} without one trailing newline: the text Python's {@code $} lets a resolver regex match. */
+    private static String withoutTrailingNewline(String text) {
+        return text.endsWith("\n") ? text.substring(0, text.length() - 1) : text;
     }
 
     /** {@code node}'s tag with the implicit mark removed. */
@@ -301,22 +315,36 @@ public final class Readiness {
     private static final String PY_SPACE =
             "[\\t\\n\\x0b\\x0c\\r\\x1c-\\x1f \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*";
 
-    /** Python's {@code int(text, base)} over ASCII digits, by base: an optional sign, the base's own
-     * optional prefix, then digits (Python also takes non-ASCII digits, which are refused here). */
+    /** Python's {@code int(text, base)} by base, after {@link #asciiDigits}: an optional sign, the base's own
+     * optional prefix, then digits. */
     private static final Map<Integer, java.util.regex.Pattern> PY_INT_RE = Map.of(
             2, java.util.regex.Pattern.compile("^" + PY_SPACE + "([-+]?)(?:0[bB])?([01]+)" + PY_SPACE + "$"),
             8, java.util.regex.Pattern.compile("^" + PY_SPACE + "([-+]?)(?:0[oO])?([0-7]+)" + PY_SPACE + "$"),
             10, java.util.regex.Pattern.compile("^" + PY_SPACE + "([-+]?)([0-9]+)" + PY_SPACE + "$"),
             16, java.util.regex.Pattern.compile("^" + PY_SPACE + "([-+]?)(?:0[xX])?([0-9a-fA-F]+)" + PY_SPACE + "$"));
 
-    /** Python's {@code float(text)} over ASCII digits: decimal with an optional exponent, {@code inf},
+    /** Python's {@code float(text)}, after {@link #asciiDigits}: decimal with an optional exponent, {@code inf},
      * {@code infinity} or {@code nan}, any case, after an optional sign. */
     private static final java.util.regex.Pattern PY_FLOAT_RE = java.util.regex.Pattern.compile(
             "^" + PY_SPACE + "([-+]?)(?:((?:[0-9]+\\.?[0-9]*|\\.[0-9]+)(?:e[-+]?[0-9]+)?)|(inf|infinity)|(nan))" + PY_SPACE + "$",
             java.util.regex.Pattern.CASE_INSENSITIVE);
 
+    /** {@code text} with each Unicode decimal digit ({@code ١}, {@code １}, {@code 𝟏}) written as its ASCII digit, as
+     * Python's {@code int()} and {@code float()} read it first; other characters, {@code ²} among them, are kept. */
+    private static String asciiDigits(String text) {
+        StringBuilder out = new StringBuilder(text.length());
+        text.codePoints().forEach(cp -> {
+            if (Character.getType(cp) == Character.DECIMAL_DIGIT_NUMBER) {
+                out.append((char) ('0' + Character.digit(cp, 10)));
+            } else {
+                out.appendCodePoint(cp);
+            }
+        });
+        return out.toString();
+    }
+
     private static BigInteger pythonInt(String text, int base) {
-        java.util.regex.Matcher m = PY_INT_RE.get(base).matcher(text);
+        java.util.regex.Matcher m = PY_INT_RE.get(base).matcher(asciiDigits(text));
         if (!m.matches()) {
             throw new IllegalArgumentException("invalid literal for int() with base " + base + ": " + pyRepr(text));
         }
@@ -325,7 +353,7 @@ public final class Readiness {
     }
 
     private static double pythonFloat(String text) {
-        java.util.regex.Matcher m = PY_FLOAT_RE.matcher(text);
+        java.util.regex.Matcher m = PY_FLOAT_RE.matcher(asciiDigits(text));
         if (!m.matches()) {
             throw new IllegalArgumentException("could not convert string to float: " + pyRepr(text));
         }
@@ -445,8 +473,10 @@ public final class Readiness {
                 return null;
             }
             if (tag.equals(Tag.TIMESTAMP)) {
-                // A date construct_yaml_timestamp cannot build stays text, as load_untrusted_yaml keeps it.
-                return isPyyamlCalendarTimestamp(text) ? new PyyamlTimestamp(text) : pythonizeTimestamp(text);
+                // A date construct_yaml_timestamp cannot build stays text, as load_untrusted_yaml keeps it; its regex
+                // ends in `$`, so a `! |` block's trailing newline is not part of the date.
+                String stamp = implicit ? withoutTrailingNewline(text) : text;
+                return isPyyamlCalendarTimestamp(stamp) ? new PyyamlTimestamp(stamp) : pythonizeTimestamp(text);
             }
             String lower = text.toLowerCase(Locale.ROOT);
             if (tag.equals(Tag.BOOL)) {
@@ -457,11 +487,12 @@ public final class Readiness {
             }
             if (implicit) {
                 // SnakeYAML's int/float resolution differs from PyYAML's; its null/bool/timestamp agree.
-                if (couldBeNumeric(text)) {
-                    if (PYYAML_INT_RESOLVE_RE.matcher(text).matches()) {
+                String resolved = withoutTrailingNewline(text);
+                if (couldBeNumeric(resolved)) {
+                    if (PYYAML_INT_RESOLVE_RE.matcher(resolved).matches()) {
                         return pyyamlConstructInt(text);
                     }
-                    if (PYYAML_FLOAT_RESOLVE_RE.matcher(text).matches()) {
+                    if (PYYAML_FLOAT_RESOLVE_RE.matcher(resolved).matches()) {
                         return pyyamlConstructFloat(text);
                     }
                 }
@@ -486,11 +517,21 @@ public final class Readiness {
         if (node instanceof MappingNode map) {
             Map<String, Object> out = new LinkedHashMap<>();
             for (NodeTuple tuple : flattenMapping(map)) {
-                out.put(String.valueOf(composeValue(tuple.getKeyNode())), composeValue(tuple.getValueNode()));
+                out.put(String.valueOf(composeValue(scalarKey(tuple))), composeValue(tuple.getValueNode()));
             }
             return out;
         }
         throw new IllegalStateException("unsupported YAML node: " + node.getNodeId());
+    }
+
+    /** {@code tuple}'s key node, refused unless it is a scalar: PyYAML cannot hash a sequence or mapping key (written
+     * {@code [a]: 1}, {@code ? [a]}, or as an alias to one), where SnakeYAML would read it as its text. */
+    private static Node scalarKey(NodeTuple tuple) {
+        Node key = tuple.getKeyNode();
+        if (!(key instanceof ScalarNode)) {
+            throw new IllegalArgumentException("while constructing a mapping: found unhashable key");
+        }
+        return key;
     }
 
     /** PyYAML's own {@code flatten_mapping} ({@code yaml/constructor.py}), ported at the {@link Node}
@@ -758,9 +799,16 @@ public final class Readiness {
             }
         } else if (node instanceof MappingNode map) {
             Set<String> seen = new HashSet<>();
+            boolean merged = false;
             for (NodeTuple tuple : map.getValue()) {
-                if (!Tag.MERGE.equals(pyyamlTag(tuple.getKeyNode()))) {
-                    String k = String.valueOf(composeValue(tuple.getKeyNode()));
+                if (Tag.MERGE.equals(pyyamlTag(tuple.getKeyNode()))) {
+                    // `<<` is a key too: which of two merges wins is never read (18.184k D1).
+                    if (merged) {
+                        throw new IllegalArgumentException("found the merge key '<<' twice");
+                    }
+                    merged = true;
+                } else {
+                    String k = String.valueOf(composeValue(scalarKey(tuple)));
                     if (!seen.add(k)) {
                         throw new IllegalArgumentException("found the key " + k + " twice");
                     }
