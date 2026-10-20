@@ -7,7 +7,13 @@
  */
 
 import { lstatSync, readFileSync, statSync } from "node:fs";
-import { DEFAULT_SCHEMA, FAILSAFE_SCHEMA, Type as YamlType, load as yamlLoad } from "js-yaml";
+import {
+  DEFAULT_SCHEMA,
+  FAILSAFE_SCHEMA,
+  YAMLException,
+  Type as YamlType,
+  load as yamlLoad,
+} from "js-yaml";
 import { InputError } from "./errors";
 import { byteCompare, decodeUtf8Strict, joinPath, normalizePosixPath, pyRepr, pyStr } from "./util";
 
@@ -192,7 +198,7 @@ const PY_SPACE =
 /** Python's `int(text, base)` over ASCII digits: an optional sign, the base's own optional prefix,
  * then digits. `undefined` where Python raises `ValueError` (it also takes non-ASCII digits, which
  * are refused here). */
-const PY_INT_RE: Record<number, RegExp> = {
+const PY_INT_RE: Record<2 | 8 | 10 | 16, RegExp> = {
   2: new RegExp(`^${PY_SPACE}([-+]?)(?:0[bB])?([01]+)${PY_SPACE}$`),
   8: new RegExp(`^${PY_SPACE}([-+]?)(?:0[oO])?([0-7]+)${PY_SPACE}$`),
   10: new RegExp(`^${PY_SPACE}([-+]?)([0-9]+)${PY_SPACE}$`),
@@ -200,8 +206,8 @@ const PY_INT_RE: Record<number, RegExp> = {
 };
 
 function pythonInt(text: string, base: 2 | 8 | 10 | 16): number | undefined {
-  const m = PY_INT_RE[base]?.exec(text);
-  if (m === null || m === undefined) {
+  const m = PY_INT_RE[base].exec(text);
+  if (m === null) {
     return undefined;
   }
   const n = Number.parseInt(m[2] ?? "", base);
@@ -340,13 +346,12 @@ const PYYAML_EXPLICIT_SCALAR_TYPES = [
   }),
   new YamlType("tag:yaml.org,2002:int", {
     kind: "scalar",
-    resolve: (data: unknown) => typeof data === "string" && pyyamlConstructInt(data) !== undefined,
+    resolve: (data: unknown) => typeof data === "string",
     construct: (data: string) => constructed(pyyamlConstructInt(data), data, "int"),
   }),
   new YamlType("tag:yaml.org,2002:float", {
     kind: "scalar",
-    resolve: (data: unknown) =>
-      typeof data === "string" && pyyamlConstructFloat(data) !== undefined,
+    resolve: (data: unknown) => typeof data === "string",
     construct: (data: string) => constructed(pyyamlConstructFloat(data), data, "float"),
   }),
   new YamlType("tag:yaml.org,2002:timestamp", {
@@ -425,8 +430,8 @@ export const PYYAML_SAFE_SCHEMA = FAILSAFE_SCHEMA.extend({
  * `str(date)`/`str(datetime)` rendering, given a {@link PyyamlTimestamp} marker's raw text -- never a
  * plain string, which {@link normalizeDeviationDates} passes through completely unchanged. Performs
  * **no range validation**: an out-of-range field renders anyway (a syntactically-plausible but
- * semantically invalid string); {@link parseDate} is the one place both a quoted and a
- * pythonized-unquoted value are range-checked, so both fail exactly the same way. */
+ * semantically invalid string, which the loader keeps as text); {@link parseDate} range-checks a
+ * quoted and a pythonized-unquoted value alike. */
 export function pythonizeTimestamp(raw: string): string {
   const m = PYYAML_TIMESTAMP_FIELDS_RE.exec(raw);
   if (m === null || m.groups === undefined) {
@@ -486,6 +491,18 @@ export function normalizeDeviationDates(
   });
 }
 
+/** `text` read with {@link PYYAML_SAFE_SCHEMA}: every load with that schema goes through here, so a `<<`
+ * read as a value is refused as SafeLoader refuses it. `json` keeps the last of a repeated key. */
+export function pyyamlLoad(text: string, json = true): unknown {
+  const data = yamlLoad(text, { schema: PYYAML_SAFE_SCHEMA, json });
+  if (holdsMergeValue(data)) {
+    throw new YAMLException(
+      "could not determine a constructor for the tag 'tag:yaml.org,2002:merge'",
+    );
+  }
+  return data;
+}
+
 /** The YAML at `path` as Python's `load_untrusted_yaml` reads it (PyYAML's `SafeLoader` typing, PYYAML_SAFE_SCHEMA),
  * refusing a file that is not UTF-8, nests too deeply, or carries YAML it cannot load under `key`. With `uniqueKeys`, a
  * mapping that writes one key twice is refused too (js-yaml's own duplicate-key error); without it the last value wins,
@@ -506,11 +523,7 @@ export function loadPyyaml(path: string, key: string, what: string, uniqueKeys =
     );
   }
   try {
-    const data = yamlLoad(text, { schema: PYYAML_SAFE_SCHEMA, json: !uniqueKeys });
-    if (holdsMergeValue(data)) {
-      throw new Error("could not determine a constructor for the tag 'tag:yaml.org,2002:merge'");
-    }
-    return data;
+    return pyyamlLoad(text, !uniqueKeys);
   } catch (error) {
     if (error instanceof RangeError || /exceeded maxDepth/.test((error as Error).message)) {
       // js-yaml caps nesting (and recurses per level), as PyYAML's composer hits its RecursionError.

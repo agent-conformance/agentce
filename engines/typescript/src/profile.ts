@@ -9,8 +9,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { load } from "js-yaml";
-import { PYYAML_SAFE_SCHEMA, isPyyamlTimestamp, pythonizeTimestamp } from "./readiness";
+import { isPyyamlTimestamp, pythonizeTimestamp, pyyamlLoad } from "./readiness";
 import { pyStr } from "./util";
 
 export interface EvidenceSource {
@@ -132,7 +131,7 @@ export function profileFromDict(data: Record<string, unknown>): Profile {
 
 export function loadProfile(path: string): Profile {
   // PyYAML's SafeLoader resolution (YAML 1.1): `0o17` and `1e10` stay strings, as Python reads them.
-  const data = load(readFileSync(path, "utf-8"), { schema: PYYAML_SAFE_SCHEMA });
+  const data = pyyamlLoad(readFileSync(path, "utf-8"));
   if (!isRecord(data)) {
     return { profileVersion: 1, observationWindow: {}, subjects: [], catalogs: [] };
   }

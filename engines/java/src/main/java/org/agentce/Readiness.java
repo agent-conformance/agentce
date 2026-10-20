@@ -645,8 +645,8 @@ public final class Readiness {
      * own {@code str(date)}/{@code str(datetime)} rendering, given a {@link PyyamlTimestamp} marker's
      * raw text -- never a plain string, which {@link #normalizeDeviationDates} passes through
      * completely unchanged. Performs <b>no range validation</b>: an out-of-range field renders anyway;
-     * {@link #parseDate} is the one place both a quoted and a pythonized-unquoted value are
-     * range-checked, so both fail exactly the same way. */
+     * the loader keeps a date no calendar holds as text, and {@link #parseDate} range-checks a quoted
+     * and a pythonized-unquoted value alike. */
     public static String pythonizeTimestamp(String raw) {
         java.util.regex.Matcher m = PYYAML_TIMESTAMP_FIELDS_RE.matcher(raw);
         if (!m.matches()) {
