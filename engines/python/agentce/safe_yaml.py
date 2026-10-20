@@ -66,6 +66,33 @@ class _PermissiveTimestampSafeLoader(yaml.SafeLoader):
             raise _construction_error(node, exc) from exc
 
 
+class _UniqueKeySafeLoader(_PermissiveTimestampSafeLoader):
+    """The loader above, refusing a mapping that writes one key twice, where ``SafeLoader`` keeps the last value. A
+    key a ``<<`` merge brings in may still be written again, as PyYAML's ``flatten_mapping`` allows."""
+
+    def construct_mapping(
+        self, node: yaml.MappingNode, deep: bool = False
+    ) -> dict[Any, Any]:
+        seen: set[Any] = set()
+        for key_node, _ in node.value:
+            if key_node.tag == "tag:yaml.org,2002:merge":
+                continue
+            key = self.construct_object(key_node, deep=deep)
+            try:
+                repeated = key in seen
+            except TypeError:
+                break  # an unhashable key: SafeLoader's own construct_mapping refuses it
+            if repeated:
+                raise yaml.constructor.ConstructorError(
+                    "while constructing a mapping",
+                    node.start_mark,
+                    f"found the key {key!r} twice",
+                    key_node.start_mark,
+                )
+            seen.add(key)
+        return super().construct_mapping(node, deep=deep)
+
+
 def _construction_error(
     node: yaml.Node, exc: Exception
 ) -> yaml.constructor.ConstructorError:
@@ -122,11 +149,19 @@ def _pythonize_timestamp(raw: str) -> str:
     return out
 
 
-def load_untrusted_yaml(path: Path, *, key: str, what: str) -> Any:
-    """Load and return the YAML at ``path``, refusing hazards under the ``input.*`` ``key``."""
+def load_untrusted_yaml(
+    path: Path, *, key: str, what: str, unique_keys: bool = False
+) -> Any:
+    """Load and return the YAML at ``path``, refusing hazards under the ``input.*`` ``key``; with ``unique_keys``,
+    a mapping that writes one key twice is refused too."""
     try:
         text = path.read_text(encoding="utf-8")
-        return yaml.load(text, Loader=_PermissiveTimestampSafeLoader)
+        return yaml.load(
+            text,
+            Loader=_UniqueKeySafeLoader
+            if unique_keys
+            else _PermissiveTimestampSafeLoader,
+        )
     except yaml.YAMLError as exc:
         raise InputError(
             key,

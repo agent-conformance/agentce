@@ -10,6 +10,7 @@ valid (an empty binding).
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -63,14 +64,14 @@ def token_count(value: Any) -> int | None:
 
 
 def _limit(dimension: str, value: Any) -> int | float | None:
-    """A declared budget limit: a non-negative number, a whole one for tokens; anything else is None, a limit
-    no usage can be shown to stay within."""
+    """A declared budget limit: a finite non-negative number, a whole one for tokens; anything else (inf and nan
+    included) is None, a limit no usage can be shown to stay within."""
     if dimension == "tokens":
         limit = whole_number(value)
         return limit if limit is not None and limit <= MAX_COUNT else None
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
-    return value if value >= 0 else None
+    return value if math.isfinite(value) and value >= 0 else None
 
 
 def _budgets(value: Any) -> tuple[tuple[str, int | float | None], ...]:
@@ -180,7 +181,10 @@ class DomainBinding:
     def load(cls, path: Path) -> DomainBinding:
         data = (
             load_untrusted_yaml(
-                path, key="input.domain_binding_invalid", what="the domain binding"
+                path,
+                key="input.domain_binding_invalid",
+                what="the domain binding",
+                unique_keys=True,
             )
             or {}
         )

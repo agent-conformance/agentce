@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agentce.domain import CONTEXT_ROOT, DECISION_ROOT, DomainBinding
+import pytest
+
+from agentce.domain import CONTEXT_ROOT, DECISION_ROOT, DomainBinding, TaskScope
+from agentce.errors import InputError
 
 
 def test_empty_binding() -> None:
@@ -147,3 +150,80 @@ def test_task_scope_budgets() -> None:
     )
     assert binding.task_scopes["c"][0].budgets == (("tokens", None), ("spend", None))
     assert binding.task_scopes["d"][0].budgets == ()
+
+
+def _scope_from_yaml(tmp_path: Path, scope: str) -> TaskScope:
+    path = tmp_path / "domain.yaml"
+    path.write_text(f"task_scopes:\n  - {{task_type: a, {scope}}}\n", encoding="utf-8")
+    return DomainBinding.load(path).task_scopes["a"][0]
+
+
+@pytest.mark.parametrize("value", [".inf", "-.inf", ".nan"])
+@pytest.mark.parametrize("dimension", ["spend", "compute_seconds", "tokens"])
+def test_non_finite_budget_limit_is_unreadable(
+    tmp_path: Path, dimension: str, value: str
+) -> None:
+    """A non-finite limit is unreadable in every dimension (18.184g): never a limit nothing exceeds."""
+    scope = _scope_from_yaml(tmp_path, f"budgets: {{{dimension}: {value}}}")
+    assert scope.budgets == ((dimension, None),)
+
+
+@pytest.mark.parametrize(
+    ("value", "limit"),
+    [
+        ("10", 10),
+        ("1_0", 10),
+        ("010", 8),
+        ("0x10", 16),
+        ("1e1", None),
+        ('"1e1"', None),
+        ("2.5", 2.5),
+    ],
+)
+def test_budget_limit_spellings_read_as_pyyaml_types_them(
+    tmp_path: Path, value: str, limit: float | None
+) -> None:
+    """YAML 1.1 number spellings (18.184g): 1e1 without a dot is a string to PyYAML, so the limit is unreadable."""
+    assert _scope_from_yaml(tmp_path, f"budgets: {{spend: {value}}}").budgets == (
+        ("spend", limit),
+    )
+
+
+def test_allowed_tools_yaml11_booleans_are_not_tool_names(tmp_path: Path) -> None:
+    """[yes, on, off] are booleans to PyYAML and name no tool; quoted they are names (18.184g)."""
+    assert (
+        _scope_from_yaml(tmp_path, "allowed_tools: [yes, on, off]").allowed_tools
+        == frozenset()
+    )
+    assert _scope_from_yaml(
+        tmp_path, 'allowed_tools: ["yes"]'
+    ).allowed_tools == frozenset({"yes"})
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        'task_scopes:\n  - {task_type: a, allowed_tools: ["x"], allowed_tools: ["y"]}\n',
+        "task_scopes:\n  - {task_type: a, budgets: {spend: 1, spend: 2}}\n",
+        "task_scopes: []\ntask_scopes: []\n",
+    ],
+)
+def test_repeated_key_is_refused(tmp_path: Path, text: str) -> None:
+    """A key written twice, at any depth, is refused with one stable key, never the last value (18.184g)."""
+    path = tmp_path / "domain.yaml"
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(InputError) as caught:
+        DomainBinding.load(path)
+    assert caught.value.key == "input.domain_binding_invalid"
+
+
+def test_merge_key_may_be_written_again(tmp_path: Path) -> None:
+    """A key a << merge brings in may be set again, as PyYAML allows (18.184g)."""
+    path = tmp_path / "domain.yaml"
+    path.write_text(
+        "base: &b {task_type: a, allowed_tools: [x]}\ntask_scopes:\n  - {<<: *b, allowed_tools: [y]}\n",
+        encoding="utf-8",
+    )
+    assert DomainBinding.load(path).task_scopes["a"][0].allowed_tools == frozenset(
+        {"y"}
+    )
