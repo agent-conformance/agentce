@@ -471,9 +471,10 @@ public final class Readiness {
     }
 
     /** {@code value} (a plain {@link String}/{@link Boolean}/{@link BigInteger}/{@link Double}/{@code
-     * null}/{@link List}/{@link Map}, per {@link #composeValue}) rendered as a {@link JsonNode}. Called
-     * only after {@link #normalizeDeviationDates} has rewritten every {@link PyyamlTimestamp} marker to
-     * a plain string, so no marker ever reaches this method. */
+     * null}/{@link List}/{@link Map}/{@link PyyamlTimestamp}, per {@link #composeValue}) rendered as a
+     * {@link JsonNode}. A timestamp becomes a POJO node holding Python's {@code str(date)}: like PyYAML's
+     * {@code date} it is neither text nor a number to {@code isTextual}/{@code isNumber}, and {@code asText}
+     * renders it as Python's {@code str} does (a mapping key the same way). */
     static JsonNode toJsonNode(Object value) {
         JsonNodeFactory f = Json.nodes();
         if (value == null) {
@@ -491,6 +492,9 @@ public final class Readiness {
         if (value instanceof Double d) {
             return f.numberNode(d);
         }
+        if (value instanceof PyyamlTimestamp ts) {
+            return f.pojoNode(pythonizeTimestamp(ts.text()));
+        }
         if (value instanceof List<?> list) {
             ArrayNode arr = f.arrayNode();
             for (Object v : list) {
@@ -501,7 +505,10 @@ public final class Readiness {
         if (value instanceof Map<?, ?> map) {
             ObjectNode obj = f.objectNode();
             for (Map.Entry<?, ?> e : map.entrySet()) {
-                obj.set(String.valueOf(e.getKey()), toJsonNode(e.getValue()));
+                Object k = e.getKey();
+                obj.set(
+                        k instanceof PyyamlTimestamp ts ? pythonizeTimestamp(ts.text()) : String.valueOf(k),
+                        toJsonNode(e.getValue()));
             }
             return obj;
         }

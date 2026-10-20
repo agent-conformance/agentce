@@ -156,4 +156,36 @@ class DomainBindingTest {
                 "base: &b {task_type: a, allowed_tools: [x]}\ntask_scopes:\n  - {<<: *b, allowed_tools: [y]}\n");
         assertEquals(Set.of("y"), binding.taskScopes.get("a").get(0).allowedTools());
     }
+
+    @Test
+    void yamlDatesReadAsPyyamlDatesNeitherTextNorNumber() throws IOException {
+        DomainBinding top = loadText("reviewed: 2026-01-01\ntask_scopes:\n  - {task_type: a, allowed_tools: [x]}\n");
+        assertEquals(Set.of("x"), top.taskScopes.get("a").get(0).allowedTools());
+        assertEquals(Set.of("x"), scopeFromYaml("allowed_tools: [2026-01-01, x]").allowedTools());
+        assertEquals(
+                List.of(new DomainBinding.Budget("tokens", null), new DomainBinding.Budget("spend", null)),
+                scopeFromYaml("budgets: {tokens: 2020-01-01, spend: 2026-01-01T10:00:00}").budgets());
+        assertEquals(
+                List.of(
+                        new DomainBinding.Budget("tokens", null),
+                        new DomainBinding.Budget("compute_seconds", null),
+                        new DomainBinding.Budget("spend", null)),
+                scopeFromYaml("budgets: 2026-01-01").budgets());
+        DomainBinding taskType = loadText("task_scopes:\n  - {task_type: 2026-01-01}\n  - 2026-01-01\n");
+        assertTrue(taskType.taskScopes.isEmpty() && taskType.taskScopesMalformed);
+        assertTrue(loadText("2026-01-01\n").taskScopes.isEmpty());
+        DomainBinding ids = loadText("decision_types:\n  - {id: 2026-01-01, subclass_of: 2026-01-02T03:04:05Z,"
+                + " required_oversight_modality: 2026-01-03}\ncontext_classes:\n  - {id: 2026-01-01 10:00:00}\n");
+        assertEquals("2026-01-02 03:04:05+00:00", ids.subclasses.get("2026-01-01"));
+        assertEquals(DomainBinding.CONTEXT_ROOT, ids.subclasses.get("2026-01-01 10:00:00"));
+        assertTrue(ids.requiredOversight.isEmpty());
+    }
+
+    @Test
+    void limitPastFloatRangeIsUnreadable() throws IOException {
+        String huge = "9".repeat(400);
+        assertEquals(
+                List.of(new DomainBinding.Budget("compute_seconds", null), new DomainBinding.Budget("spend", null)),
+                scopeFromYaml("budgets: {spend: " + huge + ", compute_seconds: " + huge + "}").budgets());
+    }
 }
