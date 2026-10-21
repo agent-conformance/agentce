@@ -266,6 +266,20 @@ def test_explicit_core_tags_stay_readable(tmp_path: Path) -> None:
     assert any(c.id == "DAT-01" for c in load_catalog(directory).controls)
 
 
+def test_a_mapping_merged_after_its_own_merge_is_read() -> None:
+    """A source is checked for repeated keys before it is flattened, so a mapping that merged another and is merged in
+    turn is not read as writing the merged key twice (18.184o)."""
+    from agentce.safe_yaml import load_catalog_yaml
+
+    text = "b: &b {m: 1}\na: &a {<<: *b, m: 2}\nc: {<<: *a}\nd: {<<: [*a, *b]}\n"
+    assert load_catalog_yaml(text) == {
+        "b": {"m": 1},
+        "a": {"m": 2},
+        "c": {"m": 2},
+        "d": {"m": 2},
+    }
+
+
 def test_the_other_loaders_keep_the_safe_loader_tags() -> None:
     """Only the catalog loader drops the four constructors; the domain binding's loader (census line 95) is as it was."""
     from agentce.safe_yaml import _UniqueKeySafeLoader
