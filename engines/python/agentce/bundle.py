@@ -109,7 +109,12 @@ def confine_to_root(root: Path, rel: str) -> Path | None:
         return None
     if _meets_symlink_loop(resolved):
         return None
-    if resolved != resolved_root and not resolved.is_relative_to(resolved_root):
+    if (
+        resolved != resolved_root
+        and not resolved.is_relative_to(resolved_root)
+        # The same folder spelled another way (letter case), judged by identity (18.184l).
+        and not signing.inside_folder(resolved_root, resolved, or_root=True)
+    ):
         return None
     return candidate
 

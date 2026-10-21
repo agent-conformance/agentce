@@ -150,13 +150,31 @@ public final class Bundle {
                 return null;
             }
             Path inside = Path.of(resolved);
-            if (!inside.equals(resolvedRoot) && !inside.startsWith(resolvedRoot)) {
+            if (!inside.equals(resolvedRoot) && !inside.startsWith(resolvedRoot)
+                    // The same folder spelled another way (letter case), judged by identity (18.184l).
+                    && !underByIdentity(resolvedRoot, inside)) {
                 return null;
             }
             return candidate;
         } catch (IOException | RuntimeException e) {
             return null; // fail closed: anything unresolvable is unsafe.
         }
+    }
+
+    /** Whether the already resolved {@code path} is {@code root} or lies under it by folder identity:
+     * {@code path} or one of its existing ancestors is the same file as {@code root}; a folder that is
+     * not there is never {@code root} (18.184l). */
+    static boolean underByIdentity(Path root, Path path) {
+        for (Path at = path; at != null; at = at.getParent()) {
+            try {
+                if (Files.isSameFile(at, root)) {
+                    return true;
+                }
+            } catch (IOException | RuntimeException e) {
+                // not there, or cannot be looked at: never the root
+            }
+        }
+        return false;
     }
 
     /**

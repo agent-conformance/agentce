@@ -326,6 +326,7 @@ def scan(
         out = exclude.resolve()
         stale = out / BUNDLE_DIR
         skip.append(stale)
+        collides = inside_and_used = False
         try:
             collides = (
                 _within(folder, stale)
@@ -348,11 +349,20 @@ def scan(
                 )
             )
         except PermissionError as exc:  # unreachable, on every Python (18.169)
-            raise InputError(
-                OUT_DIR.key,
-                f"{OUT_DIR.flag} {str(exclude)!r} {UNREACHABLE}.",
-                OUT_DIR.fix,
-            ) from exc
+            # Inside the records folder and not enterable: unless it lists as empty, it cannot be
+            # shown to hold only a previous run's output, so it is the more specific collision
+            # (inbox row 421).
+            if _within(out, folder) and not _same(out, folder):
+                try:
+                    inside_and_used = any(out.iterdir())
+                except OSError:
+                    inside_and_used = True
+            if not inside_and_used:
+                raise InputError(
+                    OUT_DIR.key,
+                    f"{OUT_DIR.flag} {str(exclude)!r} {UNREACHABLE}.",
+                    OUT_DIR.fix,
+                ) from exc
         if collides:
             raise InputError(
                 "input.records_out_collides",

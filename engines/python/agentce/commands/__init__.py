@@ -1518,6 +1518,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             raw_catalog_dirs,
             deviations_path,
         )
+        _refuse_package_links_out(out_dir)
     if scanned is not None:
         scanned.write(out_dir, write_profile=derived_profile)
         limitations.append(RECORDS_LIMITATION)
@@ -2171,6 +2172,30 @@ def _check_package_path_overlap(
             )
 
 
+def _refuse_package_links_out(out_dir: Path) -> None:
+    """Refuse (``input.package_link_outside``) before anything is written when an entry under ``--out``
+    is a link leading outside it (ruling R7): the package is the folder handed over, and packaging
+    would write through the link. Links are found without following them and judged by where they
+    point, so a link to something missing outside is refused too. A link planted after this check is
+    the out-write family's (18.184), not closed here."""
+    if not signing.is_directory(out_dir):
+        return
+    for top, dirs, files in os.walk(out_dir, followlinks=False):
+        for name in sorted([*dirs, *files]):
+            entry = Path(top) / name
+            if os.path.islink(entry) and not signing.inside_folder(
+                out_dir, entry, or_root=True
+            ):
+                rel = entry.relative_to(out_dir).as_posix()
+                entry_key = MESSAGE_KEYS["input.package_link_outside"]
+                raise InputError(
+                    "input.package_link_outside",
+                    f"--package-for-sharing: {rel} in --out links outside the output folder, so "
+                    "the package would not hold it.",
+                    entry_key.fix,
+                )
+
+
 def _resolve_catalogs(
     requested: str | None,
     profile: Profile,
@@ -2690,9 +2715,9 @@ def _reject_inside_catalog(
     """Raise ``InputError(key)`` if `value` resolves inside `catalog_dir` -- an operator-supplied path
     for something that must live outside the catalog it's paired with (a support matrix, a signing
     key, a trust root)."""
-    # `os.path.realpath`, not `Path.resolve`: on 3.12 resolve raises RuntimeError on a link loop, where
-    # 3.13 and later return the path; the caller's own check then refuses the loop (18.179).
-    if Path(os.path.realpath(value)).is_relative_to(catalog_dir):
+    # By folder identity, whatever the spelling (census line 56); a loop is left to the caller's own
+    # check (18.179).
+    if signing.inside_folder(catalog_dir, Path(value), or_root=True):
         raise InputError(
             key,
             f"{flag} {value!r} resolves inside the catalog directory {shown_dir}.",
@@ -3636,9 +3661,10 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
             "fix the lint problems (`agentce catalog lint <dir>`) before signing.",
         )
     assert linted.files is not None
-    if linted.files.links_out:
-        # The catalog signed is the folder handed over (18.181): never sign bytes kept elsewhere.
-        raise link_outside(min(linted.files.links_out))
+    if linted.files.outside:
+        # The catalog signed is the folder handed over (18.181): never sign bytes kept elsewhere,
+        # whether a file or a folder on the way is the link (inbox row 397).
+        raise link_outside(min(linted.files.outside))
     check_output(str(directory), CATALOG_SIGN_DIR)
     sig_path = check_output(
         str(directory / signing.CATALOG_SIGNATURE_NAME), CATALOG_SIGN_FILE
@@ -3886,7 +3912,7 @@ def _declaration_path(project: Path, name: str) -> Path:
     )
 
 
-def _doctor_unreadable(key: str, what: str, exc: PermissionError) -> dict[str, str]:
+def _doctor_unreadable(key: str, what: str, exc: OSError) -> dict[str, str]:
     """doctor's problem for a declaration or bundle it cannot reach: named as unreadable, never as
     missing, with one answer on every Python (18.169)."""
     return _doctor_problem(
@@ -3941,8 +3967,27 @@ def cmd_doctor(ns: argparse.Namespace) -> CommandResult:
         else:
             from ..tools.validate_profile import validate_profile
 
-            profile_data = yaml.safe_load(profile_path.read_text("utf-8")) or {}
-            for problem in validate_profile(profile_data):
+            # assess's reader (18.184l): unreadable, not UTF-8 or not YAML is a named problem, never a crash.
+            try:
+                profile_data = (
+                    load_untrusted_yaml(
+                        profile_path,
+                        key="input.profile_invalid",
+                        what="the applicability profile",
+                    )
+                    or {}
+                )
+            except OSError as exc:
+                problems.append(
+                    _doctor_unreadable("input.profile_unreadable", PROFILE_FILE, exc)
+                )
+                profile_data = None
+            except InputError as exc:
+                problems.append(_doctor_problem(exc.key, exc.cause, exc.fix))
+                profile_data = None
+            for problem in (
+                validate_profile(profile_data) if profile_data is not None else []
+            ):
                 problems.append(
                     _doctor_problem(
                         "schema_invalid",
@@ -3952,9 +3997,14 @@ def cmd_doctor(ns: argparse.Namespace) -> CommandResult:
                 )
             declared_sources = {
                 str(source.get("source"))
-                for subject in profile_data.get("subjects", [])
-                for source in subject.get("evidence_sources", [])
-                if source.get("source")
+                for subject in (
+                    profile_data.get("subjects", [])
+                    if isinstance(profile_data, dict)
+                    else []
+                )
+                if isinstance(subject, dict)
+                for source in subject.get("evidence_sources", None) or []
+                if isinstance(source, dict) and source.get("source")
             }
 
     bundle_dir = project / "evidence"

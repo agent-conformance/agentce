@@ -668,10 +668,10 @@ def _lint_loaded(
     meta = _yaml_mapping(files, "catalog.yaml")
     if require_provenance:
         # A catalog published with provenance is the folder handed over: a file linked from outside
-        # it would not travel with it (18.181).
+        # it, or reached through a linked folder, would not travel with it (18.181, inbox row 397).
         problems.extend(
             f"catalog.link_outside: {link_outside(rel).cause}"
-            for rel in sorted(files.links_out)
+            for rel in sorted(files.outside)
         )
         problems.extend(_provenance_problems(files, meta))
     floor = meta.get("min_crosswalk_frameworks", 0)

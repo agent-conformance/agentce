@@ -78,6 +78,30 @@ export function insideFolder(root: string, path: string): boolean {
   return false;
 }
 
+/** Whether the already resolved `path` is `root` or lies under it by folder identity: `path` or one
+ * of its existing ancestors has `root`'s device and inode; a folder that is not there is never `root`
+ * (18.184l: the same folder spelled in another letter case). */
+export function underByIdentity(root: string, path: string): boolean {
+  let rootId: string;
+  try {
+    rootId = folderIdentity(root);
+  } catch {
+    return false;
+  }
+  for (let at = path; ; at = dirname(at)) {
+    try {
+      if (folderIdentity(at) === rootId) {
+        return true;
+      }
+    } catch {
+      // not there, or cannot be looked at: never the root
+    }
+    if (dirname(at) === at) {
+      return false;
+    }
+  }
+}
+
 /** Whether `path`, following links, is a folder: a missing target or a link loop is not, and any
  * other error (a parent that cannot be entered) propagates, as Python's `signing.is_directory`. */
 export function isDirFollowingLinks(path: string): boolean {

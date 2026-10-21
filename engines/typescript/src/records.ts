@@ -456,6 +456,16 @@ function realId(event: Event): string | undefined {
   return typeof id === "string" ? id : undefined;
 }
 
+/** Whether the folder `out` holds any entry; one that cannot be listed counts as holding some, since
+ * it cannot be shown to hold only a previous run's output (inbox row 421, Python's `scan`). */
+function holdsEntries(out: string): boolean {
+  try {
+    return readdirSync(out).length > 0;
+  } catch {
+    return true;
+  }
+}
+
 /** Read every recognised trace export under `folder`; refuse a folder with none (Python's `scan`). */
 export function scanRecords(folderArg: string, options: ScanOptions = {}): ScannedRecords {
   const folder = realpathSync.native(folderArg);
@@ -476,10 +486,7 @@ export function scanRecords(folderArg: string, options: ScanOptions = {}): Scann
       );
     }
     if (within(out, folder)) {
-      if (
-        same(out, folder) ||
-        (statOrNull(out) !== null && !isDir(stale) && readdirSync(out).length > 0)
-      ) {
+      if (same(out, folder) || (statOrNull(out) !== null && !isDir(stale) && holdsEntries(out))) {
         throw new InputError(
           "input.records_out_collides",
           `the output folder ${pyRepr(basename(out))} is the records folder or lies inside it and holds files that are not a previous run's output; writing there would overwrite records.`,

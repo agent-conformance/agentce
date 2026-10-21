@@ -21,6 +21,7 @@ import {
 import { isAbsolute, posix, relative, sep } from "node:path";
 import { sha256Hex } from "./canonical";
 import { InputError, isPermissionError, readPermissionError, unreadableError } from "./errors";
+import { underByIdentity } from "./report";
 import { joinPath } from "./util";
 import { parseUntrustedJson } from "./verify";
 
@@ -87,7 +88,12 @@ export function confineToRoot(root: string, rel: string): string | null {
     return null;
   }
   const inside = relative(resolvedRoot, resolved);
-  if (inside !== "" && (inside === ".." || inside.startsWith(`..${sep}`) || isAbsolute(inside))) {
+  if (
+    inside !== "" &&
+    (inside === ".." || inside.startsWith(`..${sep}`) || isAbsolute(inside)) &&
+    // The same folder spelled another way (letter case), judged by identity (18.184l).
+    !underByIdentity(resolvedRoot, resolved)
+  ) {
     return null;
   }
   return candidate;

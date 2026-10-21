@@ -381,11 +381,25 @@ def _identity(folder: Path) -> tuple[int, int]:
     return st.st_dev, st.st_ino
 
 
-def inside_folder(root: Path, path: Path) -> bool:
-    """Whether ``path``, after links, lies under ``root``. Judged by folder identity, never by path
-    spelling, which a case-insensitive filesystem allows many of (18.181)."""
-    root_id = _identity(root)
-    return any(_identity(parent) == root_id for parent in path.resolve().parents)
+def _identity_or_none(folder: Path) -> tuple[int, int] | None:
+    try:
+        return _identity(folder)
+    except OSError:
+        return None
+
+
+def inside_folder(root: Path, path: Path, *, or_root: bool = False) -> bool:
+    """Whether ``path``, after links, lies under ``root`` (or, with ``or_root``, is ``root``). Judged by
+    folder identity, never by path spelling, which a case-insensitive filesystem allows many of (18.181);
+    a folder that is not there is never ``root``, so a path not written yet is judged by its nearest
+    existing folder (18.184l). `os.path.realpath`, not `Path.resolve`: on 3.12 resolve raises
+    RuntimeError on a link loop."""
+    root_id = _identity_or_none(root)
+    if root_id is None:  # a root that cannot be looked at holds nothing (fail closed)
+        return False
+    resolved = Path(os.path.realpath(path))
+    candidates = (resolved, *resolved.parents) if or_root else resolved.parents
+    return any(_identity_or_none(folder) == root_id for folder in candidates)
 
 
 def skipped_part(part: str) -> bool:
@@ -447,9 +461,14 @@ class CatalogFiles:
 
     root: Path
     files: Mapping[str, bytes]
-    #: The covered files that are links to a file outside the catalog folder (18.181): a signed load,
-    #: ``catalog sign`` and ``catalog lint --require-provenance`` refuse them; other reads follow them.
+    #: The covered files that are links to a file outside the catalog folder (18.181): a signed load
+    #: refuses them; other reads follow them.
     links_out: frozenset[str] = frozenset()
+    #: For each covered file whose real path leaves the catalog folder, the shortest prefix of it that
+    #: is a link out: the file itself or a linked folder on the way (inbox row 397). ``catalog sign``
+    #: and ``catalog lint --require-provenance`` refuse them, since the folder handed over must hold
+    #: its own files; a signed load follows a linked folder (18.164). Always covers ``links_out``.
+    outside: frozenset[str] = frozenset()
 
     def digest(self, *, exclude: frozenset[str] = frozenset()) -> str:
         return digest_files(self.files, exclude=exclude)
@@ -494,7 +513,23 @@ def read_catalog_files(
             for rel in rels
             if os.path.islink(root / rel) and not inside_folder(root, root / rel)
         ),
+        frozenset(
+            _link_out_prefix(root, rel)
+            for rel in rels
+            if not inside_folder(root, root / rel)
+        ),
     )
+
+
+def _link_out_prefix(root: Path, rel: str) -> str:
+    """The shortest prefix of ``rel`` that is a link resolving outside ``root``: the folder or file a
+    user replaces (R4); ``rel`` itself when no single part is to blame."""
+    parts = rel.split("/")
+    for end in range(1, len(parts) + 1):
+        prefix = "/".join(parts[:end])
+        if os.path.islink(root / prefix) and not inside_folder(root, root / prefix):
+            return prefix
+    return rel
 
 
 def intoto_statement(
