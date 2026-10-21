@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 
@@ -158,8 +159,14 @@ _SEPARATORS = {
     "ps": "\u2029".encode(),
     "lone_cr": b"\r",
 }
-_NOT_JSONL = {
-    **{k: lambda r, sep=sep: r + sep + r + b"\n" for k, sep in _SEPARATORS.items()},
+
+
+def _joined_by(sep: bytes) -> Callable[[bytes], bytes]:
+    return lambda r: r + sep + r + b"\n"
+
+
+_NOT_JSONL: dict[str, Callable[[bytes], bytes]] = {
+    **{k: _joined_by(sep) for k, sep in _SEPARATORS.items()},
     "lone_cr_no_lf": lambda r: r + b"\r" + r,
     "lead_nbsp": lambda r: _NBSP + r + b"\n",
     "lead_bom": lambda r: _BOM + r + b"\n",
@@ -167,7 +174,7 @@ _NOT_JSONL = {
     "nbsp_line": lambda r: _NBSP + b"\n" + r + b"\n",
     "not_utf8": lambda r: r[:-1] + b', "x": "\xff"}\n',
 }
-_JSONL_OK = {
+_JSONL_OK: dict[str, Callable[[bytes], bytes]] = {
     "crlf": lambda r: r + b"\r\n",
     "space_tab": lambda r: b"\t " + r + b" \t\n",
     "blank_lines": lambda r: b"\n \n\r\n" + r + b"\n\n",
