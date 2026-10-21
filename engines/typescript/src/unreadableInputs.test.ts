@@ -189,3 +189,55 @@ test("conformance run's no_ml does not follow --engine to another engine's folde
     assert.equal(report.claim, "full");
   });
 });
+
+test(
+  "a corpus-manifest.json at mode 000 is refused input.corpus_unreadable (18.184h)",
+  { skip: ROOT_READS_ANYTHING },
+  () => {
+    inScratch((dir) => {
+      const corpus = join(dir, "corpus");
+      mkdirSync(corpus);
+      const manifest = join(corpus, "corpus-manifest.json");
+      writeFileSync(manifest, '{"projects": []}');
+      chmodSync(manifest, 0o000);
+      try {
+        const argv = ["conformance", "run", "--engine", join(REPO, "engines", "typescript")];
+        assert.deepEqual(refusal([...argv, "--corpus", corpus, "--out", join(dir, "o")]), {
+          exitCode: 3,
+          key: "input.corpus_unreadable",
+        });
+      } finally {
+        chmodSync(manifest, 0o600);
+      }
+    });
+  },
+);
+
+for (const text of [
+  "{x",
+  "null",
+  "[]",
+  '{"projects": 3}',
+  '{"projects": null}',
+  '{"projects": [3]}',
+]) {
+  test(`a corpus-manifest.json reading ${text} is refused input.corpus_unreadable, never a crash (18.184h)`, () => {
+    inScratch((dir) => {
+      const corpus = join(dir, "corpus");
+      mkdirSync(corpus);
+      writeFileSync(join(corpus, "corpus-manifest.json"), text);
+      const argv = ["conformance", "run", "--engine", join(REPO, "engines", "typescript")];
+      const { exitCode, envelope } = runJson([
+        ...argv,
+        "--corpus",
+        corpus,
+        "--out",
+        join(dir, "o"),
+      ]);
+      const error = envelope.error as { message_key: string; detail: string };
+      assert.equal(exitCode, 3);
+      assert.equal(error.message_key, "input.corpus_unreadable");
+      assert.match(error.detail, /corpus-manifest\.json/);
+    });
+  });
+}

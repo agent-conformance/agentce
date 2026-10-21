@@ -2834,3 +2834,116 @@ for (const extra of [[], ["--allow-unverified-catalog"]]) {
     },
   );
 }
+
+test("sign: a manifest.json linked outside the report folder gives sign.claim_outside_report (18.184h)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-sign-"));
+  try {
+    const report = signReportDir(dir);
+    const outside = join(dir, "outside");
+    mkdirSync(outside);
+    writeFileSync(join(outside, "manifest.json"), "{}");
+    rmSync(join(report, "manifest.json"));
+    symlinkSync(join(outside, "manifest.json"), join(report, "manifest.json"));
+    const claim = readFileSync(join(report, "claim.json"), "utf-8");
+    for (const args of [["--dry-run"], ["--key", join(dir, "missing.pem")]]) {
+      const { exitCode, envelope } = runJson([
+        "sign",
+        report,
+        "--as",
+        "claimant",
+        "--profile",
+        "kms",
+        ...args,
+      ]);
+      const error = envelope.error as { message_key: string; detail: string };
+      assert.equal(exitCode, 3);
+      assert.equal(error.message_key, "sign.claim_outside_report");
+      assert.match(error.detail, /manifest\.json/);
+    }
+    assert.equal(readFileSync(join(report, "claim.json"), "utf-8"), claim);
+    assert.equal(existsSync(join(report, "signatures")), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- readiness --catalog-dir is verified as assess verifies it (inbox row 354, 18.184h). ---
+
+function byoReport(work: string): string {
+  const { exitCode, out } = byoAssess(work, []);
+  assert.ok(exitCode === 0 || exitCode === 1, `assess exited ${exitCode}`);
+  return out;
+}
+
+test("readiness refuses a --catalog-dir edited after signing (18.184h)", () => {
+  withWork("agentce-byo-readiness-", (work) => {
+    const report = byoReport(work);
+    const key = catalogKey(work, "signer");
+    const dir = unsignedCatalogCopy(work, "signed-cat");
+    key.signDir(dir);
+    const verified = runJson([
+      "readiness",
+      report,
+      "--catalog-dir",
+      dir,
+      "--trust-root",
+      key.trustRoot,
+    ]);
+    assert.ok(
+      verified.exitCode === 0 || verified.exitCode === 1,
+      JSON.stringify(verified.envelope),
+    );
+    const control = join(dir, "controls", "DOC-01.yaml");
+    writeFileSync(
+      control,
+      readFileSync(control, "utf-8").replace("severity: high", "severity: low"),
+    );
+    const { exitCode, envelope } = runJson([
+      "readiness",
+      report,
+      "--catalog-dir",
+      dir,
+      "--trust-root",
+      key.trustRoot,
+    ]);
+    assert.equal(exitCode, 3);
+    assert.equal(
+      (envelope.error as { message_key: string }).message_key,
+      "input.catalog_unverified",
+    );
+  });
+});
+
+test("readiness --allow-unverified-catalog reads an unsigned catalog and records the limitation (18.184h)", () => {
+  withWork("agentce-byo-readiness-", (work) => {
+    const report = byoReport(work);
+    const dir = unsignedCatalogCopy(work, "unsigned-cat");
+    const refused = runJson(["readiness", report, "--catalog-dir", dir]);
+    assert.equal(refused.exitCode, 3);
+    const { exitCode, envelope } = runJson([
+      "readiness",
+      report,
+      "--catalog-dir",
+      dir,
+      "--allow-unverified-catalog",
+    ]);
+    assert.ok(exitCode === 0 || exitCode === 1);
+    assert.notEqual(envelope.verdict, "READY");
+    assert.ok((envelope.limitations as string[]).some((line) => line.includes("unsigned-cat")));
+  });
+});
+
+for (const [extra, key] of [
+  [["--trust-root", ""], "input.trust_root_not_a_file"],
+  [["--trust-root", "/nonexistent/trust-root.json"], "input.trust_root_not_a_file"],
+  [["--allow-unverified-catalog"], "input.allow_unverified_requires_catalog_dir"],
+] as const) {
+  test(`readiness ${extra.join(" ")} without --catalog-dir is refused ${key} (18.184h)`, () => {
+    withWork("agentce-byo-readiness-", (work) => {
+      const report = byoReport(work);
+      const { exitCode, envelope } = runJson(["readiness", report, ...extra]);
+      assert.equal(exitCode, 3);
+      assert.equal((envelope.error as { message_key: string }).message_key, key);
+    });
+  });
+}

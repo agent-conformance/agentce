@@ -1126,6 +1126,31 @@ function parseJsonObject(text: string): Record<string, unknown> {
   return value;
 }
 
+function objectOfObjects(value: unknown): void {
+  if (!isRecord(value)) {
+    throw new Error("not a JSON object");
+  }
+  objects(Object.values(value));
+}
+
+/** coverage.json: an object whose `subjects` (when present) maps each subject to an object, and each
+ * subject's `event_types` (when present) maps each type to an object. An entry of another shape makes
+ * the file unreadable, never skipped: skipping it loses what deleting it would (SPEC §13.3.4). */
+function parseCoverage(text: string): Record<string, unknown> {
+  const coverage = parseJsonObject(text);
+  if (Object.hasOwn(coverage, "subjects")) {
+    objectOfObjects(coverage.subjects);
+    for (const entry of Object.values(
+      coverage.subjects as Record<string, Record<string, unknown>>,
+    )) {
+      if (Object.hasOwn(entry, "event_types")) {
+        objectOfObjects(entry.event_types);
+      }
+    }
+  }
+  return coverage;
+}
+
 function parseJsonObjects(text: string): Record<string, unknown>[] {
   const value: unknown = JSON.parse(text);
   if (!Array.isArray(value)) {
@@ -1190,25 +1215,22 @@ export function computeReadiness(
     }
   }
 
-  const coverage = reportFile("coverage.json", parseJsonObject) ?? {};
-  const subjects = isRecord(coverage.subjects) ? coverage.subjects : {};
+  const coverage = reportFile("coverage.json", parseCoverage) ?? {};
+  const subjects = (coverage.subjects ?? {}) as Record<string, Record<string, unknown>>;
   for (const subject of Object.keys(subjects).sort(byteCompare)) {
     const entry = subjects[subject];
-    if (!isRecord(entry)) {
-      continue;
-    }
     if (entry.coverage_status === "gap") {
       reasons.push(`coverage shortfall for subject ${subject}`);
     } else if (entry.coverage_status === "unknown") {
       // No independent denominator reconciles the subject's records (SPEC §6.5, §13.3.4).
       reasons.push(`coverage unknown for subject ${subject}: no independent denominator`);
     }
-    const eventTypes = isRecord(entry.event_types) ? entry.event_types : {};
+    const eventTypes = (entry.event_types ?? {}) as Record<string, Record<string, unknown>>;
     for (const eventType of Object.keys(eventTypes).sort(byteCompare)) {
       const detail = eventTypes[eventType];
       // A declared source below the coverage threshold is a shortfall even when another event
       // type has unknown coverage and masks it in the subject-level roll-up (SPEC §13.3.4).
-      if (isRecord(detail) && detail.status === "below_threshold") {
+      if (detail.status === "below_threshold") {
         reasons.push(`coverage shortfall for ${subject} ${eventType}`);
       }
     }

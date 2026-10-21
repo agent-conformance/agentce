@@ -2101,7 +2101,8 @@ function readinessUnrecognized(detail: string, fix: string): InputError {
  * verdict computed without it. An empty `--gaps`/`--deviations` value is ignored, as Python's
  * `if gaps_path:` does. */
 function parseReadinessArgv(argv: string[]): ReadinessArgs {
-  const flagFix = "pass --gaps, --deviations, or --catalog-dir, or drop the flag.";
+  const flagFix =
+    "pass --gaps, --deviations, --catalog-dir, --trust-root or --allow-unverified-catalog, or drop the flag.";
   const parsed: ReadinessArgs = {
     reportDir: undefined,
     gaps: undefined,

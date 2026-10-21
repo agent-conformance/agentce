@@ -677,3 +677,51 @@ test("normalizeDeviationDates passes a plain string, number, or boolean through 
   ]);
   assert.deepEqual(out, [{ control: "OVS-03", granted: "already a string", count: 3, ok: true }]);
 });
+
+// A report file that is not JSON of its shape reads NOT READY, never a crash and never READY (inbox
+// row 393, 18.184h), and so does an inner coverage entry of the wrong shape (watch ruling 2026-10-21).
+for (const [name, text] of [
+  ["coverage.json", "null"],
+  ["coverage.json", "[]"],
+  ["coverage.json", '"x"'],
+  ["coverage.json", "3"],
+  ["coverage.json", ""],
+  ["coverage.json", "{"],
+  ["coverage.json", '{"subjects": []}'],
+  ["coverage.json", '{"subjects": null}'],
+  ["coverage.json", '{"subjects": {"s": 3}}'],
+  ["coverage.json", '{"subjects": {"s": null}}'],
+  ["coverage.json", '{"subjects": {"s": {"event_types": []}}}'],
+  ["coverage.json", '{"subjects": {"s": {"event_types": {"t": 3}}}}'],
+  ["assertions.json", "null"],
+  ["assertions.json", "{}"],
+  ["assertions.json", ""],
+  ["assertions.json", "[3]"],
+  ["assertions.json", "[null]"],
+  ["integrity.jsonl", "not json\n"],
+  ["integrity.jsonl", "3\n"],
+  ["applicability.jsonl", "[]\n"],
+] as const) {
+  test(`${name} reading ${JSON.stringify(text)} is NOT READY, named (18.184h)`, () => {
+    const dir = report();
+    writeFileSync(join(dir, name), text);
+    const verdict = computeReadiness(dir, { severities: SEVERITIES });
+    assert.equal(verdict.verdict, NOT_READY);
+    assert.deepEqual(verdict.reasons, [`cannot read report file ${name}`]);
+  });
+}
+
+test("a coverage.json that is not UTF-8 is NOT READY (18.184h)", () => {
+  const dir = report();
+  writeFileSync(join(dir, "coverage.json"), Buffer.from('{"subjects": {}}\xff', "latin1"));
+  assert.deepEqual(computeReadiness(dir, { severities: SEVERITIES }).reasons, [
+    "cannot read report file coverage.json",
+  ]);
+});
+
+test("an empty coverage.json object stays READY (ruling 393)", () => {
+  assert.equal(
+    computeReadiness(report({ coverage: {} }), { severities: SEVERITIES }).verdict,
+    READY,
+  );
+});

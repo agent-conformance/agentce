@@ -294,6 +294,38 @@ export interface RunEcsOptions {
 }
 
 /** Run every corpus project through the engine and return the implementation report. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** The corpus manifest: UTF-8 JSON, an object whose `projects` (when present) is an array of
+ * objects, or the run is refused, never a crash (as Python does). */
+function parseManifest(
+  bytes: Buffer,
+  manifestPath: string,
+  corpusDir: string,
+): { manifest: Record<string, unknown>; projects: Array<Record<string, unknown>> } {
+  let manifest: unknown;
+  try {
+    manifest = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  } catch {
+    manifest = undefined;
+  }
+  const projects: unknown = !isRecord(manifest)
+    ? undefined
+    : Object.hasOwn(manifest, "projects")
+      ? manifest.projects
+      : [];
+  if (!isRecord(manifest) || !Array.isArray(projects) || !projects.every(isRecord)) {
+    throw new InputError(
+      "input.corpus_unreadable",
+      `${manifestPath} in the corpus folder ${corpusDir} is not a JSON object with a projects array.`,
+      "regenerate the corpus manifest, then re-run.",
+    );
+  }
+  return { manifest, projects };
+}
+
 export function runEcs(options: RunEcsOptions): EcsReport {
   const enginePath = realpathSync.native(options.enginePath);
   const repoRoot = dirname(dirname(enginePath));
@@ -305,9 +337,9 @@ export function runEcs(options: RunEcsOptions): EcsReport {
       : mkdtempSync(joinPath(tmpdir(), "agentce-ecs-"));
 
   const manifestPath = joinPath(corpusRoot, "corpus-manifest.json");
-  let manifestText: string;
+  let manifestBytes: Buffer;
   try {
-    manifestText = readFileSync(manifestPath, "utf-8");
+    manifestBytes = readFileSync(manifestPath);
   } catch (error) {
     throw new InputError(
       "input.corpus_unreadable",
@@ -315,10 +347,7 @@ export function runEcs(options: RunEcsOptions): EcsReport {
       "make the corpus folder readable and enterable, then re-run.",
     );
   }
-  const manifest = JSON.parse(manifestText);
-  const projects: Array<Record<string, unknown>> = Array.isArray(manifest.projects)
-    ? manifest.projects
-    : [];
+  const { manifest, projects } = parseManifest(manifestBytes, manifestPath, options.corpusDir);
   let identical = 0;
   const failures: Array<{ project: string; error: string }> = [];
   const sorted = [...projects].sort((a, b) => byteCompare(String(a.id), String(b.id)));
