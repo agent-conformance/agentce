@@ -210,7 +210,8 @@ public final class Coverage {
                     yardstick.add(e.getKey().source + "\u0000" + t);
                 }
             }
-            Map<String, Integer> observed = new LinkedHashMap<>();
+            // Longs, as expected is: Assess compares the two row nodes, and an int node never equals a long one.
+            Map<String, Long> observed = new LinkedHashMap<>();
             Set<String> types = new LinkedHashSet<>();
             for (JsonNode event : events) {
                 if (!subject(event).equals(subject.id)) {
@@ -220,7 +221,7 @@ public final class Coverage {
                 if (yardstick.contains(source(event) + "\u0000" + type)) {
                     continue;
                 }
-                observed.merge(type, 1, Integer::sum);
+                observed.merge(type, 1L, Long::sum);
                 types.add(type);
             }
 
@@ -245,8 +246,7 @@ public final class Coverage {
             List<String> sortedTypes = new ArrayList<>(types);
             sortedTypes.sort(Json::byteCompare);
             for (String type : sortedTypes) {
-                // A long, as expected is: Assess compares the two nodes, and an int node never equals a long one.
-                long obs = observed.getOrDefault(type, 0);
+                long obs = observed.getOrDefault(type, 0L);
                 ExpectedEntry entry = expected.get(type);
                 ObjectNode row = byType.putObject(type);
                 if (entry == null) {
