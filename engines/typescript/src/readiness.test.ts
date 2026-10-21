@@ -729,3 +729,42 @@ test("an empty coverage.json object stays READY (ruling 393)", () => {
     READY,
   );
 });
+
+// A field the verdict is decided on that is not a JSON string (null included) makes its file
+// unreadable, with or without a deviation register, never read loosely (18.184m, as Python).
+for (const [name, text] of [
+  ["integrity.jsonl", '{"status": ["broken"], "stream": "s"}\n'],
+  ["integrity.jsonl", '{"status": null, "stream": "s"}\n'],
+  ["assertions.json", '[{"control": ["DOC-01"], "outcome": "insufficient_evidence"}]'],
+  ["assertions.json", '[{"control": "DOC-01", "outcome": 3}]'],
+  ["assertions.json", '[{"control": "DOC-01", "window": "x"}]'],
+  ["assertions.json", '[{"control": "DOC-01", "window": {"end": 3}}]'],
+  ["assertions.json", '[{"control": "DOC-01", "deviation": ["D-1"]}]'],
+  ["coverage.json", '{"subjects": {"s": {"coverage_status": ["gap"]}}}'],
+  ["coverage.json", '{"subjects": {"s": {"event_types": {"t": {"status": true}}}}}'],
+] as const) {
+  for (const deviations of [undefined, [{ control: "DOC-01" }]]) {
+    test(`${name} reading ${text.trim()} is NOT READY${deviations ? " under a register" : ""} (18.184m)`, () => {
+      const dir = report();
+      writeFileSync(join(dir, name), text);
+      const verdict = computeReadiness(dir, {
+        severities: SEVERITIES,
+        deviations,
+      });
+      assert.equal(verdict.verdict, NOT_READY);
+      assert.ok(
+        verdict.reasons.includes(`cannot read report file ${name}`),
+        verdict.reasons.join("; "),
+      );
+    });
+  }
+}
+
+test("deviation: null stays readable (18.184m)", () => {
+  const dir = report();
+  writeFileSync(
+    join(dir, "assertions.json"),
+    '[{"control": "DOC-01", "outcome": "conformant", "deviation": null}]',
+  );
+  assert.equal(computeReadiness(dir, { severities: SEVERITIES }).verdict, READY);
+});

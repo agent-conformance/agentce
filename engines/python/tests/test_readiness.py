@@ -171,6 +171,47 @@ def test_inner_coverage_entry_of_the_wrong_shape_is_not_ready(
     assert verdict["reasons"] == ["cannot read report file coverage.json"]
 
 
+_WRONG_TYPED = [
+    ("integrity.jsonl", '{"status": ["broken"], "stream": "s"}\n'),
+    ("integrity.jsonl", '{"status": null, "stream": "s"}\n'),
+    (
+        "assertions.json",
+        '[{"control": ["DOC-01"], "outcome": "insufficient_evidence"}]',
+    ),
+    ("assertions.json", '[{"control": "DOC-01", "outcome": 3}]'),
+    ("assertions.json", '[{"control": "DOC-01", "window": "x"}]'),
+    ("assertions.json", '[{"control": "DOC-01", "window": {"end": 3}}]'),
+    ("assertions.json", '[{"control": "DOC-01", "deviation": ["D-1"]}]'),
+    ("coverage.json", '{"subjects": {"s": {"coverage_status": ["gap"]}}}'),
+    ("coverage.json", '{"subjects": {"s": {"event_types": {"t": {"status": true}}}}}'),
+]
+
+
+@pytest.mark.parametrize("deviations", [None, [{"control": "DOC-01"}]])
+@pytest.mark.parametrize(("name", "text"), _WRONG_TYPED)
+def test_field_decided_on_of_the_wrong_type_is_not_ready(
+    tmp_path: Path, name: str, text: str, deviations: list | None
+) -> None:
+    # A field the verdict is decided on that is not a JSON string (null included) makes its file
+    # unreadable, with or without a deviation register, never read loosely or crashed on (18.184m).
+    report = _report(tmp_path)
+    (report / name).write_text(text, encoding="utf-8")
+    verdict = compute_readiness(report, severities=_SEVERITIES, deviations=deviations)
+    assert verdict["verdict"] == NOT_READY
+    assert f"cannot read report file {name}" in verdict["reasons"]
+
+
+def test_null_deviation_stays_readable(tmp_path: Path) -> None:
+    # assess writes deviation: null when none applies; that is not a wrong type.
+    report = _report(tmp_path)
+    (report / "assertions.json").write_text(
+        '[{"control": "DOC-01", "outcome": "conformant", "deviation": null}]',
+        encoding="utf-8",
+    )
+    verdict = compute_readiness(report, severities=_SEVERITIES)
+    assert verdict["verdict"] == READY
+
+
 @_not_root
 @pytest.mark.parametrize("name", _REPORT_FILES)
 @pytest.mark.parametrize(

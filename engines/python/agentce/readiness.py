@@ -80,9 +80,22 @@ def _objects(values: list[Any]) -> list[dict[str, Any]]:
     return values
 
 
+def _strings(record: dict[str, Any], *fields: str) -> dict[str, Any]:
+    """Each named field the verdict is decided on is a JSON string when present (null included), or the
+    file is unreadable: a wrong-typed field read loosely hides a gap or a break (SPEC §13.3.4)."""
+    if any(field in record and not isinstance(record[field], str) for field in fields):
+        raise _Unreadable(f"a field of {', '.join(fields)} is not a JSON string")
+    return record
+
+
 def _jsonl(text: str) -> list[dict[str, Any]]:
     lines = (line.strip() for line in text.splitlines())
     return _objects([_parse_json(line) for line in lines if line])
+
+
+def _integrity(text: str) -> list[dict[str, Any]]:
+    """integrity.jsonl: one object per line, whose ``status`` (when present) is a string."""
+    return [_strings(record, "status") for record in _jsonl(text)]
 
 
 def _json_object(text: str) -> dict[str, Any]:
@@ -108,14 +121,17 @@ def _object_of_objects(value: Any) -> dict[str, dict[str, Any]]:
 
 def _coverage(text: str) -> dict[str, Any]:
     """coverage.json: an object whose ``subjects`` (when present) maps each subject to an object,
-    and each subject's ``event_types`` (when present) maps each type to an object. An entry of
+    and each subject's ``event_types`` (when present) maps each type to an object; a subject's
+    ``coverage_status`` and an event type's ``status`` are strings when present. An entry of
     another shape makes the file unreadable, never skipped: skipping it loses what deleting it
     would (SPEC §13.3.4)."""
     coverage = _json_object(text)
     if "subjects" in coverage:
         for entry in _object_of_objects(coverage["subjects"]).values():
+            _strings(entry, "coverage_status")
             if "event_types" in entry:
-                _object_of_objects(entry["event_types"])
+                for detail in _object_of_objects(entry["event_types"]).values():
+                    _strings(detail, "status")
     return coverage
 
 
@@ -130,6 +146,23 @@ def _applicability(text: str) -> list[dict[str, Any]]:
                 raise _Unreadable("drift is not a JSON array")
             _objects(drift)
     return statements
+
+
+def _assertions(text: str) -> list[dict[str, Any]]:
+    """assertions.json: an array of objects whose ``control`` and ``outcome`` are strings, ``window`` an
+    object whose ``end`` is a string, and ``deviation`` a string or null, each when present. Another
+    type makes the file unreadable, never read loosely (SPEC §13.3.4)."""
+    assertions = _json_objects(text)
+    for assertion in assertions:
+        _strings(assertion, "control", "outcome")
+        if "window" in assertion:
+            window = assertion["window"]
+            if not isinstance(window, dict):
+                raise _Unreadable("window is not a JSON object")
+            _strings(window, "end")
+        if assertion.get("deviation") is not None:
+            _strings(assertion, "deviation")
+    return assertions
 
 
 def _schema(name: str) -> dict[str, Any]:
@@ -248,7 +281,7 @@ def compute_readiness(
         reasons.append(f"missing report file {name}")
         return None
 
-    for record in report_file("integrity.jsonl", _jsonl) or []:
+    for record in report_file("integrity.jsonl", _integrity) or []:
         if record.get("status") in _BAD_INTEGRITY:
             reasons.append(
                 f"integrity {record.get('status')} on stream {record.get('stream')}"
@@ -275,7 +308,7 @@ def compute_readiness(
                 f"applicability drift: {drift.get('kind')} {drift.get('ref')}"
             )
 
-    assertions = report_file("assertions.json", _json_objects) or []
+    assertions = report_file("assertions.json", _assertions) or []
     for assertion in assertions:
         if assertion.get("outcome") != "insufficient_evidence":
             continue

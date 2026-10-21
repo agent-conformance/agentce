@@ -881,4 +881,36 @@ class ReadinessTest {
         writeReport(dir, Json.nodes().arrayNode(), List.of(), Json.nodes().objectNode(), List.of());
         assertEquals(Readiness.READY, Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).verdict());
     }
+
+    /** A field the verdict is decided on that is not a JSON string (null included) makes its file unreadable,
+     * with or without a deviation register, never read loosely (18.184m, as Python). */
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "integrity.jsonl|{\"status\": [\"broken\"], \"stream\": \"s\"}\n",
+        "integrity.jsonl|{\"status\": null, \"stream\": \"s\"}\n",
+        "assertions.json|[{\"control\": [\"DOC-01\"], \"outcome\": \"insufficient_evidence\"}]",
+        "assertions.json|[{\"control\": \"DOC-01\", \"outcome\": 3}]",
+        "assertions.json|[{\"control\": \"DOC-01\", \"window\": \"x\"}]",
+        "assertions.json|[{\"control\": \"DOC-01\", \"window\": {\"end\": 3}}]",
+        "assertions.json|[{\"control\": \"DOC-01\", \"deviation\": [\"D-1\"]}]",
+        "coverage.json|{\"subjects\": {\"s\": {\"coverage_status\": [\"gap\"]}}}",
+        "coverage.json|{\"subjects\": {\"s\": {\"event_types\": {\"t\": {\"status\": true}}}}}"})
+    void aFieldDecidedOnOfTheWrongTypeIsNotReady(String spec, @TempDir Path dir) throws IOException {
+        String[] parts = spec.split("\\|", 2);
+        writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
+        Files.writeString(dir.resolve(parts[0]), parts[1].replace("\\n", "\n"));
+        for (List<JsonNode> deviations : List.of(List.<JsonNode>of(), List.<JsonNode>of(deviation()))) {
+            Readiness.Verdict verdict = Readiness.computeReadiness(dir, SEVERITIES, deviations, Set.of());
+            assertEquals(Readiness.NOT_READY, verdict.verdict());
+            assertTrue(verdict.reasons().contains("cannot read report file " + parts[0]), verdict.reasons().toString());
+        }
+    }
+
+    @Test
+    void aNullDeviationStaysReadable(@TempDir Path dir) throws IOException {
+        writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
+        Files.writeString(dir.resolve("assertions.json"),
+                "[{\"control\": \"DOC-01\", \"outcome\": \"conformant\", \"deviation\": null}]");
+        assertEquals(Readiness.READY, Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).verdict());
+    }
 }

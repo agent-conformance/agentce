@@ -1113,9 +1113,23 @@ function objects(values: unknown[]): Record<string, unknown>[] {
   return values as Record<string, unknown>[];
 }
 
+/** Each named field the verdict is decided on is a JSON string when present (null included), or the
+ * file is unreadable: a wrong-typed field read loosely hides a gap or a break (SPEC §13.3.4). */
+function strings(record: Record<string, unknown>, ...fields: string[]): Record<string, unknown> {
+  if (fields.some((field) => Object.hasOwn(record, field) && typeof record[field] !== "string")) {
+    throw new Error(`a field of ${fields.join(", ")} is not a JSON string`);
+  }
+  return record;
+}
+
 function parseJsonl(text: string): Record<string, unknown>[] {
   const lines = text.split("\n").map((line) => line.trim());
   return objects(lines.filter((line) => line).map((line) => JSON.parse(line) as unknown));
+}
+
+/** integrity.jsonl: one object per line, whose `status` (when present) is a string. */
+function parseIntegrity(text: string): Record<string, unknown>[] {
+  return parseJsonl(text).map((record) => strings(record, "status"));
 }
 
 function parseJsonObject(text: string): Record<string, unknown> {
@@ -1134,7 +1148,8 @@ function objectOfObjects(value: unknown): void {
 }
 
 /** coverage.json: an object whose `subjects` (when present) maps each subject to an object, and each
- * subject's `event_types` (when present) maps each type to an object. An entry of another shape makes
+ * subject's `event_types` (when present) maps each type to an object; a subject's `coverage_status` and
+ * an event type's `status` are strings when present. An entry of another shape makes
  * the file unreadable, never skipped: skipping it loses what deleting it would (SPEC §13.3.4). */
 function parseCoverage(text: string): Record<string, unknown> {
   const coverage = parseJsonObject(text);
@@ -1143,8 +1158,14 @@ function parseCoverage(text: string): Record<string, unknown> {
     for (const entry of Object.values(
       coverage.subjects as Record<string, Record<string, unknown>>,
     )) {
+      strings(entry, "coverage_status");
       if (Object.hasOwn(entry, "event_types")) {
         objectOfObjects(entry.event_types);
+        for (const detail of Object.values(
+          entry.event_types as Record<string, Record<string, unknown>>,
+        )) {
+          strings(detail, "status");
+        }
       }
     }
   }
@@ -1172,6 +1193,26 @@ function parseJsonObjects(text: string): Record<string, unknown>[] {
     throw new Error("not a JSON array");
   }
   return objects(value);
+}
+
+/** assertions.json: an array of objects whose `control` and `outcome` are strings, `window` an object
+ * whose `end` is a string, and `deviation` a string or null, each when present. Another type makes the
+ * file unreadable, never read loosely (SPEC §13.3.4). */
+function parseAssertions(text: string): Record<string, unknown>[] {
+  const assertions = parseJsonObjects(text);
+  for (const assertion of assertions) {
+    strings(assertion, "control", "outcome");
+    if (Object.hasOwn(assertion, "window")) {
+      if (!isRecord(assertion.window)) {
+        throw new Error("window is not a JSON object");
+      }
+      strings(assertion.window, "end");
+    }
+    if (assertion.deviation !== null && assertion.deviation !== undefined) {
+      strings(assertion, "deviation");
+    }
+  }
+  return assertions;
 }
 
 export interface ComputeReadinessOptions {
@@ -1223,7 +1264,7 @@ export function computeReadiness(
     return undefined;
   };
 
-  for (const record of reportFile("integrity.jsonl", parseJsonl) ?? []) {
+  for (const record of reportFile("integrity.jsonl", parseIntegrity) ?? []) {
     const status = record.status;
     if (typeof status === "string" && GAP_INTEGRITY_STATUSES.has(status)) {
       reasons.push(`integrity ${pyStr(status)} on stream ${pyStr(record.stream)}`);
@@ -1257,7 +1298,7 @@ export function computeReadiness(
     }
   }
 
-  const assertions = reportFile("assertions.json", parseJsonObjects) ?? [];
+  const assertions = reportFile("assertions.json", parseAssertions) ?? [];
   for (const assertion of assertions) {
     if (assertion.outcome !== "insufficient_evidence") {
       continue;

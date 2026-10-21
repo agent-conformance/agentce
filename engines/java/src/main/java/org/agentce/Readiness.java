@@ -1146,8 +1146,24 @@ public final class Readiness {
         return out;
     }
 
+    /** Each named field the verdict is decided on is a JSON string when present (null included), or the
+     * file is unreadable: a wrong-typed field read loosely hides a gap or a break (SPEC §13.3.4). */
+    private static JsonNode strings(JsonNode record, String... fields) {
+        for (String field : fields) {
+            if (record.has(field) && !record.get(field).isTextual()) {
+                throw new Unreadable("a field of " + String.join(", ", fields) + " is not a JSON string");
+            }
+        }
+        return record;
+    }
+
     private static List<JsonNode> parseJsonl(String text) {
         return objects(text.lines().map(String::strip).filter(s -> !s.isEmpty()).map(Readiness::parseJson).toList());
+    }
+
+    /** integrity.jsonl: one object per line, whose {@code status} (when present) is a string. */
+    private static List<JsonNode> parseIntegrity(String text) {
+        return parseJsonl(text).stream().map(record -> strings(record, "status")).toList();
     }
 
     private static JsonNode parseJsonObject(String text) {
@@ -1174,7 +1190,8 @@ public final class Readiness {
     }
 
     /** coverage.json: an object whose {@code subjects} (when present) maps each subject to an object,
-     * and each subject's {@code event_types} (when present) maps each type to an object. An entry of
+     * and each subject's {@code event_types} (when present) maps each type to an object; a subject's
+     * {@code coverage_status} and an event type's {@code status} are strings when present. An entry of
      * another shape makes the file unreadable, never skipped: skipping it loses what deleting it would
      * (SPEC §13.3.4). */
     private static JsonNode parseCoverage(String text) {
@@ -1182,12 +1199,36 @@ public final class Readiness {
         if (coverage.has("subjects")) {
             objectOfObjects(coverage.get("subjects"));
             for (JsonNode entry : coverage.get("subjects")) {
+                strings(entry, "coverage_status");
                 if (entry.has("event_types")) {
                     objectOfObjects(entry.get("event_types"));
+                    for (JsonNode detail : entry.get("event_types")) {
+                        strings(detail, "status");
+                    }
                 }
             }
         }
         return coverage;
+    }
+
+    /** assertions.json: an array of objects whose {@code control} and {@code outcome} are strings,
+     * {@code window} an object whose {@code end} is a string, and {@code deviation} a string or null,
+     * each when present. Another type makes the file unreadable, never read loosely (SPEC §13.3.4). */
+    private static List<JsonNode> parseAssertions(String text) {
+        List<JsonNode> assertions = parseJsonObjects(text);
+        for (JsonNode assertion : assertions) {
+            strings(assertion, "control", "outcome");
+            if (assertion.has("window")) {
+                if (!assertion.get("window").isObject()) {
+                    throw new Unreadable("window is not a JSON object");
+                }
+                strings(assertion.get("window"), "end");
+            }
+            if (assertion.has("deviation") && !assertion.get("deviation").isNull()) {
+                strings(assertion, "deviation");
+            }
+        }
+        return assertions;
     }
 
     /** applicability.jsonl: one object per line, whose {@code drift} (when present) is an array of
@@ -1231,7 +1272,7 @@ public final class Readiness {
         List<String> limitations = new ArrayList<>(given);
 
         for (JsonNode record :
-                Readiness.<List<JsonNode>>reportFile(reportDir, "integrity.jsonl", Readiness::parseJsonl, List.of(), reasons)) {
+                Readiness.<List<JsonNode>>reportFile(reportDir, "integrity.jsonl", Readiness::parseIntegrity, List.of(), reasons)) {
             JsonNode status = record.path("status");
             if (status.isTextual() && GAP_INTEGRITY_STATUSES.contains(status.textValue())) {
                 reasons.add("integrity " + pyStr(status) + " on stream " + pyStr(record.path("stream")));
@@ -1275,7 +1316,7 @@ public final class Readiness {
         }
 
         List<JsonNode> assertions =
-                reportFile(reportDir, "assertions.json", Readiness::parseJsonObjects, List.of(), reasons);
+                reportFile(reportDir, "assertions.json", Readiness::parseAssertions, List.of(), reasons);
         for (JsonNode assertion : assertions) {
             if (!"insufficient_evidence".equals(assertion.path("outcome").asText(null))) {
                 continue;
