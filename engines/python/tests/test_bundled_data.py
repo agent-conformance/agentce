@@ -114,8 +114,8 @@ def test_default_catalog_severities_come_from_the_bundled_catalogs() -> None:
 
     from agentce.commands import _readiness_severities
 
-    severities = _readiness_severities(Namespace(catalog_dir=None))
-    assert len(severities) > 10
+    severities, limitations = _readiness_severities(Namespace(catalog_dir=None))
+    assert len(severities) > 10 and limitations == []
     assert "eu-ai-act@2026.09" in bundled.vendored_catalogs()
     assert {"conduct", "employment", "finance", "insurance"} <= {
         d.name for d in (bundled.catalogs_dir() / "overlays").iterdir()
