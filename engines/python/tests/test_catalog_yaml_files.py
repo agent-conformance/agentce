@@ -133,6 +133,24 @@ for _tag, _value in {
         ),
         "is not YAML the engine can load",
     )
+# A merge source is never constructed, so its tag is checked on its own, and a key it writes twice is refused (18.184o).
+for _name, _merge in {
+    "!!set": "!!set {min_source_class: self_report}",
+    "!!omap": "!!omap [{min_source_class: self_report}]",
+    "!!pairs": "!!pairs [{min_source_class: self_report}]",
+    "!!set in a list": "[!!set {min_source_class: self_report}]",
+    "!!merge": "!!merge {min_source_class: self_report}",
+    "local tag": "!foo {min_source_class: self_report}",
+    "repeated key": "{min_source_class: independent_system, min_source_class: self_report}",
+    "repeated key in a list": "[{min_source_class: independent_system, min_source_class: self_report}]",
+}.items():
+    _CASES[f"control merge source {_name}"] = (
+        _CONTROL,
+        lambda d, line=f"extra:\n  <<: {_merge}\n": _edit(
+            d, _CONTROL, "id: DAT-01\n", "id: DAT-01\n" + line
+        ),
+        "is not YAML the engine can load",
+    )
 _CASES["catalog.yaml !!binary"] = (
     "catalog.yaml",
     lambda d: _edit(

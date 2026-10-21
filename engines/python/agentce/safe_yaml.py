@@ -66,18 +66,49 @@ class _PermissiveTimestampSafeLoader(yaml.SafeLoader):
             raise _construction_error(node, exc) from exc
 
 
+_MERGE_TAG = "tag:yaml.org,2002:merge"
+
+
+def _merge_sources(value_node: yaml.Node) -> list[yaml.Node]:
+    """The nodes a ``<<`` key's ``value_node`` merges: the node itself, or each item of a merge list."""
+    if isinstance(value_node, yaml.SequenceNode):
+        return list(value_node.value)
+    return [value_node]
+
+
 class _UniqueKeySafeLoader(_PermissiveTimestampSafeLoader):
     """The loader above, refusing a mapping that writes one key twice, where ``SafeLoader`` keeps the last value. A
     key a ``<<`` merge brings in may still be written again, as PyYAML's ``flatten_mapping`` allows; ``<<`` itself is a
-    key, so two merge keys in one mapping are refused too (the ports cannot all follow PyYAML's last-merge-wins)."""
+    key, so two merge keys in one mapping are refused too (the ports cannot all follow PyYAML's last-merge-wins). A
+    merge source is checked too: ``flatten_mapping`` merges it without constructing it, so ``<<: {m: a, m: b}`` would
+    otherwise keep its last value. Each mapping is checked once, before ``flatten_mapping`` adds merged keys to it."""
+
+    def __init__(self, stream: str) -> None:
+        super().__init__(stream)
+        self._keys_checked: set[int] = set()
 
     def construct_mapping(
         self, node: yaml.MappingNode, deep: bool = False
     ) -> dict[Any, Any]:
+        self._refuse_repeated_keys(node, deep)
+        return super().construct_mapping(node, deep=deep)
+
+    def flatten_mapping(self, node: yaml.MappingNode) -> None:
+        for key_node, value_node in node.value:
+            if key_node.tag == _MERGE_TAG:
+                for source in _merge_sources(value_node):
+                    if isinstance(source, yaml.MappingNode):
+                        self._refuse_repeated_keys(source, False)
+        super().flatten_mapping(node)
+
+    def _refuse_repeated_keys(self, node: yaml.MappingNode, deep: bool) -> None:
+        if id(node) in self._keys_checked:
+            return
+        self._keys_checked.add(id(node))
         seen: set[Any] = set()
         merged = False
         for key_node, _ in node.value:
-            if key_node.tag == "tag:yaml.org,2002:merge":
+            if key_node.tag == _MERGE_TAG:
                 if merged:
                     raise yaml.constructor.ConstructorError(
                         "while constructing a mapping",
@@ -91,7 +122,7 @@ class _UniqueKeySafeLoader(_PermissiveTimestampSafeLoader):
             try:
                 repeated = key in seen
             except TypeError:
-                break  # an unhashable key: SafeLoader's own construct_mapping refuses it
+                return  # an unhashable key: SafeLoader's own construct_mapping refuses it
             if repeated:
                 raise yaml.constructor.ConstructorError(
                     "while constructing a mapping",
@@ -100,7 +131,6 @@ class _UniqueKeySafeLoader(_PermissiveTimestampSafeLoader):
                     key_node.start_mark,
                 )
             seen.add(key)
-        return super().construct_mapping(node, deep=deep)
 
 
 def _construction_error(
@@ -167,13 +197,27 @@ _SAFE_LOADER_ONLY_TAGS = frozenset(
 class _CatalogLoader(_UniqueKeySafeLoader):
     """The unique-key loader without ``SafeLoader``'s ``!!binary``, ``!!set``, ``!!omap`` and ``!!pairs``
     constructors, so a catalog file holding one is refused by ``construct_undefined`` as in the TypeScript and Java
-    readers (18.184o). The constructors are removed from this class's own copy; the other loaders keep them."""
+    readers (18.184o). The constructors are removed from this class's own copy; the other loaders keep them. A merge
+    source is never constructed, so its tag (and a merge list's) is checked against the same constructors here."""
 
     yaml_constructors = {
         tag: construct
         for tag, construct in _UniqueKeySafeLoader.yaml_constructors.items()
         if tag not in _SAFE_LOADER_ONLY_TAGS
     }
+
+    def flatten_mapping(self, node: yaml.MappingNode) -> None:
+        for key_node, value_node in node.value:
+            if key_node.tag == _MERGE_TAG:
+                for source in [value_node, *_merge_sources(value_node)]:
+                    if source.tag not in self.yaml_constructors:
+                        raise yaml.constructor.ConstructorError(
+                            None,
+                            None,
+                            f"could not determine a constructor for the tag {source.tag!r}",
+                            source.start_mark,
+                        )
+        super().flatten_mapping(node)
 
 
 def load_catalog_yaml(text: str) -> Any:

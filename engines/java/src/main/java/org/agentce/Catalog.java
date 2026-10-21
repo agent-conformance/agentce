@@ -437,7 +437,7 @@ public final class Catalog {
     }
 
     /** {@code catalog.yaml} or a control file as one YAML mapping (18.184i): checked as Python's unique-key
-     * {@code SafeLoader} reads it ({@link Readiness#composePyyaml}), so a key written twice, YAML the engine
+     * {@code SafeLoader} reads it ({@link Readiness#composeCatalogPyyaml}), so a key written twice, YAML the engine
      * refuses to load, or anything but one mapping (an empty file included) is refused naming the file, never
      * read with its last value, as nothing, or skipped. The values are read from that same tree, so a merge key
      * ({@code <<}) applies as in PyYAML (18.184o). */
@@ -445,7 +445,7 @@ public final class Catalog {
         String text = text(files, rel);
         JsonNode data;
         try {
-            data = Readiness.toJsonNode(Readiness.composePyyaml(text, true));
+            data = Readiness.toJsonNode(Readiness.composeCatalogPyyaml(text));
         } catch (StackOverflowError | RuntimeException e) {
             throw fileUnloadable(
                     files.root(),

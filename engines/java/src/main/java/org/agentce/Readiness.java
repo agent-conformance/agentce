@@ -792,13 +792,55 @@ public final class Readiness {
     /** {@code text} read as {@link #loadPyyaml} reads a file, its errors left to the caller: a {@link
      * StackOverflowError} or a {@link RuntimeException} ({@link #nestedTooDeeply} tells the depth cap apart). */
     static Object composePyyaml(String text, boolean uniqueKeys) {
+        return composePyyaml(text, uniqueKeys, false);
+    }
+
+    /** {@code text} read as a catalog file: {@link #composePyyaml} with unique keys, and a merge source's tag (or a
+     * merge list's) refused unless it is one of {@link #SAFE_TAGS} other than the merge tag, as Python's catalog loader
+     * refuses a tag it has no constructor for (18.184o). {@link #flattenMapping} never composes a merge source, so
+     * {@link #composeValue}'s own tag check does not reach it. */
+    static Object composeCatalogPyyaml(String text) {
+        return composePyyaml(text, true, true);
+    }
+
+    private static Object composePyyaml(String text, boolean uniqueKeys, boolean checkMergeSources) {
         LoaderOptions options = new LoaderOptions();
         options.setNestingDepthLimit(DEVIATION_REGISTER_MAX_DEPTH);
         Node root = pyyamlComposer(options).compose(new StringReader(text));
         if (root != null && uniqueKeys) {
             rejectRepeatedKeys(root);
         }
+        if (root != null && checkMergeSources) {
+            rejectMergeSourceTags(root);
+        }
         return root == null ? null : composeValue(root);
+    }
+
+    private static void rejectMergeSourceTags(Node node) {
+        if (node instanceof SequenceNode seq) {
+            for (Node child : seq.getValue()) {
+                rejectMergeSourceTags(child);
+            }
+        } else if (node instanceof MappingNode map) {
+            for (NodeTuple tuple : map.getValue()) {
+                Node value = tuple.getValueNode();
+                if (Tag.MERGE.equals(pyyamlTag(tuple.getKeyNode()))) {
+                    List<Node> sources = new ArrayList<>(List.of(value));
+                    if (value instanceof SequenceNode seq) {
+                        sources.addAll(seq.getValue());
+                    }
+                    for (Node source : sources) {
+                        Tag tag = pyyamlTag(source);
+                        if (!SAFE_TAGS.contains(tag) || tag.equals(Tag.MERGE)) {
+                            throw new IllegalArgumentException(
+                                    "could not determine a constructor for the tag '" + tag.getValue() + "'");
+                        }
+                    }
+                }
+                rejectMergeSourceTags(tuple.getKeyNode());
+                rejectMergeSourceTags(value);
+            }
+        }
     }
 
     /** Whether {@code e}, thrown by {@link #composePyyaml}, is SnakeYAML's nesting cap or the recursion it

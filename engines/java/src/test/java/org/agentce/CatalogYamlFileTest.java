@@ -117,6 +117,29 @@ class CatalogYamlFileTest {
         assertTrue(e.reason.contains("holds a file that cannot be loaded: " + rel + " " + problem), e.reason);
     }
 
+    /** 18.184o: a merge source is never composed, so its tag is checked on its own, and a key it writes twice is
+     * refused (Python's "control merge source" cases). */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "!!set {min_source_class: self_report}",
+                "!!omap [{min_source_class: self_report}]",
+                "!!pairs [{min_source_class: self_report}]",
+                "[!!set {min_source_class: self_report}]",
+                "!!merge {min_source_class: self_report}",
+                "!foo {min_source_class: self_report}",
+                "{min_source_class: independent_system, min_source_class: self_report}",
+                "[{min_source_class: independent_system, min_source_class: self_report}]"
+            })
+    void aMergeSourceTheEngineCannotLoadIsRefused(String merge, @TempDir Path tmp) throws IOException {
+        Path dir = copy(tmp);
+        edit(dir, CONTROL, "id: DAT-01\n", "id: DAT-01\nextra:\n  <<: " + merge + "\n");
+        InputError e = assertThrows(InputError.class, () -> Catalog.load(dir));
+        assertEquals("input.catalog_unreadable", e.key);
+        assertTrue(e.reason.contains("holds a file that cannot be loaded: " + CONTROL + " is not YAML the engine can load"),
+                e.reason);
+    }
+
     private static final String FLOOR = "  min_source_class: self_report\n";
 
     /** 18.184o: a merge key in a control is read as PyYAML merges it (Python's

@@ -115,6 +115,24 @@ for (const [tag, value] of Object.entries({
     NOT_YAML,
   ];
 }
+// 18.184o: a merge source's tag is checked on its own, and a key it writes twice is refused.
+for (const [name, merge] of Object.entries({
+  "!!set": "!!set {min_source_class: self_report}",
+  "!!omap": "!!omap [{min_source_class: self_report}]",
+  "!!pairs": "!!pairs [{min_source_class: self_report}]",
+  "!!set in a list": "[!!set {min_source_class: self_report}]",
+  "!!merge": "!!merge {min_source_class: self_report}",
+  "local tag": "!foo {min_source_class: self_report}",
+  "repeated key": "{min_source_class: independent_system, min_source_class: self_report}",
+  "repeated key in a list":
+    "[{min_source_class: independent_system, min_source_class: self_report}]",
+})) {
+  CASES[`control merge source ${name}`] = [
+    CONTROL,
+    (d) => edit(d, CONTROL, "id: DAT-01\n", `id: DAT-01\nextra:\n  <<: ${merge}\n`),
+    NOT_YAML,
+  ];
+}
 CASES["catalog.yaml !!binary"] = [
   "catalog.yaml",
   (d) => edit(d, "catalog.yaml", "id: eu-ai-act\n", "id: eu-ai-act\nextra: !!binary aGVsbG8=\n"),
