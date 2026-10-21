@@ -102,14 +102,40 @@ const CASES: Record<string, [string, (dir: string) => void, string]> = {
     NOT_YAML,
   ],
 };
+// 18.184o: a tag PyYAML's SafeLoader constructs but no engine reads in a catalog.
+for (const [tag, value] of Object.entries({
+  binary: "aGVsbG8=",
+  set: "{a: null}",
+  omap: "[{a: 1}]",
+  pairs: "[{a: 1}]",
+})) {
+  CASES[`control !!${tag}`] = [
+    CONTROL,
+    (d) => edit(d, CONTROL, "id: DAT-01\n", `id: DAT-01\nextra: !!${tag} ${value}\n`),
+    NOT_YAML,
+  ];
+}
+CASES["catalog.yaml !!binary"] = [
+  "catalog.yaml",
+  (d) => edit(d, "catalog.yaml", "id: eu-ai-act\n", "id: eu-ai-act\nextra: !!binary aGVsbG8=\n"),
+  NOT_YAML,
+];
+
+function withCatalog(body: (dir: string) => void): void {
+  const tmp = mkdtempSync(join(tmpdir(), "agentce-catalog-yaml-"));
+  const dir = join(tmp, "cat");
+  try {
+    cpSync(BASE, dir, { recursive: true });
+    rmSync(join(dir, "catalog.sig.json"));
+    body(dir);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
 
 for (const [name, [rel, change, problem]] of Object.entries(CASES)) {
   test(`a catalog file that cannot be loaded is refused naming it: ${name}`, () => {
-    const tmp = mkdtempSync(join(tmpdir(), "agentce-catalog-yaml-"));
-    const dir = join(tmp, "cat");
-    try {
-      cpSync(BASE, dir, { recursive: true });
-      rmSync(join(dir, "catalog.sig.json"));
+    withCatalog((dir) => {
       change(dir);
       assert.throws(
         () => loadCatalog(dir),
@@ -123,9 +149,7 @@ for (const [name, [rel, change, problem]] of Object.entries(CASES)) {
           return true;
         },
       );
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-    }
+    });
   });
 }
 
@@ -147,4 +171,76 @@ test("every shipped catalog still loads through the check (18.184i)", () => {
   for (const dir of dirs) {
     assert.notEqual(loadCatalog(dir).version, "", dir);
   }
+});
+
+const FLOOR = "  min_source_class: self_report\n";
+
+// 18.184o: a merge key in a control is read as PyYAML merges it (Python's
+// test_a_merge_key_in_a_control_is_read_as_pyyaml_merges, the same cases): an explicit key beats a merged one
+// wherever it is written, and the first source of a merge list wins.
+const MERGES: Record<string, [string, string, string]> = {
+  "inline mapping": ["", "  <<: {min_source_class: independent_system}\n", "independent_system"],
+  alias: ["x-b: &b {min_source_class: independent_system}\n", "  <<: *b\n", "independent_system"],
+  "list, stronger first": [
+    "",
+    "  <<: [{min_source_class: independent_system}, {min_source_class: self_report}]\n",
+    "independent_system",
+  ],
+  "list, weaker first": [
+    "",
+    "  <<: [{min_source_class: self_report}, {min_source_class: independent_system}]\n",
+    "self_report",
+  ],
+  "nested override": [
+    "x-a: &a {min_source_class: self_report}\nx-b: &b {<<: *a, min_source_class: independent_system}\n",
+    "  <<: *b\n",
+    "independent_system",
+  ],
+  "explicit key after the merge": [
+    "",
+    `  <<: {min_source_class: independent_system}\n${FLOOR}`,
+    "self_report",
+  ],
+  "explicit key before the merge": [
+    "",
+    "  min_source_class: independent_system\n  <<: {min_source_class: self_report}\n",
+    "independent_system",
+  ],
+};
+
+for (const [name, [head, floor, expected]] of Object.entries(MERGES)) {
+  test(`a merge key in a control is read as PyYAML merges it: ${name}`, () => {
+    withCatalog((dir) => {
+      const text = readFileSync(join(dir, CONTROL), "utf-8");
+      assert.ok(text.includes(FLOOR));
+      writeFileSync(join(dir, CONTROL), head + text.replace(FLOOR, floor));
+      const control = loadCatalog(dir).controls.find((c) => c.id === "DAT-01");
+      assert.equal(control?.minSourceClass, expected);
+    });
+  });
+}
+
+test("a merged value that is not a source class is refused (18.184o)", () => {
+  withCatalog((dir) => {
+    edit(dir, CONTROL, FLOOR, "  <<: {min_source_class: trusted}\n");
+    assert.throws(
+      () => loadCatalog(dir),
+      (err: unknown) =>
+        err instanceof InputError && err.key === "catalog.control.min_source_class_unknown",
+    );
+  });
+});
+
+test("a merge key in catalog.yaml is read (18.184o)", () => {
+  withCatalog((dir) => {
+    edit(dir, "catalog.yaml", 'version: "2026.09"\n', '<<: {version: "2026.09"}\n');
+    assert.equal(loadCatalog(dir).version, "2026.09");
+  });
+});
+
+test("explicit core tags stay readable (18.184o)", () => {
+  withCatalog((dir) => {
+    edit(dir, CONTROL, "id: DAT-01\n", "id: !!str DAT-01\nsince: !!timestamp 2026-01-02\n");
+    assert.ok(loadCatalog(dir).controls.some((c) => c.id === "DAT-01"));
+  });
 });
