@@ -893,3 +893,78 @@ def test_catalog_lint_reads_a_non_file_catalog_yaml_as_unreadable(
         f"input.catalog_unreadable: the catalog directory {catalog} holds a file or folder"
         " that cannot be read: catalog.yaml."
     ]
+
+
+def _readiness(
+    capsys: pytest.CaptureFixture[str], report: Path, *extra: str
+) -> tuple[int, dict[str, Any]]:
+    code = cli.main(["readiness", str(report), *extra, "--json"])
+    stdout = capsys.readouterr().out
+    return code, json.loads(stdout) if stdout.strip() else {}
+
+
+def test_readiness_refuses_a_catalog_edited_after_signing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """readiness verifies --catalog-dir as assess does, so a severity lowered after signing never
+    reaches the verdict (inbox row 354, 18.184h)."""
+    key = Ed25519PrivateKey.generate()
+    report = tmp_path / "report"
+    assert _assess(capsys, report)[0] in (0, 1)
+    catalog = _copy_catalog(tmp_path / "testcat")
+    _sign_catalog(catalog, key)
+    trust_root = str(_trust_root_file(tmp_path / "trust-root.json", key))
+    code, _ = _readiness(
+        capsys, report, "--catalog-dir", str(catalog), "--trust-root", trust_root
+    )
+    assert code in (0, 1)
+    control = catalog / "controls" / "DOC-01.yaml"
+    control.write_text(
+        control.read_text("utf-8").replace("severity: high", "severity: low"),
+        encoding="utf-8",
+    )
+    for written in report.glob("report-readiness-*.md"):
+        written.unlink()
+    code, envelope = _readiness(
+        capsys, report, "--catalog-dir", str(catalog), "--trust-root", trust_root
+    )
+    assert code == 3
+    assert envelope["error"]["key"] == "input.catalog_unverified"
+    assert not list(report.glob("report-readiness-*.md"))
+
+
+def test_readiness_override_records_the_unverified_catalog(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    report = tmp_path / "report"
+    assert _assess(capsys, report)[0] in (0, 1)
+    catalog = _copy_catalog(tmp_path / "testcat")
+    code, envelope = _readiness(capsys, report, "--catalog-dir", str(catalog))
+    assert (code, envelope["error"]["key"]) == (3, "input.catalog_unverified")
+    code, verdict = _readiness(
+        capsys, report, "--catalog-dir", str(catalog), "--allow-unverified-catalog"
+    )
+    assert code in (0, 1)
+    assert verdict["verdict"] != "READY"
+    assert any("testcat" in line for line in verdict["limitations"])
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        ["--trust-root", ""],
+        ["--trust-root", "/nonexistent/trust-root.json"],
+        ["--allow-unverified-catalog"],
+    ],
+)
+def test_readiness_trust_options_without_a_catalog_dir_are_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], extra: list[str]
+) -> None:
+    report = tmp_path / "report"
+    assert _assess(capsys, report)[0] in (0, 1)
+    code, envelope = _readiness(capsys, report, *extra)
+    assert code == 3
+    assert envelope["error"]["key"] in {
+        "input.trust_root_not_a_file",
+        "input.allow_unverified_requires_catalog_dir",
+    }

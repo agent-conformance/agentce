@@ -198,7 +198,7 @@ _ARGV: dict[str, _ArgvErrors] = {
     "readiness": _ArgvErrors(
         "readiness",
         "input.readiness_unrecognized_flag",
-        "pass --gaps, --deviations, or --catalog-dir, or drop the flag.",
+        "pass --gaps, --deviations, --catalog-dir, --trust-root or --allow-unverified-catalog, or drop the flag.",
         "pass exactly one report directory: `agentce readiness <report-dir>`.",
         value_hint="<path>",
     ),

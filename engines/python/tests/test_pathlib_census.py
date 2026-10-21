@@ -331,3 +331,21 @@ def test_validate_profile_tool_names_an_unreadable_profile(
     assert f"PROFILE INVALID: {inside} could not be read" in capsys.readouterr().err
     assert validate_profile.main([str(tmp_path / "absent.yaml")]) == 1
     assert "is not a file" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["{x", "null", "[]", '{"projects": 3}', '{"projects": null}', '{"projects": [3]}'],
+)
+def test_conformance_refuses_a_corpus_manifest_that_is_not_a_manifest(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], text: str
+) -> None:
+    # Not JSON, or not an object with a projects array: keyed, never a crash (watch 2026-10-21, 18.184h).
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    (corpus / "corpus-manifest.json").write_text(text, encoding="utf-8")
+    code, env = _run(
+        [*_CONFORMANCE, "--corpus", str(corpus), "--out", str(tmp_path / "o")], capsys
+    )
+    assert (code, _key(env)) == (3, "input.corpus_unreadable")
+    assert "corpus-manifest.json" in env["error"]["cause"]

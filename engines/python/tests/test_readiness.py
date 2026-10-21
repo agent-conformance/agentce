@@ -135,23 +135,32 @@ def test_report_file_not_utf8_is_not_ready(tmp_path: Path) -> None:
     assert verdict["reasons"] == ["cannot read report file coverage.json"]
 
 
+def test_empty_coverage_object_stays_ready(tmp_path: Path) -> None:
+    verdict = compute_readiness(_report(tmp_path, coverage={}), severities=_SEVERITIES)
+    assert verdict["verdict"] == READY
+
+
 @pytest.mark.parametrize(
     "coverage",
     [
-        {},
         {"subjects": []},
+        {"subjects": None},
         {"subjects": {"s": 3}},
+        {"subjects": {"s": None}},
+        {"subjects": {"s": {"event_types": []}}},
         {"subjects": {"s": {"event_types": {"t": 3}}}},
     ],
 )
-def test_inner_coverage_entries_that_are_not_objects_are_skipped(
+def test_inner_coverage_entry_of_the_wrong_shape_is_not_ready(
     tmp_path: Path, coverage: dict
 ) -> None:
-    # As TypeScript and Java read them; Python crashed here before 18.184h.
+    # Skipping an unusable entry loses what deleting it would, so it blocks like a malformed file
+    # (R5; watch ruling 2026-10-21 on 18.184h, inbox row 447).
     verdict = compute_readiness(
         _report(tmp_path, coverage=coverage), severities=_SEVERITIES
     )
-    assert verdict["verdict"] == READY
+    assert verdict["verdict"] == NOT_READY
+    assert verdict["reasons"] == ["cannot read report file coverage.json"]
 
 
 @_not_root

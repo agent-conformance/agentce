@@ -192,6 +192,14 @@ def _adapter_claim(detail: dict[str, Any]) -> str:
     return "none"
 
 
+def _manifest_not_an_object(manifest_path: Path, corpus_dir: Path) -> InputError:
+    return InputError(
+        "input.corpus_unreadable",
+        f"{manifest_path} in the corpus folder {corpus_dir} is not a JSON object with a projects array.",
+        "regenerate the corpus manifest, then re-run.",
+    )
+
+
 def run_ecs(
     *,
     engine_path: Path,
@@ -222,7 +230,11 @@ def run_ecs(
             f"{manifest_path} in the corpus folder {corpus_dir} could not be read ({exc.strerror}).",
             "make the corpus folder readable and enterable, then re-run.",
         ) from exc
-    projects = manifest.get("projects", [])
+    except ValueError as exc:  # not UTF-8 or not JSON
+        raise _manifest_not_an_object(manifest_path, corpus_dir) from exc
+    projects = manifest.get("projects", []) if isinstance(manifest, dict) else None
+    if not isinstance(projects, list) or not all(isinstance(p, dict) for p in projects):
+        raise _manifest_not_an_object(manifest_path, corpus_dir)
     identical = 0
     failures: list[dict[str, str]] = []
     summaries: list[dict[str, Any]] = []

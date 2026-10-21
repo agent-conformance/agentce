@@ -1385,6 +1385,37 @@ def test_sign_refuses_a_write_target_linked_outside(
     assert sorted(p.name for p in outside.iterdir()) == ["claim.json"]
 
 
+def test_sign_refuses_a_manifest_linked_outside(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """sign reads and signs manifest.json, so one linked out of the report folder is refused too,
+    before anything is written (18.184h)."""
+    report = _stage4_files(tmp_path / "report")
+    (report / "claim.json").write_text("{}", encoding="utf-8")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "manifest.json").write_text("{}", encoding="utf-8")
+    (report / "manifest.json").symlink_to(outside / "manifest.json")
+    for args in (("--dry-run",), ("--key", str(tmp_path / "missing.pem"))):
+        code, env = run(
+            [
+                "sign",
+                str(report),
+                "--as",
+                "claimant",
+                "--profile",
+                "kms",
+                *args,
+                "--json",
+            ],
+            capsys,
+        )
+        assert (code, env["error"]["key"]) == (3, "sign.claim_outside_report")
+        assert "manifest.json" in env["error"]["cause"]
+    assert (report / "claim.json").read_text(encoding="utf-8") == "{}"
+    assert not (report / "signatures").exists()
+
+
 def test_sign_accepts_a_claim_linked_inside(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

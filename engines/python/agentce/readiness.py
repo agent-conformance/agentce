@@ -98,6 +98,26 @@ def _json_objects(text: str) -> list[dict[str, Any]]:
     return _objects(value)
 
 
+def _object_of_objects(value: Any) -> dict[str, dict[str, Any]]:
+    if not isinstance(value, dict):
+        raise _Unreadable("not a JSON object")
+    _objects(list(value.values()))
+    return value
+
+
+def _coverage(text: str) -> dict[str, Any]:
+    """coverage.json: an object whose ``subjects`` (when present) maps each subject to an object,
+    and each subject's ``event_types`` (when present) maps each type to an object. An entry of
+    another shape makes the file unreadable, never skipped: skipping it loses what deleting it
+    would (SPEC §13.3.4)."""
+    coverage = _json_object(text)
+    if "subjects" in coverage:
+        for entry in _object_of_objects(coverage["subjects"]).values():
+            if "event_types" in entry:
+                _object_of_objects(entry["event_types"])
+    return coverage
+
+
 def _mapping(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
@@ -224,10 +244,8 @@ def compute_readiness(
                 f"integrity {record.get('status')} on stream {record.get('stream')}"
             )
 
-    coverage = report_file("coverage.json", _json_object) or {}
-    for subject, entry in sorted(_mapping(coverage.get("subjects")).items()):
-        if not isinstance(entry, dict):
-            continue
+    coverage = report_file("coverage.json", _coverage) or {}
+    for subject, entry in sorted(coverage.get("subjects", {}).items()):
         if entry.get("coverage_status") == "gap":
             reasons.append(f"coverage shortfall for subject {subject}")
         elif entry.get("coverage_status") == STATUS_UNKNOWN:
@@ -235,10 +253,10 @@ def compute_readiness(
             reasons.append(
                 f"coverage unknown for subject {subject}: no independent denominator"
             )
-        for event_type, detail in sorted(_mapping(entry.get("event_types")).items()):
+        for event_type, detail in sorted(entry.get("event_types", {}).items()):
             # A declared source below the coverage threshold is a shortfall even when another event
             # type has unknown coverage and masks it in the subject-level roll-up (SPEC §13.3.4).
-            if isinstance(detail, dict) and detail.get("status") == "below_threshold":
+            if detail.get("status") == "below_threshold":
                 reasons.append(f"coverage shortfall for {subject} {event_type}")
 
     for statement in report_file("applicability.jsonl", _jsonl) or []:
