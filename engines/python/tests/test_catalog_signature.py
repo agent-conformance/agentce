@@ -679,7 +679,7 @@ def test_a_signed_catalog_file_linked_outside_is_refused(
     assert code == 3
     assert envelope["error"]["key"] == "input.catalog_unverified"
     assert (
-        f"the catalog file {rel} is a link to a file outside"
+        f"the catalog file or folder {rel} is a link to a place outside"
         in envelope["error"]["cause"]
     )
     code, envelope = _assess(
@@ -692,7 +692,7 @@ def test_a_signed_catalog_file_linked_outside_is_refused(
         "--allow-unverified-catalog",
     )
     assert code == 0
-    assert any("link to a file outside" in item for item in envelope["limitations"])
+    assert any("link to a place outside" in item for item in envelope["limitations"])
 
 
 def test_a_signed_catalog_file_linked_inside_is_followed(tmp_path: Path) -> None:
@@ -755,7 +755,7 @@ def test_catalog_sign_and_provenance_lint_refuse_a_control_linked_outside(
     envelope = json.loads(capsys.readouterr().out)
     assert code == 1
     assert envelope["problems"] == [
-        "catalog.link_outside: the catalog file controls/DOC-01.yaml is a link to a file outside"
+        "catalog.link_outside: the catalog file or folder controls/DOC-01.yaml is a link to a place outside"
         " the catalog folder. A signed catalog must hold its own files, because a file kept"
         " elsewhere is not handed over with the catalog."
     ]
