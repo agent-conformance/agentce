@@ -48,11 +48,12 @@ sign_catalog "$work/rebrand-cat" rebrand "$work/rebrand-trust-root.json"
 fi
 if [ "$part" = walk ]; then
 # 18.164: a catalog whose controls/ is a symlink, signed, then edited behind the link; and one with a link
-# back to an ancestor folder.
+# back to an ancestor folder. Signed before controls/ moves out: `catalog sign` refuses a folder linked
+# outside (18.184l, inbox row 397), and the moved folder holds the same bytes, so the signature still covers it.
 cp -R "$work/unsigned-cat" "$work/linked-cat"
+sign_catalog "$work/linked-cat" linked "$work/linked-trust-root.json"
 mv "$work/linked-cat/controls" "$work/linked-controls"
 ln -s "$work/linked-controls" "$work/linked-cat/controls"
-sign_catalog "$work/linked-cat" linked "$work/linked-trust-root.json"
 cp -R "$work/linked-cat" "$work/edited-cat"
 rm "$work/edited-cat/controls"
 cp -R "$work/linked-controls" "$work/edited-controls"
