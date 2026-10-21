@@ -10,6 +10,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -324,5 +325,34 @@ test("bundle member swapped after confinement", () => {
       bundleReadHooks.afterConfine = undefined;
       bundleReadHooks.afterCheck = undefined;
     }
+  });
+});
+
+/** The folder `dir` spelled in upper case, or null where the filesystem tells names apart by case
+ * (KD-441: the case-variant cases discriminate only on a case-insensitive filesystem). */
+function folded(dir: string): string | null {
+  const upper = dir.toUpperCase();
+  return upper !== dir && existsSync(upper) ? upper : null;
+}
+
+test("confineToRoot judges a link spelled with the bundle in another case by folder identity (18.184l)", (t) => {
+  withTempDir((dir) => {
+    const bundle = join(dir, "bundle");
+    mkdirSync(join(bundle, "moved-inside"), { recursive: true });
+    mkdirSync(join(dir, "bundle2"));
+    writeFileSync(join(bundle, "moved-inside", "x.jsonl"), "{}\n");
+    writeFileSync(join(dir, "bundle2", "x.jsonl"), "{}\n");
+    writeFileSync(join(dir, "up.jsonl"), "{}\n");
+    const upper = folded(bundle);
+    if (upper === null) {
+      t.skip("needs a case-insensitive filesystem");
+      return;
+    }
+    symlinkSync(join(upper, "moved-inside", "x.jsonl"), join(bundle, "inside.jsonl"));
+    symlinkSync(join(dir, "bundle2", "x.jsonl").toUpperCase(), join(bundle, "sibling.jsonl"));
+    symlinkSync(join(dir, "up.jsonl").toUpperCase(), join(bundle, "parent.jsonl"));
+    assert.equal(confineToRoot(bundle, "inside.jsonl"), join(bundle, "inside.jsonl"));
+    assert.equal(confineToRoot(bundle, "sibling.jsonl"), null);
+    assert.equal(confineToRoot(bundle, "parent.jsonl"), null);
   });
 });

@@ -3,7 +3,15 @@
  * derived profile and the round trip (VG-RECORDS-FOLDER-PARITY compares the two engines end to end). */
 
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
@@ -376,4 +384,30 @@ test("the derived profile passed back gives the same assertions and writes no pr
     readFileSync(join(work, "first", "assertions.json")),
   );
   assert.throws(() => readFileSync(join(work, "second", "applicability.yaml")));
+});
+
+test("an out folder inside the records folder that cannot be listed collides with the records (18.184l)", (t) => {
+  const root = folder({ "session.json": SESSION, "full/keep.txt": "mine" });
+  mkdirSync(join(root, "empty"));
+  for (const [rel, mode] of [
+    ["full", 0o600],
+    ["full", 0o000],
+    ["empty", 0o000],
+  ] as const) {
+    const out = join(root, rel);
+    chmodSync(out, mode);
+    try {
+      if (mode === 0o000 && process.getuid?.() === 0) {
+        t.skip("this user lists a mode-000 folder");
+        return;
+      }
+      assert.equal(
+        refusal(() => scanRecords(root, { exclude: out })),
+        "input.records_out_collides",
+      );
+    } finally {
+      chmodSync(out, 0o700);
+    }
+  }
+  assert.equal(readFileSync(join(root, "full", "keep.txt"), "utf-8"), "mine");
 });

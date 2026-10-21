@@ -193,4 +193,31 @@ class BundleTest {
         InputError error = assertThrows(InputError.class, () -> Bundle.load(bundle));
         assertEquals("input.bundle_manifest_missing", error.key);
     }
+
+    /** The bundle's own folder spelled in upper case, or null where the filesystem tells names apart
+     * by case (KD-441: these cases discriminate only on a case-insensitive filesystem). */
+    private static Path folded(Path dir) {
+        Path upper = Path.of(dir.toString().toUpperCase(java.util.Locale.ROOT));
+        return !upper.equals(dir) && Files.exists(upper) ? upper : null;
+    }
+
+    @Test
+    void aLinkSpelledWithTheBundleInAnotherCaseIsJudgedByFolderIdentity(@TempDir Path tempDir)
+            throws IOException {
+        Path bundle = Files.createDirectories(tempDir.resolve("bundle").resolve("moved-inside"))
+                .getParent();
+        Files.createDirectories(tempDir.resolve("bundle2"));
+        Files.writeString(bundle.resolve("moved-inside/x.jsonl"), "{}\n");
+        Files.writeString(tempDir.resolve("bundle2/x.jsonl"), "{}\n");
+        Files.writeString(tempDir.resolve("up.jsonl"), "{}\n");
+        Path upper = folded(bundle);
+        org.junit.jupiter.api.Assumptions.assumeTrue(upper != null, "needs a case-insensitive filesystem");
+        Files.createSymbolicLink(bundle.resolve("inside.jsonl"), upper.resolve("moved-inside/x.jsonl"));
+        Files.createSymbolicLink(bundle.resolve("sibling.jsonl"),
+                folded(tempDir.resolve("bundle2")).resolve("x.jsonl"));
+        Files.createSymbolicLink(bundle.resolve("parent.jsonl"), folded(tempDir).resolve("up.jsonl"));
+        assertEquals(bundle.resolve("inside.jsonl"), Bundle.confineToRoot(bundle, "inside.jsonl"));
+        assertNull(Bundle.confineToRoot(bundle, "sibling.jsonl"));
+        assertNull(Bundle.confineToRoot(bundle, "parent.jsonl"));
+    }
 }
