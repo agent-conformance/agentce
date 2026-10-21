@@ -333,6 +333,27 @@ def test_validate_profile_tool_names_an_unreadable_profile(
     assert "is not a file" in capsys.readouterr().err
 
 
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads a mode-000 file")
+def test_conformance_refuses_a_corpus_manifest_at_mode_000(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # The manifest file itself unreadable: keyed, never a crash (18.184h).
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    manifest = corpus / "corpus-manifest.json"
+    manifest.write_text("{}", encoding="utf-8")
+    manifest.chmod(0o000)
+    try:
+        code, env = _run(
+            [*_CONFORMANCE, "--corpus", str(corpus), "--out", str(tmp_path / "o")],
+            capsys,
+        )
+    finally:
+        manifest.chmod(0o600)
+    assert (code, _key(env)) == (3, "input.corpus_unreadable")
+    assert "corpus-manifest.json" in env["error"]["cause"]
+
+
 @pytest.mark.parametrize(
     "text",
     ["{x", "null", "[]", '{"projects": 3}', '{"projects": null}', '{"projects": [3]}'],
