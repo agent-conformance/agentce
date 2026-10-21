@@ -2023,7 +2023,23 @@ function localIsoDate(): string {
  * `_readiness_severities`, `commands/__init__.py:2815-2827`, which has no try/catch around
  * `load_catalog`). A later catalog's control silently overwrites an earlier one sharing an id
  * (plain last-write-wins, matching Python's dict-comprehension). */
-function readinessSeverities(catalogDirs: string[]): Map<string, string> {
+/** Control severities from the catalogs the verdict reads, and the limitations the override records,
+ * as Python's `_readiness_severities`: a `--catalog-dir` is verified against `trust` as assess
+ * verifies it (SPEC §8.7), so a severity edited after signing never reaches the verdict; the bundled
+ * catalogs are the engine's own. `trust` is `undefined` only for `sign`, which takes no
+ * `--catalog-dir`. */
+function readinessSeverities(
+  catalogDirs: string[],
+  trust?: TrustRoot,
+  allowUnverified = false,
+): { severities: Map<string, string>; limitations: string[] } {
+  if (allowUnverified && catalogDirs.length === 0) {
+    throw new InputError(
+      "input.allow_unverified_requires_catalog_dir",
+      "--allow-unverified-catalog was given without --catalog-dir.",
+      "add --catalog-dir <dir>, or drop --allow-unverified-catalog.",
+    );
+  }
   let dirs = catalogDirs;
   if (dirs.length === 0) {
     const base = joinPath(bundledCatalogsDir(), "base");
@@ -2037,16 +2053,20 @@ function readinessSeverities(catalogDirs: string[]): Map<string, string> {
       .map((name) => joinPath(base, name))
       .filter((dir) => existsSync(joinPath(dir, "catalog.yaml")));
   }
+  const catalogs = dirs.map((dir) =>
+    loadCatalog(requireDir(dir, "catalog_dir", "a catalog directory", "pass --catalog-dir <dir>.")),
+  );
+  const limitations =
+    catalogDirs.length > 0
+      ? verifyCatalogDirs(catalogs, trust ?? effectiveTrustRoot(undefined), allowUnverified)
+      : [];
   const severities = new Map<string, string>();
-  for (const dir of dirs) {
-    const catalog = loadCatalog(
-      requireDir(dir, "catalog_dir", "a catalog directory", "pass --catalog-dir <dir>."),
-    );
+  for (const catalog of catalogs) {
     for (const control of catalog.controls) {
       severities.set(control.id, control.severity);
     }
   }
-  return severities;
+  return { severities, limitations };
 }
 
 interface ReadinessArgs {
@@ -2054,6 +2074,8 @@ interface ReadinessArgs {
   gaps: string | undefined;
   deviations: string | undefined;
   catalogDirs: string[];
+  trustRoot: string | undefined;
+  allowUnverified: boolean;
 }
 
 /** A token argparse classifies as an option rather than a value: it starts with `-`, is not a bare
@@ -2085,6 +2107,8 @@ function parseReadinessArgv(argv: string[]): ReadinessArgs {
     gaps: undefined,
     deviations: undefined,
     catalogDirs: [],
+    trustRoot: undefined,
+    allowUnverified: false,
   };
   let optionsEnded = false;
   for (let i = 1; i < argv.length; i++) {
@@ -2096,13 +2120,14 @@ function parseReadinessArgv(argv: string[]): ReadinessArgs {
     if (!optionsEnded && looksLikeOption(token)) {
       const eq = token.indexOf("=");
       const name = eq >= 0 ? token.slice(0, eq) : token;
-      if (GLOBAL_BOOLEAN_FLAGS.has(name)) {
+      if (GLOBAL_BOOLEAN_FLAGS.has(name) || name === "--allow-unverified-catalog") {
         if (eq >= 0) {
           throw readinessUnrecognized(`flag '${name}' takes no value.`, `drop the value: ${name}.`);
         }
+        parsed.allowUnverified ||= name === "--allow-unverified-catalog";
         continue;
       }
-      if (name !== "--gaps" && name !== "--deviations" && name !== "--catalog-dir") {
+      if (!["--gaps", "--deviations", "--catalog-dir", "--trust-root"].includes(name)) {
         throw readinessUnrecognized(`unrecognized flag '${token}'.`, flagFix);
       }
       let value: string;
@@ -2118,6 +2143,8 @@ function parseReadinessArgv(argv: string[]): ReadinessArgs {
       }
       if (name === "--catalog-dir") {
         parsed.catalogDirs.push(value);
+      } else if (name === "--trust-root") {
+        parsed.trustRoot = value;
       } else {
         parsed[name === "--gaps" ? "gaps" : "deviations"] = value;
       }
@@ -2158,8 +2185,14 @@ function cmdReadiness(argv: string[]): CommandResult {
       requireFile(args.deviations, "deviations", "the deviation register"),
     );
   }
-  const severities = readinessSeverities(args.catalogDirs);
-  const verdict = computeReadiness(reportDir, { severities, deviations, gaps });
+  // The trust root is loaded whether or not --catalog-dir is given, as assess loads it: a
+  // --trust-root that is empty, missing or not a trust root is refused, never ignored.
+  const { severities, limitations } = readinessSeverities(
+    args.catalogDirs,
+    effectiveTrustRoot(args.trustRoot),
+    args.allowUnverified,
+  );
+  const verdict = computeReadiness(reportDir, { severities, deviations, gaps, limitations });
   result.data.verdict = verdict.verdict;
   result.data.reasons = verdict.reasons;
   result.data.limitations = verdict.limitations;
@@ -2352,11 +2385,26 @@ function refuseSignTargetsOutside(
 }
 
 /** manifest.json's bytes, which the signature covers: absent, not a regular file or unreadable (mode
- * 000, behind a folder that cannot be entered) is refused, never signed without; matches
- * `_read_sign_manifest`. */
-function readSignManifest(manifestPath: string): Buffer {
+ * 000, behind a folder that cannot be entered) is refused, never signed without; a manifest.json that
+ * links outside the report directory is refused too, so the signature covers a file the folder holds
+ * (by analogy with ruling R7); matches `_read_sign_manifest`. */
+function readSignManifest(reportDir: string): Buffer {
+  const manifestPath = joinPath(reportDir, "manifest.json");
+  let regular = false;
   try {
-    if (statSync(manifestPath).isFile()) {
+    regular = statSync(manifestPath).isFile();
+  } catch {
+    // fall through to the refusal
+  }
+  if (regular && confineToRoot(reportDir, "manifest.json") === null) {
+    throw new InputError(
+      "sign.claim_outside_report",
+      "manifest.json links outside the report directory.",
+      "replace the link with the file itself, inside the report directory.",
+    );
+  }
+  try {
+    if (regular) {
       return readFileSync(manifestPath);
     }
   } catch {
@@ -2442,7 +2490,7 @@ function cmdSign(argv: string[]): CommandResult {
   // The engine refuses to sign a report that is not ready to publish (SPEC §8.5); `sign` never takes
   // its own `--catalog-dir`/`--gaps`/`--deviations` flags, so this always uses the bundled catalogs
   // with no deviations/gaps.
-  const verdict = computeReadiness(reportDir, { severities: readinessSeverities([]) });
+  const verdict = computeReadiness(reportDir, { severities: readinessSeverities([]).severities });
   result.data.readiness = verdict.verdict;
   if (verdict.verdict === NOT_READY) {
     throw new InputError(
@@ -2464,7 +2512,7 @@ function cmdSign(argv: string[]): CommandResult {
   }
   refuseSignTargetsOutside(reportDir, role, profile, writeTrustRoot);
   const claim = readSignClaim(claimPath);
-  const manifest = readSignManifest(joinPath(reportDir, "manifest.json"));
+  const manifest = readSignManifest(reportDir);
 
   if (dryRun) {
     result.note(`dry run: would sign the claim as ${role} (${profile})`);

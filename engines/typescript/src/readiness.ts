@@ -1100,24 +1100,46 @@ function readReportFile(path: string): string | undefined {
   if (!statSync(path).isFile()) {
     throw new Error(`${path} is not a regular file`);
   }
-  return readFileSync(path, "utf-8");
+  // Bytes that are not UTF-8 are unreadable, as Python's strict decode makes them; a BOM is kept, so
+  // JSON.parse refuses it as json.loads does.
+  return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(readFileSync(path));
 }
 
-function parseJsonl(text: string | undefined): Record<string, unknown>[] {
-  const out: Record<string, unknown>[] = [];
-  for (const rawLine of (text ?? "").split("\n")) {
-    const line = rawLine.trim();
-    if (line) {
-      out.push(JSON.parse(line));
-    }
+/** Every entry an object, or the file is unreadable (a report file of the wrong shape). */
+function objects(values: unknown[]): Record<string, unknown>[] {
+  if (!values.every(isRecord)) {
+    throw new Error("an entry is not a JSON object");
   }
-  return out;
+  return values as Record<string, unknown>[];
+}
+
+function parseJsonl(text: string): Record<string, unknown>[] {
+  const lines = text.split("\n").map((line) => line.trim());
+  return objects(lines.filter((line) => line).map((line) => JSON.parse(line) as unknown));
+}
+
+function parseJsonObject(text: string): Record<string, unknown> {
+  const value: unknown = JSON.parse(text);
+  if (!isRecord(value)) {
+    throw new Error("not a JSON object");
+  }
+  return value;
+}
+
+function parseJsonObjects(text: string): Record<string, unknown>[] {
+  const value: unknown = JSON.parse(text);
+  if (!Array.isArray(value)) {
+    throw new Error("not a JSON array");
+  }
+  return objects(value);
 }
 
 export interface ComputeReadinessOptions {
   readonly severities: Map<string, string>;
   readonly deviations?: Record<string, unknown>[];
   readonly gaps?: Set<string>;
+  /** Limitations recorded before the verdict, e.g. a catalog read under --allow-unverified-catalog. */
+  readonly limitations?: readonly string[];
 }
 
 export interface ReadinessVerdict {
@@ -1138,38 +1160,37 @@ export interface ReadinessVerdict {
  * control id, subject, stream name, or drift `ref` can carry arbitrary report content. */
 export function computeReadiness(
   reportDir: string,
-  { severities, deviations, gaps }: ComputeReadinessOptions,
+  { severities, deviations, gaps, limitations: given }: ComputeReadinessOptions,
 ): ReadinessVerdict {
   const gapSet = gaps ?? new Set<string>();
   const reasons: string[] = [];
-  const limitations: string[] = [];
+  const limitations: string[] = [...(given ?? [])];
 
   // A stage-4 input every report has: an absent one is a blocking reason, never an empty file, so
-  // deleting the record of a gap or a break cannot clear it (SPEC §13.3.4).
-  const reportFile = (name: string): string | undefined => {
-    let text: string | undefined;
+  // deleting the record of a gap or a break cannot clear it (SPEC §13.3.4). One that is not UTF-8
+  // JSON of its shape blocks the same way, never a crash and never read as empty.
+  const reportFile = <T>(name: string, parse: (text: string) => T): T | undefined => {
     try {
-      text = readReportFile(joinPath(reportDir, name));
+      const text = readReportFile(joinPath(reportDir, name));
+      if (text !== undefined) {
+        return parse(text);
+      }
     } catch {
       reasons.push(`cannot read report file ${name}`);
       return undefined;
     }
-    if (text === undefined) {
-      reasons.push(`missing report file ${name}`);
-    }
-    return text;
+    reasons.push(`missing report file ${name}`);
+    return undefined;
   };
 
-  for (const record of parseJsonl(reportFile("integrity.jsonl"))) {
+  for (const record of reportFile("integrity.jsonl", parseJsonl) ?? []) {
     const status = record.status;
     if (typeof status === "string" && GAP_INTEGRITY_STATUSES.has(status)) {
       reasons.push(`integrity ${pyStr(status)} on stream ${pyStr(record.stream)}`);
     }
   }
 
-  const coverageText = reportFile("coverage.json");
-  const coverage: Record<string, unknown> =
-    coverageText === undefined ? {} : JSON.parse(coverageText);
+  const coverage = reportFile("coverage.json", parseJsonObject) ?? {};
   const subjects = isRecord(coverage.subjects) ? coverage.subjects : {};
   for (const subject of Object.keys(subjects).sort(byteCompare)) {
     const entry = subjects[subject];
@@ -1193,7 +1214,7 @@ export function computeReadiness(
     }
   }
 
-  for (const statement of parseJsonl(reportFile("applicability.jsonl"))) {
+  for (const statement of reportFile("applicability.jsonl", parseJsonl) ?? []) {
     const driftRaw = pyGet(statement, "drift", []);
     const drift = pyTruthy(driftRaw) && Array.isArray(driftRaw) ? driftRaw : [];
     for (const entry of drift) {
@@ -1202,9 +1223,7 @@ export function computeReadiness(
     }
   }
 
-  const assertionsText = reportFile("assertions.json");
-  const assertions: Record<string, unknown>[] =
-    assertionsText === undefined ? [] : JSON.parse(assertionsText);
+  const assertions = reportFile("assertions.json", parseJsonObjects) ?? [];
   for (const assertion of assertions) {
     if (assertion.outcome !== "insufficient_evidence") {
       continue;

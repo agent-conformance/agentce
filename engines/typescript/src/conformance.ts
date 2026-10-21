@@ -304,7 +304,18 @@ export function runEcs(options: RunEcsOptions): EcsReport {
       ? joinPath(options.outDir, "projects")
       : mkdtempSync(joinPath(tmpdir(), "agentce-ecs-"));
 
-  const manifest = JSON.parse(readFileSync(joinPath(corpusRoot, "corpus-manifest.json"), "utf-8"));
+  const manifestPath = joinPath(corpusRoot, "corpus-manifest.json");
+  let manifestText: string;
+  try {
+    manifestText = readFileSync(manifestPath, "utf-8");
+  } catch (error) {
+    throw new InputError(
+      "input.corpus_unreadable",
+      `${manifestPath} in the corpus folder ${options.corpusDir} could not be read (${(error as NodeJS.ErrnoException).code ?? "unreadable"}).`,
+      "make the corpus folder readable and enterable, then re-run.",
+    );
+  }
+  const manifest = JSON.parse(manifestText);
   const projects: Array<Record<string, unknown>> = Array.isArray(manifest.projects)
     ? manifest.projects
     : [];
