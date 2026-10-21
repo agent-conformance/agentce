@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
@@ -50,6 +51,48 @@ public final class Conformance {
         } catch (IOException | RuntimeException e) {
             return false;
         }
+    }
+
+    /** corpus-manifest.json: UTF-8 JSON, an object whose {@code projects} (when present) is an array of
+     * objects. One it cannot read, or of another shape, is refused {@code input.corpus_unreadable},
+     * never a crash, as Python's {@code run_ecs}. */
+    private static JsonNode readManifest(Path manifestPath, Path corpusDir) {
+        String text;
+        try {
+            text = Files.readString(manifestPath, StandardCharsets.UTF_8);
+        } catch (CharacterCodingException e) {
+            text = null;
+        } catch (IOException e) {
+            String why = e instanceof AccessDeniedException ? "Permission denied" : e.getMessage();
+            throw new InputError(
+                    "input.corpus_unreadable",
+                    manifestPath + " in the corpus folder " + corpusDir + " could not be read (" + why + ").",
+                    "make the corpus folder readable and enterable, then re-run.");
+        }
+        JsonNode manifest = null;
+        if (text != null) {
+            try {
+                manifest = Json.parse(text);
+            } catch (IllegalArgumentException e) {
+                manifest = null;
+            }
+        }
+        boolean shaped = manifest != null && manifest.isObject();
+        if (shaped && manifest.has("projects")) {
+            JsonNode projects = manifest.get("projects");
+            shaped = projects.isArray();
+            for (JsonNode p : projects) {
+                shaped &= p.isObject();
+            }
+        }
+        if (!shaped) {
+            throw new InputError(
+                    "input.corpus_unreadable",
+                    manifestPath + " in the corpus folder " + corpusDir
+                            + " is not a JSON object with a projects array.",
+                    "regenerate the corpus manifest, then re-run.");
+        }
+        return manifest;
     }
 
     private static Corpus materialiseCorpus(Path corpusDir) {
@@ -326,13 +369,10 @@ public final class Conformance {
             throw new IllegalStateException("cannot create the reports directory: " + e.getMessage(), e);
         }
 
-        JsonNode manifest = Json.parseFile(corpus.root.resolve("corpus-manifest.json"));
+        JsonNode manifest = readManifest(corpus.root.resolve("corpus-manifest.json"), corpusDir);
         List<String> projectIds = new ArrayList<>();
-        JsonNode projects = manifest.get("projects");
-        if (projects != null && projects.isArray()) {
-            for (JsonNode p : projects) {
-                projectIds.add(p.get("id").asText());
-            }
+        for (JsonNode p : manifest.path("projects")) {
+            projectIds.add(p.get("id").asText());
         }
         projectIds.sort(Json::byteCompare);
 

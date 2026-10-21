@@ -2212,4 +2212,87 @@ class CliTest {
         assertEquals("none", env.get("claim").asText());
         assertTrue(Files.isRegularFile(out.resolve("implementation-report.json")));
     }
+
+    @Test
+    void signRefusesAManifestLinkedOutside(@TempDir Path dir) throws Exception {
+        Path report = signReportDir(dir);
+        Path outside = Files.createDirectory(dir.resolve("outside"));
+        Files.writeString(outside.resolve("manifest.json"), "{}");
+        Files.delete(report.resolve("manifest.json"));
+        Files.createSymbolicLink(report.resolve("manifest.json"), outside.resolve("manifest.json"));
+        String claim = Files.readString(report.resolve("claim.json"));
+        String missingKey = dir.resolve("missing.pem").toString();
+        for (String[] args : List.of(new String[] {"--dry-run"}, new String[] {"--key", missingKey})) {
+            List<String> argv =
+                    new ArrayList<>(List.of("sign", report.toString(), "--as", "claimant", "--profile", "kms"));
+            argv.addAll(Arrays.asList(args));
+            JsonNode env = runJson(argv.toArray(String[]::new));
+            assertEquals(3, env.get("exit_code").asInt());
+            assertEquals("sign.claim_outside_report", env.get("error").get("message_key").asText());
+            assertTrue(env.get("error").get("detail").asText().contains("manifest.json"));
+        }
+        assertEquals(claim, Files.readString(report.resolve("claim.json")));
+        assertFalse(Files.exists(report.resolve("signatures")));
+    }
+
+    // --- readiness --catalog-dir is verified as assess verifies it (inbox row 354, 18.184h). ---
+
+    private static Path byoReport(Path work) {
+        int code = byoAssess(work).get("exit_code").asInt();
+        assertTrue(code == 0 || code == 1, "assess exited " + code);
+        return work.resolve("out");
+    }
+
+    @Test
+    void readinessRefusesACatalogDirEditedAfterSigning(@TempDir Path work) throws Exception {
+        Path report = byoReport(work);
+        CatalogKey key = CatalogKey.create(work, "signer");
+        Path dir = unsignedCatalogCopy(work, "signed-cat");
+        key.signDir(dir);
+        String trust = key.trustRoot().toString();
+        int verified = runJson("readiness", report.toString(), "--catalog-dir", dir.toString(), "--trust-root", trust)
+                .get("exit_code").asInt();
+        assertTrue(verified == 0 || verified == 1);
+        Path control = dir.resolve("controls/DOC-01.yaml");
+        Files.writeString(control, Files.readString(control).replace("severity: high", "severity: low"));
+        JsonNode env = runJson("readiness", report.toString(), "--catalog-dir", dir.toString(), "--trust-root", trust);
+        assertEquals(3, env.get("exit_code").asInt(), env.toString());
+        assertEquals("input.catalog_unverified", env.get("error").get("message_key").asText());
+    }
+
+    @Test
+    void readinessOverrideReadsAnUnsignedCatalogAndRecordsTheLimitation(@TempDir Path work) throws Exception {
+        Path report = byoReport(work);
+        Path dir = unsignedCatalogCopy(work, "unsigned-cat");
+        assertEquals(3, runJson("readiness", report.toString(), "--catalog-dir", dir.toString())
+                .get("exit_code").asInt());
+        JsonNode env = runJson(
+                "readiness", report.toString(), "--catalog-dir", dir.toString(), "--allow-unverified-catalog");
+        int code = env.get("exit_code").asInt();
+        assertTrue(code == 0 || code == 1, env.toString());
+        JsonNode data = env.has("data") ? env.get("data") : env;
+        assertFalse("READY".equals(data.get("verdict").asText()));
+        boolean named = false;
+        for (JsonNode line : data.get("limitations")) {
+            named |= line.asText().contains("unsigned-cat");
+        }
+        assertTrue(named, env.toString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "--trust-root||input.trust_root_not_a_file",
+        "--trust-root|/nonexistent/trust-root.json|input.trust_root_not_a_file",
+        "--allow-unverified-catalog||input.allow_unverified_requires_catalog_dir"})
+    void readinessTrustOptionsWithoutACatalogDirAreRefused(String spec, @TempDir Path work) {
+        String[] parts = spec.split("\\|", -1);
+        Path report = byoReport(work);
+        List<String> argv = new ArrayList<>(List.of("readiness", report.toString(), parts[0]));
+        if (parts[0].equals("--trust-root")) {
+            argv.add(parts[1]);
+        }
+        JsonNode env = runJson(argv.toArray(String[]::new));
+        assertEquals(3, env.get("exit_code").asInt(), env.toString());
+        assertEquals(parts[2], env.get("error").get("message_key").asText());
+    }
 }

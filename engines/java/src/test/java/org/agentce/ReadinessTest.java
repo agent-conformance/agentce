@@ -841,4 +841,41 @@ class ReadinessTest {
         List<Map<String, Object>> out = Readiness.normalizeDeviationDates(List.of(entry));
         assertEquals(List.of(entry), out);
     }
+
+    /** Not JSON of its shape reads NOT READY, never a crash and never READY (inbox row 393, 18.184h), and so
+     * does an inner coverage entry of the wrong shape (watch ruling 2026-10-21). */
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "coverage.json|null", "coverage.json|[]", "coverage.json|\"x\"", "coverage.json|3", "coverage.json|",
+        "coverage.json|{", "coverage.json|{\"subjects\": []}", "coverage.json|{\"subjects\": null}",
+        "coverage.json|{\"subjects\": {\"s\": 3}}", "coverage.json|{\"subjects\": {\"s\": null}}",
+        "coverage.json|{\"subjects\": {\"s\": {\"event_types\": []}}}",
+        "coverage.json|{\"subjects\": {\"s\": {\"event_types\": {\"t\": 3}}}}",
+        "assertions.json|null", "assertions.json|{}", "assertions.json|", "assertions.json|[3]",
+        "assertions.json|[null]", "integrity.jsonl|not json\n", "integrity.jsonl|3\n", "applicability.jsonl|[]\n"})
+    void aReportFileOfTheWrongShapeIsNotReady(String spec, @TempDir Path dir) throws IOException {
+        String[] parts = spec.split("\\|", 2);
+        writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
+        Files.writeString(dir.resolve(parts[0]), parts[1].replace("\\n", "\n"));
+        Readiness.Verdict verdict = Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of());
+        assertEquals(Readiness.NOT_READY, verdict.verdict());
+        assertEquals(List.of("cannot read report file " + parts[0]), verdict.reasons());
+    }
+
+    @Test
+    void aCoverageFileThatIsNotUtf8IsNotReady(@TempDir Path dir) throws IOException {
+        writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
+        byte[] text = "{\"subjects\": {}}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] bytes = java.util.Arrays.copyOf(text, text.length + 1);
+        bytes[text.length] = (byte) 0xff;
+        Files.write(dir.resolve("coverage.json"), bytes);
+        assertEquals(List.of("cannot read report file coverage.json"),
+                Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).reasons());
+    }
+
+    @Test
+    void anEmptyCoverageObjectStaysReady(@TempDir Path dir) throws IOException {
+        writeReport(dir, Json.nodes().arrayNode(), List.of(), Json.nodes().objectNode(), List.of());
+        assertEquals(Readiness.READY, Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).verdict());
+    }
 }

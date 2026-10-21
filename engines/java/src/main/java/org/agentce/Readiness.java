@@ -1080,12 +1080,31 @@ public final class Readiness {
 
     // --- computeReadiness ------------------------------------------------------------------------
 
+    /** A stage-4 input every report has, parsed: an absent one is a blocking reason, never an empty
+     * file, so deleting the record of a gap or a break cannot clear it (SPEC §13.3.4). One that is not
+     * UTF-8 JSON of its shape blocks the same way, never a crash and never read as empty; either way
+     * {@code empty} is returned. */
+    private static <T> T reportFile(
+            Path reportDir, String name, Function<String, T> parse, T empty, List<String> reasons) {
+        try {
+            String text = readReportFile(reportDir.resolve(name));
+            if (text != null) {
+                return parse.apply(text);
+            }
+        } catch (IOException | Unreadable e) {
+            reasons.add("cannot read report file " + name);
+            return empty;
+        }
+        reasons.add("missing report file " + name);
+        return empty;
+    }
+
     /** The text of one report file, or {@code null} when the report folder has no entry by that name,
      * ported from {@code _read_report_file}. An entry that is there but cannot be read as a regular file
      * (a folder, a dangling link, a link into a folder that can be listed but not entered, a file
      * without read permission) throws {@link IOException}: readiness reports it as a blocking reason
      * rather than reading it as absent, which would let a coverage gap or an integrity break stop
-     * blocking. Text that is not UTF-8 stays an engine error, as before. */
+     * blocking. Text that is not UTF-8 is unreadable the same way (as Python's strict decode makes it). */
     private static String readReportFile(Path path) throws IOException {
         try {
             Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
@@ -1095,17 +1114,80 @@ public final class Readiness {
         if (!Files.isRegularFile(path)) {
             throw new IOException(path + " is not a regular file");
         }
-        try {
-            return Files.readString(path, StandardCharsets.UTF_8);
-        } catch (CharacterCodingException e) {
-            throw new IllegalArgumentException("cannot read JSON " + path + ": " + e.getMessage(), e);
+        return Files.readString(path, StandardCharsets.UTF_8);
+    }
+
+    /** A report file whose content is not JSON of the shape readiness reads. */
+    private static final class Unreadable extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        Unreadable(String message) {
+            super(message);
         }
     }
 
+    private static JsonNode parseJson(String text) {
+        try {
+            return Json.parse(text);
+        } catch (IllegalArgumentException e) {
+            throw new Unreadable(e.getMessage());
+        }
+    }
+
+    /** Every entry an object, or the file is unreadable (a report file of the wrong shape). */
+    private static List<JsonNode> objects(Iterable<JsonNode> values) {
+        List<JsonNode> out = new ArrayList<>();
+        for (JsonNode value : values) {
+            if (!value.isObject()) {
+                throw new Unreadable("an entry is not a JSON object");
+            }
+            out.add(value);
+        }
+        return out;
+    }
+
     private static List<JsonNode> parseJsonl(String text) {
-        return text == null
-                ? List.of()
-                : text.lines().map(String::strip).filter(s -> !s.isEmpty()).map(Json::parse).toList();
+        return objects(text.lines().map(String::strip).filter(s -> !s.isEmpty()).map(Readiness::parseJson).toList());
+    }
+
+    private static JsonNode parseJsonObject(String text) {
+        JsonNode value = parseJson(text);
+        if (!value.isObject()) {
+            throw new Unreadable("not a JSON object");
+        }
+        return value;
+    }
+
+    private static List<JsonNode> parseJsonObjects(String text) {
+        JsonNode value = parseJson(text);
+        if (!value.isArray()) {
+            throw new Unreadable("not a JSON array");
+        }
+        return objects(value);
+    }
+
+    private static void objectOfObjects(JsonNode value) {
+        if (!value.isObject()) {
+            throw new Unreadable("not a JSON object");
+        }
+        objects(value::elements);
+    }
+
+    /** coverage.json: an object whose {@code subjects} (when present) maps each subject to an object,
+     * and each subject's {@code event_types} (when present) maps each type to an object. An entry of
+     * another shape makes the file unreadable, never skipped: skipping it loses what deleting it would
+     * (SPEC §13.3.4). */
+    private static JsonNode parseCoverage(String text) {
+        JsonNode coverage = parseJsonObject(text);
+        if (coverage.has("subjects")) {
+            objectOfObjects(coverage.get("subjects"));
+            for (JsonNode entry : coverage.get("subjects")) {
+                if (entry.has("event_types")) {
+                    objectOfObjects(entry.get("event_types"));
+                }
+            }
+        }
+        return coverage;
     }
 
     /** Returns the readiness verdict for a finished report directory (SPEC §13.3.4 stage 4), ported
@@ -1120,46 +1202,34 @@ public final class Readiness {
      * Json#byteCompare}, never {@code String::compareTo}'s UTF-16 code-unit order. */
     public static Verdict computeReadiness(
             Path reportDir, Map<String, String> severities, List<JsonNode> deviations, Set<String> gaps) {
+        return computeReadiness(reportDir, severities, deviations, gaps, List.of());
+    }
+
+    /** As {@link #computeReadiness(Path, Map, List, Set)}, starting from {@code given} limitations (a
+     * catalog read under {@code --allow-unverified-catalog}). */
+    public static Verdict computeReadiness(
+            Path reportDir, Map<String, String> severities, List<JsonNode> deviations, Set<String> gaps,
+            List<String> given) {
         Set<String> gapSet = gaps != null ? gaps : Set.of();
         List<String> reasons = new ArrayList<>();
-        List<String> limitations = new ArrayList<>();
+        List<String> limitations = new ArrayList<>(given);
 
-        // A stage-4 input every report has: an absent one is a blocking reason, never an empty file,
-        // so deleting the record of a gap or a break cannot clear it (SPEC §13.3.4).
-        Function<String, String> reportFile = name -> {
-            String text;
-            try {
-                text = readReportFile(reportDir.resolve(name));
-            } catch (IOException e) {
-                reasons.add("cannot read report file " + name);
-                return null;
-            }
-            if (text == null) {
-                reasons.add("missing report file " + name);
-            }
-            return text;
-        };
-
-        for (JsonNode record : parseJsonl(reportFile.apply("integrity.jsonl"))) {
+        for (JsonNode record :
+                Readiness.<List<JsonNode>>reportFile(reportDir, "integrity.jsonl", Readiness::parseJsonl, List.of(), reasons)) {
             JsonNode status = record.path("status");
             if (status.isTextual() && GAP_INTEGRITY_STATUSES.contains(status.textValue())) {
                 reasons.add("integrity " + pyStr(status) + " on stream " + pyStr(record.path("stream")));
             }
         }
 
-        String coverageText = reportFile.apply("coverage.json");
-        JsonNode coverage = coverageText == null ? Json.nodes().objectNode() : Json.parse(coverageText);
+        JsonNode coverage =
+                reportFile(reportDir, "coverage.json", Readiness::parseCoverage, Json.nodes().objectNode(), reasons);
         JsonNode subjects = coverage.path("subjects");
         List<String> subjectNames = new ArrayList<>();
-        if (subjects.isObject()) {
-            subjects.fieldNames().forEachRemaining(subjectNames::add);
-        }
+        subjects.fieldNames().forEachRemaining(subjectNames::add);
         subjectNames.sort(Json::byteCompare);
         for (String subject : subjectNames) {
             JsonNode entry = subjects.get(subject);
-            if (!entry.isObject()) {
-                continue;
-            }
             if ("gap".equals(entry.path("coverage_status").asText(null))) {
                 reasons.add("coverage shortfall for subject " + subject);
             } else if ("unknown".equals(entry.path("coverage_status").asText(null))) {
@@ -1167,9 +1237,6 @@ public final class Readiness {
                 reasons.add("coverage unknown for subject " + subject + ": no independent denominator");
             }
             JsonNode eventTypes = entry.path("event_types");
-            if (!eventTypes.isObject()) {
-                continue;
-            }
             List<String> eventTypeNames = new ArrayList<>();
             eventTypes.fieldNames().forEachRemaining(eventTypeNames::add);
             eventTypeNames.sort(Json::byteCompare);
@@ -1177,13 +1244,15 @@ public final class Readiness {
                 JsonNode detail = eventTypes.get(eventType);
                 // A declared source below the coverage threshold is a shortfall even when another
                 // event type has unknown coverage and masks it in the subject-level roll-up (§13.3.4).
-                if (detail.isObject() && "below_threshold".equals(detail.path("status").asText(null))) {
+                if ("below_threshold".equals(detail.path("status").asText(null))) {
                     reasons.add("coverage shortfall for " + subject + " " + eventType);
                 }
             }
         }
 
-        for (JsonNode statement : parseJsonl(reportFile.apply("applicability.jsonl"))) {
+        for (JsonNode statement :
+                Readiness.<List<JsonNode>>reportFile(
+                        reportDir, "applicability.jsonl", Readiness::parseJsonl, List.of(), reasons)) {
             JsonNode driftRaw = pyGet(statement, "drift", Json.nodes().arrayNode());
             JsonNode drift = pyTruthy(driftRaw) && driftRaw.isArray() ? driftRaw : Json.nodes().arrayNode();
             for (JsonNode d : drift) {
@@ -1192,9 +1261,8 @@ public final class Readiness {
             }
         }
 
-        String assertionsText = reportFile.apply("assertions.json");
-        JsonNode assertionsRaw = assertionsText == null ? Json.nodes().arrayNode() : Json.parse(assertionsText);
-        JsonNode assertions = assertionsRaw.isArray() ? assertionsRaw : Json.nodes().arrayNode();
+        List<JsonNode> assertions =
+                reportFile(reportDir, "assertions.json", Readiness::parseJsonObjects, List.of(), reasons);
         for (JsonNode assertion : assertions) {
             if (!"insufficient_evidence".equals(assertion.path("outcome").asText(null))) {
                 continue;

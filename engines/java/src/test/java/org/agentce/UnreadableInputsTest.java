@@ -1,6 +1,7 @@
 package org.agentce;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -123,5 +124,33 @@ class UnreadableInputsTest {
         ObjectNode report = Conformance.runEcs(REPO.resolve("engines/python"), corpus, null);
         assertEquals("pass", report.get("no_ml").asText());
         assertEquals("full", report.get("claim").asText(), report.toString());
+    }
+
+    @Test
+    void aCorpusManifestAtMode000IsRefused(@TempDir Path dir) throws IOException {
+        assumeFalse(ROOT, "root reads a mode 000 file");
+        Path corpus = Files.createDirectory(dir.resolve("corpus"));
+        Path manifest = corpus.resolve("corpus-manifest.json");
+        Files.writeString(manifest, "{\"projects\": []}");
+        Files.setPosixFilePermissions(manifest, PosixFilePermissions.fromString("---------"));
+        try {
+            assertRefused("input.corpus_unreadable", "conformance", "run", "--engine",
+                    REPO.resolve("engines/java").toString(), "--corpus", corpus.toString(),
+                    "--out", dir.resolve("o").toString());
+        } finally {
+            Files.setPosixFilePermissions(manifest, PosixFilePermissions.fromString("rw-------"));
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{x", "null", "[]", "{\"projects\": 3}", "{\"projects\": null}", "{\"projects\": [3]}"})
+    void aCorpusManifestThatIsNotAManifestIsRefusedNeverACrash(String text, @TempDir Path dir) throws IOException {
+        Path corpus = Files.createDirectory(dir.resolve("corpus"));
+        Files.writeString(corpus.resolve("corpus-manifest.json"), text);
+        JsonNode env = Fixtures.runJson("conformance", "run", "--engine", REPO.resolve("engines/java").toString(),
+                "--corpus", corpus.toString(), "--out", dir.resolve("o").toString());
+        assertEquals(3, env.get("exit_code").asInt(), env.toString());
+        assertEquals("input.corpus_unreadable", env.get("error").get("message_key").asText());
+        assertTrue(env.get("error").get("detail").asText().contains("corpus-manifest.json"));
     }
 }

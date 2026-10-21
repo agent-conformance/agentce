@@ -2052,7 +2052,9 @@ global options:
     }
 
     /** {@code agentce readiness}'s parsed args (see {@link #parseReadinessArgs}). */
-    private record ReadinessArgs(String reportDir, String gaps, String deviations, List<String> catalogDirs) {}
+    private record ReadinessArgs(
+            String reportDir, String gaps, String deviations, List<String> catalogDirs, String trustRoot,
+            boolean allowUnverified) {}
 
     /** argparse's {@code ^-\d+$|^-\d*\.\d+$} over a {@code str}: {@code \d} is any Unicode decimal
      * digit (Nd), and {@code $} also matches before one trailing newline. */
@@ -2080,11 +2082,13 @@ global options:
      * skipped, so a mistyped flag can never give a verdict computed without it. An empty
      * {@code --gaps}/{@code --deviations} value is ignored, as Python's {@code if gaps_path:} does. */
     private static ReadinessArgs parseReadinessArgs(String[] args) {
-        String flagFix = "pass --gaps, --deviations, or --catalog-dir, or drop the flag.";
+        String flagFix = "pass --gaps, --deviations, --catalog-dir, --trust-root or --allow-unverified-catalog, or drop the flag.";
         String reportDir = null;
         String gaps = null;
         String deviations = null;
         List<String> catalogDirs = new ArrayList<>();
+        String trustRoot = null;
+        boolean allowUnverified = false;
         boolean optionsEnded = false;
         for (int i = 1; i < args.length; i++) {
             String token = args[i];
@@ -2095,13 +2099,14 @@ global options:
             if (!optionsEnded && looksLikeOption(token)) {
                 int eq = token.indexOf('=');
                 String name = eq >= 0 ? token.substring(0, eq) : token;
-                if (GLOBAL_BOOLEAN_FLAGS.contains(name)) {
+                if (GLOBAL_BOOLEAN_FLAGS.contains(name) || "--allow-unverified-catalog".equals(name)) {
                     if (eq >= 0) {
                         throw readinessUnrecognized("flag '" + name + "' takes no value.", "drop the value: " + name + ".");
                     }
+                    allowUnverified |= "--allow-unverified-catalog".equals(name);
                     continue;
                 }
-                if (!"--gaps".equals(name) && !"--deviations".equals(name) && !"--catalog-dir".equals(name)) {
+                if (!List.of("--gaps", "--deviations", "--catalog-dir", "--trust-root").contains(name)) {
                     throw readinessUnrecognized("unrecognized flag '" + token + "'.", flagFix);
                 }
                 String value;
@@ -2115,6 +2120,8 @@ global options:
                 }
                 if ("--catalog-dir".equals(name)) {
                     catalogDirs.add(value);
+                } else if ("--trust-root".equals(name)) {
+                    trustRoot = value;
                 } else if ("--gaps".equals(name)) {
                     gaps = value;
                 } else {
@@ -2129,7 +2136,7 @@ global options:
             }
             reportDir = token;
         }
-        return new ReadinessArgs(reportDir, gaps, deviations, catalogDirs);
+        return new ReadinessArgs(reportDir, gaps, deviations, catalogDirs, trustRoot, allowUnverified);
     }
 
     /** Every control's severity, from the given {@code --catalog-dir}s, else every vendored base
@@ -2138,8 +2145,19 @@ global options:
      * {@code overlays/}, neither of which matches this method's own throw-on-malformed, {@code
      * base}-only behaviour (mirrors Python's {@code _readiness_severities}, which has no try/catch
      * around {@code load_catalog}). A later catalog's control silently overwrites an earlier one
-     * sharing an id (plain last-write-wins, matching Python's dict-comprehension). */
-    private static Map<String, String> readinessSeverities(List<String> catalogDirs) {
+     * sharing an id (plain last-write-wins, matching Python's dict-comprehension). A {@code
+     * --catalog-dir} is verified against {@code trust} as assess verifies it (SPEC §8.7), so a severity
+     * edited after signing never reaches the verdict; each catalog the override lets through adds a line
+     * to {@code limitations}. {@code trust} is null only for {@code sign}, which takes no {@code
+     * --catalog-dir}. */
+    private static Map<String, String> readinessSeverities(
+            List<String> catalogDirs, Verify.TrustRoot trust, boolean allowUnverified, List<String> limitations) {
+        if (allowUnverified && catalogDirs.isEmpty()) {
+            throw new InputError(
+                    "input.allow_unverified_requires_catalog_dir",
+                    "--allow-unverified-catalog was given without --catalog-dir.",
+                    "add --catalog-dir <dir>, or drop --allow-unverified-catalog.");
+        }
         List<String> dirs = catalogDirs;
         if (dirs.isEmpty()) {
             Path base = Bundled.catalogsDir().resolve("base");
@@ -2160,9 +2178,17 @@ global options:
                 }
             }
         }
-        Map<String, String> severities = new LinkedHashMap<>();
+        List<Catalog> catalogs = new ArrayList<>();
         for (String dir : dirs) {
-            Catalog catalog = Catalog.load(Paths.get(requireDir(dir, "catalog_dir", "a catalog directory", "pass --catalog-dir <dir>.")));
+            catalogs.add(Catalog.load(
+                    Paths.get(requireDir(dir, "catalog_dir", "a catalog directory", "pass --catalog-dir <dir>."))));
+        }
+        if (!catalogDirs.isEmpty()) {
+            limitations.addAll(verifyCatalogDirs(
+                    catalogs, trust != null ? trust : effectiveTrustRoot(null), allowUnverified));
+        }
+        Map<String, String> severities = new LinkedHashMap<>();
+        for (Catalog catalog : catalogs) {
             for (Catalog.ControlSpec control : catalog.controls) {
                 severities.put(control.id, control.severity);
             }
@@ -2200,8 +2226,14 @@ global options:
             deviations = Readiness.loadDeviationRegister(
                     Paths.get(requireFile(deviationsPath, "deviations", "the deviation register")));
         }
-        Map<String, String> severities = readinessSeverities(parsed.catalogDirs());
-        Readiness.Verdict verdict = Readiness.computeReadiness(reportDir, severities, deviations, gaps);
+        // The trust root is loaded whether or not --catalog-dir is given, as assess loads it: a
+        // --trust-root that is empty, missing or not a trust root is refused, never ignored.
+        List<String> catalogLimitations = new ArrayList<>();
+        Map<String, String> severities = readinessSeverities(
+                parsed.catalogDirs(), effectiveTrustRoot(parsed.trustRoot()), parsed.allowUnverified(),
+                catalogLimitations);
+        Readiness.Verdict verdict =
+                Readiness.computeReadiness(reportDir, severities, deviations, gaps, catalogLimitations);
         result.data.put("verdict", verdict.verdict());
         ArrayNode reasonsArr = result.data.putArray("reasons");
         verdict.reasons().forEach(reasonsArr::add);
@@ -2382,11 +2414,19 @@ global options:
     }
 
     /** manifest.json's bytes, which the signature covers: absent, not a regular file or unreadable
-     * (mode 000, behind a folder that cannot be entered) is refused, never signed without; matches
-     * {@code _read_sign_manifest}. */
-    static byte[] readSignManifest(Path manifestPath) {
+     * (mode 000, behind a folder that cannot be entered) is refused, never signed without; a
+     * manifest.json that links outside the report directory is refused too, so the signature covers a
+     * file the folder holds (by analogy with ruling R7); matches {@code _read_sign_manifest}. */
+    static byte[] readSignManifest(Path reportDir) {
+        Path manifestPath = reportDir.resolve("manifest.json");
         try {
             if (Files.isRegularFile(manifestPath)) {
+                if (Bundle.confineToRoot(reportDir, "manifest.json") == null) {
+                    throw new InputError(
+                            "sign.claim_outside_report",
+                            "manifest.json links outside the report directory.",
+                            "replace the link with the file itself, inside the report directory.");
+                }
                 return Files.readAllBytes(manifestPath);
             }
         } catch (IOException | SecurityException e) {
@@ -2485,7 +2525,8 @@ global options:
         // takes its own `--catalog-dir`/`--gaps`/`--deviations` flags, so this always uses the bundled
         // catalogs with no deviations/gaps.
         Readiness.Verdict verdict =
-                Readiness.computeReadiness(reportDir, readinessSeverities(List.of()), List.of(), Set.of());
+                Readiness.computeReadiness(
+                        reportDir, readinessSeverities(List.of(), null, false, new ArrayList<>()), List.of(), Set.of());
         result.data.put("readiness", verdict.verdict());
         if (Readiness.NOT_READY.equals(verdict.verdict())) {
             throw new InputError(
@@ -2505,7 +2546,7 @@ global options:
         }
         refuseSignTargetsOutside(reportDir, role, profile, writeTrustRoot);
         ObjectNode claim = readSignClaim(claimPath);
-        byte[] manifest = readSignManifest(reportDir.resolve("manifest.json"));
+        byte[] manifest = readSignManifest(reportDir);
 
         if (dryRun) {
             result.note("dry run: would sign the claim as " + role + " (" + profile + ")");
