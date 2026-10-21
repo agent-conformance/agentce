@@ -3815,7 +3815,7 @@ def _validate_xml_wellformed(filename: str, data: bytes) -> list[str]:
 
 
 def _validate_jsonl(filename: str, text: str) -> list[str]:
-    """Every non-blank line of ``text`` (:func:`jsonl_lines`) parses as its own JSON object."""
+    """Every non-blank line of ``text`` (:func:`jsonl_lines`) parses as JSON on its own."""
     problems = []
     for i, line in jsonl_lines(text):
         try:

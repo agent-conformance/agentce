@@ -88,6 +88,8 @@ public final class Json {
      * accepts only JSON's whitespace around a value (so a CRLF pair reads as LF) and refuses a VT, FF, NEL,
      * U+2028, no-break space or byte-order mark outside a string, and two values joined by a lone CR.
      * Python's {@code safe_json.jsonl_lines} and {@code json.ts}'s {@code jsonlLines} apply the same rule.
+     * Report files are the engines' own JSON Lines output; evidence input keeps {@code Ingest}'s wider
+     * {@code splitLines} (18.65), where a lone CR also ends a line.
      */
     public static List<Line> jsonlLines(String text) {
         String[] lines = text.split("\n", -1);

@@ -150,43 +150,35 @@ _JSONL_RECORD = {
 _NBSP, _BOM = "\u00a0".encode(), "\ufeff".encode()
 
 
+_SEPARATORS = {
+    "vt": b"\x0b",
+    "ff": b"\x0c",
+    "nel": "\u0085".encode(),
+    "ls": "\u2028".encode(),
+    "ps": "\u2029".encode(),
+    "lone_cr": b"\r",
+}
+_NOT_JSONL = {
+    **{k: lambda r, sep=sep: r + sep + r + b"\n" for k, sep in _SEPARATORS.items()},
+    "lone_cr_no_lf": lambda r: r + b"\r" + r,
+    "lead_nbsp": lambda r: _NBSP + r + b"\n",
+    "lead_bom": lambda r: _BOM + r + b"\n",
+    "trail_nbsp": lambda r: r + _NBSP + b"\n",
+    "nbsp_line": lambda r: _NBSP + b"\n" + r + b"\n",
+    "not_utf8": lambda r: r[:-1] + b', "x": "\xff"}\n',
+}
+_JSONL_OK = {
+    "crlf": lambda r: r + b"\r\n",
+    "space_tab": lambda r: b"\t " + r + b" \t\n",
+    "blank_lines": lambda r: b"\n \n\r\n" + r + b"\n\n",
+    "cr_between_tokens": lambda r: r.replace(b": ", b":\r", 1) + b"\n",
+    "u2028_in_string": lambda r: r[:-1] + ', "x": "a\u2028b"}\n'.encode(),
+    "empty": lambda r: b"",
+}
+
+
 @pytest.mark.parametrize("name", sorted(_JSONL_RECORD))
-@pytest.mark.parametrize(
-    "lines",
-    [
-        lambda r, sep=sep: r + sep + r + b"\n"
-        for sep in (
-            b"\x0b",
-            b"\x0c",
-            "\u0085".encode(),
-            "\u2028".encode(),
-            "\u2029".encode(),
-            b"\r",
-        )
-    ]
-    + [
-        lambda r: r + b"\r" + r,
-        lambda r: _NBSP + r + b"\n",
-        lambda r: _BOM + r + b"\n",
-        lambda r: r + _NBSP + b"\n",
-        lambda r: _NBSP + b"\n" + r + b"\n",
-        lambda r: r[:-1] + b', "x": "\xff"}\n',
-    ],
-    ids=[
-        "vt",
-        "ff",
-        "nel",
-        "ls",
-        "ps",
-        "lone_cr",
-        "lone_cr_no_lf",
-        "lead_nbsp",
-        "lead_bom",
-        "trail_nbsp",
-        "nbsp_line",
-        "not_utf8",
-    ],
-)
+@pytest.mark.parametrize("lines", _NOT_JSONL.values(), ids=_NOT_JSONL.keys())
 def test_jsonl_line_outside_the_line_rule_is_not_ready(
     tmp_path: Path, name: str, lines
 ) -> None:
@@ -199,25 +191,7 @@ def test_jsonl_line_outside_the_line_rule_is_not_ready(
 
 
 @pytest.mark.parametrize("name", sorted(_JSONL_RECORD))
-@pytest.mark.parametrize(
-    "lines",
-    [
-        lambda r: r + b"\r\n",
-        lambda r: b"\t " + r + b" \t\n",
-        lambda r: b"\n \n\r\n" + r + b"\n\n",
-        lambda r: r.replace(b": ", b":\r", 1) + b"\n",
-        lambda r: r.replace(b'": "', '": "\u2028'.encode(), 1) + b"\n",
-        lambda r: b"",
-    ],
-    ids=[
-        "crlf",
-        "space_tab",
-        "blank_lines",
-        "cr_between_tokens",
-        "u2028_in_string",
-        "empty",
-    ],
-)
+@pytest.mark.parametrize("lines", _JSONL_OK.values(), ids=_JSONL_OK.keys())
 def test_jsonl_line_inside_the_line_rule_stays_ready(
     tmp_path: Path, name: str, lines
 ) -> None:

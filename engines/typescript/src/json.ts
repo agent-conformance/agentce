@@ -230,7 +230,9 @@ const PYTHON_CONSTANTS = [
  * and a line holding only space, tab or CR is blank. Every other line is returned as it stands for a
  * strict JSON parser, which accepts only JSON's whitespace around a value (so a CRLF pair reads as LF)
  * and refuses a VT, FF, NEL, U+2028, no-break space or byte-order mark outside a string, and two values
- * joined by a lone CR. Python's `safe_json.jsonl_lines` and `Json.java` apply the same rule. */
+ * joined by a lone CR. Python's `safe_json.jsonl_lines` and `Json.java` apply the same rule. Report files
+ * are the engines' own JSON Lines output; evidence input keeps `ingest.ts`'s wider `splitLines` (18.65),
+ * where a lone CR also ends a line. */
 export function jsonlLines(text: string): Array<[number, string]> {
   return text
     .split("\n")

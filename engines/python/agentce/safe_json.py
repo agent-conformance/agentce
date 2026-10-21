@@ -60,7 +60,9 @@ def jsonl_lines(text: str) -> list[tuple[int, str]]:
     line, and a line holding only space, tab or CR is blank. Every other line is returned as it stands
     for a strict JSON parser, which accepts only JSON's whitespace around a value (so a CRLF pair reads
     as LF) and refuses a VT, FF, NEL, U+2028, no-break space or byte-order mark outside a string, and
-    two values joined by a lone CR. ``json.ts`` and ``Json.java`` apply the same rule."""
+    two values joined by a lone CR. ``json.ts`` and ``Json.java`` apply the same rule. Report files are the
+    engines' own JSON Lines output; evidence input keeps ingest's wider rule (18.65), where a lone CR also
+    ends a line."""
     return [
         (n, line)
         for n, line in enumerate(text.split("\n"), start=1)

@@ -140,8 +140,9 @@ class ReadinessTest {
         cases.put("leading BOM", "﻿" + r + "\n");
         cases.put("trailing NBSP", r + " \n");
         cases.put("NBSP-only line", " \n" + r + "\n");
+        int i = 0;
         for (Map.Entry<String, String> c : cases.entrySet()) {
-            Path dir = Files.createDirectories(tmp.resolve("c" + cases.keySet().stream().toList().indexOf(c.getKey())));
+            Path dir = Files.createDirectories(tmp.resolve("c" + i++));
             writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
             Files.writeString(dir.resolve(name), c.getValue());
             assertEquals(List.of("cannot read report file " + name),
@@ -149,10 +150,8 @@ class ReadinessTest {
         }
         Path dir = Files.createDirectories(tmp.resolve("not-utf8"));
         writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
-        byte[] head = (r.substring(0, r.length() - 1) + ", \"x\": \"").getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        byte[] bytes = java.util.Arrays.copyOf(head, head.length + 4);
-        System.arraycopy(new byte[] {(byte) 0xff, '"', '}', '\n'}, 0, bytes, head.length, 4);
-        Files.write(dir.resolve(name), bytes);
+        Files.writeString(dir.resolve(name), r.substring(0, r.length() - 1) + ", \"x\": \"");
+        Files.write(dir.resolve(name), new byte[] {(byte) 0xff, '"', '}', '\n'}, java.nio.file.StandardOpenOption.APPEND);
         assertEquals(List.of("cannot read report file " + name),
                 Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).reasons(), "not UTF-8");
     }
