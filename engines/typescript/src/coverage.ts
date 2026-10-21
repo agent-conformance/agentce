@@ -9,8 +9,11 @@
  * integer arithmetic so it is cross-language identical.
  */
 
+import { MAX_COUNT } from "./domain";
+import { InputError } from "./errors";
+import { NonCanonicalNumber, parseJson } from "./json";
 import type { CoverageDenominator, Profile, Subject } from "./profile";
-import { byteCompare } from "./util";
+import { byteCompare, decodeUtf8Strict } from "./util";
 
 export const STATUS_COVERED = "covered";
 const STATUS_BELOW = "below_threshold";
@@ -45,13 +48,50 @@ function ratio(observed: number, expected: number): string | null {
   return `${(q / 10000n).toString()}.${frac}`;
 }
 
-function firstNonEmpty(...candidates: unknown[]): Record<string, unknown> {
-  for (const candidate of candidates) {
-    if (isRecord(candidate) && Object.keys(candidate).length > 0) {
-      return candidate;
+function invalidManifest(name: string, why: string): InputError {
+  return new InputError(
+    "input.coverage_denominator_manifest_invalid",
+    `the coverage denominator manifest '${name}' ${why}.`,
+    'write the manifest as one JSON object whose "counts" maps each event type to a whole number of records, 0 or more.',
+  );
+}
+
+/** The manifest's JSON, read as every engine reads it: strict UTF-8 and standard JSON only (18.184j). */
+function loadManifest(name: string, raw: Buffer): unknown {
+  try {
+    return parseJson(decodeUtf8Strict(raw));
+  } catch (exc) {
+    throw invalidManifest(
+      name,
+      `is not JSON (${exc instanceof Error ? exc.message : String(exc)})`,
+    );
+  }
+}
+
+/** `data[key]` as counts: absent is none, anything else must be an object of whole numbers from 0 to 2^53 - 1. A
+ * number with a fraction or exponent, or past that range, reads as a NonCanonicalNumber and is refused. */
+function manifestCounts(
+  name: string,
+  data: Record<string, unknown>,
+  key: string,
+): Record<string, number> {
+  if (!Object.hasOwn(data, key)) {
+    return {};
+  }
+  const declared = data[key];
+  if (!isRecord(declared) || declared instanceof NonCanonicalNumber) {
+    throw invalidManifest(name, `has a '${key}' that is not a JSON object`);
+  }
+  for (const [type, count] of Object.entries(declared)) {
+    if (typeof count !== "number" || !Number.isSafeInteger(count) || count < 0) {
+      const shown = count instanceof NonCanonicalNumber ? count.source : JSON.stringify(count);
+      throw invalidManifest(
+        name,
+        `counts '${type}' as ${shown}, not a whole number from 0 to ${MAX_COUNT}`,
+      );
     }
   }
-  return {};
+  return declared as Record<string, number>;
 }
 
 /** A denominator counts only when it is independent (SPEC §6.5): never one of the subject's own declared evidence
@@ -99,14 +139,12 @@ function declaredCounts(
       return {};
     }
     // The bytes loadBundle checked and hashed, never a second read of the name (18.184f).
-    const data = JSON.parse(raw.toString("utf-8"));
-    if (isRecord(data)) {
-      const declared = firstNonEmpty(data.counts, data.expected);
-      const out: Record<string, number> = {};
-      for (const [key, val] of Object.entries(declared)) {
-        out[key] = Math.trunc(Number(val));
-      }
-      return out;
+    const name = denominator.manifest;
+    const data = loadManifest(name, raw);
+    // A root that is not an object (a number token included) declares no counts: fall through, as Python and Java do.
+    if (isRecord(data) && !(data instanceof NonCanonicalNumber)) {
+      const declared = ["counts", "expected"].map((key) => manifestCounts(name, data, key));
+      return declared.find((found) => Object.keys(found).length > 0) ?? {};
     }
   }
   // Otherwise count the denominator source's own ingested events, per type.

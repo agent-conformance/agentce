@@ -46,7 +46,7 @@ public final class Coverage {
     }
 
     /** {@code observed / expected} to four decimals, banker's rounding, or null when {@code expected <= 0}. */
-    private static String ratio(int observed, int expected) {
+    private static String ratio(int observed, long expected) {
         if (expected <= 0) {
             return null;
         }
@@ -89,19 +89,19 @@ public final class Coverage {
      * The denominator's counts for the types it covers (every type it counts when {@code covers} is empty): both its
      * yardstick and its expected counts (SPEC §6.5).
      */
-    static Map<String, Integer> denominatorCounts(
+    static Map<String, Long> denominatorCounts(
             Profile.CoverageDenominator denominator,
             Profile.Subject subject,
             Map<String, Map<String, Integer>> bySource,
             Map<String, byte[]> members) {
-        Map<String, Integer> counts = declaredCounts(denominator, subject, bySource, members);
+        Map<String, Long> counts = declaredCounts(denominator, subject, bySource, members);
         if (!denominator.covers.isEmpty()) {
             counts.keySet().retainAll(denominator.covers);
         }
         return counts;
     }
 
-    private static Map<String, Integer> declaredCounts(
+    private static Map<String, Long> declaredCounts(
             Profile.CoverageDenominator denominator,
             Profile.Subject subject,
             Map<String, Map<String, Integer>> bySource,
@@ -116,45 +116,69 @@ public final class Coverage {
                 return new LinkedHashMap<>();
             }
             // The bytes Bundle.load checked and hashed, never a second read of the name (18.184f).
-            JsonNode data;
-            try {
-                data = Json.parse(Verify.decodeStrict(raw).toString());
-            } catch (CharacterCodingException e) {
-                throw new IllegalArgumentException(
-                        "cannot read JSON " + denominator.manifest + ": " + e.getMessage(), e);
-            }
+            JsonNode data = loadManifest(denominator.manifest, raw);
+            // A root that is not an object declares no counts: fall through, as Python and TypeScript do.
             if (data != null && data.isObject()) {
-                JsonNode declared = firstNonEmpty(data.get("counts"), data.get("expected"));
-                Map<String, Integer> out = new LinkedHashMap<>();
-                var it = declared.fields();
-                while (it.hasNext()) {
-                    var e = it.next();
-                    out.put(e.getKey(), (int) e.getValue().asDouble());
-                }
-                return out;
+                Map<String, Long> counts = manifestCounts(denominator.manifest, data, "counts");
+                Map<String, Long> expected = manifestCounts(denominator.manifest, data, "expected");
+                return counts.isEmpty() ? expected : counts;
             }
         }
-        Map<String, Integer> counts = new LinkedHashMap<>();
+        Map<String, Long> counts = new LinkedHashMap<>();
         Map<String, Integer> inner = bySource.get(denominator.source);
         if (inner != null) {
             for (Map.Entry<String, Integer> e : inner.entrySet()) {
-                counts.merge(e.getKey(), e.getValue(), Integer::sum);
+                counts.merge(e.getKey(), (long) e.getValue(), Long::sum);
             }
         }
         return counts;
     }
 
-    private static JsonNode firstNonEmpty(JsonNode... candidates) {
-        for (JsonNode candidate : candidates) {
-            if (candidate != null && candidate.isObject() && !candidate.isEmpty()) {
-                return candidate;
-            }
+    private static InputError invalidManifest(String name, String why) {
+        return new InputError(
+                "input.coverage_denominator_manifest_invalid",
+                "the coverage denominator manifest '" + name + "' " + why + ".",
+                "write the manifest as one JSON object whose \"counts\" maps each event type to a whole number of"
+                        + " records, 0 or more.");
+    }
+
+    /** The manifest's JSON, read as every engine reads it: strict UTF-8 and standard JSON only (18.184j). */
+    private static JsonNode loadManifest(String name, byte[] raw) {
+        try {
+            return Json.parse(Verify.decodeStrict(raw).toString());
+        } catch (CharacterCodingException | RuntimeException e) {
+            throw invalidManifest(name, "is not JSON (" + e.getMessage() + ")");
         }
-        return Json.nodes().objectNode();
+    }
+
+    /** {@code data[key]} as counts: absent is none, anything else must be an object of whole numbers from 0 to 2^53 - 1. */
+    private static Map<String, Long> manifestCounts(String name, JsonNode data, String key) {
+        Map<String, Long> out = new LinkedHashMap<>();
+        if (!data.has(key)) {
+            return out;
+        }
+        JsonNode declared = data.get(key);
+        if (!declared.isObject()) {
+            throw invalidManifest(name, "has a '" + key + "' that is not a JSON object");
+        }
+        var it = declared.fields();
+        while (it.hasNext()) {
+            var e = it.next();
+            JsonNode count = e.getValue();
+            boolean whole = count.isIntegralNumber()
+                    && count.bigIntegerValue().signum() >= 0
+                    && count.bigIntegerValue().compareTo(BigInteger.valueOf(DomainBinding.MAX_COUNT)) <= 0;
+            if (!whole) {
+                throw invalidManifest(name, "counts '" + e.getKey() + "' as " + count
+                        + ", not a whole number from 0 to " + DomainBinding.MAX_COUNT);
+            }
+            out.put(e.getKey(), count.longValue());
+        }
+        return out;
     }
 
     private static final class ExpectedEntry {
-        int count = -1;
+        long count = -1;
         List<String> denominators = new ArrayList<>();
     }
 
@@ -173,14 +197,14 @@ public final class Coverage {
 
         ObjectNode subjectsOut = Json.nodes().objectNode();
         for (Profile.Subject subject : profile.subjects) {
-            List<Map.Entry<Profile.CoverageDenominator, Map<String, Integer>>> countsByDenominator = new ArrayList<>();
+            List<Map.Entry<Profile.CoverageDenominator, Map<String, Long>>> countsByDenominator = new ArrayList<>();
             for (Profile.CoverageDenominator d : subject.coverageDenominators) {
                 countsByDenominator.add(Map.entry(d, denominatorCounts(d, subject, bySource, members)));
             }
             // A denominator's own records of a type it covers and counts are the yardstick, not captured operations.
             // One that is not independent, or does not count a type, hides none of that type's events (SPEC §6.5).
             Set<String> yardstick = new HashSet<>();
-            for (Map.Entry<Profile.CoverageDenominator, Map<String, Integer>> e : countsByDenominator) {
+            for (Map.Entry<Profile.CoverageDenominator, Map<String, Long>> e : countsByDenominator) {
                 for (String t : e.getValue().keySet()) {
                     yardstick.add(e.getKey().source + "\u0000" + t);
                 }
@@ -200,13 +224,13 @@ public final class Coverage {
             }
 
             Map<String, ExpectedEntry> expected = new LinkedHashMap<>();
-            for (Map.Entry<Profile.CoverageDenominator, Map<String, Integer>> e : countsByDenominator) {
+            for (Map.Entry<Profile.CoverageDenominator, Map<String, Long>> e : countsByDenominator) {
                 Profile.CoverageDenominator denominator = e.getKey();
-                Map<String, Integer> counts = e.getValue();
+                Map<String, Long> counts = e.getValue();
                 for (String type : counts.keySet()) {
                     types.add(type);
                     ExpectedEntry entry = expected.computeIfAbsent(type, k -> new ExpectedEntry());
-                    int value = counts.get(type);
+                    long value = counts.get(type);
                     if (value > entry.count) {
                         entry.count = value;
                         entry.denominators = new ArrayList<>(List.of(denominator.source));

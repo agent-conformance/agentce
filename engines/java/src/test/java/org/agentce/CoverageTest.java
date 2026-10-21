@@ -1,16 +1,21 @@
 package org.agentce;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Coverage reconciliation is byte-identical to the reference (SPEC §6.5, §8.3): the {@code ok}/{@code
@@ -94,7 +99,7 @@ class CoverageTest {
                 StandardCharsets.UTF_8);
 
         assertEquals(
-                Map.of("ToolCall", 7),
+                Map.of("ToolCall", 7L),
                 Coverage.denominatorCounts(
                         denominator("reference/counts.json"), SUBJECT, BY_SOURCE, membersOf(bundleRoot, LISTED)));
     }
@@ -144,5 +149,65 @@ class CoverageTest {
         assertEquals(1, subject.get("event_types").get("SessionStart").get("observed").asInt());
         assertEquals("unknown", subject.get("event_types").get("SessionStart").get("status").asText());
         assertEquals("unknown", subject.get("coverage_status").asText());
+    }
+
+    // --- 18.184j: every engine refuses the same manifests with one key, never a crash or a truncated count.
+
+    private static Map<String, Long> manifestCounts(String raw) {
+        return manifestCounts(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static Map<String, Long> manifestCounts(byte[] raw) {
+        return Coverage.denominatorCounts(denominator(LISTED), SUBJECT, BY_SOURCE, Map.of(LISTED, raw));
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "not json",
+                "",
+                "{\"counts\": {\"ToolCall\": NaN}}",
+                "{\"counts\": {\"ToolCall\": Infinity}}",
+                "{\"counts\": [3]}",
+                "{\"counts\": []}",
+                "{\"counts\": \"x\"}",
+                "{\"counts\": null}",
+                "{\"counts\": true}",
+                "{\"counts\": {\"ToolCall\": 1}, \"expected\": [1]}",
+                "{\"counts\": {\"ToolCall\": 1}, \"expected\": {\"ToolCall\": -1}}",
+                "{\"counts\": {\"ToolCall\": \"x\"}}",
+                "{\"counts\": {\"ToolCall\": \"1\"}}",
+                "{\"counts\": {\"ToolCall\": -3}}",
+                "{\"counts\": {\"ToolCall\": true}}",
+                "{\"counts\": {\"ToolCall\": null}}",
+                "{\"counts\": {\"ToolCall\": {\"n\": 1}}}",
+                "{\"counts\": {\"ToolCall\": 1.0}}",
+                "{\"counts\": {\"ToolCall\": 1.5}}",
+                "{\"counts\": {\"ToolCall\": 1e0}}",
+                "{\"counts\": {\"ToolCall\": 9007199254740992}}",
+            })
+    void denominatorManifestWithBadCountsIsRefusedNamingTheFile(String raw) {
+        InputError error = assertThrows(InputError.class, () -> manifestCounts(raw));
+        assertEquals("input.coverage_denominator_manifest_invalid", error.key);
+        assertTrue(error.reason.contains(LISTED), error.reason);
+    }
+
+    @Test
+    void denominatorManifestThatIsNotUtf8IsRefused() {
+        byte[] good = "{\"counts\": {\"ToolCall\": 1}}".getBytes(StandardCharsets.UTF_8);
+        byte[] raw = Arrays.copyOf(good, good.length + 1);
+        raw[good.length] = (byte) 0xff;
+        InputError error = assertThrows(InputError.class, () -> manifestCounts(raw));
+        assertEquals("input.coverage_denominator_manifest_invalid", error.key);
+    }
+
+    @Test
+    void denominatorManifestWholeCountsAreReadPastInt32() {
+        assertEquals(Map.of("ToolCall", 0L), manifestCounts("{\"counts\": {\"ToolCall\": 0}}"));
+        assertEquals(Map.of("ToolCall", 3000000000L), manifestCounts("{\"counts\": {\"ToolCall\": 3000000000}}"));
+        assertEquals(
+                Map.of("ToolCall", 9007199254740991L), manifestCounts("{\"counts\": {\"ToolCall\": 9007199254740991}}"));
+        assertEquals(Map.of("ToolCall", 2L), manifestCounts("{\"counts\": {}, \"expected\": {\"ToolCall\": 2}}"));
+        assertEquals(Map.of("ToolCall", 2L), manifestCounts("{\"expected\": {\"ToolCall\": 2}}"));
     }
 }

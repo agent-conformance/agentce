@@ -19,6 +19,7 @@ from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Any
 
 from . import signing
+from .domain import MAX_COUNT
 from .errors import InputError
 from .profile import CoverageDenominator, Profile, Subject
 
@@ -88,23 +89,67 @@ def _declared_counts(
         if signing._too_deep(raw):
             raise InputError(
                 "input.coverage_denominator_manifest_invalid",
-                f"the coverage denominator manifest {denominator.manifest!r} is nested too deeply "
+                f"the coverage denominator manifest '{denominator.manifest}' is nested too deeply "
                 "to parse safely.",
                 "flatten the denominator manifest's structure; it exceeds the engine's safe "
                 "nesting depth.",
             )
-        data = json.loads(raw.decode("utf-8"))
+        data = _load_manifest(denominator.manifest, raw)
         # A root that is not an object declares no counts: fall through, as TypeScript and Java do.
         if isinstance(data, dict):
-            declared = data.get("counts") or data.get("expected") or {}
-            if isinstance(declared, dict):
-                return {str(k): int(v) for k, v in declared.items()}
+            declared = [
+                _counts(denominator.manifest, data, key)
+                for key in ("counts", "expected")
+            ]
+            return next((counts for counts in declared if counts), {})
     # Otherwise count the denominator source's own ingested events, per type.
     counts: dict[str, int] = {}
     for (source, event_type), count in by_source_type.items():
         if source == denominator.source:
             counts[event_type] = counts.get(event_type, 0) + count
     return counts
+
+
+def _invalid_manifest(name: str, why: str) -> InputError:
+    return InputError(
+        "input.coverage_denominator_manifest_invalid",
+        f"the coverage denominator manifest '{name}' {why}.",
+        'write the manifest as one JSON object whose "counts" maps each event type to a whole number of '
+        "records, 0 or more.",
+    )
+
+
+def _reject_constant(token: str) -> Any:
+    raise ValueError(f"{token} is not JSON")
+
+
+def _load_manifest(name: str, raw: bytes) -> Any:
+    """The manifest's JSON, read as every engine reads it: strict UTF-8 and standard JSON only (no NaN or Infinity)."""
+    try:
+        return json.loads(raw.decode("utf-8"), parse_constant=_reject_constant)
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise _invalid_manifest(name, f"is not JSON ({exc})") from None
+
+
+def _counts(name: str, data: dict[str, Any], key: str) -> dict[str, int]:
+    """``data[key]`` as counts: absent is none, anything else must be an object of whole numbers from 0 to 2^53 - 1
+    (18.184j)."""
+    if key not in data:
+        return {}
+    declared = data[key]
+    if not isinstance(declared, dict):
+        raise _invalid_manifest(name, f"has a '{key}' that is not a JSON object")
+    for event_type, count in declared.items():
+        if (
+            isinstance(count, bool)
+            or not isinstance(count, int)
+            or not 0 <= count <= MAX_COUNT
+        ):
+            raise _invalid_manifest(
+                name,
+                f"counts '{event_type}' as {json.dumps(count)}, not a whole number from 0 to {MAX_COUNT}",
+            )
+    return {str(k): v for k, v in declared.items()}
 
 
 def compute_coverage(

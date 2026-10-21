@@ -16,6 +16,7 @@ import { test } from "node:test";
 import { confineToRoot, loadBundle, safeIsFile } from "./bundle";
 import { canonicalString } from "./canonical";
 import { computeCoverage } from "./coverage";
+import { InputError } from "./errors";
 import { profileFromDict } from "./profile";
 
 const TESTDATA = join(__dirname, "..", "testdata");
@@ -244,3 +245,69 @@ test("coverage denominator rewritten after load counts the checked bytes", () =>
     assert.equal(subjects["subj-A"]?.event_types.ToolCall?.expected, 1);
   });
 });
+
+// --- 18.184j: every engine refuses the same manifests with one key, never a crash or a truncated count.
+
+/** The coverage of EVENTS when the listed manifest holds `raw` (the checked bytes, as loadBundle hands them). */
+function coverageWithManifest(raw: string | Buffer): Record<string, unknown> {
+  return computeCoverage(
+    EVENTS,
+    profileWithManifest("reference/counts.json"),
+    new Map([["reference/counts.json", Buffer.from(raw)]]),
+  );
+}
+
+for (const raw of [
+  "not json",
+  "",
+  Buffer.concat([Buffer.from('{"counts": {"ToolCall": 1}}'), Buffer.from([0xff])]),
+  '{"counts": {"ToolCall": NaN}}',
+  '{"counts": {"ToolCall": Infinity}}',
+  '{"counts": [3]}',
+  '{"counts": []}',
+  '{"counts": "x"}',
+  '{"counts": null}',
+  '{"counts": true}',
+  '{"counts": {"ToolCall": 1}, "expected": [1]}',
+  '{"counts": {"ToolCall": 1}, "expected": {"ToolCall": -1}}',
+  '{"counts": {"ToolCall": "x"}}',
+  '{"counts": {"ToolCall": "1"}}',
+  '{"counts": {"ToolCall": -3}}',
+  '{"counts": {"ToolCall": true}}',
+  '{"counts": {"ToolCall": null}}',
+  '{"counts": {"ToolCall": {"n": 1}}}',
+  '{"counts": {"ToolCall": 1.0}}',
+  '{"counts": {"ToolCall": 1.5}}',
+  '{"counts": {"ToolCall": 1e0}}',
+  '{"counts": {"ToolCall": 9007199254740992}}',
+]) {
+  test(`a denominator manifest holding ${JSON.stringify(raw.toString())} is refused naming the file`, () => {
+    assert.throws(
+      () => coverageWithManifest(raw),
+      (exc: unknown) =>
+        exc instanceof InputError &&
+        exc.key === "input.coverage_denominator_manifest_invalid" &&
+        exc.cause.includes("reference/counts.json"),
+    );
+  });
+}
+
+for (const [raw, expected] of [
+  ['{"counts": {"ToolCall": 0}}', 0],
+  ['{"counts": {"ToolCall": 3000000000}}', 3000000000],
+  ['{"counts": {"ToolCall": 9007199254740991}}', 9007199254740991],
+  ['{"counts": {}, "expected": {"ToolCall": 2}}', 2],
+  ['{"expected": {"ToolCall": 2}}', 2],
+] as const) {
+  test(`a denominator manifest holding ${raw} declares ${expected}`, () => {
+    assert.equal(expectedToolCalls(coverageWithManifest(raw)), expected);
+  });
+}
+
+for (const raw of ["[1]", '"counts"', "null", "3", "1.5", "5e3", "9007199254740993"]) {
+  test(`a denominator manifest whose root is ${raw} falls through to the source's own events`, () => {
+    // Not an object, so it declares no counts: the two ToolCalls from the denominator source are expected, as in
+    // Python and Java (a number token that reads as a NonCanonicalNumber is not an object either).
+    assert.equal(expectedToolCalls(coverageWithManifest(raw)), 2);
+  });
+}

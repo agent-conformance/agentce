@@ -569,3 +569,70 @@ def test_coverage_denominator_manifest_with_deep_json_is_refused(
     with pytest.raises(InputError) as excinfo:
         _denominator_counts(denominator, _SUBJECT, {}, _members(bundle_root))
     assert excinfo.value.key == "input.coverage_denominator_manifest_invalid"
+
+
+def _manifest_counts(tmp_path: Path, raw: bytes) -> dict[str, int]:
+    bundle_root = tmp_path / "bundle"
+    (bundle_root / "reference").mkdir(parents=True)
+    (bundle_root / "reference" / "counts.json").write_bytes(raw)
+    denominator = CoverageDenominator(
+        kind="registry",
+        source="urn:src:egress",
+        covers=[],
+        manifest="reference/counts.json",
+    )
+    return _denominator_counts(denominator, _SUBJECT, {}, _members(bundle_root))
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b"not json",
+        b"",
+        b'{"counts": {"ToolCall": 1}}\xff',
+        b'{"counts": {"ToolCall": NaN}}',
+        b'{"counts": {"ToolCall": Infinity}}',
+        b'{"counts": [3]}',
+        b'{"counts": []}',
+        b'{"counts": "x"}',
+        b'{"counts": null}',
+        b'{"counts": true}',
+        b'{"counts": {"ToolCall": 1}, "expected": [1]}',
+        b'{"counts": {"ToolCall": 1}, "expected": {"ToolCall": -1}}',
+        b'{"counts": {"ToolCall": "x"}}',
+        b'{"counts": {"ToolCall": "1"}}',
+        b'{"counts": {"ToolCall": -3}}',
+        b'{"counts": {"ToolCall": true}}',
+        b'{"counts": {"ToolCall": null}}',
+        b'{"counts": {"ToolCall": {"n": 1}}}',
+        b'{"counts": {"ToolCall": 1.0}}',
+        b'{"counts": {"ToolCall": 1.5}}',
+        b'{"counts": {"ToolCall": 1e0}}',
+        b'{"counts": {"ToolCall": 9007199254740992}}',
+    ],
+)
+def test_coverage_denominator_manifest_with_bad_counts_is_refused_naming_the_file(
+    tmp_path: Path, raw: bytes
+) -> None:
+    # 18.184j: every engine refuses the same manifests with one key, never a crash or a truncated count.
+    with pytest.raises(InputError) as excinfo:
+        _manifest_counts(tmp_path, raw)
+    assert excinfo.value.key == "input.coverage_denominator_manifest_invalid"
+    assert "reference/counts.json" in excinfo.value.cause
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (b'{"counts": {"ToolCall": 0}}', {"ToolCall": 0}),
+        (b'{"counts": {"ToolCall": 3000000000}}', {"ToolCall": 3000000000}),
+        (b'{"counts": {"ToolCall": 9007199254740991}}', {"ToolCall": 9007199254740991}),
+        (b'{"counts": {}, "expected": {"ToolCall": 2}}', {"ToolCall": 2}),
+        (b'{"expected": {"ToolCall": 2}}', {"ToolCall": 2}),
+        (b'{"counts": {}}', {}),
+    ],
+)
+def test_coverage_denominator_manifest_whole_counts_are_read(
+    tmp_path: Path, raw: bytes, expected: dict[str, int]
+) -> None:
+    assert _manifest_counts(tmp_path, raw) == expected
