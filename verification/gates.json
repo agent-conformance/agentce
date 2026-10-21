@@ -2178,32 +2178,32 @@
         {
           "description": "Python's loader lists the controls folder instead of the files the digest covers, so a dot-named control file added after signing is read",
           "file": "engines/python/agentce/catalog.py",
-          "search": "    evidence_shape_iris: dict[str, str] = {}\n    for rel in _control_files(files.files):\n        data = yaml.safe_load(files.text(rel))",
-          "replace": "    evidence_shape_iris: dict[str, str] = {}\n    for rel in _control_files({f\"controls/{p.name}\" for p in (directory / \"controls\").iterdir()}):\n        data = yaml.safe_load((directory / rel).read_text(encoding=\"utf-8\"))"
+          "search": "    evidence_shape_iris: dict[str, str] = {}\n    for rel in _control_files(files.files):\n        control = _control_from_dict(_yaml_mapping(files, rel))",
+          "replace": "    evidence_shape_iris: dict[str, str] = {}\n    for rel in _control_files({f\"controls/{p.name}\" for p in (directory / \"controls\").iterdir()}):\n        control = _control_from_dict(yaml.safe_load((directory / rel).read_text(encoding=\"utf-8\")))"
         },
         {
           "description": "TypeScript's loader lists the controls folder instead of the files the digest covers, so a dot-named control file added after signing is read",
           "file": "engines/typescript/src/catalog.ts",
-          "search": "  for (const rel of controlFiles(files.files.keys())) {\n    const data = load(text(rel));",
-          "replace": "  for (const rel of controlFiles(new Set(readdirSync(join(directory, \"controls\")).map((n) => `controls/${n}`)))) {\n    const data = load(readFileSync(join(directory, rel), \"utf-8\"));"
+          "search": "  for (const rel of controlFiles(files.files.keys())) {\n    const control = controlFromDict(catalogMapping(files, rel));",
+          "replace": "  for (const rel of controlFiles(new Set(readdirSync(joinPath(directory, \"controls\")).map((n) => `controls/${n}`)))) {\n    const control = controlFromDict(load(readFileSync(joinPath(directory, rel), \"utf-8\")) as Record<string, unknown>);"
         },
         {
           "description": "Java's loader lists the controls folder instead of the files the digest covers, so a dot-named control file added after signing is read",
           "file": "engines/java/src/main/java/org/agentce/Catalog.java",
-          "search": "        for (String rel : controlFiles(files.files().keySet())) {\n            JsonNode data = readYaml(files, rel);",
-          "replace": "        for (String rel : controlFiles(new HashSet<>(java.util.Arrays.stream(directory.resolve(\"controls\").toFile().list()).map(n -> \"controls/\" + n).toList()))) {\n            JsonNode data = Yaml.parseFile(directory.resolve(rel));"
+          "search": "        for (String rel : controlFiles(files.files().keySet())) {\n            ControlSpec control = controlFromDict(readMapping(files, rel));",
+          "replace": "        for (String rel : controlFiles(new HashSet<>(java.util.Arrays.stream(directory.resolve(\"controls\").toFile().list()).map(n -> \"controls/\" + n).toList()))) {\n            ControlSpec control = controlFromDict(Yaml.parseFile(directory.resolve(rel)));"
         },
         {
           "description": "Python's loader drops the shape membership check, so a shape the digest does not cover is loaded",
           "file": "engines/python/agentce/catalog.py",
-          "search": "            if control.shape_path not in files.files:\n                raise _refuse_uncovered(\n                    _SHAPE_UNRESOLVED, control.id, control.shape_path\n                )\n            shapes.update(\n                parse_shapes_ttl(files.text(control.shape_path), control.shape_path)\n            )",
+          "search": "            if control.shape_path not in files.files:\n                raise _refuse_uncovered(\n                    _SHAPE_UNRESOLVED, control.id, control.shape_path\n                )\n            shapes.update(\n                parse_shapes_ttl(_text(files, control.shape_path), control.shape_path)\n            )",
           "replace": "            shapes.update(\n                parse_shapes_ttl((directory / control.shape_path).read_text(encoding=\"utf-8\"), control.shape_path)\n            )"
         },
         {
           "description": "TypeScript's loader drops the shape membership check, so a shape the digest does not cover is loaded",
           "file": "engines/typescript/src/catalog.ts",
-          "search": "      if (!files.files.has(control.shapePath)) {\n        throw refuseUncovered(SHAPE_UNRESOLVED, control, control.shapePath);\n      }\n      for (const [iri, shape] of parseShapesTtl(text(control.shapePath), control.shapePath)) {",
-          "replace": "      for (const [iri, shape] of parseShapesTtl(readFileSync(join(directory, control.shapePath), \"utf-8\"), control.shapePath)) {"
+          "search": "      if (!files.files.has(control.shapePath)) {\n        throw refuseUncovered(SHAPE_UNRESOLVED, control, control.shapePath);\n      }\n      for (const [iri, shape] of parseShapesTtl(\n        catalogText(files, control.shapePath),\n        control.shapePath,\n      )) {",
+          "replace": "      for (const [iri, shape] of parseShapesTtl(readFileSync(joinPath(directory, control.shapePath), \"utf-8\"), control.shapePath)) {"
         },
         {
           "description": "Java's loader drops the shape membership check, so a shape the digest does not cover is loaded",
@@ -5402,8 +5402,8 @@
         {
           "description": "Python's catalog loader reads each control from disk again instead of the bytes it read",
           "file": "engines/python/agentce/catalog.py",
-          "search": "        data = yaml.safe_load(files.text(rel))\n        control = _control_from_dict(data)\n",
-          "replace": "        data = yaml.safe_load((directory / rel).read_text(encoding=\"utf-8\"))\n        control = _control_from_dict(data)\n"
+          "search": "        control = _control_from_dict(_yaml_mapping(files, rel))\n",
+          "replace": "        control = _control_from_dict(yaml.safe_load((directory / rel).read_text(encoding=\"utf-8\")))\n"
         },
         {
           "description": "Python's catalog sign signs a fresh read of the folder instead of the bytes it linted",
@@ -5414,14 +5414,14 @@
         {
           "description": "TypeScript's catalog loader reads each control from disk again instead of the bytes it read",
           "file": "engines/typescript/src/catalog.ts",
-          "search": "    const data = load(text(rel));\n",
-          "replace": "    const data = load(readFileSync(join(directory, rel), \"utf-8\"));\n"
+          "search": "    const control = controlFromDict(catalogMapping(files, rel));\n",
+          "replace": "    const control = controlFromDict(load(readFileSync(joinPath(directory, rel), \"utf-8\")) as Record<string, unknown>);\n"
         },
         {
           "description": "Java's catalog loader reads each control from disk again instead of the bytes it read",
           "file": "engines/java/src/main/java/org/agentce/Catalog.java",
-          "search": "            JsonNode data = readYaml(files, rel);\n",
-          "replace": "            JsonNode data = Yaml.parseFile(directory.resolve(rel));\n"
+          "search": "            ControlSpec control = controlFromDict(readMapping(files, rel));\n",
+          "replace": "            ControlSpec control = controlFromDict(Yaml.parseFile(directory.resolve(rel)));\n"
         }
       ],
       "fix_hint": "Run verification/gates/catalog_read_once.sh and read which engine and case failed; the one read lives in signing.read_catalog_files / readCatalogFiles (verify.ts) / Catalog.readFiles, and every consumer (loader, signature check, provenance digest, packaging, lint, catalog sign) must take those bytes."
