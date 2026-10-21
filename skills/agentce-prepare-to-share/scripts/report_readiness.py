@@ -8,46 +8,68 @@ the verdict: READY, READY WITH LIMITATIONS, or NOT READY. Exit 0 for the first t
 
 from __future__ import annotations
 
+import argparse
 import re
 import sys
 from pathlib import Path
+from typing import NoReturn
 
 from _common import (
     FINDINGS,
     INPUT_ERROR,
     OK,
-    arg_value,
-    default_catalog_dirs,
     emit,
     run_guarded,
 )
 
 from agentce import readiness
-from agentce.catalog import load_catalog
-from agentce.commands import _load_deviation_register
+from agentce.commands import (
+    _effective_trust_root,
+    _load_deviation_register,
+    _readiness_severities,
+)
 from agentce.errors import AgentceError
 
 
-def _catalog_dirs(argv: list[str]) -> list[Path]:
-    dirs = [
-        Path(argv[i + 1])
-        for i, a in enumerate(argv)
-        if a == "--catalog-dir" and i + 1 < len(argv)
-    ]
-    return dirs or default_catalog_dirs()
+class _ArgError(Exception):
+    """A malformed command line: refused, never read as a missing option."""
 
 
-def _severities(argv: list[str]) -> dict[str, str]:
-    severities: dict[str, str] = {}
-    for directory in _catalog_dirs(argv):
-        for control in load_catalog(directory).controls:
-            severities[control.id] = control.severity
-    return severities
+class _Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> NoReturn:
+        raise _ArgError(message)
+
+
+def _parse(argv: list[str]) -> argparse.Namespace:
+    """The options as `agentce readiness` reads them: `--flag=value` is the same as `--flag value`, a
+    repeated single-value option keeps its last value, and a flag without its value is refused."""
+    p = _Parser(prog="report_readiness", add_help=False, allow_abbrev=False)
+    p.add_argument("--report")
+    p.add_argument("--gaps")
+    p.add_argument("--deviations")
+    p.add_argument("--catalog-dir", dest="catalog_dir", action="append")
+    p.add_argument("--trust-root", dest="trust_root")
+    p.add_argument(
+        "--allow-unverified-catalog",
+        dest="allow_unverified_catalog",
+        action="store_true",
+    )
+    p.add_argument("--json", action="store_true")
+    return p.parse_args(argv)
 
 
 def body(argv: list[str]) -> int:
     want_json = "--json" in argv
-    report = arg_value(argv, "--report")
+    try:
+        ns = _parse(argv)
+    except _ArgError as exc:
+        emit(
+            {"status": "input_error", "message": str(exc)},
+            want_json=want_json,
+            human=f"INPUT ERROR: {exc}",
+        )
+        return INPUT_ERROR
+    report = ns.report
     if not report or not Path(report).is_dir():
         emit(
             {"status": "input_error", "message": "pass --report <report-dir>"},
@@ -56,25 +78,31 @@ def body(argv: list[str]) -> int:
         )
         return INPUT_ERROR
     gaps: set[str] = set()
-    gaps_file = arg_value(argv, "--gaps")
+    gaps_file = ns.gaps
     if gaps_file:
         gaps = set(
             re.findall(r"\b[A-Z]{2,4}-[0-9]{2}\b", Path(gaps_file).read_text("utf-8"))
         )
     deviations: list[dict] = []
-    dev_file = arg_value(argv, "--deviations")
-    if dev_file:
-        try:
+    dev_file = ns.deviations
+    try:
+        if dev_file:
             deviations = _load_deviation_register(Path(dev_file))
-        except AgentceError as exc:
-            emit(
-                {"status": "input_error", "message": str(exc)},
-                want_json=want_json,
-                human=f"INPUT ERROR: {exc}",
-            )
-            return INPUT_ERROR
+        # --catalog-dir is verified as `agentce readiness` verifies it (SPEC §8.7).
+        severities, limitations = _readiness_severities(ns, _effective_trust_root(ns))
+    except AgentceError as exc:
+        emit(
+            {"status": "input_error", "message": str(exc)},
+            want_json=want_json,
+            human=f"INPUT ERROR: {exc}",
+        )
+        return INPUT_ERROR
     verdict = readiness.compute_readiness(
-        Path(report), severities=_severities(argv), deviations=deviations, gaps=gaps
+        Path(report),
+        severities=severities,
+        deviations=deviations,
+        gaps=gaps,
+        limitations=limitations,
     )
     emit(
         verdict,

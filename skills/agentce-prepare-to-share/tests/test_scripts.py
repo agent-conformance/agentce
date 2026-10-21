@@ -95,6 +95,54 @@ def test_report_readiness_not_ready_on_integrity(tmp_path: Path, capsys) -> None
     assert json.loads(capsys.readouterr().out)["verdict"] == "NOT READY"
 
 
+def _edited_catalog(tmp_path: Path) -> Path:
+    """The engine's signed baseline catalog with one severity lowered after signing."""
+    from agentce.bundled import catalogs_dir
+
+    cat = tmp_path / "cat"
+    shutil.copytree(catalogs_dir() / "base" / "baseline", cat)
+    control = next((cat / "controls").glob("*.yaml"))
+    text = control.read_text(encoding="utf-8")
+    control.write_text(
+        re.sub(r"severity: \w+", "severity: low", text, count=1), encoding="utf-8"
+    )
+    return cat
+
+
+def test_report_readiness_refuses_a_catalog_edited_after_signing(
+    tmp_path: Path, capsys
+) -> None:
+    report = _report(tmp_path, [])
+    argv = [
+        "--report",
+        str(report),
+        "--catalog-dir",
+        str(_edited_catalog(tmp_path)),
+        "--json",
+    ]
+    assert report_readiness.body(argv) == INPUT_ERROR
+    assert "input.catalog_unverified" in json.loads(capsys.readouterr().out)["message"]
+
+
+def test_report_readiness_records_the_unverified_catalog_override(
+    tmp_path: Path, capsys
+) -> None:
+    report = _report(tmp_path, [])
+    cat = _edited_catalog(tmp_path)
+    argv = [
+        "--report",
+        str(report),
+        "--catalog-dir",
+        str(cat),
+        "--allow-unverified-catalog",
+        "--json",
+    ]
+    assert report_readiness.body(argv) == OK
+    verdict = json.loads(capsys.readouterr().out)
+    assert verdict["verdict"] == "READY WITH LIMITATIONS"
+    assert any("--allow-unverified-catalog" in line for line in verdict["limitations"])
+
+
 def test_report_readiness_accepts_an_unquoted_yaml_expiry_the_same_way_assess_does(
     tmp_path: Path, capsys
 ) -> None:
@@ -505,3 +553,41 @@ def test_skill_is_for_the_coding_assistant_and_never_signs() -> None:
     assert "never for the agent being checked" in " ".join(front["description"].split())
     skill = _SKILL_MD.read_text(encoding="utf-8")
     assert "and never signs anything." in " ".join(skill.split())
+
+
+def test_report_readiness_reads_trust_root_as_the_engine_does(
+    tmp_path: Path, capsys
+) -> None:
+    report = _report(tmp_path, [])
+    missing = str(tmp_path / "nope.json")
+    for argv in (
+        [f"--trust-root={missing}"],
+        ["--trust-root", ""],
+        ["--trust-root", "/dev/null", "--trust-root", missing],
+    ):
+        assert (
+            report_readiness.body(["--report", str(report), *argv, "--json"])
+            == INPUT_ERROR
+        )
+        assert (
+            "input.trust_root_not_a_file"
+            in json.loads(capsys.readouterr().out)["message"]
+        )
+    for argv in (["--trust-root"], ["--allow-unverified-catalog=1"], ["--catalog-dir"]):
+        assert (
+            report_readiness.body(["--report", str(report), *argv, "--json"])
+            == INPUT_ERROR
+        )
+        capsys.readouterr()
+
+
+def test_report_readiness_reads_an_equals_catalog_dir(tmp_path: Path, capsys) -> None:
+    report = _report(tmp_path, [])
+    argv = [
+        "--report",
+        str(report),
+        f"--catalog-dir={_edited_catalog(tmp_path)}",
+        "--json",
+    ]
+    assert report_readiness.body(argv) == INPUT_ERROR
+    assert "input.catalog_unverified" in json.loads(capsys.readouterr().out)["message"]

@@ -3358,7 +3358,7 @@ def cmd_sign(ns: argparse.Namespace) -> CommandResult:
 
     # The engine refuses to sign a report that is not ready to publish (SPEC §8.5).
     verdict = readiness.compute_readiness(
-        report_dir, severities=_readiness_severities(ns)
+        report_dir, severities=_readiness_severities(ns)[0]
     )
     result.data["readiness"] = verdict["verdict"]
     if verdict["verdict"] == readiness.NOT_READY:
@@ -3379,7 +3379,7 @@ def cmd_sign(ns: argparse.Namespace) -> CommandResult:
         )
     _refuse_sign_targets_outside(report_dir, role, profile, write_trust_root)
     claim = _read_sign_claim(claim_path)
-    manifest = _read_sign_manifest(report_dir / "manifest.json")
+    manifest = _read_sign_manifest(report_dir)
 
     if dry_run:
         result.note(f"dry run: would sign the claim as {role} ({profile})")
@@ -3473,11 +3473,20 @@ def _refuse_sign_targets_outside(
             )
 
 
-def _read_sign_manifest(manifest_path: Path) -> bytes:
+def _read_sign_manifest(report_dir: Path) -> bytes:
     """manifest.json's bytes, which the signature covers: absent, not a regular file or unreadable
-    (mode 000, behind a folder that cannot be entered) is refused, never signed without."""
+    (mode 000, behind a folder that cannot be entered) is refused, never signed without; a
+    manifest.json that links outside the report directory is refused too, so the signature covers a
+    file the folder holds (by analogy with ruling R7)."""
+    manifest_path = report_dir / "manifest.json"
     try:
         if signing.is_regular_file(manifest_path):
+            if confine_to_root(report_dir, "manifest.json") is None:
+                raise InputError(
+                    "sign.claim_outside_report",
+                    "manifest.json links outside the report directory.",
+                    "replace the link with the file itself, inside the report directory.",
+                )
             return manifest_path.read_bytes()
     except OSError:
         pass
@@ -3750,19 +3759,42 @@ def _cmd_catalog_sign(ns: argparse.Namespace) -> CommandResult:
     return result
 
 
-def _readiness_severities(ns: argparse.Namespace) -> dict[str, str]:
+def _readiness_severities(
+    ns: argparse.Namespace, trust_root: signing.TrustRoot | None = None
+) -> tuple[dict[str, str], list[str]]:
+    """Control severities from the catalogs the verdict reads, and the limitations the override
+    records. A ``--catalog-dir`` is verified as assess verifies it (SPEC §8.7), so a severity edited
+    after signing never reaches the verdict; the bundled catalogs are the engine's own. ``trust_root``
+    is the effective root when the caller has already loaded it."""
     dirs = list(getattr(ns, "catalog_dir", None) or [])
-    if not dirs:
-        base = bundled.catalogs_dir() / "base"
-        dirs = [str(p.parent) for p in sorted(base.glob("*/catalog.yaml"))]
-    severities: dict[str, str] = {}
-    for directory in dirs:
-        catalog = load_catalog(
-            _require_dir(directory, key="catalog_dir", what="a catalog directory")
+    allow_unverified = _flag(ns, "allow_unverified_catalog")
+    if allow_unverified and not dirs:
+        raise InputError(
+            "input.allow_unverified_requires_catalog_dir",
+            "--allow-unverified-catalog was given without --catalog-dir.",
+            "add --catalog-dir <dir>, or drop --allow-unverified-catalog.",
         )
+    limitations: list[str] = []
+    if dirs:
+        catalogs = [
+            load_catalog(
+                _require_dir(directory, key="catalog_dir", what="a catalog directory")
+            )
+            for directory in dirs
+        ]
+        limitations = _verify_catalog_dirs(
+            catalogs,
+            trust_root or _effective_trust_root(ns),
+            allow_unverified=allow_unverified,
+        )
+    else:
+        base = bundled.catalogs_dir() / "base"
+        catalogs = [load_catalog(p.parent) for p in sorted(base.glob("*/catalog.yaml"))]
+    severities: dict[str, str] = {}
+    for catalog in catalogs:
         for control in catalog.controls:
             severities[control.id] = control.severity
-    return severities
+    return severities, limitations
 
 
 def cmd_readiness(ns: argparse.Namespace) -> CommandResult:
@@ -3791,11 +3823,17 @@ def cmd_readiness(ns: argparse.Namespace) -> CommandResult:
         deviations = _load_deviation_register(
             _require_file(dev_path, key="deviations", what="the deviation register")
         )
+    # The trust root is loaded whether or not --catalog-dir is given, as assess loads it: a
+    # --trust-root that is empty, missing or not a trust root is refused, never ignored.
+    severities, catalog_limitations = _readiness_severities(
+        ns, _effective_trust_root(ns)
+    )
     verdict = readiness.compute_readiness(
         report_dir,
-        severities=_readiness_severities(ns),
+        severities=severities,
         deviations=deviations,
         gaps=gaps,
+        limitations=catalog_limitations,
     )
     result.data.update(verdict)
     out = report_dir / f"report-readiness-{date.today().isoformat()}.md"

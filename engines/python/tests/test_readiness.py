@@ -98,6 +98,62 @@ def _unreadable(report: Path, name: str, shape: str, tmp_path: Path) -> Path | N
     return None
 
 
+_MALFORMED = [
+    ("coverage.json", "null"),
+    ("coverage.json", "[]"),
+    ("coverage.json", '"x"'),
+    ("coverage.json", "3"),
+    ("coverage.json", ""),
+    ("coverage.json", "{"),
+    ("assertions.json", "null"),
+    ("assertions.json", "{}"),
+    ("assertions.json", ""),
+    ("assertions.json", "[3]"),
+    ("assertions.json", "[null]"),
+    ("integrity.jsonl", "not json\n"),
+    ("integrity.jsonl", "3\n"),
+    ("applicability.jsonl", "[]\n"),
+]
+
+
+@pytest.mark.parametrize(("name", "text"), _MALFORMED)
+def test_report_file_of_the_wrong_shape_is_not_ready(
+    tmp_path: Path, name: str, text: str
+) -> None:
+    # Not JSON of its shape reads NOT READY, never a crash and never READY (inbox row 393, 18.184h).
+    report = _report(tmp_path)
+    (report / name).write_text(text, encoding="utf-8")
+    verdict = compute_readiness(report, severities=_SEVERITIES)
+    assert verdict["verdict"] == NOT_READY
+    assert verdict["reasons"] == [f"cannot read report file {name}"]
+
+
+def test_report_file_not_utf8_is_not_ready(tmp_path: Path) -> None:
+    report = _report(tmp_path)
+    (report / "coverage.json").write_bytes(b'{"subjects": {}}\xff')
+    verdict = compute_readiness(report, severities=_SEVERITIES)
+    assert verdict["reasons"] == ["cannot read report file coverage.json"]
+
+
+@pytest.mark.parametrize(
+    "coverage",
+    [
+        {},
+        {"subjects": []},
+        {"subjects": {"s": 3}},
+        {"subjects": {"s": {"event_types": {"t": 3}}}},
+    ],
+)
+def test_inner_coverage_entries_that_are_not_objects_are_skipped(
+    tmp_path: Path, coverage: dict
+) -> None:
+    # As TypeScript and Java read them; Python crashed here before 18.184h.
+    verdict = compute_readiness(
+        _report(tmp_path, coverage=coverage), severities=_SEVERITIES
+    )
+    assert verdict["verdict"] == READY
+
+
 @_not_root
 @pytest.mark.parametrize("name", _REPORT_FILES)
 @pytest.mark.parametrize(

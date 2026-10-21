@@ -16,12 +16,15 @@ import re
 from datetime import date, datetime
 from importlib import resources
 from pathlib import Path
-from typing import Any
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 import jsonschema
 
 from .coverage import STATUS_UNKNOWN
 from .signing import is_regular_file
+
+_T = TypeVar("_T")
 
 READY = "READY"
 READY_WITH_LIMITATIONS = "READY WITH LIMITATIONS"
@@ -59,9 +62,44 @@ def _read_report_file(path: Path) -> str | None:
     return path.read_text(encoding="utf-8")
 
 
-def _jsonl(text: str | None) -> list[dict[str, Any]]:
-    lines = (line.strip() for line in (text or "").splitlines())
-    return [json.loads(line) for line in lines if line]
+class _Unreadable(ValueError):
+    """A report file whose content is not JSON of the shape readiness reads."""
+
+
+def _parse_json(text: str) -> Any:
+    try:
+        return json.loads(text)
+    except ValueError as exc:
+        raise _Unreadable(str(exc)) from exc
+
+
+def _objects(values: list[Any]) -> list[dict[str, Any]]:
+    if not all(isinstance(value, dict) for value in values):
+        raise _Unreadable("an entry is not a JSON object")
+    return values
+
+
+def _jsonl(text: str) -> list[dict[str, Any]]:
+    lines = (line.strip() for line in text.splitlines())
+    return _objects([_parse_json(line) for line in lines if line])
+
+
+def _json_object(text: str) -> dict[str, Any]:
+    value = _parse_json(text)
+    if not isinstance(value, dict):
+        raise _Unreadable("not a JSON object")
+    return value
+
+
+def _json_objects(text: str) -> list[dict[str, Any]]:
+    value = _parse_json(text)
+    if not isinstance(value, list):
+        raise _Unreadable("not a JSON array")
+    return _objects(value)
+
+
+def _mapping(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
 
 
 def _schema(name: str) -> dict[str, Any]:
@@ -153,6 +191,7 @@ def compute_readiness(
     severities: dict[str, str],
     deviations: list[dict[str, Any]] | None = None,
     gaps: set[str] | None = None,
+    limitations: list[str] | None = None,
 ) -> dict[str, Any]:
     """Return the readiness verdict for a finished report directory (SPEC §13.3.4 stage 4).
 
@@ -163,29 +202,32 @@ def compute_readiness(
     always block."""
     gaps = gaps or set()
     reasons: list[str] = []
-    limitations: list[str] = []
+    limitations = list(limitations or [])
 
-    def report_file(name: str) -> str | None:
+    def report_file(name: str, parse: Callable[[str], _T]) -> _T | None:
         """A stage-4 input every report has: an absent one is a blocking reason, never an empty
-        file, so deleting the record of a gap or a break cannot clear it (SPEC §13.3.4)."""
+        file, so deleting the record of a gap or a break cannot clear it (SPEC §13.3.4). One that
+        is not UTF-8 JSON of its shape blocks the same way, never a crash and never read as empty."""
         try:
             text = _read_report_file(report_dir / name)
-        except OSError:
+            if text is not None:
+                return parse(text)
+        except (OSError, UnicodeDecodeError, _Unreadable):
             reasons.append(f"cannot read report file {name}")
             return None
-        if text is None:
-            reasons.append(f"missing report file {name}")
-        return text
+        reasons.append(f"missing report file {name}")
+        return None
 
-    for record in _jsonl(report_file("integrity.jsonl")):
+    for record in report_file("integrity.jsonl", _jsonl) or []:
         if record.get("status") in _BAD_INTEGRITY:
             reasons.append(
                 f"integrity {record.get('status')} on stream {record.get('stream')}"
             )
 
-    coverage_text = report_file("coverage.json")
-    coverage = json.loads(coverage_text) if coverage_text is not None else {}
-    for subject, entry in sorted((coverage.get("subjects") or {}).items()):
+    coverage = report_file("coverage.json", _json_object) or {}
+    for subject, entry in sorted(_mapping(coverage.get("subjects")).items()):
+        if not isinstance(entry, dict):
+            continue
         if entry.get("coverage_status") == "gap":
             reasons.append(f"coverage shortfall for subject {subject}")
         elif entry.get("coverage_status") == STATUS_UNKNOWN:
@@ -193,20 +235,21 @@ def compute_readiness(
             reasons.append(
                 f"coverage unknown for subject {subject}: no independent denominator"
             )
-        for event_type, detail in sorted((entry.get("event_types") or {}).items()):
+        for event_type, detail in sorted(_mapping(entry.get("event_types")).items()):
             # A declared source below the coverage threshold is a shortfall even when another event
             # type has unknown coverage and masks it in the subject-level roll-up (SPEC §13.3.4).
-            if detail.get("status") == "below_threshold":
+            if isinstance(detail, dict) and detail.get("status") == "below_threshold":
                 reasons.append(f"coverage shortfall for {subject} {event_type}")
 
-    for statement in _jsonl(report_file("applicability.jsonl")):
-        for drift in statement.get("drift", []) or []:
+    for statement in report_file("applicability.jsonl", _jsonl) or []:
+        drifts = statement.get("drift")
+        for raw in drifts if isinstance(drifts, list) else []:
+            drift = _mapping(raw)
             reasons.append(
                 f"applicability drift: {drift.get('kind')} {drift.get('ref')}"
             )
 
-    assertions_text = report_file("assertions.json")
-    assertions = json.loads(assertions_text) if assertions_text is not None else []
+    assertions = report_file("assertions.json", _json_objects) or []
     for assertion in assertions:
         if assertion.get("outcome") != "insufficient_evidence":
             continue

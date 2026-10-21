@@ -213,9 +213,15 @@ def run_ecs(
         else Path(tempfile.mkdtemp(prefix="agentce-ecs-"))
     )
 
-    manifest = json.loads(
-        (corpus_root / "corpus-manifest.json").read_text(encoding="utf-8")
-    )
+    manifest_path = corpus_root / "corpus-manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise InputError(
+            "input.corpus_unreadable",
+            f"{manifest_path} in the corpus folder {corpus_dir} could not be read ({exc.strerror}).",
+            "make the corpus folder readable and enterable, then re-run.",
+        ) from exc
     projects = manifest.get("projects", [])
     identical = 0
     failures: list[dict[str, str]] = []

@@ -767,7 +767,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--catalog-dir",
         dest="catalog_dir",
         action="append",
-        help="a catalog directory whose control severities the verdict reads (repeatable)",
+        help="a catalog directory whose control severities the verdict reads (repeatable); "
+        "verified as assess verifies it",
+    )
+    p.add_argument(
+        "--trust-root",
+        dest="trust_root",
+        help="trust root every --catalog-dir signature is verified against (default: "
+        "AGENTCE_TRUST_ROOT, else the vendored development root)",
+    )
+    p.add_argument(
+        "--allow-unverified-catalog",
+        dest="allow_unverified_catalog",
+        action="store_true",
+        help="read a --catalog-dir catalog whose signature is absent or does not verify, "
+        "recording the override as a limitation in the verdict (SPEC 8.7). Requires --catalog-dir.",
     )
     p.set_defaults(func=commands.cmd_readiness)
 
