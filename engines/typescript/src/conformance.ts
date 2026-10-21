@@ -293,7 +293,6 @@ export interface RunEcsOptions {
   runAdapters?: AdapterRunner;
 }
 
-/** Run every corpus project through the engine and return the implementation report. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -307,7 +306,7 @@ function parseManifest(
 ): { manifest: Record<string, unknown>; projects: Array<Record<string, unknown>> } {
   let manifest: unknown;
   try {
-    manifest = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+    manifest = JSON.parse(decodeUtf8Strict(bytes));
   } catch {
     manifest = undefined;
   }
@@ -326,6 +325,7 @@ function parseManifest(
   return { manifest, projects };
 }
 
+/** Run every corpus project through the engine and return the implementation report. */
 export function runEcs(options: RunEcsOptions): EcsReport {
   const enginePath = realpathSync.native(options.enginePath);
   const repoRoot = dirname(dirname(enginePath));

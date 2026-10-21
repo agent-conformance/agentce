@@ -1102,7 +1102,7 @@ function readReportFile(path: string): string | undefined {
   }
   // Bytes that are not UTF-8 are unreadable, as Python's strict decode makes them; a BOM is kept, so
   // JSON.parse refuses it as json.loads does.
-  return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(readFileSync(path));
+  return decodeUtf8Strict(readFileSync(path));
 }
 
 /** Every entry an object, or the file is unreadable (a report file of the wrong shape). */

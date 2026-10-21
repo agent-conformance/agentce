@@ -2016,17 +2016,12 @@ function localIsoDate(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/** Every control's severity, from the given `--catalog-dir`s, else every vendored base catalog (SPEC
- * §13.3.4). Deliberately **not** a factoring of {@link vendoredCatalogs}: that function silently
- * skips a subdirectory whose `catalog.yaml` fails to parse and also scans `overlays/`, neither of
- * which matches this function's own throw-on-malformed, `base`-only behaviour (mirrors Python's
- * `_readiness_severities`, `commands/__init__.py:2815-2827`, which has no try/catch around
- * `load_catalog`). A later catalog's control silently overwrites an earlier one sharing an id
- * (plain last-write-wins, matching Python's dict-comprehension). */
 /** Control severities from the catalogs the verdict reads, and the limitations the override records,
  * as Python's `_readiness_severities`: a `--catalog-dir` is verified against `trust` as assess
  * verifies it (SPEC §8.7), so a severity edited after signing never reaches the verdict; the bundled
- * catalogs are the engine's own. `trust` is `undefined` only for `sign`, which takes no
+ * catalogs are the engine's own (every vendored base catalog, deliberately not {@link
+ * vendoredCatalogs}, which skips a malformed catalog and scans overlays). A later catalog's control
+ * overwrites an earlier one sharing an id. `trust` is `undefined` only for `sign`, which takes no
  * `--catalog-dir`. */
 function readinessSeverities(
   catalogDirs: string[],
