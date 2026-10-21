@@ -502,22 +502,15 @@ def read_catalog_files(
     given = first or {}
     rels = covered_files(root, exclude=frozenset({CATALOG_SIGNATURE_NAME}))
     _refuse_folder_controls(root)
+    outside = [rel for rel in rels if not inside_folder(root, root / rel)]
     return CatalogFiles(
         root,
         {
             rel: given[rel] if rel in given else (root / rel).read_bytes()
             for rel in rels
         },
-        frozenset(
-            rel
-            for rel in rels
-            if os.path.islink(root / rel) and not inside_folder(root, root / rel)
-        ),
-        frozenset(
-            _link_out_prefix(root, rel)
-            for rel in rels
-            if not inside_folder(root, root / rel)
-        ),
+        frozenset(rel for rel in outside if os.path.islink(root / rel)),
+        frozenset(_link_out_prefix(root, rel) for rel in outside),
     )
 
 

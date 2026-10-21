@@ -2187,12 +2187,11 @@ def _refuse_package_links_out(out_dir: Path) -> None:
                 out_dir, entry, or_root=True
             ):
                 rel = entry.relative_to(out_dir).as_posix()
-                entry_key = MESSAGE_KEYS["input.package_link_outside"]
                 raise InputError(
                     "input.package_link_outside",
                     f"--package-for-sharing: {rel} in --out links outside the output folder, so "
                     "the package would not hold it.",
-                    entry_key.fix,
+                    MESSAGE_KEYS["input.package_link_outside"].fix,
                 )
 
 
@@ -4003,7 +4002,7 @@ def cmd_doctor(ns: argparse.Namespace) -> CommandResult:
                     else []
                 )
                 if isinstance(subject, dict)
-                for source in subject.get("evidence_sources", None) or []
+                for source in subject.get("evidence_sources") or []
                 if isinstance(source, dict) and source.get("source")
             }
 
