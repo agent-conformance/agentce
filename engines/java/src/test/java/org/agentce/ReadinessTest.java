@@ -843,7 +843,7 @@ class ReadinessTest {
     }
 
     /** Not JSON of its shape reads NOT READY, never a crash and never READY (inbox row 393, 18.184h), and so
-     * does an inner coverage entry of the wrong shape (watch ruling 2026-10-21). */
+     * does an inner coverage entry or an applicability drift of the wrong shape (watch ruling 2026-10-21). */
     @ParameterizedTest
     @ValueSource(strings = {
         "coverage.json|null", "coverage.json|[]", "coverage.json|\"x\"", "coverage.json|3", "coverage.json|",
@@ -852,7 +852,10 @@ class ReadinessTest {
         "coverage.json|{\"subjects\": {\"s\": {\"event_types\": []}}}",
         "coverage.json|{\"subjects\": {\"s\": {\"event_types\": {\"t\": 3}}}}",
         "assertions.json|null", "assertions.json|{}", "assertions.json|", "assertions.json|[3]",
-        "assertions.json|[null]", "integrity.jsonl|not json\n", "integrity.jsonl|3\n", "applicability.jsonl|[]\n"})
+        "assertions.json|[null]", "integrity.jsonl|not json\n", "integrity.jsonl|3\n", "applicability.jsonl|[]\n",
+        "applicability.jsonl|{\"drift\": {\"kind\": \"k\", \"ref\": \"r\"}}\n",
+        "applicability.jsonl|{\"drift\": \"x\"}\n", "applicability.jsonl|{\"drift\": null}\n",
+        "applicability.jsonl|{\"drift\": [3]}\n"})
     void aReportFileOfTheWrongShapeIsNotReady(String spec, @TempDir Path dir) throws IOException {
         String[] parts = spec.split("\\|", 2);
         writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());

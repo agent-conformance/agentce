@@ -113,6 +113,10 @@ _MALFORMED = [
     ("integrity.jsonl", "not json\n"),
     ("integrity.jsonl", "3\n"),
     ("applicability.jsonl", "[]\n"),
+    ("applicability.jsonl", '{"drift": {"kind": "k", "ref": "r"}}\n'),
+    ("applicability.jsonl", '{"drift": "x"}\n'),
+    ("applicability.jsonl", '{"drift": null}\n'),
+    ("applicability.jsonl", '{"drift": [3]}\n'),
 ]
 
 

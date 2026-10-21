@@ -118,8 +118,17 @@ def _coverage(text: str) -> dict[str, Any]:
     return coverage
 
 
-def _mapping(value: Any) -> dict[str, Any]:
-    return value if isinstance(value, dict) else {}
+def _applicability(text: str) -> list[dict[str, Any]]:
+    """applicability.jsonl: one object per line, whose ``drift`` (when present) is an array of
+    objects. A drift of another shape makes the file unreadable, never skipped (SPEC §13.3.4)."""
+    statements = _jsonl(text)
+    for statement in statements:
+        if "drift" in statement:
+            drift = statement["drift"]
+            if not isinstance(drift, list):
+                raise _Unreadable("drift is not a JSON array")
+            _objects(drift)
+    return statements
 
 
 def _schema(name: str) -> dict[str, Any]:
@@ -259,10 +268,8 @@ def compute_readiness(
             if detail.get("status") == "below_threshold":
                 reasons.append(f"coverage shortfall for {subject} {event_type}")
 
-    for statement in report_file("applicability.jsonl", _jsonl) or []:
-        drifts = statement.get("drift")
-        for raw in drifts if isinstance(drifts, list) else []:
-            drift = _mapping(raw)
+    for statement in report_file("applicability.jsonl", _applicability) or []:
+        for drift in statement.get("drift", []):
             reasons.append(
                 f"applicability drift: {drift.get('kind')} {drift.get('ref')}"
             )

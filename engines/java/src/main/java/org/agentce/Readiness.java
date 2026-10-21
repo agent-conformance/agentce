@@ -1190,6 +1190,22 @@ public final class Readiness {
         return coverage;
     }
 
+    /** applicability.jsonl: one object per line, whose {@code drift} (when present) is an array of
+     * objects. A drift of another shape makes the file unreadable, never skipped (SPEC §13.3.4). */
+    private static List<JsonNode> parseApplicability(String text) {
+        List<JsonNode> statements = parseJsonl(text);
+        for (JsonNode statement : statements) {
+            if (statement.has("drift")) {
+                JsonNode drift = statement.get("drift");
+                if (!drift.isArray()) {
+                    throw new Unreadable("drift is not a JSON array");
+                }
+                objects(drift);
+            }
+        }
+        return statements;
+    }
+
     /** Returns the readiness verdict for a finished report directory (SPEC §13.3.4 stage 4), ported
      * from {@code compute_readiness} ({@code readiness.py:104-197}) exactly. {@code severities} maps
      * control id to severity (from the catalogs the report used); {@code gaps} is the set of control
@@ -1252,12 +1268,9 @@ public final class Readiness {
 
         for (JsonNode statement :
                 Readiness.<List<JsonNode>>reportFile(
-                        reportDir, "applicability.jsonl", Readiness::parseJsonl, List.of(), reasons)) {
-            JsonNode driftRaw = pyGet(statement, "drift", Json.nodes().arrayNode());
-            JsonNode drift = pyTruthy(driftRaw) && driftRaw.isArray() ? driftRaw : Json.nodes().arrayNode();
-            for (JsonNode d : drift) {
-                JsonNode dd = d.isObject() ? d : Json.nodes().objectNode();
-                reasons.add("applicability drift: " + pyStr(dd.path("kind")) + " " + pyStr(dd.path("ref")));
+                        reportDir, "applicability.jsonl", Readiness::parseApplicability, List.of(), reasons)) {
+            for (JsonNode d : statement.path("drift")) {
+                reasons.add("applicability drift: " + pyStr(d.path("kind")) + " " + pyStr(d.path("ref")));
             }
         }
 

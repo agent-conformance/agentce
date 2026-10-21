@@ -1151,6 +1151,21 @@ function parseCoverage(text: string): Record<string, unknown> {
   return coverage;
 }
 
+/** applicability.jsonl: one object per line, whose `drift` (when present) is an array of objects. A
+ * drift of another shape makes the file unreadable, never skipped (SPEC §13.3.4). */
+function parseApplicability(text: string): Record<string, unknown>[] {
+  const statements = parseJsonl(text);
+  for (const statement of statements) {
+    if (Object.hasOwn(statement, "drift")) {
+      if (!Array.isArray(statement.drift)) {
+        throw new Error("drift is not a JSON array");
+      }
+      objects(statement.drift);
+    }
+  }
+  return statements;
+}
+
 function parseJsonObjects(text: string): Record<string, unknown>[] {
   const value: unknown = JSON.parse(text);
   if (!Array.isArray(value)) {
@@ -1236,11 +1251,8 @@ export function computeReadiness(
     }
   }
 
-  for (const statement of reportFile("applicability.jsonl", parseJsonl) ?? []) {
-    const driftRaw = pyGet(statement, "drift", []);
-    const drift = pyTruthy(driftRaw) && Array.isArray(driftRaw) ? driftRaw : [];
-    for (const entry of drift) {
-      const d = isRecord(entry) ? entry : {};
+  for (const statement of reportFile("applicability.jsonl", parseApplicability) ?? []) {
+    for (const d of (statement.drift ?? []) as Record<string, unknown>[]) {
       reasons.push(`applicability drift: ${pyStr(d.kind)} ${pyStr(d.ref)}`);
     }
   }
