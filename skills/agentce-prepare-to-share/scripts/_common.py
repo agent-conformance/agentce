@@ -119,12 +119,16 @@ def run_guarded(argv: list[str], body: Any) -> int:
 
 
 def arg_value(argv: list[str], flag: str) -> str | None:
-    """Return the value following ``flag`` in ``argv`` (``--flag value``), or ``None``."""
-    if flag in argv:
-        index = argv.index(flag)
-        if index + 1 < len(argv):
-            return argv[index + 1]
-    return None
+    """Return the value of ``flag`` in ``argv`` (``--flag value`` or ``--flag=value``), or ``None``.
+
+    A repeated flag keeps its last value, as the engine's own options do."""
+    value = None
+    for index, token in enumerate(argv):
+        if token == flag and index + 1 < len(argv):
+            value = argv[index + 1]
+        elif token.startswith(flag + "="):
+            value = token[len(flag) + 1 :]
+    return value
 
 
 def default_catalog_dirs() -> list[Path]:

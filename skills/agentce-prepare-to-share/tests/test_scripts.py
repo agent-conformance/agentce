@@ -23,6 +23,7 @@ from _common import (
     OK,
     VERSION_MISMATCH,
     Finding,
+    arg_value,
     check_pins,
     read_frontmatter,
     run_guarded,
@@ -591,3 +592,10 @@ def test_report_readiness_reads_an_equals_catalog_dir(tmp_path: Path, capsys) ->
     ]
     assert report_readiness.body(argv) == INPUT_ERROR
     assert "input.catalog_unverified" in json.loads(capsys.readouterr().out)["message"]
+
+
+def test_arg_value_reads_options_as_the_engine_does() -> None:
+    assert arg_value(["--gaps=g.txt"], "--gaps") == "g.txt"
+    assert arg_value(["--gaps", "a", "--gaps", "b"], "--gaps") == "b"
+    assert arg_value(["--gaps", "a", "--gaps=b"], "--gaps") == "b"
+    assert arg_value(["--gaps-file", "x"], "--gaps") is None

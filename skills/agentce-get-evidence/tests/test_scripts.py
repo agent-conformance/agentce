@@ -303,3 +303,10 @@ def test_version_mismatch_gate_returns_exit_3(monkeypatch) -> None:  # type: ign
     # When the pins hold, the body runs and its exit code is returned.
     monkeypatch.setattr(_common, "check_pins", lambda: None)
     assert _common.run_guarded([], lambda _argv: 7) == 7
+
+
+def test_arg_value_reads_options_as_the_engine_does() -> None:
+    assert _common.arg_value(["--profile=p.yaml"], "--profile") == "p.yaml"
+    assert _common.arg_value(["--profile", "a", "--profile", "b"], "--profile") == "b"
+    assert _common.arg_value(["--profile=a", "--profile", "b"], "--profile") == "b"
+    assert _common.arg_value(["--profiles=x"], "--profile") is None
