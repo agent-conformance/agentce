@@ -280,6 +280,18 @@ def test_a_mapping_merged_after_its_own_merge_is_read() -> None:
     }
 
 
+def test_the_domain_binding_loader_refuses_a_key_written_twice_in_a_merge_source() -> (
+    None
+):
+    """The unique-key loader checks a merge source too, as Java's rejectRepeatedKeys does for every unique-key file."""
+    from agentce.safe_yaml import _UniqueKeySafeLoader
+
+    with pytest.raises(
+        yaml.constructor.ConstructorError, match="found the key 'm' twice"
+    ):
+        yaml.load("e:\n  <<: {m: a, m: b}\n", Loader=_UniqueKeySafeLoader)
+
+
 def test_the_other_loaders_keep_the_safe_loader_tags() -> None:
     """Only the catalog loader drops the four constructors; the domain binding's loader (census line 95) is as it was."""
     from agentce.safe_yaml import _UniqueKeySafeLoader

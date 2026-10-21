@@ -456,11 +456,7 @@ public final class Readiness {
      * Jackson's own YAML reader ({@link Yaml}, this engine's other loader) for this file. */
     private static Object composeValue(Node node) {
         boolean implicit = node.getTag().getValue().startsWith(IMPLICIT_TAG_PREFIX);
-        Tag tag = pyyamlTag(node);
-        if (!SAFE_TAGS.contains(tag)) {
-            throw new IllegalArgumentException(
-                    "could not determine a constructor for the tag '" + tag.getValue() + "'");
-        }
+        Tag tag = safeTag(node);
         boolean collectionTag = tag.equals(Tag.SEQ) || tag.equals(Tag.MAP);
         if (tag.equals(Tag.MERGE) || collectionTag == node instanceof ScalarNode
                 || tag.equals(Tag.SEQ) && !(node instanceof SequenceNode)
@@ -525,6 +521,17 @@ public final class Readiness {
             return out;
         }
         throw new IllegalStateException("unsupported YAML node: " + node.getNodeId());
+    }
+
+    /** {@code node}'s tag, refused unless it is one of {@link #SAFE_TAGS}, as {@code SafeLoader} refuses a tag it has no
+     * constructor for. */
+    private static Tag safeTag(Node node) {
+        Tag tag = pyyamlTag(node);
+        if (!SAFE_TAGS.contains(tag)) {
+            throw new IllegalArgumentException(
+                    "could not determine a constructor for the tag '" + tag.getValue() + "'");
+        }
+        return tag;
     }
 
     /** {@code tuple}'s key node, refused unless it is a scalar: PyYAML cannot hash a sequence or mapping key (written
@@ -797,8 +804,7 @@ public final class Readiness {
 
     /** {@code text} read as a catalog file: {@link #composePyyaml} with unique keys, and a merge source's tag (or a
      * merge list's) refused unless it is one of {@link #SAFE_TAGS} other than the merge tag, as Python's catalog loader
-     * refuses a tag it has no constructor for (18.184o). {@link #flattenMapping} never composes a merge source, so
-     * {@link #composeValue}'s own tag check does not reach it. */
+     * refuses a tag it has no constructor for (18.184o). */
     static Object composeCatalogPyyaml(String text) {
         return composePyyaml(text, true, true);
     }
@@ -808,39 +814,9 @@ public final class Readiness {
         options.setNestingDepthLimit(DEVIATION_REGISTER_MAX_DEPTH);
         Node root = pyyamlComposer(options).compose(new StringReader(text));
         if (root != null && uniqueKeys) {
-            rejectRepeatedKeys(root);
-        }
-        if (root != null && checkMergeSources) {
-            rejectMergeSourceTags(root);
+            rejectRepeatedKeys(root, checkMergeSources);
         }
         return root == null ? null : composeValue(root);
-    }
-
-    private static void rejectMergeSourceTags(Node node) {
-        if (node instanceof SequenceNode seq) {
-            for (Node child : seq.getValue()) {
-                rejectMergeSourceTags(child);
-            }
-        } else if (node instanceof MappingNode map) {
-            for (NodeTuple tuple : map.getValue()) {
-                Node value = tuple.getValueNode();
-                if (Tag.MERGE.equals(pyyamlTag(tuple.getKeyNode()))) {
-                    List<Node> sources = new ArrayList<>(List.of(value));
-                    if (value instanceof SequenceNode seq) {
-                        sources.addAll(seq.getValue());
-                    }
-                    for (Node source : sources) {
-                        Tag tag = pyyamlTag(source);
-                        if (!SAFE_TAGS.contains(tag) || tag.equals(Tag.MERGE)) {
-                            throw new IllegalArgumentException(
-                                    "could not determine a constructor for the tag '" + tag.getValue() + "'");
-                        }
-                    }
-                }
-                rejectMergeSourceTags(tuple.getKeyNode());
-                rejectMergeSourceTags(value);
-            }
-        }
     }
 
     /** Whether {@code e}, thrown by {@link #composePyyaml}, is SnakeYAML's nesting cap or the recursion it
@@ -849,10 +825,12 @@ public final class Readiness {
         return e instanceof StackOverflowError || String.valueOf(e.getMessage()).contains("Nesting Depth exceeded");
     }
 
-    private static void rejectRepeatedKeys(Node node) {
+    /** Refuses a mapping anywhere under {@code node} that writes one key twice; with {@code checkMergeSources}, also a
+     * merge source (or merge-list item) whose tag is not one of {@link #SAFE_TAGS} other than the merge tag. */
+    private static void rejectRepeatedKeys(Node node, boolean checkMergeSources) {
         if (node instanceof SequenceNode seq) {
             for (Node child : seq.getValue()) {
-                rejectRepeatedKeys(child);
+                rejectRepeatedKeys(child, checkMergeSources);
             }
         } else if (node instanceof MappingNode map) {
             Set<String> seen = new HashSet<>();
@@ -864,13 +842,29 @@ public final class Readiness {
                         throw new IllegalArgumentException("found the merge key '<<' twice");
                     }
                     merged = true;
+                    if (checkMergeSources) {
+                        rejectMergeSourceTags(tuple.getValueNode());
+                    }
                 } else {
                     String k = String.valueOf(composeValue(scalarKey(tuple)));
                     if (!seen.add(k)) {
                         throw new IllegalArgumentException("found the key " + k + " twice");
                     }
                 }
-                rejectRepeatedKeys(tuple.getValueNode());
+                rejectRepeatedKeys(tuple.getValueNode(), checkMergeSources);
+            }
+        }
+    }
+
+    /** {@link #flattenMapping} never composes a merge source, so {@link #composeValue}'s tag check does not reach it. */
+    private static void rejectMergeSourceTags(Node value) {
+        List<Node> sources = new ArrayList<>(List.of(value));
+        if (value instanceof SequenceNode seq) {
+            sources.addAll(seq.getValue());
+        }
+        for (Node source : sources) {
+            if (safeTag(source).equals(Tag.MERGE)) {
+                throw new IllegalArgumentException("could not determine a constructor for the tag '" + Tag.MERGE.getValue() + "'");
             }
         }
     }

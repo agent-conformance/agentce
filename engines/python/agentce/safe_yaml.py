@@ -70,41 +70,42 @@ _MERGE_TAG = "tag:yaml.org,2002:merge"
 
 
 def _merge_sources(value_node: yaml.Node) -> list[yaml.Node]:
-    """The nodes a ``<<`` key's ``value_node`` merges: the node itself, or each item of a merge list."""
+    """The nodes a ``<<`` key's ``value_node`` brings in: the node itself, and each item of a merge list."""
     if isinstance(value_node, yaml.SequenceNode):
-        return list(value_node.value)
+        return [value_node, *value_node.value]
     return [value_node]
 
 
 class _UniqueKeySafeLoader(_PermissiveTimestampSafeLoader):
     """The loader above, refusing a mapping that writes one key twice, where ``SafeLoader`` keeps the last value. A
     key a ``<<`` merge brings in may still be written again, as PyYAML's ``flatten_mapping`` allows; ``<<`` itself is a
-    key, so two merge keys in one mapping are refused too (the ports cannot all follow PyYAML's last-merge-wins). A
-    merge source is checked too: ``flatten_mapping`` merges it without constructing it, so ``<<: {m: a, m: b}`` would
-    otherwise keep its last value. Each mapping is checked once, before ``flatten_mapping`` adds merged keys to it."""
+    key, so two merge keys in one mapping are refused too (the ports cannot all follow PyYAML's last-merge-wins). The
+    whole node tree is checked before anything is constructed, merge sources included (``flatten_mapping`` merges a
+    source without constructing it, and adds the merged keys to it), as Java's ``rejectRepeatedKeys`` does."""
 
-    def __init__(self, stream: str) -> None:
-        super().__init__(stream)
-        self._keys_checked: set[int] = set()
+    def construct_document(self, node: yaml.Node) -> Any:
+        self._check_tree(node, set())
+        return super().construct_document(node)
 
-    def construct_mapping(
-        self, node: yaml.MappingNode, deep: bool = False
-    ) -> dict[Any, Any]:
-        self._refuse_repeated_keys(node, deep)
-        return super().construct_mapping(node, deep=deep)
-
-    def flatten_mapping(self, node: yaml.MappingNode) -> None:
-        for key_node, value_node in node.value:
-            if key_node.tag == _MERGE_TAG:
-                for source in _merge_sources(value_node):
-                    if isinstance(source, yaml.MappingNode):
-                        self._refuse_repeated_keys(source, False)
-        super().flatten_mapping(node)
-
-    def _refuse_repeated_keys(self, node: yaml.MappingNode, deep: bool) -> None:
-        if id(node) in self._keys_checked:
+    def _check_tree(self, node: yaml.Node, visited: set[int]) -> None:
+        if id(node) in visited:
             return
-        self._keys_checked.add(id(node))
+        visited.add(id(node))
+        if isinstance(node, yaml.SequenceNode):
+            for child in node.value:
+                self._check_tree(child, visited)
+        elif isinstance(node, yaml.MappingNode):
+            self._refuse_repeated_keys(node)
+            for key_node, value_node in node.value:
+                if key_node.tag == _MERGE_TAG:
+                    self._check_merge_source(value_node)
+                self._check_tree(key_node, visited)
+                self._check_tree(value_node, visited)
+
+    def _check_merge_source(self, value_node: yaml.Node) -> None:
+        """A hook for what a ``<<`` key brings in, which is never constructed; this loader checks nothing more."""
+
+    def _refuse_repeated_keys(self, node: yaml.MappingNode) -> None:
         seen: set[Any] = set()
         merged = False
         for key_node, _ in node.value:
@@ -118,7 +119,7 @@ class _UniqueKeySafeLoader(_PermissiveTimestampSafeLoader):
                     )
                 merged = True
                 continue
-            key = self.construct_object(key_node, deep=deep)
+            key = self.construct_object(key_node)
             try:
                 repeated = key in seen
             except TypeError:
@@ -198,7 +199,8 @@ class _CatalogLoader(_UniqueKeySafeLoader):
     """The unique-key loader without ``SafeLoader``'s ``!!binary``, ``!!set``, ``!!omap`` and ``!!pairs``
     constructors, so a catalog file holding one is refused by ``construct_undefined`` as in the TypeScript and Java
     readers (18.184o). The constructors are removed from this class's own copy; the other loaders keep them. A merge
-    source is never constructed, so its tag (and a merge list's) is checked against the same constructors here."""
+    source is never constructed, so its tag (and a merge list's) is checked against the same constructors here,
+    refused as ``construct_undefined`` refuses any other node."""
 
     yaml_constructors = {
         tag: construct
@@ -206,18 +208,10 @@ class _CatalogLoader(_UniqueKeySafeLoader):
         if tag not in _SAFE_LOADER_ONLY_TAGS
     }
 
-    def flatten_mapping(self, node: yaml.MappingNode) -> None:
-        for key_node, value_node in node.value:
-            if key_node.tag == _MERGE_TAG:
-                for source in [value_node, *_merge_sources(value_node)]:
-                    if source.tag not in self.yaml_constructors:
-                        raise yaml.constructor.ConstructorError(
-                            None,
-                            None,
-                            f"could not determine a constructor for the tag {source.tag!r}",
-                            source.start_mark,
-                        )
-        super().flatten_mapping(node)
+    def _check_merge_source(self, value_node: yaml.Node) -> None:
+        for source in _merge_sources(value_node):
+            if source.tag not in self.yaml_constructors:
+                self.construct_undefined(source)
 
 
 def load_catalog_yaml(text: str) -> Any:
