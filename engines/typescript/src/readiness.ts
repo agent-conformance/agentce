@@ -1140,11 +1140,11 @@ function parseJsonObject(text: string): Record<string, unknown> {
   return value;
 }
 
-function objectOfObjects(value: unknown): void {
+function objectOfObjects(value: unknown): Record<string, unknown>[] {
   if (!isRecord(value)) {
     throw new Error("not a JSON object");
   }
-  objects(Object.values(value));
+  return objects(Object.values(value));
 }
 
 /** coverage.json: an object whose `subjects` (when present) maps each subject to an object, and each
@@ -1154,16 +1154,10 @@ function objectOfObjects(value: unknown): void {
 function parseCoverage(text: string): Record<string, unknown> {
   const coverage = parseJsonObject(text);
   if (Object.hasOwn(coverage, "subjects")) {
-    objectOfObjects(coverage.subjects);
-    for (const entry of Object.values(
-      coverage.subjects as Record<string, Record<string, unknown>>,
-    )) {
+    for (const entry of objectOfObjects(coverage.subjects)) {
       strings(entry, "coverage_status");
       if (Object.hasOwn(entry, "event_types")) {
-        objectOfObjects(entry.event_types);
-        for (const detail of Object.values(
-          entry.event_types as Record<string, Record<string, unknown>>,
-        )) {
+        for (const detail of objectOfObjects(entry.event_types)) {
           strings(detail, "status");
         }
       }

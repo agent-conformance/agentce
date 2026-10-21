@@ -898,7 +898,7 @@ class ReadinessTest {
     void aFieldDecidedOnOfTheWrongTypeIsNotReady(String spec, @TempDir Path dir) throws IOException {
         String[] parts = spec.split("\\|", 2);
         writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
-        Files.writeString(dir.resolve(parts[0]), parts[1].replace("\\n", "\n"));
+        Files.writeString(dir.resolve(parts[0]), parts[1]);
         for (List<JsonNode> deviations : List.of(List.<JsonNode>of(), List.<JsonNode>of(deviation()))) {
             Readiness.Verdict verdict = Readiness.computeReadiness(dir, SEVERITIES, deviations, Set.of());
             assertEquals(Readiness.NOT_READY, verdict.verdict());
