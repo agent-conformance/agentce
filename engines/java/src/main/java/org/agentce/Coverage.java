@@ -166,8 +166,9 @@ public final class Coverage {
             var e = it.next();
             JsonNode count = e.getValue();
             boolean whole = count.isIntegralNumber()
-                    && count.bigIntegerValue().signum() >= 0
-                    && count.bigIntegerValue().compareTo(BigInteger.valueOf(DomainBinding.MAX_COUNT)) <= 0;
+                    && count.canConvertToLong()
+                    && count.longValue() >= 0
+                    && count.longValue() <= DomainBinding.MAX_COUNT;
             if (!whole) {
                 throw invalidManifest(name, "counts '" + e.getKey() + "' as " + count
                         + ", not a whole number from 0 to " + DomainBinding.MAX_COUNT);

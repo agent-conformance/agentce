@@ -97,11 +97,10 @@ def _declared_counts(
         data = _load_manifest(denominator.manifest, raw)
         # A root that is not an object declares no counts: fall through, as TypeScript and Java do.
         if isinstance(data, dict):
-            declared = [
-                _counts(denominator.manifest, data, key)
-                for key in ("counts", "expected")
-            ]
-            return next((counts for counts in declared if counts), {})
+            # Both are checked before either is used, as TypeScript and Java do.
+            declared = _counts(denominator.manifest, data, "counts")
+            expected = _counts(denominator.manifest, data, "expected")
+            return declared or expected
     # Otherwise count the denominator source's own ingested events, per type.
     counts: dict[str, int] = {}
     for (source, event_type), count in by_source_type.items():

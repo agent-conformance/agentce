@@ -1,6 +1,7 @@
 package org.agentce;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
@@ -132,19 +133,14 @@ public final class Schema {
             }
             return node.bigIntegerValue().abs().compareTo(MAX_SAFE) <= 0 ? node : nonCanonical(node, "integer_out_of_range");
         }
-        if (node.isContainerNode()) {
-            JsonNode copy = node.deepCopy();
-            if (copy.isObject()) {
-                var it = node.fields();
-                while (it.hasNext()) {
-                    Map.Entry<String, JsonNode> e = it.next();
-                    ((ObjectNode) copy).set(e.getKey(), strictNumbers(e.getValue()));
-                }
-            } else {
-                for (int i = 0; i < node.size(); i++) {
-                    ((com.fasterxml.jackson.databind.node.ArrayNode) copy).set(i, strictNumbers(node.get(i)));
-                }
-            }
+        if (node.isObject()) {
+            ObjectNode copy = Json.nodes().objectNode();
+            node.fields().forEachRemaining(e -> copy.set(e.getKey(), strictNumbers(e.getValue())));
+            return copy;
+        }
+        if (node.isArray()) {
+            ArrayNode copy = Json.nodes().arrayNode();
+            node.forEach(item -> copy.add(strictNumbers(item)));
             return copy;
         }
         return node;
