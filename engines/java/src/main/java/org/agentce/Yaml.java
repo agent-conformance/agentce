@@ -10,7 +10,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * YAML loading as a {@link JsonNode}, so catalogs, profiles, and domain bindings share the JSON model.
+ * YAML loading as a {@link JsonNode}, for the inputs not yet read through {@link Readiness#composePyyaml} (catalog
+ * and domain-binding values are read from that tree).
  *
  * <p>SnakeYAML (via Jackson's {@code YAMLFactory}) parses YAML 1.1, the same version PyYAML uses in the
  * reference, so integers, booleans, and strings type identically.
@@ -24,7 +25,7 @@ public final class Yaml {
 
     /** Parse YAML text read from {@code shown} to a {@link JsonNode}; text that does not parse throws as
      * {@link #parseFile} does. Returns {@code null} for empty input. */
-    public static JsonNode parse(String text, Path shown) {
+    private static JsonNode parse(String text, Path shown) {
         try {
             return MAPPER.readTree(text);
         } catch (IOException e) {
