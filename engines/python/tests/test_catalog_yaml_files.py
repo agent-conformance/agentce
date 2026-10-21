@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 from agentce import cli, signing
 from agentce.catalog import load_catalog
@@ -118,6 +119,30 @@ _CASES: dict[str, tuple[str, Any, str]] = {
         "is not YAML the engine can load",
     ),
 }
+# A tag PyYAML's SafeLoader constructs but the TypeScript and Java readers do not is refused in every engine (18.184o).
+for _tag, _value in {
+    "binary": "aGVsbG8=",
+    "set": "{a: null}",
+    "omap": "[{a: 1}]",
+    "pairs": "[{a: 1}]",
+}.items():
+    _CASES[f"control !!{_tag}"] = (
+        _CONTROL,
+        lambda d, line=f"extra: !!{_tag} {_value}\n": _edit(
+            d, _CONTROL, "id: DAT-01\n", "id: DAT-01\n" + line
+        ),
+        "is not YAML the engine can load",
+    )
+_CASES["catalog.yaml !!binary"] = (
+    "catalog.yaml",
+    lambda d: _edit(
+        d,
+        "catalog.yaml",
+        "id: eu-ai-act\n",
+        "id: eu-ai-act\nextra: !!binary aGVsbG8=\n",
+    ),
+    "is not YAML the engine can load",
+)
 
 
 @pytest.mark.parametrize("case", sorted(_CASES))
@@ -136,9 +161,122 @@ def test_a_catalog_file_that_cannot_be_loaded_is_refused_naming_it(
 
 def test_a_calendar_invalid_unquoted_date_in_a_control_is_read() -> None:
     """TypeScript and Java read it as text; Python's safe_load crashed on it before 18.184i."""
-    from agentce.safe_yaml import load_unique_keys
+    from agentce.safe_yaml import load_catalog_yaml
 
-    assert load_unique_keys("since: 2026-02-30\n") == {"since": "2026-02-30"}
+    assert load_catalog_yaml("since: 2026-02-30\n") == {"since": "2026-02-30"}
+
+
+_FLOOR = "  min_source_class: self_report\n"
+
+# How evaluation.min_source_class is written -> the class every engine reads (PyYAML's merge rules, 18.184o): an
+# explicit key beats a merged one wherever it is written, and the first source of a merge list wins.
+_MERGES: dict[str, tuple[str, str, str]] = {
+    "inline mapping": (
+        "",
+        "  <<: {min_source_class: independent_system}\n",
+        "independent_system",
+    ),
+    "alias": (
+        "x-b: &b {min_source_class: independent_system}\n",
+        "  <<: *b\n",
+        "independent_system",
+    ),
+    "list, stronger first": (
+        "",
+        "  <<: [{min_source_class: independent_system}, {min_source_class: self_report}]\n",
+        "independent_system",
+    ),
+    "list, weaker first": (
+        "",
+        "  <<: [{min_source_class: self_report}, {min_source_class: independent_system}]\n",
+        "self_report",
+    ),
+    "nested override": (
+        "x-a: &a {min_source_class: self_report}\nx-b: &b {<<: *a, min_source_class: independent_system}\n",
+        "  <<: *b\n",
+        "independent_system",
+    ),
+    "explicit key after the merge": (
+        "",
+        "  <<: {min_source_class: independent_system}\n" + _FLOOR,
+        "self_report",
+    ),
+    "explicit key before the merge": (
+        "",
+        "  min_source_class: independent_system\n  <<: {min_source_class: self_report}\n",
+        "independent_system",
+    ),
+}
+
+
+@pytest.mark.parametrize("case", sorted(_MERGES))
+def test_a_merge_key_in_a_control_is_read_as_pyyaml_merges(
+    tmp_path: Path, case: str
+) -> None:
+    head, floor, expected = _MERGES[case]
+    directory = _catalog(tmp_path)
+    path = directory / _CONTROL
+    path.write_text(head + path.read_text("utf-8").replace(_FLOOR, floor), "utf-8")
+    control = next(c for c in load_catalog(directory).controls if c.id == "DAT-01")
+    assert control.min_source_class == expected
+
+
+def test_a_merged_value_that_is_not_a_source_class_is_refused(tmp_path: Path) -> None:
+    directory = _catalog(tmp_path)
+    _edit(directory, _CONTROL, _FLOOR, "  <<: {min_source_class: trusted}\n")
+    with pytest.raises(InputError) as caught:
+        load_catalog(directory)
+    assert caught.value.key == "catalog.control.min_source_class_unknown"
+
+
+def test_a_merge_key_in_catalog_yaml_is_read(tmp_path: Path) -> None:
+    directory = _catalog(tmp_path)
+    _edit(
+        directory, "catalog.yaml", 'version: "2026.09"\n', '<<: {version: "2026.09"}\n'
+    )
+    assert load_catalog(directory).version == "2026.09"
+
+
+def test_explicit_core_tags_stay_readable(tmp_path: Path) -> None:
+    directory = _catalog(tmp_path)
+    _edit(
+        directory,
+        _CONTROL,
+        "id: DAT-01\n",
+        "id: !!str DAT-01\nsince: !!timestamp 2026-01-02\n",
+    )
+    assert any(c.id == "DAT-01" for c in load_catalog(directory).controls)
+
+
+def test_the_other_loaders_keep_the_safe_loader_tags() -> None:
+    """Only the catalog loader drops the four constructors; the domain binding's loader (census line 95) is as it was."""
+    from agentce.safe_yaml import _UniqueKeySafeLoader
+
+    assert yaml.load("a: !!set {x: null}\n", Loader=_UniqueKeySafeLoader) == {
+        "a": {"x"}
+    }
+    assert yaml.safe_load("a: !!binary aGVsbG8=\n") == {"a": b"hello"}
+
+
+def test_catalog_sign_refuses_a_control_with_a_safe_loader_only_tag(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    directory = _catalog(tmp_path)
+    _CASES["control !!binary"][1](directory)
+    argv = [
+        "catalog",
+        "sign",
+        str(directory),
+        "--new-key",
+        str(tmp_path / "k.pem"),
+        "--json",
+    ]
+    assert cli.main(argv) == 3
+    assert (
+        json.loads(capsys.readouterr().out)["error"]["key"]
+        == "catalog.sign_lint_failed"
+    )
+    assert not (directory / signing.CATALOG_SIGNATURE_NAME).exists()
 
 
 def _assess(

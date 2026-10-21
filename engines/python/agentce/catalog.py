@@ -32,7 +32,7 @@ from .errors import InputError, catalog_file_unloadable, catalog_unreadable
 from .graph import build_graph
 from .i18n_format import format_message
 from .psp import PropertyShape, Shape, parse_shapes_ttl
-from .safe_yaml import load_unique_keys
+from .safe_yaml import load_catalog_yaml
 from .source_class import SOURCE_CLASS_FROM, SOURCE_CLASS_RANK
 from .structural import evaluate_control, evaluate_shape
 
@@ -335,7 +335,7 @@ def _yaml_mapping(files: signing.CatalogFiles, rel: str) -> dict[str, Any]:
     empty file included) is refused naming the file, never read with its last value, as nothing, or skipped."""
     text = _text(files, rel)
     try:
-        data = load_unique_keys(text)
+        data = load_catalog_yaml(text)
     except yaml.YAMLError as exc:
         raise catalog_file_unloadable(
             files.root, rel, f"is not YAML the engine can load: {exc}"

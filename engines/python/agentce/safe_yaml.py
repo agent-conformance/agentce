@@ -159,10 +159,21 @@ def _pythonize_timestamp(raw: str) -> str:
     return out
 
 
-def load_unique_keys(text: str) -> Any:
-    """``text`` read as :func:`load_untrusted_yaml` reads a file with ``unique_keys``; its ``yaml.YAMLError`` and
-    ``RecursionError`` are the caller's to report."""
-    return yaml.load(text, Loader=_UniqueKeySafeLoader)
+class _CatalogLoader(_UniqueKeySafeLoader):
+    """The unique-key loader without ``SafeLoader``'s ``!!binary``, ``!!set``, ``!!omap`` and ``!!pairs``
+    constructors, so a catalog file holding one is refused by ``construct_undefined`` as in the TypeScript and Java
+    readers (18.184o). The constructors are removed from this class's own copy; the other loaders keep them."""
+
+    yaml_constructors = dict(_UniqueKeySafeLoader.yaml_constructors)
+    for _tag in ("binary", "set", "omap", "pairs"):
+        del yaml_constructors[f"tag:yaml.org,2002:{_tag}"]
+    del _tag
+
+
+def load_catalog_yaml(text: str) -> Any:
+    """A catalog file's ``text`` read as :func:`load_untrusted_yaml` reads a file with ``unique_keys``, less the four
+    tags above; its ``yaml.YAMLError`` and ``RecursionError`` are the caller's to report."""
+    return yaml.load(text, Loader=_CatalogLoader)
 
 
 def load_untrusted_yaml(
