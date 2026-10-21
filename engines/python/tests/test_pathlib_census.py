@@ -356,7 +356,15 @@ def test_conformance_refuses_a_corpus_manifest_at_mode_000(
 
 @pytest.mark.parametrize(
     "text",
-    ["{x", "null", "[]", '{"projects": 3}', '{"projects": null}', '{"projects": [3]}'],
+    [
+        "{x",
+        "null",
+        "[]",
+        '{"projects": 3}',
+        '{"projects": null}',
+        '{"projects": [3]}',
+        '{"projects": [], "x": NaN}',
+    ],
 )
 def test_conformance_refuses_a_corpus_manifest_that_is_not_a_manifest(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], text: str

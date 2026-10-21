@@ -49,6 +49,12 @@ def _parse_int(token: str) -> int:
     return -value if negative else value
 
 
+def refuse_constant(token: str) -> Any:
+    """A ``parse_constant`` hook that refuses ``NaN``, ``Infinity`` and ``-Infinity``: they are not
+    JSON, and the TypeScript and Java parsers refuse them."""
+    raise ValueError(f"{token} is not JSON")
+
+
 def load_json(text: str | bytes) -> Any:
     """``json.loads(text)``, raising :class:`JSONError` for any invalid JSON, including an integer
     literal over :data:`MAX_INT_STR_DIGITS` digits whatever the interpreter's own limit.

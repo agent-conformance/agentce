@@ -22,6 +22,7 @@ from typing import Any, TypeVar
 import jsonschema
 
 from .coverage import STATUS_UNKNOWN
+from .safe_json import refuse_constant
 from .signing import is_regular_file
 
 _T = TypeVar("_T")
@@ -68,7 +69,7 @@ class _Unreadable(ValueError):
 
 def _parse_json(text: str) -> Any:
     try:
-        return json.loads(text)
+        return json.loads(text, parse_constant=refuse_constant)
     except ValueError as exc:
         raise _Unreadable(str(exc)) from exc
 

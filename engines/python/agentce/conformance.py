@@ -42,7 +42,7 @@ from .integrity import integrity_caps, verify_streams
 from .outputs import OUT_DIR, write_file, writing_into
 from .profile import Profile
 from .report import write_report
-from .safe_json import JSONError, load_json
+from .safe_json import JSONError, load_json, refuse_constant
 
 #: Stable provenance for ECS assessments, so per-project manifests are identical across machines
 #: except for the timestamp and host fingerprint (SPEC §11.5 determinism, P1.2).
@@ -223,7 +223,9 @@ def run_ecs(
 
     manifest_path = corpus_root / "corpus-manifest.json"
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest = json.loads(
+            manifest_path.read_text(encoding="utf-8"), parse_constant=refuse_constant
+        )
     except OSError as exc:
         raise InputError(
             "input.corpus_unreadable",

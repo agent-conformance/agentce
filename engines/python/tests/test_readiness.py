@@ -117,6 +117,10 @@ _MALFORMED = [
     ("applicability.jsonl", '{"drift": "x"}\n'),
     ("applicability.jsonl", '{"drift": null}\n'),
     ("applicability.jsonl", '{"drift": [3]}\n'),
+    ("coverage.json", '{"subjects": {}, "x": NaN}'),
+    ("assertions.json", '[{"x": Infinity}]'),
+    ("integrity.jsonl", '{"x": -Infinity}\n'),
+    ("applicability.jsonl", '{"x": NaN}\n'),
 ]
 
 
