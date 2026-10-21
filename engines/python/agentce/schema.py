@@ -17,6 +17,8 @@ from typing import Any
 import jsonschema
 from jsonschema.protocols import Validator
 
+from .domain import MAX_COUNT
+
 
 @functools.lru_cache(maxsize=1)
 def evidence_schema() -> dict[str, Any]:
@@ -48,7 +50,23 @@ def _validator_for_def(ref: str) -> Validator:
     }
     validator_cls = jsonschema.validators.validator_for(full)
     validator_cls.check_schema(sub_schema)
-    return validator_cls(sub_schema)
+    return _strict_integers(validator_cls)(sub_schema)
+
+
+def _is_integer(checker: Any, instance: Any) -> bool:
+    """An integer is a whole-number token within the range every engine holds exactly: ``5000.0``, ``5e3`` and
+    ``2**53`` are not integers, so a record holding one is quarantined schema_invalid in all three engines, as the
+    TypeScript reader has always read them (18.184j)."""
+    return (
+        isinstance(instance, int)
+        and not isinstance(instance, bool)
+        and abs(instance) <= MAX_COUNT
+    )
+
+
+def _strict_integers(validator_cls: Any) -> Any:
+    checker = validator_cls.TYPE_CHECKER.redefine("integer", _is_integer)
+    return jsonschema.validators.extend(validator_cls, type_checker=checker)
 
 
 def validate_event(event: Any) -> list[str]:

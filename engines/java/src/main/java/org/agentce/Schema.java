@@ -8,6 +8,7 @@ import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -85,7 +86,7 @@ public final class Schema {
             return List.of("event is not a JSON object");
         }
         List<String> errors = new ArrayList<>();
-        ObjectNode envelope = ((ObjectNode) event).deepCopy();
+        ObjectNode envelope = (ObjectNode) strictNumbers(event);
         envelope.set("data", Json.nodes().objectNode());
         errors.addAll(messagesOf(validatorForDef("EvidenceEvent").validate(envelope)));
 
@@ -112,7 +113,47 @@ public final class Schema {
                 payload.set(e.getKey(), e.getValue());
             }
         }
-        errors.addAll(messagesOf(validatorForDef(definition).validate(payload)));
+        errors.addAll(messagesOf(validatorForDef(definition).validate(strictNumbers(payload))));
         return errors;
+    }
+
+    private static final BigInteger MAX_SAFE = BigInteger.valueOf(DomainBinding.MAX_COUNT);
+
+    /**
+     * A copy of {@code node} in which every number that is not a whole-number token within +-(2^53 - 1) (5000.0, 5e3,
+     * 2^53) is the object TypeScript's reader makes of it ({@code {source, reason}}), so a typed field holding one fails
+     * the schema and the record is quarantined schema_invalid, as Python and TypeScript read it (18.184j); a position
+     * the schema does not type is unchanged.
+     */
+    private static JsonNode strictNumbers(JsonNode node) {
+        if (node.isNumber()) {
+            if (!node.isIntegralNumber()) {
+                return nonCanonical(node, "non_integer_number");
+            }
+            return node.bigIntegerValue().abs().compareTo(MAX_SAFE) <= 0 ? node : nonCanonical(node, "integer_out_of_range");
+        }
+        if (node.isContainerNode()) {
+            JsonNode copy = node.deepCopy();
+            if (copy.isObject()) {
+                var it = node.fields();
+                while (it.hasNext()) {
+                    Map.Entry<String, JsonNode> e = it.next();
+                    ((ObjectNode) copy).set(e.getKey(), strictNumbers(e.getValue()));
+                }
+            } else {
+                for (int i = 0; i < node.size(); i++) {
+                    ((com.fasterxml.jackson.databind.node.ArrayNode) copy).set(i, strictNumbers(node.get(i)));
+                }
+            }
+            return copy;
+        }
+        return node;
+    }
+
+    private static JsonNode nonCanonical(JsonNode number, String reason) {
+        ObjectNode out = Json.nodes().objectNode();
+        out.put("source", number.asText());
+        out.put("reason", reason);
+        return out;
     }
 }
