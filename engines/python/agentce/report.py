@@ -60,7 +60,7 @@ from .buyer_view import (
 from .catalog import Catalog, ControlSpec, catalog_provenance_digest
 from .outputs import write_file
 from .profile import Profile, Subject
-from .safe_json import JSONError, load_json
+from .safe_json import JSONError, jsonl_lines, load_json
 from .project import (
     blind_spots_by_subject,
     compute_project_view,
@@ -3815,11 +3815,9 @@ def _validate_xml_wellformed(filename: str, data: bytes) -> list[str]:
 
 
 def _validate_jsonl(filename: str, text: str) -> list[str]:
-    """Every non-blank line of ``text`` parses as its own JSON object."""
+    """Every non-blank line of ``text`` (:func:`jsonl_lines`) parses as its own JSON object."""
     problems = []
-    for i, line in enumerate(text.splitlines(), start=1):
-        if not line.strip():
-            continue
+    for i, line in jsonl_lines(text):
         try:
             load_json(line)
         except JSONError as exc:

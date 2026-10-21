@@ -182,6 +182,77 @@ test("broken integrity is NOT READY", () => {
   assert.equal(computeReadiness(dir, { severities: SEVERITIES }).verdict, NOT_READY);
 });
 
+const JSONL_RECORD: Record<string, string> = {
+  "integrity.jsonl": '{"stream": "s", "status": "ok"}',
+  "applicability.jsonl": '{"drift": []}',
+};
+const NOT_JSONL: Record<string, (r: string) => string> = {
+  vt: (r) => `${r}\u000b${r}\n`,
+  ff: (r) => `${r}\u000c${r}\n`,
+  nel: (r) => `${r}\u0085${r}\n`,
+  ls: (r) => `${r} ${r}\n`,
+  ps: (r) => `${r} ${r}\n`,
+  lone_cr: (r) => `${r}\r${r}\n`,
+  lone_cr_no_lf: (r) => `${r}\r${r}`,
+  lead_nbsp: (r) => ` ${r}\n`,
+  lead_bom: (r) => `﻿${r}\n`,
+  trail_nbsp: (r) => `${r} \n`,
+  nbsp_line: (r) => ` \n${r}\n`,
+};
+const JSONL_OK: Record<string, (r: string) => string> = {
+  crlf: (r) => `${r}\r\n`,
+  space_tab: (r) => `\t ${r} \t\n`,
+  blank_lines: (r) => `\n \n\r\n${r}\n\n`,
+  cr_between_tokens: (r) => `${r.replace(": ", ":\r")}\n`,
+  u2028_in_string: (r) => `${r.slice(0, -1)}, "x": "a b"}\n`,
+  empty: () => "",
+};
+
+for (const [name, record] of Object.entries(JSONL_RECORD)) {
+  for (const [id, lines] of Object.entries(NOT_JSONL)) {
+    test(`${name} line outside the JSON Lines rule (${id}) is NOT READY (18.184n)`, () => {
+      const dir = report();
+      writeFileSync(join(dir, name), lines(record));
+      assert.deepEqual(computeReadiness(dir, { severities: SEVERITIES }).reasons, [
+        `cannot read report file ${name}`,
+      ]);
+    });
+  }
+  test(`${name} with a byte that is not UTF-8 is NOT READY (18.184n)`, () => {
+    const dir = report();
+    writeFileSync(
+      join(dir, name),
+      Buffer.concat([
+        Buffer.from(`${record.slice(0, -1)}, "x": "`),
+        Buffer.from([0xff, 0x22, 0x7d, 0x0a]),
+      ]),
+    );
+    assert.deepEqual(computeReadiness(dir, { severities: SEVERITIES }).reasons, [
+      `cannot read report file ${name}`,
+    ]);
+  });
+  for (const [id, lines] of Object.entries(JSONL_OK)) {
+    test(`${name} line inside the JSON Lines rule (${id}) stays READY (18.184n)`, () => {
+      const dir = report();
+      writeFileSync(join(dir, name), lines(record));
+      assert.equal(computeReadiness(dir, { severities: SEVERITIES }).verdict, READY);
+    });
+  }
+}
+
+for (const [name, record, reason] of [
+  ["integrity.jsonl", '{"stream": "s", "status": "failed"}', "integrity failed on stream s"],
+  ["applicability.jsonl", '{"drift": [{"kind": "k", "ref": "r"}]}', "applicability drift: k r"],
+]) {
+  for (const tail of ["", "\r"]) {
+    test(`the last ${name} record with no LF after it is read (${JSON.stringify(tail)}, 18.184n)`, () => {
+      const dir = report();
+      writeFileSync(join(dir, name), `\n${record}${tail}`);
+      assert.deepEqual(computeReadiness(dir, { severities: SEVERITIES }).reasons, [reason]);
+    });
+  }
+}
+
 test("a coverage gap is NOT READY", () => {
   const dir = report({ coverage: { subjects: { s: { coverage_status: "gap" } } } });
   const verdict = computeReadiness(dir, { severities: SEVERITIES });

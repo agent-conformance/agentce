@@ -22,7 +22,7 @@ from typing import Any, TypeVar
 import jsonschema
 
 from .coverage import STATUS_UNKNOWN
-from .safe_json import refuse_constant
+from .safe_json import jsonl_lines, refuse_constant
 from .signing import is_regular_file
 
 _T = TypeVar("_T")
@@ -53,14 +53,15 @@ def _read_report_file(path: Path) -> str | None:
     into a folder that can be listed but not entered, a file without read permission) raises
     ``OSError``: readiness reports it as a blocking reason rather than reading it as absent, which
     would let a coverage gap or an integrity break stop blocking. ``os.stat`` answers the same on
-    every supported Python, as ``signing.is_regular_file`` does, where ``Path.is_file`` does not."""
+    every supported Python, as ``signing.is_regular_file`` does, where ``Path.is_file`` does not.
+    The bytes are decoded without newline translation, so a lone CR stays a CR for :func:`jsonl_lines`."""
     try:
         os.lstat(path)
     except FileNotFoundError:
         return None
     if not is_regular_file(path):
         raise OSError(f"{path} is not a regular file")
-    return path.read_text(encoding="utf-8")
+    return path.read_bytes().decode("utf-8")
 
 
 class _Unreadable(ValueError):
@@ -89,8 +90,7 @@ def _strings(record: dict[str, Any], *fields: str) -> dict[str, Any]:
 
 
 def _jsonl(text: str) -> list[dict[str, Any]]:
-    lines = (line.strip() for line in text.splitlines())
-    return _objects([_parse_json(line) for line in lines if line])
+    return _objects([_parse_json(line) for _, line in jsonl_lines(text)])
 
 
 def _integrity(text: str) -> list[dict[str, Any]]:

@@ -143,6 +143,113 @@ def test_report_file_not_utf8_is_not_ready(tmp_path: Path) -> None:
     assert verdict["reasons"] == ["cannot read report file coverage.json"]
 
 
+_JSONL_RECORD = {
+    "integrity.jsonl": b'{"stream": "s", "status": "ok"}',
+    "applicability.jsonl": b'{"drift": []}',
+}
+_NBSP, _BOM = "\u00a0".encode(), "\ufeff".encode()
+
+
+@pytest.mark.parametrize("name", sorted(_JSONL_RECORD))
+@pytest.mark.parametrize(
+    "lines",
+    [
+        lambda r, sep=sep: r + sep + r + b"\n"
+        for sep in (
+            b"\x0b",
+            b"\x0c",
+            "\u0085".encode(),
+            "\u2028".encode(),
+            "\u2029".encode(),
+            b"\r",
+        )
+    ]
+    + [
+        lambda r: r + b"\r" + r,
+        lambda r: _NBSP + r + b"\n",
+        lambda r: _BOM + r + b"\n",
+        lambda r: r + _NBSP + b"\n",
+        lambda r: _NBSP + b"\n" + r + b"\n",
+        lambda r: r[:-1] + b', "x": "\xff"}\n',
+    ],
+    ids=[
+        "vt",
+        "ff",
+        "nel",
+        "ls",
+        "ps",
+        "lone_cr",
+        "lone_cr_no_lf",
+        "lead_nbsp",
+        "lead_bom",
+        "trail_nbsp",
+        "nbsp_line",
+        "not_utf8",
+    ],
+)
+def test_jsonl_line_outside_the_line_rule_is_not_ready(
+    tmp_path: Path, name: str, lines
+) -> None:
+    """LF alone ends a line; any other separator or a no-break space or byte-order mark leaves a line
+    not JSON (18.184n), in every engine alike."""
+    report = _report(tmp_path)
+    (report / name).write_bytes(lines(_JSONL_RECORD[name]))
+    verdict = compute_readiness(report, severities=_SEVERITIES)
+    assert verdict["reasons"] == [f"cannot read report file {name}"]
+
+
+@pytest.mark.parametrize("name", sorted(_JSONL_RECORD))
+@pytest.mark.parametrize(
+    "lines",
+    [
+        lambda r: r + b"\r\n",
+        lambda r: b"\t " + r + b" \t\n",
+        lambda r: b"\n \n\r\n" + r + b"\n\n",
+        lambda r: r.replace(b": ", b":\r", 1) + b"\n",
+        lambda r: r.replace(b'": "', '": "\u2028'.encode(), 1) + b"\n",
+        lambda r: b"",
+    ],
+    ids=[
+        "crlf",
+        "space_tab",
+        "blank_lines",
+        "cr_between_tokens",
+        "u2028_in_string",
+        "empty",
+    ],
+)
+def test_jsonl_line_inside_the_line_rule_stays_ready(
+    tmp_path: Path, name: str, lines
+) -> None:
+    report = _report(tmp_path)
+    (report / name).write_bytes(lines(_JSONL_RECORD[name]))
+    assert compute_readiness(report, severities=_SEVERITIES)["verdict"] == READY
+
+
+@pytest.mark.parametrize(
+    ("name", "record", "reason"),
+    [
+        (
+            "integrity.jsonl",
+            b'{"stream": "s", "status": "failed"}',
+            "integrity failed on stream s",
+        ),
+        (
+            "applicability.jsonl",
+            b'{"drift": [{"kind": "k", "ref": "r"}]}',
+            "applicability drift: k r",
+        ),
+    ],
+)
+@pytest.mark.parametrize("tail", [b"", b"\r"], ids=["no_lf", "lone_cr_at_end"])
+def test_last_jsonl_record_without_lf_is_read(
+    tmp_path: Path, name: str, record: bytes, reason: str, tail: bytes
+) -> None:
+    report = _report(tmp_path)
+    (report / name).write_bytes(b"\n" + record + tail)
+    assert compute_readiness(report, severities=_SEVERITIES)["reasons"] == [reason]
+
+
 def test_empty_coverage_object_stays_ready(tmp_path: Path) -> None:
     verdict = compute_readiness(_report(tmp_path, coverage={}), severities=_SEVERITIES)
     assert verdict["verdict"] == READY

@@ -373,16 +373,11 @@ public final class ReportValidate {
 
     private static List<String> validateJsonl(String text, String filename) {
         List<String> problems = new ArrayList<>();
-        String[] lines = text.split("\r?\n", -1);
-        for (int i = 0; i < lines.length; i++) {
-            String line = lines[i];
-            if (line.strip().isEmpty()) {
-                continue;
-            }
+        for (Json.Line line : Json.jsonlLines(text)) {
             try {
-                Json.parse(line);
+                Json.parse(line.text());
             } catch (IllegalArgumentException e) {
-                problems.add(filename + ": line " + (i + 1) + " is not valid JSON (" + originalMessage(e) + ")");
+                problems.add(filename + ": line " + line.number() + " is not valid JSON (" + originalMessage(e) + ")");
             }
         }
         return problems;

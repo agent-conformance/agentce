@@ -79,6 +79,27 @@ public final class Json {
         return JsonNodeFactory.instance;
     }
 
+    /** One non-blank JSON Lines line: its 1-based number and its text, as {@link #jsonlLines} returns it. */
+    public record Line(int number, String text) {}
+
+    /**
+     * The JSON Lines of {@code text}, blank lines left out: LF alone ends a line, and a line holding only
+     * space, tab or CR is blank. Every other line is returned as it stands for a strict JSON parser, which
+     * accepts only JSON's whitespace around a value (so a CRLF pair reads as LF) and refuses a VT, FF, NEL,
+     * U+2028, no-break space or byte-order mark outside a string, and two values joined by a lone CR.
+     * Python's {@code safe_json.jsonl_lines} and {@code json.ts}'s {@code jsonlLines} apply the same rule.
+     */
+    public static List<Line> jsonlLines(String text) {
+        String[] lines = text.split("\n", -1);
+        List<Line> out = new ArrayList<>();
+        for (int i = 0; i < lines.length; i++) {
+            if (!lines[i].chars().allMatch(c -> c == ' ' || c == '\t' || c == '\r')) {
+                out.add(new Line(i + 1, lines[i]));
+            }
+        }
+        return out;
+    }
+
     /**
      * Parse a JSON document, refusing trailing content after the root value and an empty or
      * whitespace-only document. {@code readTree} alone stops at the end of the first value and

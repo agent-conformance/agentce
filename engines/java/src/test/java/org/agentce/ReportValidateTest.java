@@ -271,6 +271,26 @@ class ReportValidateTest {
                 problems.toString());
     }
 
+    /** The JSON Lines rule, with the same line numbers as Python and TypeScript (18.184n). */
+    @Test
+    void runtimeDriftJsonlIsReadByTheLineRule(@TempDir Path out) throws IOException {
+        freshFullReport(out);
+        Path manifestPath = out.resolve("manifest.json");
+        ObjectNode manifest = readObject(manifestPath);
+        ((ObjectNode) manifest.get("outputs")).put("runtime_drift.jsonl", "sha256:" + "0".repeat(64));
+        Files.writeString(manifestPath, manifest.toString());
+        Path driftPath = out.resolve("runtime_drift.jsonl");
+        Files.writeString(driftPath, "{\"subject\": \"x\"}\r\n \t\r\n{\"subject\":\r\"y\"}\n");
+        assertEquals(List.of(), ReportValidate.validateReport(out));
+        Files.writeString(driftPath, "{\"subject\": \"x\"}\n\n{\"a\": 1}\u000b{\"b\": 2}\n ");
+        assertEquals(
+                List.of("runtime_drift.jsonl: line 3 is not valid JSON", "runtime_drift.jsonl: line 4 is not valid JSON"),
+                ReportValidate.validateReport(out).stream()
+                        .filter(p -> p.startsWith("runtime_drift.jsonl"))
+                        .map(p -> p.split(" \\(")[0])
+                        .toList());
+    }
+
     @Test
     void aNonUtf8RuntimeDriftLineIsATidyProblemNotACrash(@TempDir Path out) throws IOException {
         freshFullReport(out);

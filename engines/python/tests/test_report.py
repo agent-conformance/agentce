@@ -1690,6 +1690,34 @@ def test_validate_report_handles_a_non_utf8_jsonl_line_without_crashing(
     )
 
 
+def test_validate_report_reads_jsonl_by_the_line_rule(tmp_path: Path) -> None:
+    """LF alone ends a line, a line of only space, tab or CR is blank, and a VT-joined line is not
+    JSON, with the same line number in every engine (18.184n)."""
+    write_report(
+        tmp_path,
+        [_assertion("conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+    )
+    manifest_path = tmp_path / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["outputs"]["runtime_drift.jsonl"] = "sha256:" + "0" * 64
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    drift = tmp_path / "runtime_drift.jsonl"
+    drift.write_bytes(b'{"subject": "x"}\r\n \t\r\n{"subject":\r"y"}\n')
+    assert not [
+        p for p in validate_report(tmp_path) if p.startswith("runtime_drift.jsonl")
+    ]
+    drift.write_bytes(b'{"subject": "x"}\n\n{"a": 1}\x0b{"b": 2}\n' + "\u2028".encode())
+    problems = [
+        p for p in validate_report(tmp_path) if p.startswith("runtime_drift.jsonl")
+    ]
+    assert [p.split(" (")[0] for p in problems] == [
+        "runtime_drift.jsonl: line 3 is not valid JSON",
+        "runtime_drift.jsonl: line 4 is not valid JSON",
+    ], problems
+
+
 def test_validate_report_optional_artifacts_absent_is_fine(tmp_path: Path) -> None:
     write_report(
         tmp_path,

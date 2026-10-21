@@ -15,6 +15,7 @@ import {
   load as yamlLoad,
 } from "js-yaml";
 import { InputError } from "./errors";
+import { jsonlLines } from "./json";
 import { byteCompare, decodeUtf8Strict, joinPath, normalizePosixPath, pyRepr, pyStr } from "./util";
 
 export const READY = "READY";
@@ -1123,8 +1124,7 @@ function strings(record: Record<string, unknown>, ...fields: string[]): Record<s
 }
 
 function parseJsonl(text: string): Record<string, unknown>[] {
-  const lines = text.split("\n").map((line) => line.trim());
-  return objects(lines.filter((line) => line).map((line) => JSON.parse(line) as unknown));
+  return objects(jsonlLines(text).map(([, line]) => JSON.parse(line) as unknown));
 }
 
 /** integrity.jsonl: one object per line, whose `status` (when present) is a string. */

@@ -226,6 +226,18 @@ const PYTHON_CONSTANTS = [
   ["-Infinity", "-inf"],
 ] as const;
 
+/** The JSON Lines of `text` as [1-based line number, line], blank lines left out: LF alone ends a line,
+ * and a line holding only space, tab or CR is blank. Every other line is returned as it stands for a
+ * strict JSON parser, which accepts only JSON's whitespace around a value (so a CRLF pair reads as LF)
+ * and refuses a VT, FF, NEL, U+2028, no-break space or byte-order mark outside a string, and two values
+ * joined by a lone CR. Python's `safe_json.jsonl_lines` and `Json.java` apply the same rule. */
+export function jsonlLines(text: string): Array<[number, string]> {
+  return text
+    .split("\n")
+    .map((line, i): [number, string] => [i + 1, line])
+    .filter(([, line]) => /[^ \t\r]/.test(line));
+}
+
 /** Parse JSON text like `JSON.parse`, keeping a non-canonical number token as a marker value. With
  * `pythonConstants`, `NaN`, `Infinity` and `-Infinity` are read as Python's `json.loads` reads them
  * (as non-canonical numbers) instead of being refused. */

@@ -331,6 +331,30 @@ test("non-UTF-8 bytes in a mandatory artifact are a tidy problem, not a crash", 
   }
 });
 
+test("runtime_drift.jsonl is read by the JSON Lines rule, with the same line numbers as every engine (18.184n)", () => {
+  const out = freshFullReport();
+  try {
+    const manifestPath = join(out, "manifest.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    manifest.outputs["runtime_drift.jsonl"] = `sha256:${"0".repeat(64)}`;
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+    const drift = join(out, "runtime_drift.jsonl");
+    const ofDrift = () => validateReport(out).filter((p) => p.startsWith("runtime_drift.jsonl"));
+    writeFileSync(drift, '{"subject": "x"}\r\n \t\r\n{"subject":\r"y"}\n');
+    assert.deepEqual(ofDrift(), []);
+    writeFileSync(drift, '{"subject": "x"}\n\n{"a": 1}\u000b{"b": 2}\n ');
+    assert.deepEqual(
+      ofDrift().map((p) => p.split(" (")[0]),
+      [
+        "runtime_drift.jsonl: line 3 is not valid JSON",
+        "runtime_drift.jsonl: line 4 is not valid JSON",
+      ],
+    );
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
 test("a non-UTF-8 runtime_drift.jsonl line is a tidy problem, not a crash", () => {
   const out = freshFullReport();
   try {

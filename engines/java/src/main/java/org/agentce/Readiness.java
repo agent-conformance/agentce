@@ -1158,7 +1158,7 @@ public final class Readiness {
     }
 
     private static List<JsonNode> parseJsonl(String text) {
-        return objects(text.lines().map(String::strip).filter(s -> !s.isEmpty()).map(Readiness::parseJson).toList());
+        return objects(Json.jsonlLines(text).stream().map(line -> parseJson(line.text())).toList());
     }
 
     /** integrity.jsonl: one object per line, whose {@code status} (when present) is a string. */

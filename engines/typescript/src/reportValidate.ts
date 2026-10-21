@@ -16,7 +16,7 @@ import Ajv2020 from "ajv/dist/2020";
 import anyOfDef from "ajv/dist/vocabularies/applicator/anyOf";
 import oneOfDef from "ajv/dist/vocabularies/applicator/oneOf";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
-import { MAX_INT_STR_DIGITS, parseJson } from "./json";
+import { MAX_INT_STR_DIGITS, jsonlLines, parseJson } from "./json";
 import { byteCompare, decodeUtf8Strict, joinPath } from "./util";
 
 /** Always written, regardless of `--emit`: the run's structural core. */
@@ -406,17 +406,13 @@ function validateXmlWellformed(text: string, filename: string): string[] {
 
 function validateJsonl(text: string, filename: string): string[] {
   const problems: string[] = [];
-  const lines = text.split(/\r?\n/);
-  lines.forEach((line, i) => {
-    if (line.trim() === "") {
-      return;
-    }
+  for (const [n, line] of jsonlLines(text)) {
     try {
       parseJsonText(line);
     } catch (exc) {
-      problems.push(`${filename}: line ${i + 1} is not valid JSON (${(exc as Error).message})`);
+      problems.push(`${filename}: line ${n} is not valid JSON (${(exc as Error).message})`);
     }
-  });
+  }
   return problems;
 }
 

@@ -121,6 +121,78 @@ class ReadinessTest {
         return null;
     }
 
+    private static final Map<String, String> JSONL_RECORD = Map.of(
+            "integrity.jsonl", "{\"stream\": \"s\", \"status\": \"ok\"}",
+            "applicability.jsonl", "{\"drift\": []}");
+
+    /** LF alone ends a line; any other separator, or a no-break space or byte-order mark, leaves a
+     * line not JSON (18.184n), as in Python and TypeScript. */
+    @ParameterizedTest
+    @ValueSource(strings = {"integrity.jsonl", "applicability.jsonl"})
+    void jsonlLineOutsideTheLineRuleIsNotReady(String name, @TempDir Path tmp) throws IOException {
+        String r = JSONL_RECORD.get(name);
+        Map<String, String> cases = new LinkedHashMap<>();
+        for (String sep : List.of("\u000b", "\u000c", "\u0085", " ", " ", "\r")) {
+            cases.put("joined " + (int) sep.charAt(0), r + sep + r + "\n");
+        }
+        cases.put("lone CR, no LF", r + "\r" + r);
+        cases.put("leading NBSP", " " + r + "\n");
+        cases.put("leading BOM", "﻿" + r + "\n");
+        cases.put("trailing NBSP", r + " \n");
+        cases.put("NBSP-only line", " \n" + r + "\n");
+        for (Map.Entry<String, String> c : cases.entrySet()) {
+            Path dir = Files.createDirectories(tmp.resolve("c" + cases.keySet().stream().toList().indexOf(c.getKey())));
+            writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
+            Files.writeString(dir.resolve(name), c.getValue());
+            assertEquals(List.of("cannot read report file " + name),
+                    Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).reasons(), c.getKey());
+        }
+        Path dir = Files.createDirectories(tmp.resolve("not-utf8"));
+        writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
+        byte[] head = (r.substring(0, r.length() - 1) + ", \"x\": \"").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] bytes = java.util.Arrays.copyOf(head, head.length + 4);
+        System.arraycopy(new byte[] {(byte) 0xff, '"', '}', '\n'}, 0, bytes, head.length, 4);
+        Files.write(dir.resolve(name), bytes);
+        assertEquals(List.of("cannot read report file " + name),
+                Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).reasons(), "not UTF-8");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"integrity.jsonl", "applicability.jsonl"})
+    void jsonlLineInsideTheLineRuleStaysReady(String name, @TempDir Path tmp) throws IOException {
+        String r = JSONL_RECORD.get(name);
+        List<String> cases = List.of(
+                r + "\r\n",
+                "\t " + r + " \t\n",
+                "\n \n\r\n" + r + "\n\n",
+                r.replaceFirst(": ", ":\r") + "\n",
+                r.substring(0, r.length() - 1) + ", \"x\": \"a b\"}\n",
+                "");
+        for (int i = 0; i < cases.size(); i++) {
+            Path dir = Files.createDirectories(tmp.resolve("c" + i));
+            writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
+            Files.writeString(dir.resolve(name), cases.get(i));
+            assertEquals(Readiness.READY, Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).verdict(),
+                    cases.get(i));
+        }
+    }
+
+    @Test
+    void lastJsonlRecordWithoutLfIsRead(@TempDir Path tmp) throws IOException {
+        Map<String, String[]> cases = Map.of(
+                "integrity.jsonl", new String[] {"{\"stream\": \"s\", \"status\": \"failed\"}", "integrity failed on stream s"},
+                "applicability.jsonl", new String[] {"{\"drift\": [{\"kind\": \"k\", \"ref\": \"r\"}]}", "applicability drift: k r"});
+        for (Map.Entry<String, String[]> c : cases.entrySet()) {
+            for (String tail : List.of("", "\r")) {
+                Path dir = Files.createDirectories(tmp.resolve(c.getKey() + tail.length()));
+                writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
+                Files.writeString(dir.resolve(c.getKey()), "\n" + c.getValue()[0] + tail);
+                assertEquals(List.of(c.getValue()[1]),
+                        Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).reasons());
+            }
+        }
+    }
+
     /** An entry that is there but cannot be read blocks; it never reads as absent, which would let a
      * recorded gap stop blocking (18.165, the same answer Python gives). */
     @ParameterizedTest

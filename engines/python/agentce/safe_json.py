@@ -55,6 +55,19 @@ def refuse_constant(token: str) -> Any:
     raise ValueError(f"{token} is not JSON")
 
 
+def jsonl_lines(text: str) -> list[tuple[int, str]]:
+    """The JSON Lines of ``text`` as (1-based line number, line), blank lines left out: LF alone ends a
+    line, and a line holding only space, tab or CR is blank. Every other line is returned as it stands
+    for a strict JSON parser, which accepts only JSON's whitespace around a value (so a CRLF pair reads
+    as LF) and refuses a VT, FF, NEL, U+2028, no-break space or byte-order mark outside a string, and
+    two values joined by a lone CR. ``json.ts`` and ``Json.java`` apply the same rule."""
+    return [
+        (n, line)
+        for n, line in enumerate(text.split("\n"), start=1)
+        if line.strip(" \t\r")
+    ]
+
+
 def load_json(text: str | bytes) -> Any:
     """``json.loads(text)``, raising :class:`JSONError` for any invalid JSON, including an integer
     literal over :data:`MAX_INT_STR_DIGITS` digits whatever the interpreter's own limit.
