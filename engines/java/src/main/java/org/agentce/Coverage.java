@@ -46,12 +46,12 @@ public final class Coverage {
     }
 
     /** {@code observed / expected} to four decimals, banker's rounding, or null when {@code expected <= 0}. */
-    private static String ratio(int observed, long expected) {
+    private static String ratio(long observed, long expected) {
         if (expected <= 0) {
             return null;
         }
         BigInteger exp = BigInteger.valueOf(expected);
-        BigInteger scaled = BigInteger.valueOf((long) observed * 10000L);
+        BigInteger scaled = BigInteger.valueOf(observed).multiply(BigInteger.valueOf(10000L));
         BigInteger[] qr = scaled.divideAndRemainder(exp);
         BigInteger q = qr[0];
         BigInteger twice = qr[1].multiply(BigInteger.TWO);
@@ -245,7 +245,8 @@ public final class Coverage {
             List<String> sortedTypes = new ArrayList<>(types);
             sortedTypes.sort(Json::byteCompare);
             for (String type : sortedTypes) {
-                int obs = observed.getOrDefault(type, 0);
+                // A long, as expected is: Assess compares the two nodes, and an int node never equals a long one.
+                long obs = observed.getOrDefault(type, 0);
                 ExpectedEntry entry = expected.get(type);
                 ObjectNode row = byType.putObject(type);
                 if (entry == null) {
