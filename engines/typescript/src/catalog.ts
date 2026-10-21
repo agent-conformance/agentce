@@ -12,7 +12,7 @@ import { load } from "js-yaml";
 import { errorCause, errorFix } from "./errorCatalogue";
 import { AgentceError, InputError, catalogFileUnloadable, catalogUnreadable } from "./errors";
 import { type Shape, parseShapesTtl } from "./psp";
-import { pyyamlLoad } from "./readiness";
+import { nestedTooDeeply, pyyamlLoad } from "./readiness";
 import { insideFolder, isFileFollowingLinks } from "./report";
 import { SOURCE_CLASS_FROM, SOURCE_CLASS_RANK } from "./sourceClass";
 import { byteCompare, decodeUtf8Strict, formatTemplate, joinPath } from "./util";
@@ -322,12 +322,10 @@ function catalogMapping(files: CatalogFiles, rel: string): Record<string, unknow
     pyyamlLoad(text, true);
     data = load(text);
   } catch (error) {
-    // js-yaml caps nesting (and recurses per level), as PyYAML's composer hits its RecursionError.
-    const deep = error instanceof RangeError || /exceeded maxDepth/.test((error as Error).message);
     throw catalogFileUnloadable(
       files.root,
       rel,
-      deep
+      nestedTooDeeply(error)
         ? "is nested too deeply to read safely"
         : `is not YAML the engine can load: ${(error as Error).message}`,
     );

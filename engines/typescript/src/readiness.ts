@@ -768,6 +768,12 @@ export function pyyamlLoad(text: string, uniqueKeys = false): unknown {
   return data;
 }
 
+/** Whether `error`, thrown by {@link pyyamlLoad}, is js-yaml's nesting cap or the recursion it guards (js-yaml
+ * recurses per level), as PyYAML's composer hits its RecursionError. */
+export function nestedTooDeeply(error: unknown): boolean {
+  return error instanceof RangeError || /exceeded maxDepth/.test((error as Error).message);
+}
+
 /** The YAML at `path` as Python's `load_untrusted_yaml` reads it (PyYAML's `SafeLoader` typing, PYYAML_SAFE_SCHEMA),
  * refusing a file that is not UTF-8, nests too deeply, or carries YAML it cannot load under `key`. With `uniqueKeys`, a
  * mapping that writes one key twice is refused too (js-yaml's own duplicate-key error); without it the last value wins,
@@ -790,8 +796,7 @@ export function loadPyyaml(path: string, key: string, what: string, uniqueKeys =
   try {
     return pyyamlLoad(text, uniqueKeys);
   } catch (error) {
-    if (error instanceof RangeError || /exceeded maxDepth/.test((error as Error).message)) {
-      // js-yaml caps nesting (and recurses per level), as PyYAML's composer hits its RecursionError.
+    if (nestedTooDeeply(error)) {
       throw new InputError(
         key,
         `${where} is nested too deeply to parse safely.`,

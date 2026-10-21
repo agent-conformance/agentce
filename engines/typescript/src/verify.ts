@@ -641,12 +641,7 @@ export function verifyCatalog(
   }
   if (!sigIsFile) {
     // There but not a file once links are followed (a FIFO, a folder, a dangling link): unsigned, never "absent".
-    let present = true;
-    try {
-      lstatSync(sigPath);
-    } catch {
-      present = false;
-    }
+    const present = lstatSync(sigPath, { throwIfNoEntry: false }) !== undefined;
     return fail(
       refusal(present ? "verify.catalog_signature_not_a_file" : "verify.catalog_unsigned"),
     );

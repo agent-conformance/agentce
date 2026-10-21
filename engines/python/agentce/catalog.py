@@ -644,7 +644,7 @@ def load_and_lint(
         return None, [f"{directory}: no catalog.yaml"]
     try:
         catalog = load_catalog(directory)
-    except (yaml.YAMLError, OSError) as exc:
+    except OSError as exc:
         return None, [f"{directory}: cannot load catalog ({exc})"]
     except InputError as exc:
         return None, [f"{exc.key}: {exc.cause}"]
