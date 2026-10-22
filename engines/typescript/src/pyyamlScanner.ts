@@ -4,9 +4,9 @@
  * stack, simple keys, plain, quoted and block scalar extents, directives, anchors, tags and aliases) and checks each
  * top-level flow collection against PyYAML's flow grammar. It reports only a refusal PyYAML makes; a document PyYAML
  * refuses for another reason may pass, and the composer refuses it. Java's `PyyamlScanner` is the same walk.
- * {@link pyyamlScan} also returns the text js-yaml should read: PyYAML takes every `?` in a flow collection as the
- * key indicator (`{?a: 1}` is `{a: 1}`), js-yaml only one followed by a space, so it gets that space. SnakeYAML reads
- * the flow `?` as PyYAML does, so Java needs no such text.
+ * {@link pyyamlScan} also returns the text js-yaml should read: PyYAML takes every `?` and `:` that starts a token in
+ * a flow collection as the key or value indicator (`{?a: 1}` is `{a: 1}`, `{&x :1}` is `{None: 1}`), js-yaml only
+ * one followed by a space, so it gets that space. SnakeYAML reads them as PyYAML does, so Java needs no such text.
  */
 
 import { pyRepr } from "./util";
@@ -39,8 +39,8 @@ export function scannerProblem(text: string): string | null {
   return scannerProblemOf(new Scanner(text));
 }
 
-/** {@link scannerProblem}, and when it is `null`, `text` with a space after each flow-collection `?` that has none,
- * so js-yaml reads every such `?` as PyYAML's key indicator. */
+/** {@link scannerProblem}, and when it is `null`, `text` with a space after each flow-collection `?` or `:`
+ * indicator that has none, so js-yaml reads it as PyYAML's indicator. */
 export function pyyamlScan(text: string): { problem: string | null; text: string } {
   const scanner = new Scanner(text);
   const problem = scannerProblemOf(scanner);
@@ -74,7 +74,7 @@ class Scanner {
   private allowKey = true;
   private keyLine = -1;
   private keyCol = 0;
-  private readonly flowKeys: number[] = [];
+  private readonly flowIndicators: number[] = [];
 
   constructor(private readonly text: string) {
     this.t = Array.from(text, (ch) => ch.codePointAt(0) ?? 0);
@@ -83,14 +83,14 @@ class Scanner {
     this.lineStart = this.i;
   }
 
-  /** The text with a space after each flow `?` {@link token} found with none. */
+  /** The text with a space after each flow `?` or `:` indicator {@link token} found with none. */
   keyedText(): string {
     let out = "";
     let from = 0;
     let unit = 0;
     let cp = 0;
-    for (const k of this.flowKeys) {
-      // flowKeys holds code-point indices; the text is sliced by UTF-16 offsets.
+    for (const k of this.flowIndicators) {
+      // flowIndicators holds code-point indices; the text is sliced by UTF-16 offsets.
       for (; cp <= k; cp += 1) {
         unit += (this.t[cp] ?? 0) > 0xffff ? 2 : 1;
       }
@@ -249,7 +249,7 @@ class Scanner {
         this.emit("?");
         this.allowKey = false;
         if (!nextEnds) {
-          this.flowKeys.push(this.i);
+          this.flowIndicators.push(this.i);
         }
       } else {
         this.addIndent(this.col());
@@ -261,6 +261,9 @@ class Scanner {
     if (ch === ":" && (this.depth > 0 || nextEnds)) {
       if (this.depth > 0) {
         this.emit(":");
+        if (!nextEnds) {
+          this.flowIndicators.push(this.i);
+        }
       } else {
         if (this.keyLine >= 0) {
           this.addIndent(this.keyCol);

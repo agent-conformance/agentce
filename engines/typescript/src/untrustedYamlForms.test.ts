@@ -91,7 +91,7 @@ test("a repeated key is decided by Python's key equality", () => {
   }
 });
 
-test("a flow `?` opens a key, as PyYAML's scanner reads it", () => {
+test("a flow `?` or `:` is an indicator, as PyYAML's scanner reads it", () => {
   for (const [text, value] of [
     ["a: {?b: 1}\n", { a: { b: 1 } }],
     ["a: {? b: 1}\n", { a: { b: 1 } }],
@@ -108,6 +108,23 @@ test("a flow `?` opens a key, as PyYAML's scanner reads it", () => {
     ],
   ] as const) {
     assert.deepEqual(pyyamlLoad(text), value, text);
+  }
+  for (const [text, value] of [
+    ["a: {?:1}\n", { a: { null: 1 } }],
+    ['a: {"b":1}\n', { a: { b: 1 } }],
+    ["a: {b:1}\n", { a: { "b:1": null } }],
+    ["a: [c, &d :e]\n", { a: ["c", { null: "e" }] }],
+    ["a: {?:, b: 2}\n", { a: { null: null, b: 2 } }],
+  ] as const) {
+    assert.deepEqual(pyyamlLoad(text), value, text);
+  }
+  for (const text of [
+    "a: {?:1, ?:2}\n",
+    "a: {? :1, ? :2}\n",
+    "a: {&b :1, &c :2}\n",
+    "a: {!!str :1, !!str :2}\n",
+  ]) {
+    assert.throws(() => pyyamlLoad(text, true), /found the key .* twice/, text);
   }
   assert.throws(() => pyyamlLoad("a: {b: 1, ?b: 2}\n", true), /found the key .* twice/);
   assert.deepEqual(pyyamlLoad("a: {b: 1, ?b: 2}\n"), { a: { b: 2 } });
