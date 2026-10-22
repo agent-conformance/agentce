@@ -285,7 +285,11 @@ class Scanner {
     if (this.peek() === TAB) {
       this.tab();
     }
-    const name = String.fromCodePoint(...this.t.slice(start, this.i));
+    // Not String.fromCodePoint(...): spreading a long name would overflow the call stack.
+    const name = this.t
+      .slice(start, this.i)
+      .map((c) => String.fromCodePoint(c))
+      .join("");
     const known = name === "YAML" || name === "TAG";
     while (!NOT_BREAK_END.has(this.peek())) {
       if (known && this.peek() === TAB) {
@@ -510,7 +514,7 @@ function withKeys(toks: Tok[]): string[] {
         j += 1;
       }
       body.push(kindAt(k) as string);
-      body.push(...withKeys(toks.slice(k + 1, Math.min(j, toks.length))));
+      pushAll(body, withKeys(toks.slice(k + 1, Math.min(j, toks.length))));
       if (j < toks.length) {
         body.push(kindAt(j) as string);
       }
@@ -525,9 +529,16 @@ function withKeys(toks: Tok[]): string[] {
     if (k < toks.length && kindAt(k) === ":" && toks[k]?.line === tok.line && out.at(-1) !== "?") {
       out.push("?");
     }
-    out.push(...body);
+    pushAll(out, body);
   }
   return out;
+}
+
+/** `into.push(...items)` without spreading, which overflows the call stack on a long flow collection. */
+function pushAll(into: string[], items: string[]): void {
+  for (const item of items) {
+    into.push(item);
+  }
 }
 
 /** PyYAML's flow grammar over the keyed tokens. */

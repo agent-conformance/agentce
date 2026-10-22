@@ -694,26 +694,16 @@ function notMergeable(): YAMLException {
   );
 }
 
-/** PyYAML's merge for a `? <<` key js-yaml stored under its text: the mapping's own keys win, then the first source. */
-function mergeExplicit(mapping: Record<string, unknown>, sources: unknown[]): void {
-  delete mapping[String(PYYAML_MERGE_VALUE)];
-  for (const source of sources) {
-    for (const [key, value] of Object.entries(source as Record<string, unknown>)) {
-      if (!Object.hasOwn(mapping, key)) {
-        mapping[key] = value;
-      }
-    }
-  }
-}
-
-/** PyYAML's reading of a mapping with several merge keys (`flatten_mapping`): a later merge key's sources win over an
- * earlier one's, the first source of a merged sequence wins within it, and the mapping's own keys win over all of them.
- * js-yaml lets the first merge key win, so the merged keys are written again here in PyYAML's order. */
+/** PyYAML's reading of a mapping's merge keys (`flatten_mapping`): a later merge key's sources win over an earlier
+ * one's, the first source of a merged sequence wins within it, and the mapping's own keys win over all of them.
+ * js-yaml lets the first merge key win and stores a `? <<` key's value under the key's text, so the merged keys are
+ * written again here in PyYAML's order. */
 function mergeInPyyamlOrder(mapping: Record<string, unknown>, node: OpenNode): void {
+  if (node.explicitMerge) {
+    delete mapping[String(PYYAML_MERGE_VALUE)];
+  }
   // js-yaml names a mapping key by its text, String(key).
-  const own = new Set(
-    (node.scalars ?? []).filter((s) => s.before !== ":").map((s) => String(s.value)),
-  );
+  const own = new Set(ownKeys(node).map((s) => String(s.value)));
   for (const sources of node.mergeSources ?? []) {
     for (const source of [...sources].reverse()) {
       for (const [key, value] of Object.entries(source as Record<string, unknown>)) {
@@ -723,6 +713,11 @@ function mergeInPyyamlOrder(mapping: Record<string, unknown>, node: OpenNode): v
       }
     }
   }
+}
+
+/** The scalars written as keys directly inside a mapping node: the ones with no `:` before them. */
+function ownKeys(node: OpenNode): { readonly before: string; readonly value: unknown }[] {
+  return (node.scalars ?? []).filter((s) => s.before !== ":");
 }
 
 function unhashableKey(): YAMLException {
@@ -737,17 +732,17 @@ interface OpenNode {
   childEnd: number;
   /** Whether a merge key has closed directly inside this node, and its value is still to come (`pending`) or not. */
   merge: "none" | "pending" | "done";
-  /** The sources of a merge written as an explicit block key (`? <<`), which js-yaml stores under the key's text as
+  /** Whether a merge key is written as an explicit block key (`? <<`), which js-yaml stores under the key's text as
    * it drops an explicit block key's tag (js-yaml 4.3.2 `readBlockMapping`); merged when this mapping closes. */
-  explicitMergeSources?: unknown[];
+  explicitMerge?: boolean;
   /** Each merge key's sources, in the order the keys are written. */
   mergeSources?: unknown[][];
   /** The sequences and mappings directly inside this node with no `:` before them: keys, if this node is a mapping
    * (js-yaml also opens a node around a whole collection, whose one child is its own result). */
   withoutValueIndicator?: unknown[];
-  /** Each scalar directly inside this node as {@link pythonKey} gives it, and the indicator before it: if this node
-   * is a mapping, the ones with no `:` before them are its keys. */
-  scalars?: { readonly key: string; readonly before: string; readonly value: unknown }[];
+  /** Each scalar directly inside this node, and the indicator before it: if this node is a mapping, the ones with no
+   * `:` before them are its keys. */
+  scalars?: { readonly before: string; readonly value: unknown }[];
 }
 
 /** The PyYAML node rules js-yaml's composer does not follow, applied as each node closes (its `listener` option):
@@ -785,19 +780,17 @@ class PyyamlComposer {
       if (node.merge === "pending") {
         throw notMergeable();
       }
-      if (node.explicitMergeSources !== undefined && isRecord(result)) {
-        mergeExplicit(result, node.explicitMergeSources);
-      }
-      if ((node.mergeSources?.length ?? 0) > 1 && isRecord(result)) {
+      if ((node.explicitMerge || (node.mergeSources?.length ?? 0) > 1) && isRecord(result)) {
         mergeInPyyamlOrder(result, node);
       }
-      const seen = new Set<string>();
-      for (const scalar of this.uniqueKeys ? (node.scalars ?? []) : []) {
-        if (scalar.before !== ":") {
-          if (seen.has(scalar.key)) {
+      if (this.uniqueKeys) {
+        const seen = new Set<string>();
+        for (const scalar of ownKeys(node)) {
+          const key = pythonKey(scalar.value);
+          if (seen.has(key)) {
             throw new YAMLException(`found the key ${pyRepr(scalar.value)} twice`);
           }
-          seen.add(scalar.key);
+          seen.add(key);
         }
       }
     }
@@ -812,9 +805,6 @@ class PyyamlComposer {
       }
       container.mergeSources ??= [];
       container.mergeSources.push(Array.isArray(result) ? result : [result]);
-      if (container.explicitMergeSources !== undefined) {
-        container.explicitMergeSources = Array.isArray(result) ? result : [result];
-      }
       return;
     }
     // js-yaml opens an untagged node around an explicit block key, so a merge key can close inside one.
@@ -825,13 +815,13 @@ class PyyamlComposer {
       }
       container.merge = "pending";
       if (node.before === "?") {
-        container.explicitMergeSources = [];
+        container.explicitMerge = true;
       }
       return;
     }
     if (!isCollection(result)) {
       container.scalars ??= [];
-      container.scalars.push({ key: pythonKey(result), before: node.before, value: result });
+      container.scalars.push({ before: node.before, value: result });
       return;
     }
     if (node.before === "?" || valueIndicatorFollows(state.input, state.position)) {

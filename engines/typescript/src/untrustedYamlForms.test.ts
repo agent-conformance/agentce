@@ -91,6 +91,17 @@ test("a repeated key is decided by Python's key equality", () => {
   }
 });
 
+test("a long flow list is read, never a stack overflow", () => {
+  const items = Array.from({ length: 200000 }, (_, i) => i);
+  assert.equal(scannerProblem(`a: [${items.join(",")}]\n`), null);
+  assert.equal(scannerProblem(`%${"X".repeat(300000)} a\n---\nb: 1\n`), null);
+});
+
+test("an explicit merge key and a later one read as PyYAML reads them", () => {
+  assert.deepEqual(pyyamlLoad("? <<\n: {a: 1}\n<<: {a: 2}\n"), { a: 2 });
+  assert.deepEqual(pyyamlLoad("<<: {a: 2}\n? <<\n: {a: 1, b: 1}\nb: 0\n"), { a: 1, b: 0 });
+});
+
 test("only a Unicode 15.0 digit reads as a digit", () => {
   assert.deepEqual(pyyamlLoad('a: !!int "١٠"\n'), { a: 10 });
   for (const text of ['a: !!int "𐵁𐵀"\n', 'a: !!float "𐵁.5"\n', 'a: !!int "𖵱"\n']) {
