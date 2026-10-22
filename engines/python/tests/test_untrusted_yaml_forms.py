@@ -4,8 +4,10 @@ merges wins where repeated keys are allowed."""
 
 from __future__ import annotations
 
+import re
 import sys
 import unicodedata
+from pathlib import Path
 
 import pytest
 import yaml
@@ -17,6 +19,8 @@ from agentce.safe_yaml import (
 )
 
 _LOADERS = [_PermissiveTimestampSafeLoader, _UniqueKeySafeLoader]
+
+_REPO = Path(__file__).resolve().parents[3]
 
 
 @pytest.mark.parametrize("loader", _LOADERS)
@@ -96,3 +100,21 @@ def test_the_digit_table_is_unicode_15() -> None:
             for start, end in UNICODE_15_DIGITS
             for cp in range(start, end + 1)
         )
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "engines/typescript/src/readiness.ts",
+        "engines/java/src/main/java/org/agentce/Readiness.java",
+    ],
+)
+def test_the_ports_carry_the_same_digit_table(source: str) -> None:
+    text = (_REPO / source).read_text(encoding="utf-8")
+    block = text[text.index("UNICODE_15_DIGITS") :]
+    block = block[: block.index(";")]
+    found = [
+        (int(a, 16), int(b, 16))
+        for a, b in re.findall(r"0x([0-9A-Fa-f]+),\s*0x([0-9A-Fa-f]+)", block)
+    ]
+    assert found == list(UNICODE_15_DIGITS)
