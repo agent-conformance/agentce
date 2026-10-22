@@ -16,6 +16,7 @@ import {
 } from "js-yaml";
 import { InputError } from "./errors";
 import { jsonlLines } from "./json";
+import { scannerProblem } from "./pyyamlScanner";
 import { byteCompare, decodeUtf8Strict, joinPath, normalizePosixPath, pyRepr, pyStr } from "./util";
 
 export const READY = "READY";
@@ -216,23 +217,94 @@ const PYYAML_FLOAT_RESOLVE_RE =
 const PY_SPACE =
   "[\\t\\n\\x0b\\x0c\\r\\x1c-\\x1f \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]*";
 
-/** `text` with each Unicode decimal digit (`١`, `１`, `𝟏`) written as its ASCII digit, as Python's `int()` and
- * `float()` read it first; other characters, `²` among them, are kept. Unicode lays each script's digits out
- * as one run from 0 to 9, so a digit's value is its distance from the run's start, mod 10. */
-function asciiDigits(text: string): string {
-  return NON_ASCII_DIGIT_RE.test(text) ? text.replace(NON_ASCII_DIGITS_RE, asciiDigit) : text;
+/** Each Unicode 15.0 decimal digit as inclusive code point ranges, the table Python's `safe_yaml` carries
+ * (`UNICODE_15_DIGITS`, from Python 3.12's `unicodedata`): a digit outside it is not read as a digit, whatever Unicode
+ * version Node's `\p{Nd}` follows (census odd-inputs line 101). */
+const UNICODE_15_DIGITS: readonly (readonly [number, number])[] = [
+  [0x0030, 0x0039],
+  [0x0660, 0x0669],
+  [0x06f0, 0x06f9],
+  [0x07c0, 0x07c9],
+  [0x0966, 0x096f],
+  [0x09e6, 0x09ef],
+  [0x0a66, 0x0a6f],
+  [0x0ae6, 0x0aef],
+  [0x0b66, 0x0b6f],
+  [0x0be6, 0x0bef],
+  [0x0c66, 0x0c6f],
+  [0x0ce6, 0x0cef],
+  [0x0d66, 0x0d6f],
+  [0x0de6, 0x0def],
+  [0x0e50, 0x0e59],
+  [0x0ed0, 0x0ed9],
+  [0x0f20, 0x0f29],
+  [0x1040, 0x1049],
+  [0x1090, 0x1099],
+  [0x17e0, 0x17e9],
+  [0x1810, 0x1819],
+  [0x1946, 0x194f],
+  [0x19d0, 0x19d9],
+  [0x1a80, 0x1a89],
+  [0x1a90, 0x1a99],
+  [0x1b50, 0x1b59],
+  [0x1bb0, 0x1bb9],
+  [0x1c40, 0x1c49],
+  [0x1c50, 0x1c59],
+  [0xa620, 0xa629],
+  [0xa8d0, 0xa8d9],
+  [0xa900, 0xa909],
+  [0xa9d0, 0xa9d9],
+  [0xa9f0, 0xa9f9],
+  [0xaa50, 0xaa59],
+  [0xabf0, 0xabf9],
+  [0xff10, 0xff19],
+  [0x104a0, 0x104a9],
+  [0x10d30, 0x10d39],
+  [0x11066, 0x1106f],
+  [0x110f0, 0x110f9],
+  [0x11136, 0x1113f],
+  [0x111d0, 0x111d9],
+  [0x112f0, 0x112f9],
+  [0x11450, 0x11459],
+  [0x114d0, 0x114d9],
+  [0x11650, 0x11659],
+  [0x116c0, 0x116c9],
+  [0x11730, 0x11739],
+  [0x118e0, 0x118e9],
+  [0x11950, 0x11959],
+  [0x11c50, 0x11c59],
+  [0x11d50, 0x11d59],
+  [0x11da0, 0x11da9],
+  [0x11f50, 0x11f59],
+  [0x16a60, 0x16a69],
+  [0x16ac0, 0x16ac9],
+  [0x16b50, 0x16b59],
+  [0x1d7ce, 0x1d7ff],
+  [0x1e140, 0x1e149],
+  [0x1e2f0, 0x1e2f9],
+  [0x1e4f0, 0x1e4f9],
+  [0x1e950, 0x1e959],
+  [0x1fbf0, 0x1fbf9],
+];
+
+/** The value of `point` if it is a {@link UNICODE_15_DIGITS} digit, else -1: each script's digits run from 0 to 9,
+ * so the value is the distance from the range's start, mod 10. */
+function unicode15Digit(point: number): number {
+  const range = UNICODE_15_DIGITS.find(([start, end]) => start <= point && point <= end);
+  return range === undefined ? -1 : (point - range[0]) % 10;
 }
 
-const NON_ASCII_DIGIT_RE = /(?![0-9])\p{Nd}/u;
-const NON_ASCII_DIGITS_RE = /(?![0-9])\p{Nd}/gu;
-
-function asciiDigit(digit: string): string {
-  const point = digit.codePointAt(0) ?? 0;
-  let start = point;
-  while (NON_ASCII_DIGIT_RE.test(String.fromCodePoint(start - 1))) {
-    start -= 1;
+/** `text` with each Unicode 15.0 decimal digit (`١`, `１`, `𝟏`) written as its ASCII digit, as Python's `int()` and
+ * `float()` read it first; other characters, `²` among them, are kept. */
+function asciiDigits(text: string): string {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: the ASCII range itself
+  if (/^[\x00-\x7f]*$/.test(text)) {
+    return text;
   }
-  return String((point - start) % 10);
+  return Array.from(text, (ch) => {
+    const digit = unicode15Digit(ch.codePointAt(0) ?? 0);
+    return digit >= 0 ? String(digit) : ch;
+  }).join("");
 }
 
 /** Python's `int(text, base)`, after {@link asciiDigits}: an optional sign, the base's own optional prefix,
@@ -652,6 +724,9 @@ interface OpenNode {
   /** The sequences and mappings directly inside this node with no `:` before them: keys, if this node is a mapping
    * (js-yaml also opens a node around a whole collection, whose one child is its own result). */
   withoutValueIndicator?: unknown[];
+  /** With `uniqueKeys`, each scalar directly inside this node as {@link pythonKey} gives it, and the indicator before
+   * it: if this node is a mapping, the ones with no `:` before them are its keys. */
+  scalars?: { readonly key: string; readonly before: string; readonly value: unknown }[];
 }
 
 /** The PyYAML node rules js-yaml's composer does not follow, applied as each node closes (its `listener` option):
@@ -692,6 +767,15 @@ class PyyamlComposer {
       if (node.explicitMergeSources !== undefined && isRecord(result)) {
         mergeExplicit(result, node.explicitMergeSources);
       }
+      const seen = new Set<string>();
+      for (const scalar of node.scalars ?? []) {
+        if (scalar.before !== ":") {
+          if (seen.has(scalar.key)) {
+            throw new YAMLException(`found the key ${pyRepr(scalar.value)} twice`);
+          }
+          seen.add(scalar.key);
+        }
+      }
     }
     if (container === undefined) {
       return;
@@ -720,6 +804,10 @@ class PyyamlComposer {
       return;
     }
     if (!isCollection(result)) {
+      if (this.uniqueKeys) {
+        container.scalars ??= [];
+        container.scalars.push({ key: pythonKey(result), before: node.before, value: result });
+      }
       return;
     }
     if (node.before === "?" || valueIndicatorFollows(state.input, state.position)) {
@@ -730,6 +818,37 @@ class PyyamlComposer {
       container.withoutValueIndicator.push(result);
     }
   };
+}
+
+/** `key` (a scalar the loader built) as text equal for two keys exactly when Python's dict keys are equal: numbers by
+ * value (`1`, `1.0` and `true` one key; every `.nan` one key, as PyYAML returns one shared nan), a string by its text,
+ * a date by its date, an aware datetime by its instant, a naive one by its fields; a string, a number, a date and a
+ * datetime are never equal to one another. Java's `pythonKey` is the same rule. */
+function pythonKey(key: unknown): string {
+  if (key === null || key === undefined) {
+    return "none";
+  }
+  if (typeof key === "string") {
+    return `str:${key}`;
+  }
+  if (typeof key === "boolean") {
+    return key ? "num:1" : "num:0";
+  }
+  if (typeof key === "number") {
+    return Number.isNaN(key) ? "nan" : `num:${key === 0 ? 0 : key}`;
+  }
+  if (isPyyamlTimestamp(key)) {
+    const text = pythonizeTimestamp(key.pyyamlTimestamp);
+    if (text.length === 10) {
+      return `date:${text}`;
+    }
+    const aware = /^(.*?)(\.\d{6})?([+-]\d\d:\d\d)$/.exec(text);
+    if (aware !== null) {
+      return `aware:${Date.parse(`${(aware[1] ?? "").replace(" ", "T")}${aware[3]}`)}${aware[2] ?? ""}`;
+    }
+    return `naive:${text}`;
+  }
+  return `other:${String(key)}`;
 }
 
 /** PyYAML resolves a `!` scalar by the implicit resolvers; their regexes end in Python's `$`, which also matches
@@ -755,10 +874,16 @@ function resolveNonSpecific(state: ComposerState): void {
  * read as a value is refused as SafeLoader refuses it, and {@link PyyamlComposer}'s node rules apply. A repeated key
  * keeps its last value; with `uniqueKeys` it is refused, `<<` included. */
 export function pyyamlLoad(text: string, uniqueKeys = false): unknown {
+  const problem = scannerProblem(text);
+  if (problem !== null) {
+    // js-yaml reads tabs and flow forms PyYAML's scanner refuses (18.184p).
+    throw new YAMLException(problem);
+  }
   const composer = new PyyamlComposer(uniqueKeys);
   const data = yamlLoad(text, {
     schema: PYYAML_SAFE_SCHEMA,
-    json: !uniqueKeys,
+    // Repeated keys are PyyamlComposer's to decide, by Python's key equality, not js-yaml's by text.
+    json: true,
     listener: composer.listener,
   });
   if (holdsMergeValue(data)) {

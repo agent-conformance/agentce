@@ -49,8 +49,8 @@ export function jsonlText(records: Iterable<unknown>): string {
 /**
  * Mirrors Python's implicit `str()` in an f-string for the handful of types a raw dict `.get()`
  * result can be in this codebase: `null`/`undefined` (an absent or JSON `null` field) as `"None"`,
- * matching Python's `None`; a boolean as `"True"`/`"False"`; anything else via plain `String()`
- * (already a no-op for the only other case these call sites ever feed it, an existing string).
+ * matching Python's `None`; a boolean as `"True"`/`"False"`; a list or plain mapping as Python's `str()` writes it
+ * (each item's {@link pyRepr}); anything else via plain `String()`.
  */
 export function pyStr(value: unknown): string {
   if (value === null || value === undefined) {
@@ -58,6 +58,14 @@ export function pyStr(value: unknown): string {
   }
   if (typeof value === "boolean") {
     return value ? "True" : "False";
+  }
+  if (Array.isArray(value)) {
+    // Python's str(list): each item's repr, so a register's `control: [DOC-01]` prints ['DOC-01'].
+    return `[${value.map(pyRepr).join(", ")}]`;
+  }
+  if (typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype) {
+    const pairs = Object.entries(value as Record<string, unknown>);
+    return `{${pairs.map(([key, item]) => `${pyRepr(key)}: ${pyRepr(item)}`).join(", ")}}`;
   }
   return String(value);
 }
@@ -84,9 +92,7 @@ export function isPrintableCodePoint(codePoint: number): boolean {
  * non-{@link isPrintableCodePoint} code point as `\t`/`\n`/`\r` (the three literal two-character
  * escapes), `\xHH` (<= 0xFF), `\uHHHH` (<= 0xFFFF), or `\UHHHHHHHH` (else) -- never a bare
  * `\x09`/`\x0a`/`\x0d` for tab/newline/carriage-return, which `repr` always spells out as the named
- * escape instead. An object or array (not reachable through this codebase's own schema-checked
- * inputs) is an accepted, out-of-scope input: rendered some deterministic way, not pinned to match
- * Python's `repr(dict)`/`repr(list)` character-for-character.
+ * escape instead. Anything else is rendered by {@link pyStr}, a list or plain mapping as Python writes it.
  */
 export function pyRepr(value: unknown): string {
   if (value === null || value === undefined) {
@@ -99,7 +105,7 @@ export function pyRepr(value: unknown): string {
     return String(value);
   }
   if (typeof value !== "string") {
-    return String(value);
+    return pyStr(value);
   }
   const quote = value.includes("'") && !value.includes('"') ? '"' : "'";
   let body = "";

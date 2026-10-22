@@ -8,8 +8,7 @@
  * carry more than one engine version reads. This is a faithful port of the Python reference.
  */
 
-import { readFileSync } from "node:fs";
-import { isPyyamlTimestamp, pythonizeTimestamp, pyyamlLoad } from "./readiness";
+import { isPyyamlTimestamp, loadPyyaml, pythonizeTimestamp } from "./readiness";
 import { pyStr } from "./util";
 
 export interface EvidenceSource {
@@ -129,9 +128,10 @@ export function profileFromDict(data: Record<string, unknown>): Profile {
   return profile;
 }
 
+/** The profile at `path` as Python's `Profile.load` reads it: PyYAML's `SafeLoader` reading ({@link loadPyyaml},
+ * YAML 1.1 typing, so `0o17` and `1e10` stay strings), a YAML error refused as `input.profile_invalid`. */
 export function loadProfile(path: string): Profile {
-  // PyYAML's SafeLoader resolution (YAML 1.1): `0o17` and `1e10` stay strings, as Python reads them.
-  const data = pyyamlLoad(readFileSync(path, "utf-8"));
+  const data = loadPyyaml(path, "input.profile_invalid", "the applicability profile");
   if (!isRecord(data)) {
     return { profileVersion: 1, observationWindow: {}, subjects: [], catalogs: [] };
   }
