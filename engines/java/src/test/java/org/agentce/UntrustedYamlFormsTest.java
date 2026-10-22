@@ -47,4 +47,12 @@ class UntrustedYamlFormsTest {
             assertThrows(IllegalArgumentException.class, () -> Readiness.composePyyaml(text, false), text);
         }
     }
+
+    @Test
+    void aListControlIsNamedAsPythonPrintsIt() {
+        List<String> problems = Readiness.deviationLint(
+                List.of(Readiness.toJsonNode(java.util.Map.of("control", List.of("DOC-01")))),
+                java.util.Set.of("DOC-01"), java.util.Map.of(), java.util.Set.of(), null, 180);
+        assertEquals("['DOC-01']: control is not in the catalog", problems.get(0));
+    }
 }

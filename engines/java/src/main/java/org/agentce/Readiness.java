@@ -72,7 +72,7 @@ public final class Readiness {
     // readiness.ts's identically-named helpers character for character) ---------------------------
 
     /** Python's {@code str()} for a value this module ever prints: {@code None}/{@code True}/{@code
-     * False} spelled Python's way, else the plain text. */
+     * False} spelled Python's way, a list or mapping as its items' reprs, else the plain text. */
     public static String pyStr(JsonNode value) {
         if (value == null || value.isNull() || value.isMissingNode()) {
             return "None";
@@ -96,6 +96,17 @@ public final class Readiness {
                 return Double.toString(d);
             }
             return value.decimalValue().toString();
+        }
+        if (value.isArray()) {
+            // Python's str(list): each item's repr, so a register's `control: [DOC-01]` prints ['DOC-01'].
+            java.util.StringJoiner out = new java.util.StringJoiner(", ", "[", "]");
+            value.forEach(item -> out.add(pyRepr(item)));
+            return out.toString();
+        }
+        if (value.isObject()) {
+            java.util.StringJoiner out = new java.util.StringJoiner(", ", "{", "}");
+            value.fields().forEachRemaining(e -> out.add(pyRepr(e.getKey()) + ": " + pyRepr(e.getValue())));
+            return out.toString();
         }
         return value.toString();
     }
