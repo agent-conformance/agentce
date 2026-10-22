@@ -16,7 +16,9 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -799,24 +801,19 @@ public final class Readiness {
     /** {@code text} read as {@link #loadPyyaml} reads a file, its errors left to the caller: a {@link
      * StackOverflowError} or a {@link RuntimeException} ({@link #nestedTooDeeply} tells the depth cap apart). */
     static Object composePyyaml(String text, boolean uniqueKeys) {
-        return composePyyaml(text, uniqueKeys, false);
-    }
-
-    /** {@code text} read as a catalog file: {@link #composePyyaml} with unique keys, and a merge source's tag (or a
-     * merge list's) refused unless it is one of {@link #SAFE_TAGS} other than the merge tag, as Python's catalog loader
-     * refuses a tag it has no constructor for (18.184o). */
-    static Object composeCatalogPyyaml(String text) {
-        return composePyyaml(text, true, true);
-    }
-
-    private static Object composePyyaml(String text, boolean uniqueKeys, boolean checkMergeSources) {
         LoaderOptions options = new LoaderOptions();
         options.setNestingDepthLimit(DEVIATION_REGISTER_MAX_DEPTH);
         Node root = pyyamlComposer(options).compose(new StringReader(text));
-        if (root != null && uniqueKeys) {
-            rejectRepeatedKeys(root, checkMergeSources);
+        if (root == null) {
+            return null;
         }
-        return root == null ? null : composeValue(root);
+        checkTree(root, uniqueKeys, Collections.newSetFromMap(new IdentityHashMap<>()));
+        return composeValue(root);
+    }
+
+    /** {@code text} read as a catalog file: {@link #composePyyaml} with unique keys (18.184o). */
+    static Object composeCatalogPyyaml(String text) {
+        return composePyyaml(text, true);
     }
 
     /** Whether {@code e}, thrown by {@link #composePyyaml}, is SnakeYAML's nesting cap or the recursion it
@@ -825,12 +822,16 @@ public final class Readiness {
         return e instanceof StackOverflowError || String.valueOf(e.getMessage()).contains("Nesting Depth exceeded");
     }
 
-    /** Refuses a mapping anywhere under {@code node} that writes one key twice; with {@code checkMergeSources}, also a
-     * merge source (or merge-list item) whose tag is not one of {@link #SAFE_TAGS} other than the merge tag. */
-    private static void rejectRepeatedKeys(Node node, boolean checkMergeSources) {
+    /** Refuses a merge source (or merge-list item) anywhere under {@code node} whose tag is not one of {@link #SAFE_TAGS}
+     * other than the merge tag, as Python's untrusted loaders refuse it in every file (18.184p); with {@code uniqueKeys},
+     * also a mapping that writes one key twice. Each node is walked once ({@code visited}), so an alias is not. */
+    private static void checkTree(Node node, boolean uniqueKeys, Set<Node> visited) {
+        if (!visited.add(node)) {
+            return;
+        }
         if (node instanceof SequenceNode seq) {
             for (Node child : seq.getValue()) {
-                rejectRepeatedKeys(child, checkMergeSources);
+                checkTree(child, uniqueKeys, visited);
             }
         } else if (node instanceof MappingNode map) {
             Set<String> seen = new HashSet<>();
@@ -838,20 +839,18 @@ public final class Readiness {
             for (NodeTuple tuple : map.getValue()) {
                 if (Tag.MERGE.equals(pyyamlTag(tuple.getKeyNode()))) {
                     // `<<` is a key too: which of two merges wins is never read (18.184k D1).
-                    if (merged) {
+                    if (merged && uniqueKeys) {
                         throw new IllegalArgumentException("found the merge key '<<' twice");
                     }
                     merged = true;
-                    if (checkMergeSources) {
-                        rejectMergeSourceTags(tuple.getValueNode());
-                    }
-                } else {
+                    rejectMergeSourceTags(tuple.getValueNode());
+                } else if (uniqueKeys) {
                     String k = String.valueOf(composeValue(scalarKey(tuple)));
                     if (!seen.add(k)) {
                         throw new IllegalArgumentException("found the key " + k + " twice");
                     }
                 }
-                rejectRepeatedKeys(tuple.getValueNode(), checkMergeSources);
+                checkTree(tuple.getValueNode(), uniqueKeys, visited);
             }
         }
     }

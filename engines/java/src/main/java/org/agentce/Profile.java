@@ -130,8 +130,12 @@ public final class Profile {
         return profile;
     }
 
+    /** The profile at {@code path} as Python's {@code Profile.load} reads it: PyYAML's {@code SafeLoader} reading
+     * ({@link Readiness#loadPyyaml}, merge keys and its typing included), a YAML error refused as
+     * {@code input.profile_invalid}. */
     public static Profile load(Path path) {
-        JsonNode data = Yaml.parseFile(path);
+        JsonNode data = Readiness.toJsonNode(
+                Readiness.loadPyyaml(path, "input.profile_invalid", "the applicability profile", false));
         if (data == null || !data.isObject()) {
             return new Profile();
         }
