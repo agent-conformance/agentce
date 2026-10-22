@@ -102,6 +102,10 @@ test("a flow `?` opens a key, as PyYAML's scanner reads it", () => {
     ["a: [?]\n", { a: [{ null: null }] }],
     ['a: ["?b", c]\n', { a: ["?b", "c"] }],
     ["?b: 1\n", { "?b": 1 }],
+    [
+      "a: [\u{10000}, ?b, \u{10000}, ?c]\n",
+      { a: ["\u{10000}", { b: null }, "\u{10000}", { c: null }] },
+    ],
   ] as const) {
     assert.deepEqual(pyyamlLoad(text), value, text);
   }

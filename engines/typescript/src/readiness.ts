@@ -888,14 +888,13 @@ function resolveNonSpecific(state: ComposerState): void {
  * read as a value is refused as SafeLoader refuses it, and {@link PyyamlComposer}'s node rules apply. A repeated key
  * keeps its last value; with `uniqueKeys` it is refused, `<<` included. */
 export function pyyamlLoad(text: string, uniqueKeys = false): unknown {
-  const scanned = pyyamlScan(text);
-  const problem = scanned.problem;
+  const { problem, text: keyed } = pyyamlScan(text);
   if (problem !== null) {
     // js-yaml reads tabs and flow forms PyYAML's scanner refuses (18.184p).
     throw new YAMLException(problem);
   }
   const composer = new PyyamlComposer(uniqueKeys);
-  const data = yamlLoad(scanned.text, {
+  const data = yamlLoad(keyed, {
     schema: PYYAML_SAFE_SCHEMA,
     // Repeated keys are PyyamlComposer's to decide, by Python's key equality, not js-yaml's by text.
     json: true,

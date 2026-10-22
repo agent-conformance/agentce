@@ -36,22 +36,27 @@ interface Tok {
 /** `null` when PyYAML's scanner and flow parser get past every tab, `?`, `:` and `-` in `text`, else PyYAML's
  * reason. */
 export function scannerProblem(text: string): string | null {
-  return pyyamlScan(text).problem;
+  return scannerProblemOf(new Scanner(text));
 }
 
 /** {@link scannerProblem}, and when it is `null`, `text` with a space after each flow-collection `?` that has none,
  * so js-yaml reads every such `?` as PyYAML's key indicator. */
 export function pyyamlScan(text: string): { problem: string | null; text: string } {
   const scanner = new Scanner(text);
+  const problem = scannerProblemOf(scanner);
+  return { problem, text: problem === null ? scanner.keyedText() : text };
+}
+
+function scannerProblemOf(scanner: Scanner): string | null {
   try {
     scanner.run();
   } catch (error) {
     if (error instanceof Problem) {
-      return { problem: error.message, text };
+      return error.message;
     }
     throw error;
   }
-  return { problem: null, text: scanner.keyedText(text) };
+  return null;
 }
 
 const nameChar = (c: number): boolean => c < 128 && /[A-Za-z0-9_-]/.test(String.fromCodePoint(c));
@@ -71,23 +76,28 @@ class Scanner {
   private keyCol = 0;
   private readonly flowKeys: number[] = [];
 
-  constructor(text: string) {
+  constructor(private readonly text: string) {
     this.t = Array.from(text, (ch) => ch.codePointAt(0) ?? 0);
     this.n = this.t.length;
     this.i = this.n > 0 && this.t[0] === 0xfeff ? 1 : 0;
     this.lineStart = this.i;
   }
 
-  /** `text` with a space after each flow `?` {@link token} found with none. */
-  keyedText(text: string): string {
-    if (this.flowKeys.length === 0) {
-      return text;
-    }
-    const out = this.t.map((c) => String.fromCodePoint(c));
+  /** The text with a space after each flow `?` {@link token} found with none. */
+  keyedText(): string {
+    let out = "";
+    let from = 0;
+    let unit = 0;
+    let cp = 0;
     for (const k of this.flowKeys) {
-      out[k] = "? ";
+      // flowKeys holds code-point indices; the text is sliced by UTF-16 offsets.
+      for (; cp <= k; cp += 1) {
+        unit += (this.t[cp] ?? 0) > 0xffff ? 2 : 1;
+      }
+      out += `${this.text.slice(from, unit)} `;
+      from = unit;
     }
-    return out.join("");
+    return from === 0 ? this.text : out + this.text.slice(from);
   }
 
   private peek(k = 0): number {
