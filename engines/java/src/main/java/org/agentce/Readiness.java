@@ -550,6 +550,15 @@ public final class Readiness {
      * PyYAML's "implicit resolution applies only to the plain scalar style" rule). Never touches
      * Jackson's own YAML reader ({@link Yaml}, this engine's other loader) for this file. */
     private static Object composeValue(Node node) {
+        return composeValue(node, new IdentityHashMap<>());
+    }
+
+    /** {@link #composeValue}, each collection node composed once ({@code done}), so an alias is one shared value, as
+     * PyYAML's constructor shares it, and nested aliases cost one pass over the document, not one per use. */
+    private static Object composeValue(Node node, Map<Node, Object> done) {
+        if (!(node instanceof ScalarNode) && done.containsKey(node)) {
+            return done.get(node);
+        }
         boolean implicit = node.getTag().getValue().startsWith(IMPLICIT_TAG_PREFIX);
         Tag tag = safeTag(node);
         boolean collectionTag = tag.equals(Tag.SEQ) || tag.equals(Tag.MAP);
@@ -603,15 +612,17 @@ public final class Readiness {
         }
         if (node instanceof SequenceNode seq) {
             List<Object> out = new ArrayList<>();
+            done.put(node, out);
             for (Node child : seq.getValue()) {
-                out.add(composeValue(child));
+                out.add(composeValue(child, done));
             }
             return out;
         }
         if (node instanceof MappingNode map) {
             Map<String, Object> out = new LinkedHashMap<>();
+            done.put(node, out);
             for (NodeTuple tuple : flattenMapping(map)) {
-                out.put(String.valueOf(composeValue(scalarKey(tuple))), composeValue(tuple.getValueNode()));
+                out.put(String.valueOf(composeValue(scalarKey(tuple), done)), composeValue(tuple.getValueNode(), done));
             }
             return out;
         }
@@ -712,6 +723,15 @@ public final class Readiness {
      * {@code date} it is neither text nor a number to {@code isTextual}/{@code isNumber}, and {@code asText}
      * renders it as Python's {@code str} does (a mapping key the same way). */
     static JsonNode toJsonNode(Object value) {
+        return toJsonNode(value, new IdentityHashMap<>());
+    }
+
+    /** {@link #toJsonNode}, each list or map converted once ({@code done}): {@link #composeValue} shares an aliased
+     * value, and Jackson nodes keep no parent, so the shared node may sit under several parents. */
+    private static JsonNode toJsonNode(Object value, Map<Object, JsonNode> done) {
+        if ((value instanceof List<?> || value instanceof Map<?, ?>) && done.containsKey(value)) {
+            return done.get(value);
+        }
         JsonNodeFactory f = Json.nodes();
         if (value == null) {
             return f.nullNode();
@@ -733,18 +753,20 @@ public final class Readiness {
         }
         if (value instanceof List<?> list) {
             ArrayNode arr = f.arrayNode();
+            done.put(value, arr);
             for (Object v : list) {
-                arr.add(toJsonNode(v));
+                arr.add(toJsonNode(v, done));
             }
             return arr;
         }
         if (value instanceof Map<?, ?> map) {
             ObjectNode obj = f.objectNode();
+            done.put(value, obj);
             for (Map.Entry<?, ?> e : map.entrySet()) {
                 Object k = e.getKey();
                 obj.set(
                         k instanceof PyyamlTimestamp ts ? pythonizeTimestamp(ts.text()) : String.valueOf(k),
-                        toJsonNode(e.getValue()));
+                        toJsonNode(e.getValue(), done));
             }
             return obj;
         }
@@ -896,6 +918,8 @@ public final class Readiness {
     static Object composePyyaml(String text, boolean uniqueKeys) {
         LoaderOptions options = new LoaderOptions();
         options.setNestingDepthLimit(DEVIATION_REGISTER_MAX_DEPTH);
+        // PyYAML has no alias cap; the composer shares an aliased value, so many aliases cost no more than one.
+        options.setMaxAliasesForCollections(Integer.MAX_VALUE);
         Node root = pyyamlComposer(options).compose(new StringReader(text));
         if (root == null) {
             return null;

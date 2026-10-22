@@ -55,4 +55,16 @@ class UntrustedYamlFormsTest {
                 java.util.Set.of("DOC-01"), java.util.Map.of(), java.util.Set.of(), null, 180);
         assertEquals("['DOC-01']: control is not in the catalog", problems.get(0));
     }
+
+    @Test
+    void nestedAliasesUnderAnIgnoredKeyAreReadInOnePass(@TempDir Path tmp) throws IOException {
+        StringBuilder text = new StringBuilder("x:\n  a0: &a0 [v]\n");
+        for (int i = 1; i <= 25; i++) {
+            String p = "*a" + (i - 1);
+            text.append("  a").append(i).append(": &a").append(i).append(" [")
+                    .append(String.join(", ", java.util.Collections.nCopies(9, p))).append("]\n");
+        }
+        text.append("catalogs: [eu-ai-act]\n");
+        assertEquals(List.of("eu-ai-act"), Profile.load(write(tmp, "p.yaml", text.toString())).catalogs);
+    }
 }
