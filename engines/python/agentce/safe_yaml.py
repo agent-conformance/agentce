@@ -118,7 +118,7 @@ class _UniqueKeySafeLoader(_PermissiveTimestampSafeLoader):
     key a ``<<`` merge brings in may still be written again, as PyYAML's ``flatten_mapping`` allows; ``<<`` itself is a
     key, so two merge keys in one mapping are refused too (the ports cannot all follow PyYAML's last-merge-wins). The
     whole node tree is checked before anything is constructed, merge sources included (``flatten_mapping`` merges a
-    source without constructing it, and adds the merged keys to it), as Java's ``rejectRepeatedKeys`` does."""
+    source without constructing it, and adds the merged keys to it), as Java's ``checkTree`` does."""
 
     def _refuse_repeated_keys(self, node: yaml.MappingNode) -> None:
         seen: set[Any] = set()

@@ -283,7 +283,7 @@ def test_a_mapping_merged_after_its_own_merge_is_read() -> None:
 def test_the_domain_binding_loader_refuses_a_key_written_twice_in_a_merge_source() -> (
     None
 ):
-    """The unique-key loader checks a merge source too, as Java's rejectRepeatedKeys does for every unique-key file."""
+    """The unique-key loader checks a merge source too, as Java's checkTree does for every unique-key file."""
     from agentce.safe_yaml import _UniqueKeySafeLoader
 
     with pytest.raises(
