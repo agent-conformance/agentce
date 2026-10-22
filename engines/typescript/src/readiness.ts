@@ -706,6 +706,25 @@ function mergeExplicit(mapping: Record<string, unknown>, sources: unknown[]): vo
   }
 }
 
+/** PyYAML's reading of a mapping with several merge keys (`flatten_mapping`): a later merge key's sources win over an
+ * earlier one's, the first source of a merged sequence wins within it, and the mapping's own keys win over all of them.
+ * js-yaml lets the first merge key win, so the merged keys are written again here in PyYAML's order. */
+function mergeInPyyamlOrder(mapping: Record<string, unknown>, node: OpenNode): void {
+  // js-yaml names a mapping key by its text, String(key).
+  const own = new Set(
+    (node.scalars ?? []).filter((s) => s.before !== ":").map((s) => String(s.value)),
+  );
+  for (const sources of node.mergeSources ?? []) {
+    for (const source of [...sources].reverse()) {
+      for (const [key, value] of Object.entries(source as Record<string, unknown>)) {
+        if (!own.has(key)) {
+          mapping[key] = value;
+        }
+      }
+    }
+  }
+}
+
 function unhashableKey(): YAMLException {
   return new YAMLException("while constructing a mapping: found unhashable key");
 }
@@ -721,11 +740,13 @@ interface OpenNode {
   /** The sources of a merge written as an explicit block key (`? <<`), which js-yaml stores under the key's text as
    * it drops an explicit block key's tag (js-yaml 4.3.2 `readBlockMapping`); merged when this mapping closes. */
   explicitMergeSources?: unknown[];
+  /** Each merge key's sources, in the order the keys are written. */
+  mergeSources?: unknown[][];
   /** The sequences and mappings directly inside this node with no `:` before them: keys, if this node is a mapping
    * (js-yaml also opens a node around a whole collection, whose one child is its own result). */
   withoutValueIndicator?: unknown[];
-  /** With `uniqueKeys`, each scalar directly inside this node as {@link pythonKey} gives it, and the indicator before
-   * it: if this node is a mapping, the ones with no `:` before them are its keys. */
+  /** Each scalar directly inside this node as {@link pythonKey} gives it, and the indicator before it: if this node
+   * is a mapping, the ones with no `:` before them are its keys. */
   scalars?: { readonly key: string; readonly before: string; readonly value: unknown }[];
 }
 
@@ -767,8 +788,11 @@ class PyyamlComposer {
       if (node.explicitMergeSources !== undefined && isRecord(result)) {
         mergeExplicit(result, node.explicitMergeSources);
       }
+      if ((node.mergeSources?.length ?? 0) > 1 && isRecord(result)) {
+        mergeInPyyamlOrder(result, node);
+      }
       const seen = new Set<string>();
-      for (const scalar of node.scalars ?? []) {
+      for (const scalar of this.uniqueKeys ? (node.scalars ?? []) : []) {
         if (scalar.before !== ":") {
           if (seen.has(scalar.key)) {
             throw new YAMLException(`found the key ${pyRepr(scalar.value)} twice`);
@@ -786,6 +810,8 @@ class PyyamlComposer {
       if (!(isMergeSource(result) || (Array.isArray(result) && result.every(isMergeSource)))) {
         throw notMergeable();
       }
+      container.mergeSources ??= [];
+      container.mergeSources.push(Array.isArray(result) ? result : [result]);
       if (container.explicitMergeSources !== undefined) {
         container.explicitMergeSources = Array.isArray(result) ? result : [result];
       }
@@ -804,10 +830,8 @@ class PyyamlComposer {
       return;
     }
     if (!isCollection(result)) {
-      if (this.uniqueKeys) {
-        container.scalars ??= [];
-        container.scalars.push({ key: pythonKey(result), before: node.before, value: result });
-      }
+      container.scalars ??= [];
+      container.scalars.push({ key: pythonKey(result), before: node.before, value: result });
       return;
     }
     if (node.before === "?" || valueIndicatorFollows(state.input, state.position)) {

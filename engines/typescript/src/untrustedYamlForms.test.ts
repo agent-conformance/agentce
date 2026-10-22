@@ -104,6 +104,20 @@ test("a profile reads its catalogs through a merge key", () => {
   });
 });
 
+test("of two merge keys the later one wins, as PyYAML flattens them", () => {
+  assert.deepEqual(pyyamlLoad("{<<: {a: 1}, <<: {a: 2}}"), { a: 2 });
+  assert.deepEqual(pyyamlLoad("{<<: {a: 2, b: 2}, <<: [{a: 1}, {a: 3, c: 3}]}"), {
+    a: 1,
+    b: 2,
+    c: 3,
+  });
+  assert.deepEqual(pyyamlLoad("{a: 0, <<: {a: 1}, <<: {a: 2, b: 2}}"), { a: 0, b: 2 });
+  assert.deepEqual(pyyamlLoad("- <<: {control: DOC-01}\n  <<: {control: NOPE-99}\n"), [
+    { control: "NOPE-99" },
+  ]);
+  assert.throws(() => pyyamlLoad("{<<: {a: 1}, <<: {a: 2}}", true), Error);
+});
+
 test("a profile with a YAML error is refused as a profile problem", () => {
   for (const text of [
     "x: !!binary aGVsbG8=\n",
