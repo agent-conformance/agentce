@@ -16,7 +16,7 @@ import {
 } from "js-yaml";
 import { InputError } from "./errors";
 import { jsonlLines } from "./json";
-import { scannerProblem } from "./pyyamlScanner";
+import { pyyamlScan } from "./pyyamlScanner";
 import { byteCompare, decodeUtf8Strict, joinPath, normalizePosixPath, pyRepr, pyStr } from "./util";
 
 export const READY = "READY";
@@ -888,13 +888,14 @@ function resolveNonSpecific(state: ComposerState): void {
  * read as a value is refused as SafeLoader refuses it, and {@link PyyamlComposer}'s node rules apply. A repeated key
  * keeps its last value; with `uniqueKeys` it is refused, `<<` included. */
 export function pyyamlLoad(text: string, uniqueKeys = false): unknown {
-  const problem = scannerProblem(text);
+  const scanned = pyyamlScan(text);
+  const problem = scanned.problem;
   if (problem !== null) {
     // js-yaml reads tabs and flow forms PyYAML's scanner refuses (18.184p).
     throw new YAMLException(problem);
   }
   const composer = new PyyamlComposer(uniqueKeys);
-  const data = yamlLoad(text, {
+  const data = yamlLoad(scanned.text, {
     schema: PYYAML_SAFE_SCHEMA,
     // Repeated keys are PyyamlComposer's to decide, by Python's key equality, not js-yaml's by text.
     json: true,

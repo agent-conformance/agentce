@@ -91,6 +91,24 @@ test("a repeated key is decided by Python's key equality", () => {
   }
 });
 
+test("a flow `?` opens a key, as PyYAML's scanner reads it", () => {
+  for (const [text, value] of [
+    ["a: {?b: 1}\n", { a: { b: 1 } }],
+    ["a: {? b: 1}\n", { a: { b: 1 } }],
+    ["a: [?b]\n", { a: [{ b: null }] }],
+    ["a: [c, ?b: d]\n", { a: ["c", { b: "d" }] }],
+    ["a: {?b}\n", { a: { b: null } }],
+    ["a: {?: 1}\n", { a: { null: 1 } }],
+    ["a: [?]\n", { a: [{ null: null }] }],
+    ['a: ["?b", c]\n', { a: ["?b", "c"] }],
+    ["?b: 1\n", { "?b": 1 }],
+  ] as const) {
+    assert.deepEqual(pyyamlLoad(text), value, text);
+  }
+  assert.throws(() => pyyamlLoad("a: {b: 1, ?b: 2}\n", true), /found the key .* twice/);
+  assert.deepEqual(pyyamlLoad("a: {b: 1, ?b: 2}\n"), { a: { b: 2 } });
+});
+
 test("a long flow list is read, never a stack overflow", () => {
   const items = Array.from({ length: 200000 }, (_, i) => i);
   assert.equal(scannerProblem(`a: [${items.join(",")}]\n`), null);

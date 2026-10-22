@@ -4,6 +4,9 @@
  * stack, simple keys, plain, quoted and block scalar extents, directives, anchors, tags and aliases) and checks each
  * top-level flow collection against PyYAML's flow grammar. It reports only a refusal PyYAML makes; a document PyYAML
  * refuses for another reason may pass, and the composer refuses it. Java's `PyyamlScanner` is the same walk.
+ * {@link pyyamlScan} also returns the text js-yaml should read: PyYAML takes every `?` in a flow collection as the
+ * key indicator (`{?a: 1}` is `{a: 1}`), js-yaml only one followed by a space, so it gets that space. SnakeYAML reads
+ * the flow `?` as PyYAML does, so Java needs no such text.
  */
 
 import { pyRepr } from "./util";
@@ -33,15 +36,22 @@ interface Tok {
 /** `null` when PyYAML's scanner and flow parser get past every tab, `?`, `:` and `-` in `text`, else PyYAML's
  * reason. */
 export function scannerProblem(text: string): string | null {
+  return pyyamlScan(text).problem;
+}
+
+/** {@link scannerProblem}, and when it is `null`, `text` with a space after each flow-collection `?` that has none,
+ * so js-yaml reads every such `?` as PyYAML's key indicator. */
+export function pyyamlScan(text: string): { problem: string | null; text: string } {
+  const scanner = new Scanner(text);
   try {
-    new Scanner(text).run();
+    scanner.run();
   } catch (error) {
     if (error instanceof Problem) {
-      return error.message;
+      return { problem: error.message, text };
     }
     throw error;
   }
-  return null;
+  return { problem: null, text: scanner.keyedText(text) };
 }
 
 const nameChar = (c: number): boolean => c < 128 && /[A-Za-z0-9_-]/.test(String.fromCodePoint(c));
@@ -59,12 +69,25 @@ class Scanner {
   private allowKey = true;
   private keyLine = -1;
   private keyCol = 0;
+  private readonly flowKeys: number[] = [];
 
   constructor(text: string) {
     this.t = Array.from(text, (ch) => ch.codePointAt(0) ?? 0);
     this.n = this.t.length;
     this.i = this.n > 0 && this.t[0] === 0xfeff ? 1 : 0;
     this.lineStart = this.i;
+  }
+
+  /** `text` with a space after each flow `?` {@link token} found with none. */
+  keyedText(text: string): string {
+    if (this.flowKeys.length === 0) {
+      return text;
+    }
+    const out = this.t.map((c) => String.fromCodePoint(c));
+    for (const k of this.flowKeys) {
+      out[k] = "? ";
+    }
+    return out.join("");
   }
 
   private peek(k = 0): number {
@@ -215,6 +238,9 @@ class Scanner {
       if (this.depth > 0) {
         this.emit("?");
         this.allowKey = false;
+        if (!nextEnds) {
+          this.flowKeys.push(this.i);
+        }
       } else {
         this.addIndent(this.col());
         this.allowKey = true;
