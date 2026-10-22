@@ -2,6 +2,7 @@ package org.agentce;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -17,6 +18,21 @@ class UntrustedYamlFormsTest {
 
     private static Path write(Path dir, String name, String text) throws IOException {
         return Files.writeString(dir.resolve(name), text);
+    }
+
+    @Test
+    void theScannerRefusesWhatPyyamlsScannerRefuses() {
+        for (String text : List.of(
+                "a: [a?, b]\n", "a: [a ?, b]\n", "a: {a?: 1}\n", "a: [a ?]\n", "a: [a?b]\n", "a: [lookup ?,\n \"yes\"]\n",
+                "a: b\t\n", "a: 'b'\t\n", "a: [b]\t\n", "a\t: b\n", "a:\tb\n", "-\ta\n", "a: |\t\n  x\n",
+                "a: [b,\tc]\n", "a: b\t# c\n", "a: {: 1}\n", "a: [: 1]\n", "a: {a: 1, : 2}\n")) {
+            assertThrows(IllegalArgumentException.class, () -> Readiness.composePyyaml(text, false), text);
+        }
+        for (String text : List.of(
+                "a: a?\n", "a: [\"a?\", b]\n", "a: [? a]\n", "a: \"b\tc\"\n", "a: b # c\td\n", "a: |\n  x\ty\n",
+                "a: [b, c]\n", "a: {b: c,\n  d: e}\n", "? [a, b]\n: c\n", "a: &x {k: v}\nb: *x\n")) {
+            assertEquals(null, PyyamlScanner.problem(text), text);
+        }
     }
 
     @Test
@@ -66,6 +82,21 @@ class UntrustedYamlFormsTest {
         }
         text.append("catalogs: [eu-ai-act]\n");
         assertEquals(List.of("eu-ai-act"), Profile.load(write(tmp, "p.yaml", text.toString())).catalogs);
+    }
+
+    @Test
+    void aThirtyLevelDoublingChainUnderAnIgnoredKeyFinishesQuickly() {
+        StringBuilder chain = new StringBuilder("x-chain:\n  a0: &a0 {k: v}\n");
+        for (int i = 1; i <= 30; i++) {
+            chain.append("  a").append(i).append(": &a").append(i).append(" {l: *a").append(i - 1)
+                    .append(", r: *a").append(i - 1).append("}\n");
+        }
+        for (String rest : List.of("catalogs: [eu-ai-act]\n", "deviations: []\n", "task_scopes: []\n")) {
+            for (boolean uniqueKeys : List.of(false, true)) {
+                assertTimeoutPreemptively(java.time.Duration.ofSeconds(10),
+                        () -> Readiness.composePyyaml(chain + rest, uniqueKeys), rest);
+            }
+        }
     }
 
     @Test

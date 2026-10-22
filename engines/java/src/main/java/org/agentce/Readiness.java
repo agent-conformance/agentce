@@ -917,6 +917,11 @@ public final class Readiness {
     /** {@code text} read as {@link #loadPyyaml} reads a file, its errors left to the caller: a {@link
      * StackOverflowError} or a {@link RuntimeException} ({@link #nestedTooDeeply} tells the depth cap apart). */
     static Object composePyyaml(String text, boolean uniqueKeys) {
+        String scannerProblem = PyyamlScanner.problem(text);
+        if (scannerProblem != null) {
+            // SnakeYAML reads tabs and flow forms PyYAML's scanner refuses (18.184p).
+            throw new IllegalArgumentException(scannerProblem);
+        }
         LoaderOptions options = new LoaderOptions();
         options.setNestingDepthLimit(DEVIATION_REGISTER_MAX_DEPTH);
         // PyYAML has no alias cap; the composer shares an aliased value, so many aliases cost no more than one.
