@@ -292,16 +292,6 @@ def test_the_domain_binding_loader_refuses_a_key_written_twice_in_a_merge_source
         yaml.load("e:\n  <<: {m: a, m: b}\n", Loader=_UniqueKeySafeLoader)
 
 
-def test_the_other_loaders_keep_the_safe_loader_tags() -> None:
-    """Only the catalog loader drops the four constructors; the domain binding's loader (census line 95) is as it was."""
-    from agentce.safe_yaml import _UniqueKeySafeLoader
-
-    assert yaml.load("a: !!set {x: null}\n", Loader=_UniqueKeySafeLoader) == {
-        "a": {"x"}
-    }
-    assert yaml.safe_load("a: !!binary aGVsbG8=\n") == {"a": b"hello"}
-
-
 def test_catalog_sign_refuses_a_control_with_a_safe_loader_only_tag(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

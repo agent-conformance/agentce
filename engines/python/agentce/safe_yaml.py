@@ -36,6 +36,7 @@ construction only, so reading the file (an ``OSError`` a caller handles itself) 
 
 from __future__ import annotations
 
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -44,10 +45,35 @@ import yaml
 from .errors import InputError
 
 
+_MERGE_TAG = "tag:yaml.org,2002:merge"
+
+_SAFE_LOADER_ONLY_TAGS = frozenset(
+    f"tag:yaml.org,2002:{tag}" for tag in ("binary", "set", "omap", "pairs")
+)
+
+
+def _merge_sources(value_node: yaml.Node) -> list[yaml.Node]:
+    """The nodes a ``<<`` key's ``value_node`` brings in: the node itself, and each item of a merge list."""
+    if isinstance(value_node, yaml.SequenceNode):
+        return [value_node, *value_node.value]
+    return [value_node]
+
+
 class _PermissiveTimestampSafeLoader(yaml.SafeLoader):
     """``yaml.SafeLoader`` whose construction never leaks a non-YAML exception: a calendar-invalid
     timestamp falls back to :func:`_pythonize_timestamp`, and any other exception raised while
-    constructing a value becomes a ``ConstructorError`` (the module docstring's fourth hazard)."""
+    constructing a value becomes a ``ConstructorError`` (the module docstring's fourth hazard).
+
+    It has no ``!!binary``, ``!!set``, ``!!omap`` or ``!!pairs`` constructor, so a file holding one is refused by
+    ``construct_undefined`` as in the TypeScript and Java readers (18.184o for catalogs, 18.184p for every file). A
+    merge source is never constructed (``flatten_mapping`` merges it as a node), so the whole tree is walked first and
+    each merge source's tag is checked against the same constructors."""
+
+    yaml_constructors = {
+        tag: construct
+        for tag, construct in yaml.SafeLoader.yaml_constructors.items()
+        if tag not in _SAFE_LOADER_ONLY_TAGS
+    }
 
     def construct_object(self, node: yaml.Node, deep: bool = False) -> Any:
         try:
@@ -58,34 +84,13 @@ class _PermissiveTimestampSafeLoader(yaml.SafeLoader):
             raise _construction_error(node, exc) from exc
 
     def construct_document(self, node: yaml.Node) -> Any:
+        self._check_tree(node, set())
         try:
             return super().construct_document(node)
         except (yaml.YAMLError, RecursionError):
             raise
         except Exception as exc:
             raise _construction_error(node, exc) from exc
-
-
-_MERGE_TAG = "tag:yaml.org,2002:merge"
-
-
-def _merge_sources(value_node: yaml.Node) -> list[yaml.Node]:
-    """The nodes a ``<<`` key's ``value_node`` brings in: the node itself, and each item of a merge list."""
-    if isinstance(value_node, yaml.SequenceNode):
-        return [value_node, *value_node.value]
-    return [value_node]
-
-
-class _UniqueKeySafeLoader(_PermissiveTimestampSafeLoader):
-    """The loader above, refusing a mapping that writes one key twice, where ``SafeLoader`` keeps the last value. A
-    key a ``<<`` merge brings in may still be written again, as PyYAML's ``flatten_mapping`` allows; ``<<`` itself is a
-    key, so two merge keys in one mapping are refused too (the ports cannot all follow PyYAML's last-merge-wins). The
-    whole node tree is checked before anything is constructed, merge sources included (``flatten_mapping`` merges a
-    source without constructing it, and adds the merged keys to it), as Java's ``rejectRepeatedKeys`` does."""
-
-    def construct_document(self, node: yaml.Node) -> Any:
-        self._check_tree(node, set())
-        return super().construct_document(node)
 
     def _check_tree(self, node: yaml.Node, visited: set[int]) -> None:
         if id(node) in visited:
@@ -98,12 +103,22 @@ class _UniqueKeySafeLoader(_PermissiveTimestampSafeLoader):
             self._refuse_repeated_keys(node)
             for key_node, value_node in node.value:
                 if key_node.tag == _MERGE_TAG:
-                    self._check_merge_source(value_node)
+                    for source in _merge_sources(value_node):
+                        if source.tag not in self.yaml_constructors:
+                            self.construct_undefined(source)
                 self._check_tree(key_node, visited)
                 self._check_tree(value_node, visited)
 
-    def _check_merge_source(self, value_node: yaml.Node) -> None:
-        """A hook for what a ``<<`` key brings in, which is never constructed; this loader checks nothing more."""
+    def _refuse_repeated_keys(self, node: yaml.MappingNode) -> None:
+        """A hook for a mapping's keys; this loader keeps the last value of a repeated key, as ``SafeLoader`` does."""
+
+
+class _UniqueKeySafeLoader(_PermissiveTimestampSafeLoader):
+    """The loader above, refusing a mapping that writes one key twice, where ``SafeLoader`` keeps the last value. A
+    key a ``<<`` merge brings in may still be written again, as PyYAML's ``flatten_mapping`` allows; ``<<`` itself is a
+    key, so two merge keys in one mapping are refused too (the ports cannot all follow PyYAML's last-merge-wins). The
+    whole node tree is checked before anything is constructed, merge sources included (``flatten_mapping`` merges a
+    source without constructing it, and adds the merged keys to it), as Java's ``rejectRepeatedKeys`` does."""
 
     def _refuse_repeated_keys(self, node: yaml.MappingNode) -> None:
         seen: set[Any] = set()
@@ -160,6 +175,111 @@ _PermissiveTimestampSafeLoader.add_constructor(
 )
 
 
+# Each Unicode 15.0 decimal digit (``unicodedata.decimal`` on Python 3.12, Unicode 15.0.0), as inclusive code point
+# ranges. ``int()`` and ``float()`` read any decimal digit the interpreter's Unicode version knows, so ``!!int "𐵁𐵀"``
+# (Garay, Unicode 16.0) is 10 on Python 3.14 and refused on 3.12; a digit outside this table is refused on every
+# Python, as the TypeScript and Java readers refuse it from the same table (census odd-inputs line 101).
+UNICODE_15_DIGITS: tuple[tuple[int, int], ...] = (
+    (0x0030, 0x0039),
+    (0x0660, 0x0669),
+    (0x06F0, 0x06F9),
+    (0x07C0, 0x07C9),
+    (0x0966, 0x096F),
+    (0x09E6, 0x09EF),
+    (0x0A66, 0x0A6F),
+    (0x0AE6, 0x0AEF),
+    (0x0B66, 0x0B6F),
+    (0x0BE6, 0x0BEF),
+    (0x0C66, 0x0C6F),
+    (0x0CE6, 0x0CEF),
+    (0x0D66, 0x0D6F),
+    (0x0DE6, 0x0DEF),
+    (0x0E50, 0x0E59),
+    (0x0ED0, 0x0ED9),
+    (0x0F20, 0x0F29),
+    (0x1040, 0x1049),
+    (0x1090, 0x1099),
+    (0x17E0, 0x17E9),
+    (0x1810, 0x1819),
+    (0x1946, 0x194F),
+    (0x19D0, 0x19D9),
+    (0x1A80, 0x1A89),
+    (0x1A90, 0x1A99),
+    (0x1B50, 0x1B59),
+    (0x1BB0, 0x1BB9),
+    (0x1C40, 0x1C49),
+    (0x1C50, 0x1C59),
+    (0xA620, 0xA629),
+    (0xA8D0, 0xA8D9),
+    (0xA900, 0xA909),
+    (0xA9D0, 0xA9D9),
+    (0xA9F0, 0xA9F9),
+    (0xAA50, 0xAA59),
+    (0xABF0, 0xABF9),
+    (0xFF10, 0xFF19),
+    (0x104A0, 0x104A9),
+    (0x10D30, 0x10D39),
+    (0x11066, 0x1106F),
+    (0x110F0, 0x110F9),
+    (0x11136, 0x1113F),
+    (0x111D0, 0x111D9),
+    (0x112F0, 0x112F9),
+    (0x11450, 0x11459),
+    (0x114D0, 0x114D9),
+    (0x11650, 0x11659),
+    (0x116C0, 0x116C9),
+    (0x11730, 0x11739),
+    (0x118E0, 0x118E9),
+    (0x11950, 0x11959),
+    (0x11C50, 0x11C59),
+    (0x11D50, 0x11D59),
+    (0x11DA0, 0x11DA9),
+    (0x11F50, 0x11F59),
+    (0x16A60, 0x16A69),
+    (0x16AC0, 0x16AC9),
+    (0x16B50, 0x16B59),
+    (0x1D7CE, 0x1D7FF),
+    (0x1E140, 0x1E149),
+    (0x1E2F0, 0x1E2F9),
+    (0x1E4F0, 0x1E4F9),
+    (0x1E950, 0x1E959),
+    (0x1FBF0, 0x1FBF9),
+)
+
+
+def _is_unicode_15_digit(code_point: int) -> bool:
+    return any(start <= code_point <= end for start, end in UNICODE_15_DIGITS)
+
+
+def _refuse_newer_digits(node: yaml.ScalarNode, what: str) -> None:
+    """Refuse ``node``'s text when it holds a decimal digit Unicode 15.0 does not, as Python 3.12's ``what`` does."""
+    for ch in str(node.value):
+        if (
+            ord(ch) > 0x7F
+            and unicodedata.decimal(ch, None) is not None
+            and not _is_unicode_15_digit(ord(ch))
+        ):
+            raise ValueError(f"could not convert {node.value!r} with {what}()")
+
+
+def _construct_yaml_int(loader: yaml.SafeLoader, node: yaml.ScalarNode) -> Any:
+    _refuse_newer_digits(node, "int")
+    return yaml.SafeLoader.construct_yaml_int(loader, node)
+
+
+def _construct_yaml_float(loader: yaml.SafeLoader, node: yaml.ScalarNode) -> Any:
+    _refuse_newer_digits(node, "float")
+    return yaml.SafeLoader.construct_yaml_float(loader, node)
+
+
+_PermissiveTimestampSafeLoader.add_constructor(
+    "tag:yaml.org,2002:int", _construct_yaml_int
+)
+_PermissiveTimestampSafeLoader.add_constructor(
+    "tag:yaml.org,2002:float", _construct_yaml_float
+)
+
+
 def _pythonize_timestamp(raw: str) -> str:
     """``str(date(...))``/``str(datetime(...))``'s own rendering, computed from PyYAML's own
     ``Constructor.timestamp_regexp`` field groups directly -- never by constructing the object itself
@@ -190,34 +310,10 @@ def _pythonize_timestamp(raw: str) -> str:
     return out
 
 
-_SAFE_LOADER_ONLY_TAGS = frozenset(
-    f"tag:yaml.org,2002:{tag}" for tag in ("binary", "set", "omap", "pairs")
-)
-
-
-class _CatalogLoader(_UniqueKeySafeLoader):
-    """The unique-key loader without ``SafeLoader``'s ``!!binary``, ``!!set``, ``!!omap`` and ``!!pairs``
-    constructors, so a catalog file holding one is refused by ``construct_undefined`` as in the TypeScript and Java
-    readers (18.184o). The constructors are removed from this class's own copy; the other loaders keep them. A merge
-    source is never constructed, so its tag (and a merge list's) is checked against the same constructors here,
-    refused as ``construct_undefined`` refuses any other node."""
-
-    yaml_constructors = {
-        tag: construct
-        for tag, construct in _UniqueKeySafeLoader.yaml_constructors.items()
-        if tag not in _SAFE_LOADER_ONLY_TAGS
-    }
-
-    def _check_merge_source(self, value_node: yaml.Node) -> None:
-        for source in _merge_sources(value_node):
-            if source.tag not in self.yaml_constructors:
-                self.construct_undefined(source)
-
-
 def load_catalog_yaml(text: str) -> Any:
-    """A catalog file's ``text`` read as :func:`load_untrusted_yaml` reads a file with ``unique_keys``, less the four
-    tags above; its ``yaml.YAMLError`` and ``RecursionError`` are the caller's to report."""
-    return yaml.load(text, Loader=_CatalogLoader)
+    """A catalog file's ``text`` read as :func:`load_untrusted_yaml` reads a file with ``unique_keys``; its
+    ``yaml.YAMLError`` and ``RecursionError`` are the caller's to report."""
+    return yaml.load(text, Loader=_UniqueKeySafeLoader)
 
 
 def load_untrusted_yaml(
