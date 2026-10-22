@@ -39,4 +39,12 @@ class UntrustedYamlFormsTest {
         InputError e = assertThrows(InputError.class, () -> Readiness.loadDeviationRegister(r));
         assertEquals("input.deviation_invalid", e.key);
     }
+
+    @Test
+    void onlyAUnicode15DigitReadsAsADigit() {
+        assertEquals(java.math.BigInteger.TEN, ((java.util.Map<?, ?>) Readiness.composePyyaml("a: !!int \"١٠\"\n", false)).get("a"));
+        for (String text : List.of("a: !!int \"𐵁𐵀\"\n", "a: !!float \"𐵁.5\"\n", "a: !!int \"𖵱\"\n")) {
+            assertThrows(IllegalArgumentException.class, () -> Readiness.composePyyaml(text, false), text);
+        }
+    }
 }
