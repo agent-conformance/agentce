@@ -106,10 +106,6 @@ test("a flow `?` or `:` is an indicator, as PyYAML's scanner reads it", () => {
       "a: [\u{10000}, ?b, \u{10000}, ?c]\n",
       { a: ["\u{10000}", { b: null }, "\u{10000}", { c: null }] },
     ],
-  ] as const) {
-    assert.deepEqual(pyyamlLoad(text), value, text);
-  }
-  for (const [text, value] of [
     ["a: {?:1}\n", { a: { null: 1 } }],
     ['a: {"b":1}\n', { a: { b: 1 } }],
     ["a: {b:1}\n", { a: { "b:1": null } }],

@@ -44,7 +44,7 @@ export function scannerProblem(text: string): string | null {
 export function pyyamlScan(text: string): { problem: string | null; text: string } {
   const scanner = new Scanner(text);
   const problem = scannerProblemOf(scanner);
-  return { problem, text: problem === null ? scanner.keyedText() : text };
+  return { problem, text: problem === null ? scanner.indicatorText() : text };
 }
 
 function scannerProblemOf(scanner: Scanner): string | null {
@@ -84,7 +84,7 @@ class Scanner {
   }
 
   /** The text with a space after each flow `?` or `:` indicator {@link token} found with none. */
-  keyedText(): string {
+  indicatorText(): string {
     let out = "";
     let from = 0;
     let unit = 0;
