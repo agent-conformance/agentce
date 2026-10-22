@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.UncheckedIOException;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
@@ -951,7 +952,7 @@ public final class Readiness {
                 checkTree(child, uniqueKeys, visited);
             }
         } else if (node instanceof MappingNode map) {
-            Set<String> seen = new HashSet<>();
+            Set<Object> seen = new HashSet<>();
             boolean merged = false;
             for (NodeTuple tuple : map.getValue()) {
                 if (Tag.MERGE.equals(pyyamlTag(tuple.getKeyNode()))) {
@@ -962,14 +963,53 @@ public final class Readiness {
                     merged = true;
                     rejectMergeSourceTags(tuple.getValueNode());
                 } else if (uniqueKeys) {
-                    String k = String.valueOf(composeValue(scalarKey(tuple)));
-                    if (!seen.add(k)) {
+                    Object k = composeValue(scalarKey(tuple));
+                    if (!seen.add(pythonKey(k))) {
                         throw new IllegalArgumentException("found the key " + k + " twice");
                     }
                 }
                 checkTree(tuple.getValueNode(), uniqueKeys, visited);
             }
         }
+    }
+
+    /** {@code key} (a scalar {@link #composeValue} built) as a value whose equality is Python's for the dict key PyYAML
+     * builds: numbers by value ({@code 1}, {@code 1.0} and {@code true} one key; every {@code .nan} one key, as PyYAML
+     * returns one shared nan), a string by its text, a date by its date, an aware datetime by its instant, a naive one by
+     * its fields; a string, a number, a date and a datetime are never equal to one another. */
+    private static Object pythonKey(Object key) {
+        if (key == null) {
+            return List.of("none");
+        }
+        if (key instanceof String text) {
+            return List.of("str", text);
+        }
+        if (key instanceof Boolean b) {
+            return List.of("num", b ? BigDecimal.ONE : BigDecimal.ZERO);
+        }
+        if (key instanceof BigInteger bi) {
+            return List.of("num", new BigDecimal(bi).stripTrailingZeros());
+        }
+        if (key instanceof Double d) {
+            if (d.isNaN()) {
+                return List.of("nan");
+            }
+            if (d.isInfinite()) {
+                return List.of("inf", d > 0);
+            }
+            return List.of("num", d == 0 ? BigDecimal.ZERO : new BigDecimal(d).stripTrailingZeros());
+        }
+        if (key instanceof PyyamlTimestamp ts) {
+            String text = pythonizeTimestamp(ts.text());
+            if (text.length() == 10) {
+                return List.of("date", text);
+            }
+            if (text.matches(".*[+-][0-9]{2}:[0-9]{2}$")) {
+                return List.of("aware", java.time.OffsetDateTime.parse(text.replace(' ', 'T')).toInstant());
+            }
+            return List.of("naive", text);
+        }
+        return List.of("other", String.valueOf(key));
     }
 
     /** {@link #flattenMapping} never composes a merge source, so {@link #composeValue}'s tag check does not reach it. */

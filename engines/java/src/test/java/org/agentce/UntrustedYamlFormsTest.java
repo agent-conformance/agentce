@@ -67,4 +67,17 @@ class UntrustedYamlFormsTest {
         text.append("catalogs: [eu-ai-act]\n");
         assertEquals(List.of("eu-ai-act"), Profile.load(write(tmp, "p.yaml", text.toString())).catalogs);
     }
+
+    @Test
+    void aRepeatedKeyIsDecidedByPythonsKeyEquality() {
+        for (String text : List.of("{1: a, 1.0: b}", "{1: a, true: b}", "{0: a, false: b}", "{0x1: a, 1: b}",
+                "{null: a, ~: b}", "{.nan: a, .nan: b}", "{2026-01-01: a, 2026-01-01: b}",
+                "{2026-01-01T00:00:00Z: a, 2026-01-01T01:00:00+01:00: b}")) {
+            assertThrows(IllegalArgumentException.class, () -> Readiness.composePyyaml(text + "\n", true), text);
+        }
+        for (String text : List.of("{\"1\": a, 1: b}", "{null: a, \"null\": b}", "{2026-01-01: a, 2026-01-02: b}",
+                "{2026-01-01: a, \"2026-01-01\": b}", "{1.5: a, 15e-1: b}")) {
+            Readiness.composePyyaml(text + "\n", true);
+        }
+    }
 }
