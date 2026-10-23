@@ -11,6 +11,7 @@ the same on every machine.
 from __future__ import annotations
 
 import json
+import math
 import re
 import sys
 from typing import Any
@@ -161,3 +162,296 @@ def load_report_json(text: str) -> Any:
         raise JSONError(TOO_LONG, TOO_LONG) from None
     except ValueError as exc:
         raise JSONError(str(exc), str(exc)) from exc
+
+
+# --- The JSON profile (SPEC 8.7) -------------------------------------------------------------------
+#
+# One hand-written check, the same rules as ``json.ts`` and ``Json.java``, runs before ``json.loads``
+# sees the text, so a file outside the profile is refused with the rule and line whatever the library
+# would have done. Rule ids are the ``rule`` values of ``spec/report/json-cases.json``.
+
+_BOM = b"\xef\xbb\xbf"
+_WS = " \t\n\r"
+_ESCAPES = '"\\/bfnrt'
+_LINE_BREAKS = "\f\x85  "
+
+
+class JsonProfileError(ValueError):
+    """Text outside the JSON profile: ``rule`` is a case-table rule id, ``line`` is 1-based."""
+
+    def __init__(self, rule: str, line: int) -> None:
+        super().__init__(f"{rule} at line {line}")
+        self.rule = rule
+        self.line = line
+
+
+def _hex4(text: str, i: int) -> int | None:
+    digits = text[i : i + 4]
+    if len(digits) != 4 or any(c not in "0123456789abcdefABCDEF" for c in digits):
+        return None
+    return int(digits, 16)
+
+
+def _string(text: str, i: int, line: int) -> tuple[str, int]:
+    """Scan the string starting at the quote at ``i``; return its decoded value and the index after it."""
+    out: list[str] = []
+    i += 1
+    n = len(text)
+    while True:
+        if i >= n:
+            raise JsonProfileError("syntax", line)
+        c = text[i]
+        if c == '"':
+            return "".join(out), i + 1
+        if c < " ":
+            raise JsonProfileError("syntax", line)
+        if c != "\\":
+            out.append(c)
+            i += 1
+            continue
+        e = text[i + 1 : i + 2]
+        if e in _ESCAPES and e:
+            out.append(json.loads(f'"\\{e}"'))
+            i += 2
+            continue
+        if e != "u":
+            raise JsonProfileError("syntax", line)
+        cp = _hex4(text, i + 2)
+        if cp is None:
+            raise JsonProfileError("syntax", line)
+        i += 6
+        if 0xDC00 <= cp <= 0xDFFF:
+            raise JsonProfileError("lone_surrogate", line)
+        if 0xD800 <= cp <= 0xDBFF:
+            low = _hex4(text, i + 2) if text[i : i + 2] == "\\u" else None
+            if low is None or not 0xDC00 <= low <= 0xDFFF:
+                raise JsonProfileError("lone_surrogate", line)
+            cp = 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00)
+            i += 6
+        out.append(chr(cp))
+
+
+def _number(text: str, i: int, line: int) -> int:
+    """Scan the number starting at ``i`` (a ``-`` or a digit); return the index after it."""
+    start = i
+    n = len(text)
+    if text[i] == "-":
+        i += 1
+        if text[i : i + 8] == "Infinity":
+            raise JsonProfileError("infinity", line)
+    if i >= n or not text[i].isascii() or not text[i].isdigit():
+        raise JsonProfileError("syntax", line)
+    if text[i] == "0" and text[i + 1 : i + 2].isdigit():
+        raise JsonProfileError("leading_zero", line)
+    while i < n and "0" <= text[i] <= "9":
+        i += 1
+    is_float = False
+    if text[i : i + 1] == ".":
+        is_float = True
+        i += 1
+        if not ("0" <= text[i : i + 1] <= "9") or i >= n:
+            raise JsonProfileError("syntax", line)
+        while i < n and "0" <= text[i] <= "9":
+            i += 1
+    if text[i : i + 1] in ("e", "E"):
+        is_float = True
+        i += 1
+        if text[i : i + 1] in ("+", "-"):
+            i += 1
+        if i >= n or not "0" <= text[i] <= "9":
+            raise JsonProfileError("syntax", line)
+        while i < n and "0" <= text[i] <= "9":
+            i += 1
+    lexeme = text[start:i]
+    if is_float:
+        if math.isinf(float(lexeme)):
+            raise JsonProfileError("infinity", line)
+    elif len(lexeme) - lexeme.startswith("-") > MAX_INT_STR_DIGITS:
+        raise JsonProfileError("integer_digit_limit", line)
+    return i
+
+
+def check_profile(text: str, *, jsonl_line: int | None = None) -> None:
+    """Raise :class:`JsonProfileError` when ``text`` (one JSON document, or one JSON Lines line when
+    ``jsonl_line`` gives its number) is outside the profile. Iterative, so depth costs no recursion."""
+    line = jsonl_line or 1
+    n = len(text)
+    i = 0
+    # Each open container: ("o", keys seen) or ("a", None). ``expect`` is what may come next:
+    # "value", "first" (a value or the closing bracket), "key", "first_key", "colon", "after", "end".
+    stack: list[tuple[str, set[str] | None]] = []
+    expect = "value"
+    saw_cr = False
+    while True:
+        while i < n and text[i] in _WS:
+            if text[i] == "\n":
+                line += 1
+            elif text[i] == "\r":
+                saw_cr = True
+            i += 1
+        if i >= n:
+            if expect != "end":
+                raise JsonProfileError("syntax", line)
+            return
+        c = text[i]
+        if c == "﻿":
+            raise JsonProfileError("bom", line)
+        if c == "/":
+            raise JsonProfileError("comment", line)
+        if jsonl_line is not None and c in _LINE_BREAKS:
+            raise JsonProfileError("jsonl_line_split", line)
+        if expect == "end":
+            rule = (
+                "jsonl_line_split"
+                if jsonl_line is not None and saw_cr
+                else "extra_value"
+            )
+            raise JsonProfileError(rule, line)
+        if expect in ("value", "first", "member"):
+            if c == "]" and expect == "first" and stack and stack[-1][0] == "a":
+                stack.pop()
+                i += 1
+            elif c in "]}":
+                raise JsonProfileError(
+                    "trailing_comma" if expect == "value" and stack else "syntax", line
+                )
+            elif c in "[{":
+                stack.append(("a", None) if c == "[" else ("o", set()))
+                if len(stack) > MAX_JSON_DEPTH:
+                    raise JsonProfileError("depth_over_limit", line)
+                i += 1
+                expect = "first" if c == "[" else "first_key"
+                continue
+            elif c == '"':
+                _, i = _string(text, i, line)
+            elif c == "-" or "0" <= c <= "9":
+                i = _number(text, i, line)
+            elif c == "+":
+                raise JsonProfileError("leading_plus", line)
+            else:
+                for word, rule in (
+                    ("true", ""),
+                    ("false", ""),
+                    ("null", ""),
+                    ("NaN", "nan"),
+                    ("Infinity", "infinity"),
+                ):
+                    if text.startswith(word, i):
+                        if rule:
+                            raise JsonProfileError(rule, line)
+                        i += len(word)
+                        break
+                else:
+                    raise JsonProfileError("syntax", line)
+            expect = "after" if stack else "end"
+        elif expect in ("key", "first_key"):
+            if c == "}" and expect == "first_key":
+                stack.pop()
+                i += 1
+                expect = "after" if stack else "end"
+            elif c == "}":
+                raise JsonProfileError("trailing_comma", line)
+            elif c == '"':
+                key, i = _string(text, i, line)
+                keys = stack[-1][1]
+                assert keys is not None
+                if key in keys:
+                    raise JsonProfileError("duplicate_key", line)
+                keys.add(key)
+                expect = "colon"
+            else:
+                raise JsonProfileError("syntax", line)
+        elif expect == "colon":
+            if c != ":":
+                raise JsonProfileError("syntax", line)
+            i += 1
+            expect = "member"
+        else:  # after a value inside a container
+            kind = stack[-1][0]
+            if c == ",":
+                i += 1
+                expect = "value" if kind == "a" else "key"
+            elif (c == "]" and kind == "a") or (c == "}" and kind == "o"):
+                stack.pop()
+                i += 1
+                expect = "after" if stack else "end"
+            else:
+                raise JsonProfileError("syntax", line)
+
+
+def _decode(raw: bytes, bom: str) -> str:
+    if raw.startswith(_BOM):
+        if bom == "refuse":
+            raise JsonProfileError("bom", 1)
+        raw = raw[len(_BOM) :]
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise JsonProfileError(
+            "invalid_utf8", raw[: exc.start].count(b"\n") + 1
+        ) from None
+
+
+def _value(text: str) -> Any:
+    # The profile check has already refused every form ``json.loads`` would read loosely.
+    return json.loads(text, parse_int=_parse_int)
+
+
+def read_json(raw: bytes, *, bom: str) -> Any:
+    """One JSON document under the profile. ``bom`` is ``"ignore"`` for an input an adopter's tool
+    may have written and ``"refuse"`` for a file an engine wrote. Raises :class:`JsonProfileError`."""
+    text = _decode(raw, bom)
+    check_profile(text)
+    return _value(text)
+
+
+def read_jsonl(raw: bytes, *, bom: str) -> list[tuple[int, Any]]:
+    """JSON Lines under the profile: (line number, value) per record, LF alone ending a line, a blank
+    line (empty, spaces, tabs) skipped. A ``JsonProfileError`` takes the place of the value of a line
+    outside the profile, so a caller can quarantine that line and read on; bytes that are not UTF-8
+    or a byte-order mark refused by ``bom`` raise for the whole file."""
+    text = _decode(raw, bom)
+    out: list[tuple[int, Any]] = []
+    for number, line in enumerate(text.split("\n"), start=1):
+        if not line.strip(" \t"):
+            continue
+        try:
+            check_profile(line, jsonl_line=number)
+            out.append((number, _value(line)))
+        except JsonProfileError as exc:
+            out.append((number, exc))
+    return out
+
+
+def read_bundled(raw: bytes) -> Any:
+    """Data shipped inside the package, under the same profile; a failure is a build defect."""
+    return read_json(raw, bom="refuse")
+
+
+def render_number(value: int | float) -> str:
+    """The one rendering of a JSON number in reason and report text (SPEC 8.7): an integer as its
+    digits, a float as the shortest decimal that reads back to it, ``.0`` when integral, exponent form
+    at 1e16 and above or below 1e-4, ``-0.0`` for negative zero. ``repr`` is that rule."""
+    if isinstance(value, bool):
+        raise TypeError("a boolean is not a JSON number")
+    return str(value) if isinstance(value, int) else repr(value)
+
+
+def json_equal(left: Any, right: Any) -> bool:
+    """Equality of two JSON values (SPEC 8.7): numbers by value, values of different JSON types
+    never equal (``1`` is not ``true``), arrays element-wise, objects by key set and values."""
+    if isinstance(left, bool) or isinstance(right, bool):
+        return type(left) is type(right) and left == right
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        return bool(left == right)  # Python compares an int and a float exactly
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, list):
+        return len(left) == len(right) and all(
+            json_equal(a, b) for a, b in zip(left, right)
+        )
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(
+            json_equal(left[k], right[k]) for k in left
+        )
+    return bool(left == right)
