@@ -182,7 +182,8 @@ def ingest(
                 continue
 
             errors = validate_event(event)
-            if errors:
+            detail = errors[0] if errors else _no_canonical_form(event)
+            if detail is not None:
                 records.append(
                     _unreadable(
                         QuarantineRecord(
@@ -190,22 +191,7 @@ def ingest(
                             event_id=_opt(event, "id"),
                             source=_opt(event, "source"),
                             type=_opt(event, "type"),
-                            detail=errors[0],
-                        ),
-                        event,
-                    )
-                )
-                continue
-            no_form = _no_canonical_form(event)
-            if no_form is not None:
-                records.append(
-                    _unreadable(
-                        QuarantineRecord(
-                            QuarantineReason.SCHEMA_INVALID,
-                            event_id=_opt(event, "id"),
-                            source=_opt(event, "source"),
-                            type=_opt(event, "type"),
-                            detail=no_form,
+                            detail=detail,
                         ),
                         event,
                     )

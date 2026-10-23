@@ -236,21 +236,13 @@ public final class Ingest {
                 }
 
                 List<String> errors = Schema.validateEvent(event);
-                if (!errors.isEmpty()) {
+                String detail = errors.isEmpty() ? noCanonicalForm(event) : errors.get(0);
+                if (detail != null) {
                     records.add(unreadable(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
                             .eventId(opt(event, "id"))
                             .source(opt(event, "source"))
                             .type(opt(event, "type"))
-                            .detail(errors.get(0)), event));
-                    continue;
-                }
-                String noForm = noCanonicalForm(event);
-                if (noForm != null) {
-                    records.add(unreadable(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
-                            .eventId(opt(event, "id"))
-                            .source(opt(event, "source"))
-                            .type(opt(event, "type"))
-                            .detail(noForm), event));
+                            .detail(detail), event));
                     continue;
                 }
 

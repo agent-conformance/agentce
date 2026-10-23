@@ -322,7 +322,8 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
       }
 
       const errors = validateEvent(event);
-      if (errors.length > 0) {
+      const detail = errors.length > 0 ? errors[0] : noCanonicalForm(event);
+      if (detail !== null) {
         records.push(
           unreadable(
             {
@@ -330,23 +331,7 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
               eventId: optStr(event, "id"),
               source: optStr(event, "source"),
               type: optStr(event, "type"),
-              detail: errors[0],
-            },
-            event,
-          ),
-        );
-        continue;
-      }
-      const noForm = noCanonicalForm(event);
-      if (noForm !== null) {
-        records.push(
-          unreadable(
-            {
-              reason: QuarantineReason.SCHEMA_INVALID,
-              eventId: optStr(event, "id"),
-              source: optStr(event, "source"),
-              type: optStr(event, "type"),
-              detail: noForm,
+              detail,
             },
             event,
           ),

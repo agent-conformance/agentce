@@ -4939,8 +4939,8 @@
         {
           "description": "Python admits a record with no canonical form (an @context of 1.5), so the integrity stage meets it and OVS-07 crashes as internal.unexpected instead of reading insufficient_evidence (18.184r)",
           "file": "engines/python/agentce/ingest.py",
-          "search": "            no_form = _no_canonical_form(event)\n",
-          "replace": "            no_form = None\n"
+          "search": "            detail = errors[0] if errors else _no_canonical_form(event)\n",
+          "replace": "            detail = errors[0] if errors else None\n"
         },
         {
           "description": "Python drops a record quarantined for time_order from the withheld list, so a late guard ruling no longer stops ROB-02 reading conformant",
