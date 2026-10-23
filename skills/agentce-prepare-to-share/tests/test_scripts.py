@@ -188,7 +188,7 @@ def test_deviation_lint_refuses_insufficient(tmp_path: Path, capsys) -> None:
                     {
                         "control": "OVS-03",
                         "rationale": "x",
-                        "compensating_control": "y",
+                        "compensating_control": "c",
                         "owner": "a",
                         "approver": "b",
                         "granted": "2026-01-01",
@@ -234,7 +234,7 @@ def test_deviation_lint_accepts_a_report_whose_deviation_is_already_applied(
                     {
                         "control": "OVS-03",
                         "rationale": "x",
-                        "compensating_control": "y",
+                        "compensating_control": "c",
                         "owner": "a",
                         "approver": "b",
                         "granted": "2026-01-01",
