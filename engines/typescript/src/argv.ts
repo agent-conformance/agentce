@@ -13,6 +13,7 @@
 import { readFileSync } from "node:fs";
 import { argvGrammarPath } from "./bundled";
 import { InputError } from "./errors";
+import { readBundled } from "./json";
 
 export const HELP: readonly string[] = ["-h", "--help"];
 
@@ -125,7 +126,7 @@ let cached: RawGrammar | undefined;
 
 /** The vendored grammar file, as data. */
 export function grammar(): RawGrammar {
-  cached ??= JSON.parse(readFileSync(argvGrammarPath(), "utf-8")) as RawGrammar;
+  cached ??= readBundled(readFileSync(argvGrammarPath())) as RawGrammar;
   return cached;
 }
 

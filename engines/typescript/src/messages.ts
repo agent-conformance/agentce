@@ -14,6 +14,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { i18nDir } from "./bundled";
+import { readBundled } from "./json";
 
 export const DEFAULT_LANGUAGE = "en";
 
@@ -34,16 +35,16 @@ export function loadCatalog(language: string): Record<string, string> {
 
 /** {@link loadCatalog}'s read of one catalogue file, exported for its unit test. */
 export function readCatalogFile(path: string): Record<string, string> {
-  let text: string;
+  let text: Buffer;
   try {
-    text = readFileSync(path, "utf-8");
+    text = readFileSync(path);
   } catch (exc) {
     if ((exc as { code?: unknown }).code === "ENOENT") {
       return {};
     }
     throw exc;
   }
-  const data: unknown = JSON.parse(text);
+  const data: unknown = readBundled(text);
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
     throw new Error(`${path} does not hold a message catalogue object`);
   }

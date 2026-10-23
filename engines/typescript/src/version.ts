@@ -7,11 +7,14 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readBundled } from "./json";
 
 export const ENGINE_NAME = "agentce-ts";
 export const SPEC_VERSION = "0.6";
 
 export function engineVersion(): string {
-  const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
+  const pkg = readBundled(readFileSync(join(__dirname, "..", "package.json"))) as {
+    version: string;
+  };
   return String(pkg.version);
 }

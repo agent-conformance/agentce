@@ -66,6 +66,7 @@ import {
   verifyBundle,
   verifyStreams,
 } from "./integrity";
+import { notValid } from "./json";
 import { DEFAULT_LANGUAGE, availableLanguages, catalogue } from "./messages";
 import { installedNoMl } from "./noMl";
 import {
@@ -511,7 +512,11 @@ function resolveCatalogs(
     }
   }
   const labels = [...new Set([...ids, ...loaded.map((c) => `${c.id}@${c.version}`)])];
-  return { catalogs: labels.map((l) => byLabel.get(l) as Catalog), labels, limitations };
+  return {
+    catalogs: labels.map((l) => byLabel.get(l) as Catalog),
+    labels,
+    limitations,
+  };
 }
 
 /** The exit-3 error for a run whose every (control, subject) pair was inapplicable or unassessed. */
@@ -1060,7 +1065,10 @@ function runAssess(options: AssessOptions): CommandResult {
     const template = messages["readiness.deviation_expired_ignored"] as string;
     for (const control of applied.expired) {
       limitations.push(
-        formatTemplate(template, { control, expiry: pyStr(byControl.get(control)?.expiry ?? "") }),
+        formatTemplate(template, {
+          control,
+          expiry: pyStr(byControl.get(control)?.expiry ?? ""),
+        }),
       );
     }
     const notWaivable = messages["readiness.deviation_not_waivable"] as string;
@@ -1796,7 +1804,12 @@ function cmdReadiness(scan: Scan): CommandResult {
     effectiveTrustRoot(args.trustRoot),
     args.allowUnverified,
   );
-  const verdict = computeReadiness(reportDir, { severities, deviations, gaps, limitations });
+  const verdict = computeReadiness(reportDir, {
+    severities,
+    deviations,
+    gaps,
+    limitations,
+  });
   result.data.verdict = verdict.verdict;
   result.data.reasons = verdict.reasons;
   result.data.limitations = verdict.limitations;
@@ -1939,8 +1952,8 @@ function readSignClaim(claimPath: string): Record<string, unknown> {
   let claim: unknown;
   try {
     claim = parseUntrustedJson(readFileSync(claimPath));
-  } catch {
-    throw new InputError("sign.claim_malformed", "claim.json is not valid JSON.", fix);
+  } catch (exc) {
+    throw new InputError("sign.claim_malformed", notValid("claim.json", exc), fix);
   }
   if (!isRecord(claim)) {
     throw new InputError("sign.claim_malformed", "claim.json is not an object.", fix);
@@ -2041,7 +2054,9 @@ function cmdSign(scan: Scan): CommandResult {
   // The engine refuses to sign a report that is not ready to publish (SPEC §8.5); `sign` never takes
   // its own `--catalog-dir`/`--gaps`/`--deviations` flags, so this always uses the bundled catalogs
   // with no deviations/gaps.
-  const verdict = computeReadiness(reportDir, { severities: readinessSeverities([]).severities });
+  const verdict = computeReadiness(reportDir, {
+    severities: readinessSeverities([]).severities,
+  });
   result.data.readiness = verdict.verdict;
   if (verdict.verdict === NOT_READY) {
     throw new InputError(
@@ -2116,7 +2131,10 @@ function cmdSign(scan: Scan): CommandResult {
     const org = pyGetField(claimant, "org", "unset");
     const document = {
       keys: {
-        [kmsSigner.keyid]: { public_key: kmsSigner.publicKeyB64, identity: org },
+        [kmsSigner.keyid]: {
+          public_key: kmsSigner.publicKeyB64,
+          identity: org,
+        },
       },
     };
     writeOutput(
@@ -2320,7 +2338,11 @@ function cmdVersion(): CommandResult {
 function errorResult(command: string, error: AgentceError): CommandResult {
   const result = new CommandResult(command);
   result.addCode(error.exitCode);
-  result.data.error = { message_key: error.key, detail: error.cause, fix: error.fix };
+  result.data.error = {
+    message_key: error.key,
+    detail: error.cause,
+    fix: error.fix,
+  };
   result.note(`${error.key}: ${error.cause}`);
   if (error.fix) {
     result.note(`fix: ${error.fix}`);
@@ -2545,7 +2567,12 @@ function parse(rawArgv: readonly string[]): Parsed {
     const usage = USAGES[scan.action === undefined ? name : `${name} ${scan.action}`] as string;
     return { kind: "print", text: usage };
   }
-  return { kind: "run", command: name, scan, globals: new Set([...pre, ...scan.flags]) };
+  return {
+    kind: "run",
+    command: name,
+    scan,
+    globals: new Set([...pre, ...scan.flags]),
+  };
 }
 
 /** A refusal of a command's own line, carrying the command for the envelope's `command`. */
@@ -2655,7 +2682,14 @@ export function main(rawArgv: string[]): number {
  * on stderr, its timestamp in Python's `isoformat()` shape. */
 function logDebug(command: string, event: string, extra: Record<string, unknown> = {}): void {
   const ts = new Date().toISOString().replace("Z", "000+00:00");
-  const record = { command, event, level: "debug", logger: "agentce", ts, ...extra };
+  const record = {
+    command,
+    event,
+    level: "debug",
+    logger: "agentce",
+    ts,
+    ...extra,
+  };
   process.stderr.write(`${jsonStringifyAscii(sortKeysDeep(record))}\n`);
 }
 

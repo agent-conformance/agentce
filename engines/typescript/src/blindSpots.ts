@@ -13,6 +13,7 @@ import { join } from "node:path";
 import type { Assertion } from "./assertions";
 import { SELF_REPORT_EQUIVALENT_CLASSES, classOk, indexBySubject, requirementMet } from "./assess";
 import type { Catalog, ControlSpec } from "./catalog";
+import { readBundled } from "./json";
 import type { Profile } from "./profile";
 import { byteCompare } from "./util";
 
@@ -52,7 +53,7 @@ let cachedEventProducers: EventProducers | null = null;
 function eventProducers(): EventProducers {
   if (cachedEventProducers === null) {
     const path = join(__dirname, "..", "data", "support_matrices", "event_producers.json");
-    cachedEventProducers = JSON.parse(readFileSync(path, "utf-8")) as EventProducers;
+    cachedEventProducers = readBundled(readFileSync(path)) as EventProducers;
   }
   return cachedEventProducers;
 }

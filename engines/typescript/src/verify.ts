@@ -23,7 +23,7 @@ import {
   unreadableError,
   unreadableRel,
 } from "./errors";
-import { MAX_JSON_DEPTH, NonCanonicalNumber, parseJson, tooDeep } from "./json";
+import { MAX_JSON_DEPTH, NonCanonicalNumber, readJson, tooDeep } from "./json";
 import { pyTruthy } from "./readiness";
 import {
   coveredFiles,
@@ -181,60 +181,41 @@ export class JsonTooDeep extends Error {
   }
 }
 
-const LONE_SURROGATE = /[\uD800-\uDFFF]/u;
 const PLAIN_ASCII = /^[ !#-&(-\[\]-~]*$/;
 
 /** Mirrors `signing.parse_untrusted_json`: parse JSON `verify` reads from an untrusted file or signed
- * payload, or throw. Strict UTF-8 with no byte-order mark, standard JSON only, containers nested at
- * most {@link MAX_JSON_DEPTH} deep, and every string and key well-formed Unicode. With
- * `keepNumberTokens`, a non-canonical number token survives as a {@link NonCanonicalNumber} so the
- * canonical form can still refuse it (the release manifest). Callers turn the error into their own
- * fixed reason text; its message is never shown. A document too deep throws {@link JsonTooDeep},
- * whatever else is wrong with it. */
-export function parseUntrustedJson(raw: Buffer, keepNumberTokens = false): unknown {
+ * payload under the JSON profile (SPEC 8.7, {@link readJson}), number kinds kept so the canonical form
+ * refuses a float as the other engines do, or throw the {@link JsonProfileError} naming the rule. `bom`
+ * is `"refuse"` for a file an engine wrote (claim.json, envelopes) and `"ignore"` for one an adopter's
+ * tool may have written (a bundle manifest, a trust root). A document too deep throws
+ * {@link JsonTooDeep}, whatever else is wrong with it. */
+export function parseUntrustedJson(raw: Buffer, bom: "ignore" | "refuse" = "refuse"): unknown {
   if (tooDeep(raw)) {
     throw new JsonTooDeep();
   }
-  const text = decodeUtf8Strict(raw);
-  const value = keepNumberTokens ? parseJson(text) : JSON.parse(text);
-  const stack: unknown[] = [value];
-  while (stack.length > 0) {
-    const node = stack.pop();
-    if (typeof node === "string") {
-      if (LONE_SURROGATE.test(node)) {
-        throw new Error(NOT_READABLE_JSON);
-      }
-    } else if (Array.isArray(node)) {
-      for (const child of node) stack.push(child);
-    } else if (isRecord(node)) {
-      for (const [key, child] of Object.entries(node)) stack.push(child, key);
-    }
-  }
-  return value;
+  return readJson(raw, bom);
 }
 
 /** {@link parseUntrustedJson} for one input verify reads, refused with that input's own key:
  * `verify.json_too_deep` naming `what` past the depth limit, else `unreadableKey`. Mirrors
  * `signing.parse_verify_input`. */
-export function parseVerifyInput(
-  raw: Buffer,
-  unreadableKey: string,
-  what: string,
-  keepNumberTokens = false,
-): unknown {
+export function parseVerifyInput(raw: Buffer, unreadableKey: string, what: string): unknown {
   try {
-    return parseUntrustedJson(raw, keepNumberTokens);
+    return parseUntrustedJson(raw);
   } catch (exc) {
     if (exc instanceof JsonTooDeep) {
-      throw refusal("verify.json_too_deep", { what, limit: String(MAX_JSON_DEPTH) });
+      throw refusal("verify.json_too_deep", {
+        what,
+        limit: String(MAX_JSON_DEPTH),
+      });
     }
     throw refusal(unreadableKey);
   }
 }
 
 /** {@link parseUntrustedJson} over a file's bytes (mirrors Java's `readUntrustedJsonFile`). */
-export function readUntrustedJsonFile(path: string, keepNumberTokens = false): unknown {
-  return parseUntrustedJson(readFileSync(path), keepNumberTokens);
+export function readUntrustedJsonFile(path: string, bom: "ignore" | "refuse" = "refuse"): unknown {
+  return parseUntrustedJson(readFileSync(path), bom);
 }
 
 /** Mirrors `signing.describe_untrusted`: how a refusal names a value read from an untrusted document
@@ -283,7 +264,9 @@ function verifyCertificate(
   const issuer = cert.issuer;
   const ca = typeof issuer === "string" ? authorities.get(issuer) : undefined;
   if (ca === undefined) {
-    throw refusal("verify.certificate_issuer_unknown", { issuer: describeUntrusted(issuer) });
+    throw refusal("verify.certificate_issuer_unknown", {
+      issuer: describeUntrusted(issuer),
+    });
   }
   let leaf: KeyEntry;
   try {
@@ -393,7 +376,9 @@ export class TrustRoot {
     }
     const authorities = new Map<string, AuthorityEntry>();
     for (const [issuer, entry] of trustEntries(data, "certificate_authorities", "id to entry")) {
-      authorities.set(issuer, { publicKeyRaw: b64dStrict(String(entry.public_key)) });
+      authorities.set(issuer, {
+        publicKeyRaw: b64dStrict(String(entry.public_key)),
+      });
     }
     return new TrustRoot(keys, authorities);
   }
@@ -420,7 +405,9 @@ export class TrustRoot {
     }
     const keyid = signature.keyid;
     if (typeof keyid !== "string" || !this.keys.has(keyid)) {
-      throw refusal("verify.keyid_untrusted", { keyid: describeUntrusted(keyid) });
+      throw refusal("verify.keyid_untrusted", {
+        keyid: describeUntrusted(keyid),
+      });
     }
     return this.keys.get(keyid) as KeyEntry;
   }
@@ -441,7 +428,7 @@ export function vendoredTrustPath(): string {
 export function loadTrustRoot(path: string): TrustRoot {
   let data: unknown;
   try {
-    data = readUntrustedJsonFile(path);
+    data = readUntrustedJsonFile(path, "ignore");
   } catch (exc) {
     if (exc instanceof JsonTooDeep) {
       const tooDeep = refusal("verify.json_too_deep", {
@@ -517,7 +504,9 @@ export function verifyEnvelope(envelope: unknown, trust: TrustRoot): VerifiedEnv
       if (!isRecord(entry)) {
         // A non-object entry has no keyid to resolve; route it through the same missing-keyid
         // refusal `TrustRoot.resolve` gives for an absent `keyid`.
-        throw refusal("verify.keyid_untrusted", { keyid: describeUntrusted(null) });
+        throw refusal("verify.keyid_untrusted", {
+          keyid: describeUntrusted(null),
+        });
       }
       const { publicKeyRaw, identity } = trust.resolve(entry);
       const sig = entry.sig;
@@ -617,7 +606,9 @@ export function verifyCatalog(
   if (files.linksOut.size > 0) {
     // A signed catalog is one folder of files (18.181): bytes behind a link do not travel with it.
     return fail(
-      refusal("catalog.link_outside", { path: [...files.linksOut].sort(byteCompare)[0] }),
+      refusal("catalog.link_outside", {
+        path: [...files.linksOut].sort(byteCompare)[0],
+      }),
     );
   }
   const sigDenied = readPermissionError(sigPath);
@@ -664,7 +655,10 @@ export interface ReleaseSoftFail {
 
 /** A verified:false result's `reason` and `reason_keys`: the refusals' texts joined with "; " and their
  * keys in the same order (mirrors `commands._refused`). */
-function refused(...refusals: unknown[]): { reason: string; reason_keys: string[] } {
+function refused(...refusals: unknown[]): {
+  reason: string;
+  reason_keys: string[];
+} {
   return {
     reason: refusals.map((r) => (r instanceof Error ? r.message : String(r))).join("; "),
     reason_keys: refusals.flatMap((r) => (r instanceof VerifyRefusal ? [...r.keys] : [])),
@@ -678,7 +672,6 @@ function loadReleaseJson(
   isShape: (value: unknown) => boolean,
   unreadableKey: string,
   what: string,
-  keepNumberTokens = false,
 ): unknown {
   let raw: Buffer;
   try {
@@ -686,7 +679,7 @@ function loadReleaseJson(
   } catch {
     throw refusal(unreadableKey);
   }
-  const value = parseVerifyInput(raw, unreadableKey, what, keepNumberTokens);
+  const value = parseVerifyInput(raw, unreadableKey, what);
   if (!isShape(value)) {
     throw refusal(unreadableKey);
   }
@@ -705,7 +698,10 @@ export interface ReleaseBundleResult {
   readonly release: string;
   readonly verified: boolean;
   readonly manifest_digest: string;
-  readonly signers: ReadonlyArray<{ readonly profile: string | null; readonly identity: string }>;
+  readonly signers: ReadonlyArray<{
+    readonly profile: string | null;
+    readonly identity: string;
+  }>;
   readonly reason?: string;
   readonly reason_keys?: readonly string[];
 }
@@ -782,15 +778,13 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
   requireReleaseReadable(releasePath, manifestPath);
   let manifest: Record<string, unknown>;
   try {
-    // Number tokens kept: `manifestDigest` below canonicalizes `manifest`, which must refuse a
-    // non-canonical number token (`1.0`, `1e2`, `-0.0`) the way Python's and Java's decoders do,
-    // rather than have `JSON.parse` fold it to an ordinary number first.
+    // Number kinds kept by the reader: `manifestDigest` below canonicalizes `manifest`, which must
+    // refuse a float (`1.0`, `1e2`, `-0.0`) the way Python's and Java's decoders do.
     manifest = loadReleaseJson(
       manifestPath,
       isRecord,
       "verify.release_manifest_unreadable",
       "release manifest",
-      true,
     ) as Record<string, unknown>;
   } catch (exc) {
     return softFail(exc);
@@ -886,7 +880,12 @@ export function verifyRelease(releasePath: string, trust: TrustRoot): ReleaseRes
   }
 
   if (problems.length === 0) {
-    return { release: releasePath, verified: true, manifest_digest: manifestDigest, signers };
+    return {
+      release: releasePath,
+      verified: true,
+      manifest_digest: manifestDigest,
+      signers,
+    };
   }
   return {
     release: releasePath,

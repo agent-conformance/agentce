@@ -21,6 +21,7 @@ import {
 import { isAbsolute, posix, relative, sep } from "node:path";
 import { sha256Hex } from "./canonical";
 import { InputError, isPermissionError, readPermissionError, unreadableError } from "./errors";
+import { notValid } from "./json";
 import { underByIdentity } from "./report";
 import { joinPath } from "./util";
 import { parseUntrustedJson } from "./verify";
@@ -272,19 +273,17 @@ export function loadBundle(bundleDir: string): Bundle {
     // readers), not the lenient `parseJson`: strict UTF-8, no BOM, bounded nesting, well-formed
     // strings/keys -- the same guard Python's `load_bundle` already gets from
     // `parse_untrusted_json` and Java's `Bundle.load` now gets from `Verify.parseUntrustedJson`
-    // (18.65). `keepNumberTokens` so a float survives to `digest`'s lazy canonicalize check instead
-    // of being silently folded.
-    parsed = parseUntrustedJson(readConfined(bundleDir, "manifest.json", manifestPath), true);
+    // (18.65), under the JSON profile with a byte-order mark ignored (SPEC 8.7). Number kinds are
+    // kept, so a float survives to `digest`'s lazy canonicalize check instead of being folded.
+    parsed = parseUntrustedJson(readConfined(bundleDir, "manifest.json", manifestPath), "ignore");
   } catch (err) {
     if (err instanceof InputError) {
       throw err;
     }
-    // A fixed message, not the parser's own text: the three engines' JSON readers each produce
-    // different exception text for the same malformed input, which would make this refusal's
-    // cause diverge across engines for no reason a reader could use (F3, 18.65).
+    // The profile rule and line, the same in the three engines; never the parser's own text (F3, 18.65).
     throw new InputError(
       "input.bundle_manifest_invalid",
-      "manifest.json is not valid JSON.",
+      notValid("manifest.json", err),
       "regenerate the bundle so its manifest.json is well-formed.",
     );
   }

@@ -16,7 +16,7 @@ import Ajv2020 from "ajv/dist/2020";
 import anyOfDef from "ajv/dist/vocabularies/applicator/anyOf";
 import oneOfDef from "ajv/dist/vocabularies/applicator/oneOf";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
-import { MAX_INT_STR_DIGITS, jsonlLines, parseJson, parseReportJson } from "./json";
+import { jsonlLines, parseReportJson, readBundled } from "./json";
 import { dataFileProblem } from "./readiness";
 import { byteCompare, decodeUtf8Strict, joinPath } from "./util";
 
@@ -68,25 +68,11 @@ function schemaDir(): string {
   return resolve(__dirname, "..", "schema");
 }
 
-/** A digit run long enough to hold an over-limit integer literal; text without one needs no token scan. */
-const LONG_DIGIT_RUN = new RegExp(`[0-9]{${MAX_INT_STR_DIGITS + 1}}`);
-
-/**
- * `JSON.parse`, refusing an integer literal over 4300 digits as Python's `json.loads` and Java's
- * `Json.parse` do (item 18.71). The native parse keeps its own syntax messages and gives the value;
- * `parseJson` then adds only the digit check, and only when such a digit run exists.
- */
-function parseJsonText(text: string): unknown {
-  const value = JSON.parse(text);
-  if (LONG_DIGIT_RUN.test(text)) {
-    parseJson(text); // throws only for an integer literal past MAX_INT_STR_DIGITS once the native parse passed
-  }
-  return value;
-}
-
 function loadSchemaJson(name: string): Record<string, unknown> {
-  const text = readFileSync(joinPath(schemaDir(), `${name}.schema.json`), "utf-8");
-  return JSON.parse(text) as Record<string, unknown>;
+  return readBundled(readFileSync(joinPath(schemaDir(), `${name}.schema.json`))) as Record<
+    string,
+    unknown
+  >;
 }
 
 /** An `anyOf`/`oneOf` keyword that, when it fails, drops every error its branches recorded and
@@ -305,7 +291,7 @@ function readArtifactText(path: string): string | null {
 function recordedOutputs(outDir: string): Record<string, string> {
   try {
     const text = readArtifactText(joinPath(outDir, "manifest.json"));
-    const manifest = text === null ? null : parseJsonText(text);
+    const manifest = text === null ? null : parseReportJson(text);
     const outputs = isRecord(manifest) ? manifest.outputs : undefined;
     return isRecord(outputs) ? (outputs as Record<string, string>) : {};
   } catch {
@@ -380,7 +366,10 @@ function validateXmlEntities(text: string, filename: string): string[] {
 function validateXmlSingleRoot(text: string, filename: string): string[] {
   let parsed: unknown;
   try {
-    parsed = new XMLParser({ preserveOrder: false, ignoreAttributes: true }).parse(text);
+    parsed = new XMLParser({
+      preserveOrder: false,
+      ignoreAttributes: true,
+    }).parse(text);
   } catch {
     return []; // a parse failure here is XMLValidator.validate's job to report, not this check's
   }
@@ -412,7 +401,7 @@ function validateJsonl(text: string, filename: string): string[] {
   for (const [n, line] of jsonlLines(text)) {
     let value: unknown;
     try {
-      value = parseReportJson(line);
+      value = parseReportJson(line, n);
     } catch (exc) {
       problems.push(`${filename}: line ${n} is not valid JSON (${(exc as Error).message})`);
       continue;

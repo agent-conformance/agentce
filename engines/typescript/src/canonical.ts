@@ -17,7 +17,7 @@
 
 import { createHash } from "node:crypto";
 
-import { NonCanonicalNumber } from "./json";
+import { NonCanonicalNumber, renderNumber } from "./json";
 
 export class CanonicalizationError extends Error {
   readonly reason: string;
@@ -84,7 +84,7 @@ function serialise(value: unknown): string {
     return value ? "true" : "false";
   }
   if (value instanceof NonCanonicalNumber) {
-    throw new CanonicalizationError(value.reason, value.source);
+    throw new CanonicalizationError(value.reason, renderNumber(value));
   }
   if (typeof value === "number") {
     if (!Number.isSafeInteger(value)) {

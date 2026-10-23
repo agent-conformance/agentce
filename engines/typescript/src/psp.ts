@@ -17,6 +17,7 @@ import { DataFactory, Parser, Store, type Term } from "n3";
 import { pspTermsPath } from "./bundled";
 import { errorCause, errorFix } from "./errorCatalogue";
 import { InputError } from "./errors";
+import { readBundled } from "./json";
 import { byteCompare, formatTemplate } from "./util";
 
 const { namedNode } = DataFactory;
@@ -277,7 +278,7 @@ interface PspTerms {
   range_datatypes: string[];
   regex_meta: string;
 }
-const TERMS = JSON.parse(readFileSync(pspTermsPath(), "utf-8")) as PspTerms;
+const TERMS = readBundled(readFileSync(pspTermsPath())) as PspTerms;
 const ALLOWED = new Set(TERMS.allowed);
 const REGEX_META = new Set(TERMS.regex_meta);
 const RANGE_DATATYPES = new Set(TERMS.range_datatypes);

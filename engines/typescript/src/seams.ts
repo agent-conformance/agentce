@@ -11,6 +11,7 @@ import { CanonicalizationError, canonicalString } from "./canonical";
 import { InputError } from "./errors";
 import { ExitCode } from "./exitCodes";
 import { parseFailOn } from "./failOn";
+import { readBundled } from "./json";
 import { computeVectorFile } from "./numerics";
 import { OtelGenaiAdapterError, adapt as adaptOtelGenai } from "./otelGenai";
 import { catalogProvenanceDigest } from "./report";
@@ -28,7 +29,7 @@ export function main(argv: string[]): number {
       console.error("numerics: a case file path is required");
       return ExitCode.INPUT_ERROR;
     }
-    const data = JSON.parse(readFileSync(casefile, "utf-8"));
+    const data = readBundled(readFileSync(casefile));
     console.log(JSON.stringify(computeVectorFile(data)));
     return 0;
   }
@@ -57,7 +58,7 @@ export function main(argv: string[]): number {
       console.error("security-view: a fixture file path is required");
       return ExitCode.INPUT_ERROR;
     }
-    const data = JSON.parse(readFileSync(fixturePath, "utf-8"));
+    const data = readBundled(readFileSync(fixturePath));
     const activity = data.activity as Activity;
     const assertions = (data.assertions as unknown[]).map(assertionFromJson);
     console.log(JSON.stringify(computeSecurityView(activity, assertions)));
@@ -73,7 +74,7 @@ export function main(argv: string[]): number {
       console.error("auditor-view: a fixture file path is required");
       return ExitCode.INPUT_ERROR;
     }
-    const data = JSON.parse(readFileSync(fixturePath, "utf-8"));
+    const data = readBundled(readFileSync(fixturePath));
     const assertions = (data.assertions as unknown[]).map(assertionFromJson);
     console.log(canonicalString(computeAuditorView(assertions, data.deviations ?? null)));
     return 0;
@@ -89,7 +90,7 @@ export function main(argv: string[]): number {
       console.error("fail-on-check: a fixture file path is required");
       return ExitCode.INPUT_ERROR;
     }
-    const data = JSON.parse(readFileSync(fixturePath, "utf-8"));
+    const data = readBundled(readFileSync(fixturePath));
     const assertions = (data.assertions as unknown[]).map(assertionFromJson);
     for (const expression of data.expressions as string[]) {
       let line: Record<string, unknown>;
@@ -123,7 +124,7 @@ export function main(argv: string[]): number {
       return ExitCode.INPUT_ERROR;
     }
     const inputBytes = readFileSync(joinPath(dir, "input.json"));
-    const adaptArgs = JSON.parse(readFileSync(joinPath(dir, "adapt.json"), "utf-8"));
+    const adaptArgs = readBundled(readFileSync(joinPath(dir, "adapt.json")));
     try {
       const result = adaptOtelGenai(inputBytes, {
         subject: adaptArgs.subject,

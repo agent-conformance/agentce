@@ -11,6 +11,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import Ajv2019, { type ValidateFunction } from "ajv/dist/2019";
+import { readBundled } from "./json";
 
 let schemaCache: Record<string, unknown> | null = null;
 // `strict: false` and `logger: false` mirror the Python validator: unknown formats (e.g. date-time)
@@ -20,11 +21,9 @@ const validators = new Map<string, ValidateFunction>();
 
 function evidenceSchema(): Record<string, unknown> {
   if (schemaCache === null) {
-    const text = readFileSync(
-      join(__dirname, "..", "schema", "agentce-evidence.schema.json"),
-      "utf-8",
+    schemaCache = readBundled(
+      readFileSync(join(__dirname, "..", "schema", "agentce-evidence.schema.json")),
     );
-    schemaCache = JSON.parse(text);
   }
   return schemaCache as Record<string, unknown>;
 }
