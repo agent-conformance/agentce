@@ -430,26 +430,31 @@ class CliTest {
         Path out = dir.resolve("o");
         boolean defaultOutBefore = Files.exists(Path.of("out")); // the refusal must not create ./out
         JsonNode bare = assessQuickstart("--out");
-        assertRefusedNothingWritten(bare, "input.assess_flag_needs_value", "argument --out: expected one argument", out);
+        assertRefusedNothingWritten(bare, "input.assess_flag_needs_value", "flag '--out' needs a value.", out);
         assertEquals("pass --out <value>.", bare.get("error").get("fix").asText());
         assertRefusedNothingWritten(assessQuickstart("--report-language", "--out", out.toString()),
-                "input.assess_flag_needs_value", "argument --report-language: expected one argument", out);
+                "input.assess_flag_needs_value", "flag '--report-language' needs a value.", out);
         assertRefusedNothingWritten(assessQuickstart("--out", "--", "x"), "input.assess_flag_needs_value",
-                "argument --out: expected one argument", out);
+                "flag '--out' needs a value.", out);
         assertEquals(defaultOutBefore, Files.exists(Path.of("out")));
     }
 
     @Test
-    void assessReadsTheEqualsFormAndTheLastOfARepeatedValue(@TempDir Path dir) {
+    void assessReadsTheEqualsFormAndRefusesARepeatedValue(@TempDir Path dir) {
         Path a = dir.resolve("a");
         Path b = dir.resolve("b");
-        JsonNode env = runJson("assess",
+        JsonNode repeated = runJson("assess",
                 "--bundle=" + QUICKSTART.resolve("evidence"), "--profile=" + QUICKSTART.resolve("applicability.yaml"),
                 "--out=" + a, "--out", b.toString());
+        assertRefusedNothingWritten(repeated, "input.assess_unrecognized_flag", "flag '--out' was given more than once.", a);
+        assertFalse(Files.exists(b));
+        JsonNode env = runJson("assess",
+                "--bundle=" + QUICKSTART.resolve("evidence"), "--profile=" + QUICKSTART.resolve("applicability.yaml"),
+                "--out=" + b);
         assertEquals(0, env.get("exit_code").asInt(), env.toString());
         assertTrue(Files.isRegularFile(b.resolve("manifest.json")));
-        assertFalse(Files.exists(a));
-        JsonNode bad = assessQuickstart("--bundle", dir.resolve("nope").toString(), "--out", a.toString());
+        JsonNode bad = runJson("assess", "--bundle", dir.resolve("nope").toString(),
+                "--profile", QUICKSTART.resolve("applicability.yaml").toString(), "--out", a.toString());
         assertRefusedNothingWritten(bad, "input.bundle_not_a_directory", null, a);
         assertRefusedNothingWritten(assessQuickstart("--catalog-dir=" + dir.resolve("nope"), "--out", a.toString()),
                 "input.catalog_dir_not_a_directory", null, a);
@@ -541,10 +546,13 @@ class CliTest {
         assertRefusedNothingWritten(
                 runJson("assess", RECORDS.toString(), "--package-for-sharing", "--out", out.toString()),
                 "input.package_requires_bundle", null, out);
-        // `-1` and a token holding a space are positionals, so beside --bundle they are a records folder
+        // `-1` and a dash-led token holding a space are unknown flags (SPEC 8.5); after `--` they are a
+        // records folder, so beside --bundle they are ambiguous
         assertRefusedNothingWritten(assessQuickstart("-1", "--out", out.toString()),
-                "input.records_source_ambiguous", null, out);
+                "input.assess_unrecognized_flag", "unrecognized flag '-1'.", out);
         assertRefusedNothingWritten(assessQuickstart("--x y", "--out", out.toString()),
+                "input.assess_unrecognized_flag", "unrecognized flag '--x y'.", out);
+        assertRefusedNothingWritten(assessQuickstart("--out", out.toString(), "--", "-1"),
                 "input.records_source_ambiguous", null, out);
     }
 
@@ -570,7 +578,7 @@ class CliTest {
         JsonNode env = runAssess(auditorAssessArgs(out), "--deviations");
         assertEquals(3, env.get("exit_code").asInt());
         assertEquals("input.assess_flag_needs_value", env.get("error").get("message_key").asText());
-        assertEquals("argument --deviations: expected one argument", env.get("error").get("detail").asText());
+        assertEquals("flag '--deviations' needs a value.", env.get("error").get("detail").asText());
         assertFalse(Files.exists(out.resolve("assertions.json")));
     }
 
@@ -585,16 +593,16 @@ class CliTest {
     }
 
     @Test
-    void assessDeviationsLastWins(@TempDir Path dir) throws IOException {
+    void assessDeviationsGivenTwiceRefused(@TempDir Path dir) throws IOException {
         Path empty = dir.resolve("empty.yaml");
         Files.writeString(empty, "deviation_register_version: 1\ndeviations: []\n");
-        String emptyDigest = Report.digestBytes(Files.readAllBytes(empty));
         Path first = dir.resolve("first");
-        runAssess(auditorAssessArgs(first), "--deviations", AUDITOR_REGISTER.toString(), "--deviations", empty.toString());
-        assertEquals(emptyDigest, registerDigest(first));
-        assertEquals("non-conformant", outcomeOf(first, "AUV-01"));
+        JsonNode env = runAssess(
+                auditorAssessArgs(first), "--deviations", AUDITOR_REGISTER.toString(), "--deviations", empty.toString());
+        assertRefusedNothingWritten(env, "input.assess_unrecognized_flag",
+                "flag '--deviations' was given more than once.", first);
         Path second = dir.resolve("second");
-        runAssess(auditorAssessArgs(second), "--deviations", empty.toString(), "--deviations", AUDITOR_REGISTER.toString());
+        runAssess(auditorAssessArgs(second), "--deviations", AUDITOR_REGISTER.toString());
         assertEquals(AUDITOR_REGISTER_DIGEST, registerDigest(second));
         assertEquals("partial AUV-01", outcomeOf(second, "AUV-01"));
     }
@@ -616,7 +624,7 @@ class CliTest {
     private static void assertNeedsValue(JsonNode env, Path out, String flag, String fix) {
         assertEquals(3, env.get("exit_code").asInt());
         assertEquals("input.assess_flag_needs_value", env.get("error").get("message_key").asText());
-        assertEquals("argument " + flag + ": expected one argument", env.get("error").get("detail").asText());
+        assertEquals("flag '" + flag + "' needs a value.", env.get("error").get("detail").asText());
         assertEquals(fix, env.get("error").get("fix").asText());
         assertFalse(Files.exists(out.resolve("assertions.json")));
     }
@@ -683,19 +691,23 @@ class CliTest {
     }
 
     @Test
-    void assessFailOnEqualsFormAndLastWins(@TempDir Path dir) {
+    void assessFailOnEqualsFormAndGivenOnce(@TempDir Path dir) {
         // F7: --fail-on=<expression>, split at the first '=' only.
         Path f7 = dir.resolve("f7");
         assertFailOnRefused(runAssess(auditorAssessArgs(f7), "--fail-on=severity==\"critical\""), f7,
                 "--fail-on 'severity==\"critical\"' is not a valid expression: "
                         + "severity 'critical' is not one of: high, medium, low");
-        // F8/F8b: the last occurrence wins, whichever spelling it uses.
-        JsonNode env = runAssess(auditorAssessArgs(dir.resolve("f8")),
-                "--fail-on", "control==\"AUV-01\"", "--fail-on", "control==\"none\"");
-        assertEquals(0, env.get("exit_code").asInt());
-        assertEquals("control==\"none\"", env.get("fail_on").get("expression").asText());
-        env = runAssess(auditorAssessArgs(dir.resolve("f8b")),
-                "--fail-on=control==\"none\"", "--fail-on", "control==\"AUV-01\"");
+        // F8/F8b: a second occurrence is refused, whichever spelling it uses (SPEC 8.5).
+        for (String[] twice : new String[][] {
+                {"--fail-on", "control==\"AUV-01\"", "--fail-on", "control==\"none\""},
+                {"--fail-on=control==\"none\"", "--fail-on", "control==\"AUV-01\""}}) {
+            Path f8 = dir.resolve("f8");
+            JsonNode env = runAssess(auditorAssessArgs(f8), twice);
+            assertEquals(3, env.get("exit_code").asInt());
+            assertEquals("flag '--fail-on' was given more than once.", env.get("error").get("detail").asText());
+            assertFalse(Files.exists(f8.resolve("assertions.json")));
+        }
+        JsonNode env = runAssess(auditorAssessArgs(dir.resolve("f8b")), "--fail-on=control==\"AUV-01\"");
         assertEquals(1, env.get("exit_code").asInt());
         assertEquals(1, env.get("fail_on").get("matched").asInt());
         // R2: --fail-on= is an empty expression, not a missing value.
@@ -722,12 +734,14 @@ class CliTest {
         // M3: -x looks like an option.
         Path m3 = dir.resolve("m3");
         assertNeedsValue(runAssess(auditorAssessArgs(m3), "--fail-on", "-x"), m3, "--fail-on", fix);
-        // M7/M8/M9: a negative number (any Unicode decimal digit) or a token holding a space is a value.
+        // M7/M8/M9: a negative number or a token holding a space is no value either (SPEC 8.5); after
+        // `=` it is the value.
         List<String> values = List.of("-1", "-a b", "-١", "-.5");
         for (int i = 0; i < values.size(); i++) {
             String value = values.get(i);
             Path out = dir.resolve("value" + i);
-            assertFailOnRefused(runAssess(auditorAssessArgs(out), "--fail-on", value), out,
+            assertNeedsValue(runAssess(auditorAssessArgs(out), "--fail-on", value), out, "--fail-on", fix);
+            assertFailOnRefused(runAssess(auditorAssessArgs(out), "--fail-on=" + value), out,
                     "--fail-on " + Readiness.pyRepr(value)
                             + " is not a valid expression: unexpected character '-' at position 0");
         }
@@ -1738,7 +1752,7 @@ class CliTest {
             {"unrecognized argument 'extra'.", "--catalog", "x", "extra"},
             {"unrecognized flag '--'.", "--", "--catalog", "x"},
             {"flag '--signer-trust-root' needs a value.", "--catalog", "x", "--signer-trust-root"},
-            {"flag '--json' takes no value.", "--json=1", "--catalog", "x"},
+            {"flag '--debug' takes no value.", "--debug=1", "--catalog", "x"},
         };
         for (String[] c : cases) {
             String[] argv = new String[c.length];
@@ -2054,16 +2068,17 @@ class CliTest {
 
     @Test
     void scanTopLevelReadsTheTokensBeforeTheCommandAsPythonDoes() {
-        // 18.108: every branch of Python's _scan_top_level.
-        assertTrue(Cli.scanTopLevel(new String[] {}).help());
-        assertTrue(Cli.scanTopLevel(new String[] {"--no-such-flag", "-h"}).help());
-        assertTrue(Cli.scanTopLevel(new String[] {"-h", "-V"}).help());
-        assertTrue(Cli.scanTopLevel(new String[] {"--version"}).version());
-        Cli.TopLevel run = Cli.scanTopLevel(new String[] {"--json", "--debug", "version", "--quiet"});
+        // 18.108, 18.184w: every branch of Python's _scan_top_level and _parse.
+        assertEquals(null, Cli.scanTopLevel(new String[] {}));
+        assertEquals(null, Cli.scanTopLevel(new String[] {"--no-such-flag", "-h"}));
+        assertEquals(null, Cli.scanTopLevel(new String[] {"-h", "-V"}));
+        assertTrue(Cli.parse(new String[] {"--version"}).version());
+        Cli.Parsed run = Cli.parse(new String[] {"--json", "--debug", "version", "--quiet"});
         assertEquals("version", run.command());
-        assertArrayEquals(new String[] {"--quiet"}, run.rest());
-        assertEquals(Set.of("--json", "--debug"), run.globals());
-        assertEquals("version", Cli.scanTopLevel(new String[] {"--", "version"}).command());
+        assertEquals(Set.of("--quiet"), run.scan().flags);
+        assertEquals(List.of("--json", "--debug"), run.pre());
+        assertEquals("version", Cli.parse(new String[] {"--", "version"}).command());
+        assertEquals(null, Cli.parse(new String[] {"collect", "--nope"}).scan()); // not built here
         String[][] refusals = {
             {"'-V' takes no other arguments.", "-V", "extra"},
             {"'--version' takes no other arguments.", "--json", "--version"},
@@ -2074,13 +2089,17 @@ class CliTest {
             {"no command given.", "--json"},
             {"unrecognized command 'nope'.", "nope"},
             {"unrecognized command 'digest-tree'.", "digest-tree", "x"},
+            {"unrecognized command '-'.", "-"},
+            {"unrecognized command '--json'.", "--", "--json"},
+            {"flag '--json' was given more than once.", "--json", "--json", "version"},
         };
         for (String[] row : refusals) {
             String[] argv = Arrays.copyOfRange(row, 1, row.length);
-            InputError exc = org.junit.jupiter.api.Assertions.assertThrows(
-                    InputError.class, () -> Cli.scanTopLevel(argv), String.join(" ", argv));
-            assertEquals("input.unknown_command", exc.key);
-            assertEquals(row[0], exc.reason);
+            Cli.ArgvError exc = org.junit.jupiter.api.Assertions.assertThrows(
+                    Cli.ArgvError.class, () -> Cli.parse(argv), String.join(" ", argv));
+            assertEquals("agentce", exc.command);
+            assertEquals("input.unknown_command", exc.error.key);
+            assertEquals(row[0], exc.error.reason);
         }
     }
 
@@ -2135,21 +2154,22 @@ class CliTest {
         assertKey("input.bundle_missing", runJson("validate", "--bundle"));
         assertKey("input.bundle_not_a_directory", runJson("validate", "--bundle="));
         assertKey("input.bundle_not_a_directory", runJson("validate", "--bundle", ""));
-        assertKey("input.bundle_not_a_directory", runJson("validate", "--bundle", bundle, "--bundle", "nope"));
+        assertKey("input.validate_unrecognized_flag", runJson("validate", "--bundle", bundle, "--bundle", "nope"));
         assertKey("input.out_dir_unwritable", runJson("validate", "--bundle", bundle, "--out="));
         assertKey("input.out_dir_unwritable", runJson("validate", "--bundle", bundle, "--out", ""));
-        // the = form is read, and the last --bundle wins
-        JsonNode env = runJson("validate", "--bundle", "nope", "--bundle=" + bundle, "--out=" + out);
+        // the = form is read
+        JsonNode env = runJson("validate", "--bundle=" + bundle, "--out=" + out);
         assertEquals(1, env.get("exit_code").asInt());
         assertTrue(Files.isRegularFile(out.resolve("quarantine.jsonl")));
     }
 
     @Test
-    void diffReadsIntermixedPositionalsTheLastFormatAndTheSeparator(@TempDir Path dir) {
+    void diffReadsIntermixedPositionalsOneFormatAndTheSeparator(@TempDir Path dir) {
         Path a = diffFixture(dir, "a.json", "[{\"control\":\"C-01\",\"subject\":\"s1\",\"outcome\":\"non-conformant\"}]");
         Path b = diffFixture(dir, "b.json", "[{\"control\":\"C-01\",\"subject\":\"s1\",\"outcome\":\"conformant\"}]");
         String md = captureStdout("diff", a.toString(), "--format", "md", b.toString());
-        assertEquals(md, captureStdout("diff", a.toString(), b.toString(), "--format", "json", "--format=md"));
+        assertEquals(md, captureStdout("diff", a.toString(), b.toString(), "--format=md"));
+        assertKey("input.diff_unrecognized_flag", runJson("diff", a.toString(), b.toString(), "--format", "json", "--format=md"));
         assertTrue(md.startsWith("## What changed"), md);
         assertEquals(1, runJsonEnvelope("diff", "--", a.toString(), b.toString()).get("exit_code").asInt());
         assertKey("input.report_b_not_a_file", runJsonEnvelope("diff", a.toString(), "--", "-h"));
@@ -2180,12 +2200,13 @@ class CliTest {
         String corpus = REPO.resolve("verification/gates/fixtures/cli_options/conformance/corpus").toString();
         assertKey("input.conformance_action", runJson("conformance"));
         assertKey("input.conformance_action", runJson("conformance", "nope"));
-        assertKey("input.conformance_action", runJson("conformance", "--he", "nope"));
+        assertKey("input.conformance_unrecognized_flag", runJson("conformance", "--he", "nope"));
         assertKey("input.conformance_action", runJsonEnvelope("conformance", "--", "run"));
         assertKey("input.conformance_unrecognized_flag", runJson("conformance", "--he", "run", "--no-such"));
         assertKey("input.conformance_unrecognized_flag", runJson("conformance", "run", "run"));
         assertKey("input.conformance_unrecognized_flag", runJson("conformance", "run", "-hx"));
-        assertKey("input.engine_missing", runJson("conformance", "run", "--he", "--engine"));
+        assertKey("input.conformance_unrecognized_flag", runJson("conformance", "run", "--he", "--engine"));
+        assertKey("input.engine_missing", runJson("conformance", "run", "--engine", "--he"));
         assertKey("input.engine_missing", runJson("conformance", "run", "--adapters", "/nonexistent"));
         assertKey("input.corpus_missing", runJson("conformance", "run", "--engine", engine, "--corpus"));
         assertKey("input.conformance_unrecognized_flag",
@@ -2193,7 +2214,7 @@ class CliTest {
         assertKey("input.conformance_unrecognized_flag",
                 runJson("conformance", "run", "--engine", engine, "--corpus", corpus, "--out"));
         assertKey("input.engine_not_a_directory", runJson("conformance", "run", "--engine=", "--corpus", corpus));
-        assertKey("input.engine_not_a_directory",
+        assertKey("input.conformance_unrecognized_flag",
                 runJson("conformance", "run", "--engine", engine, "--corpus", corpus, "--engine=nope"));
         assertKey("input.corpus_not_a_directory", runJson("conformance", "run", "--engine", engine, "--corpus="));
         for (String adapters : new String[] {"/nonexistent", ""}) {

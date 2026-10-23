@@ -2,223 +2,164 @@ package org.agentce;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/** Every branch of {@link Argv#scan}, against a small grammar and against assess's own, each answer
- * checked against what Python's argparse gives the same argv (18.109). */
+/** {@link Argv#scan} under the vendored SPEC 8.5 grammar (18.184w), against readiness's and assess's
+ * own tables: each answer is the one Python's {@code agentce.argv.scan} gives the same argv. The case
+ * table ({@link ArgvCasesTest}) runs every rule through the CLI; these pin the scanner's own reads. */
 class ArgvTest {
-    private static final Argv.Grammar G = grammar();
+    private static final Argv.Command READINESS = Argv.command("readiness");
+    private static final String KEY = "input.readiness_unrecognized_flag";
+    private static final String FLAG_FIX =
+            "pass --gaps, --deviations, --catalog-dir, --trust-root or --allow-unverified-catalog, or drop the flag.";
+    private static final String EXTRA_FIX = "pass exactly one report directory: `agentce readiness <report-dir>`.";
 
-    private static Argv.Grammar grammar() {
-        Map<String, Argv.Kind> options = new LinkedHashMap<>();
-        options.put("-h", Argv.Kind.HELP);
-        options.put("--help", Argv.Kind.HELP);
-        options.put("--json", Argv.Kind.FLAG);
-        options.put("--out", Argv.Kind.VALUE);
-        options.put("--emit", Argv.Kind.VALUE);
-        options.put("--dir", Argv.Kind.APPEND);
-        return new Argv.Grammar(
-                options, 1, "input.t_unrecognized_flag", "input.t_flag_needs_value", "FLAG-FIX", "EXTRA-FIX",
-                Map.of("--emit", "<formats>"));
-    }
-
-    private static Argv.Result scan(String... argv) {
-        return Argv.scan(argv, G);
-    }
-
-    private static InputError refused(String... argv) {
-        return assertThrows(InputError.class, () -> scan(argv));
+    private static Argv.Scan scan(String... argv) {
+        return Argv.scan(READINESS, List.of(argv));
     }
 
     private static void assertRefused(String key, String cause, String fix, String... argv) {
-        InputError err = refused(argv);
-        assertEquals(key, err.key, String.join(" ", argv));
-        assertEquals(cause, err.reason, String.join(" ", argv));
-        assertEquals(fix, err.fix, String.join(" ", argv));
+        InputError err = assertThrows(InputError.class, () -> scan(argv), String.join(" ", argv));
+        assertEquals(List.of(key, cause, fix), List.of(err.key, err.reason, err.fix), String.join(" ", argv));
     }
 
     private static void assertUnknownFlag(String token, String... argv) {
-        assertRefused("input.t_unrecognized_flag", "unrecognized flag '" + token + "'.", "FLAG-FIX", argv);
+        assertRefused(KEY, "unrecognized flag '" + token + "'.", FLAG_FIX, argv);
     }
 
-    private static void assertNeedsValue(String flag, String hint, String... argv) {
-        assertRefused("input.t_flag_needs_value", "argument " + flag + ": expected one argument",
-                "pass " + flag + " " + hint + ".", argv);
+    private static void assertNeedsValue(String flag, String... argv) {
+        assertRefused(KEY, "flag '" + flag + "' needs a value.", "pass " + flag + " <path>.", argv);
+    }
+
+    @Test
+    void theTableIsTheVendoredGrammar() {
+        assertEquals(List.of("python", "typescript", "java"), READINESS.implementedIn());
+        assertEquals(List.of("python"), Argv.command("collect").implementedIn());
+        assertEquals(1, READINESS.level().maxPositionals());
+        assertNull(Argv.command("diff").level().maxPositionals());
+        assertTrue(READINESS.level().options().get("--catalog-dir").repeatable());
+        assertTrue(READINESS.level().options().containsKey("--json")); // the globals join every level
+        assertFalse(Argv.isCommand("read"));
     }
 
     @Test
     void anEmptyArgvReadsNothing() {
-        Argv.Result r = scan();
-        assertFalse(r.help());
-        assertEquals(Map.of(), r.values());
-        assertEquals(List.of(), r.positionals());
-        assertEquals(List.of(), r.list("--dir"));
+        Argv.Scan r = scan();
+        assertFalse(r.help);
+        assertEquals(Map.of(), r.values);
+        assertEquals(List.of(), r.positionals);
+        assertEquals(List.of(), r.list("--catalog-dir"));
         assertFalse(r.flag("--json"));
     }
 
     @Test
-    void aShortClusterIsRefusedFirstAnywhereBeforeTheSeparator() {
-        assertUnknownFlag("-hx", "-hx");
-        assertUnknownFlag("-hx", "-h", "-hx"); // before -h is reached
-        assertUnknownFlag("-hx", "--zz", "--out", "-1", "-hx"); // before the deferred --zz
-        assertUnknownFlag("-h=x", "-h=x");
-        assertUnknownFlag("-x y", "-x y");
-        assertUnknownFlag("-hx", "--out", "o", "--out=-hx", "-hx");
-        // after `--` it is a positional; as an option's value it is the value
-        assertEquals(List.of("-hx"), scan("--", "-hx").positionals());
-        // a negative number is no cluster
-        assertEquals(List.of("-12"), scan("-12").positionals());
-    }
-
-    @Test
-    void theClusterPreScanStopsWhereAValueIsMissingSoTheMissingValueIsNamedFirst() {
-        assertNeedsValue("--out", "<value>", "--out", "-hx");
-        assertNeedsValue("--out", "<value>", "--out", "-xy");
-    }
-
-    @Test
-    void aKnownNameIsAnOptionAndItsValueIsTheNextToken() {
-        Argv.Result r = scan("--out", "o", "--json", "--dir", "a");
-        assertEquals("o", r.value("--out"));
+    void aValueIsTheNextTokenOrTheWholeEqualsRest() {
+        Argv.Scan r = scan("r", "--gaps", "g", "--deviations=a b=c", "--json", "--trust-root=-1", "--catalog-dir=");
+        assertEquals(Map.of("--gaps", "g", "--deviations", "a b=c", "--trust-root", "-1"), r.values);
+        assertEquals(Map.of("--catalog-dir", List.of("")), r.lists);
+        assertEquals(List.of("r"), r.positionals);
         assertTrue(r.flag("--json"));
-        assertEquals(List.of("a"), r.list("--dir"));
     }
 
     @Test
-    void theEqualsFormGivesAValueToEveryValueOption() {
-        Argv.Result r = scan("--out=o", "--emit=", "--dir=a=b");
-        assertEquals("o", r.value("--out"));
-        assertEquals("", r.value("--emit"));
-        assertEquals(List.of("a=b"), r.list("--dir"));
-        assertEquals("-1", scan("--out=-1").value("--out"));
+    void aDashLedNextTokenIsNeverAValue() {
+        assertNeedsValue("--gaps", "--gaps", "-1");
+        assertNeedsValue("--gaps", "--gaps", "-");
+        assertNeedsValue("--gaps", "--gaps", "-x y");
+        assertNeedsValue("--gaps", "--gaps", "--");
+        assertNeedsValue("--gaps", "--gaps");
+        assertNeedsValue("--gaps", "--gaps", "--trust-root", "x");
     }
 
     @Test
-    void aValueOptionTakesADashTokenThatIsNotOptionLike() {
-        assertEquals("-", scan("--out", "-").value("--out"));
-        assertEquals("-1", scan("--out", "-1").value("--out"));
-        assertEquals("-.5", scan("--out", "-.5").value("--out"));
-        assertEquals("--x y", scan("--out", "--x y").value("--out"));
-        assertEquals("-x y", scan("--out", "-x y").value("--out"));
+    void helpInAValueSlotIsNoHelp() {
+        assertNeedsValue("--gaps", "--gaps", "--help");
+        assertNeedsValue("--gaps", "--gaps", "-h");
+        // a later help still wins
+        assertTrue(scan("--gaps", "-h", "--help").help);
     }
 
     @Test
-    void theLastValueWinsAndAnAppendKeepsEveryValueInOrder() {
-        Argv.Result r = scan("--out", "a", "--out=b", "--dir", "x", "--dir=y", "--dir", "z");
-        assertEquals("b", r.value("--out"));
-        assertEquals(List.of("x", "y", "z"), r.list("--dir"));
+    void helpWinsOverEveryRefusal() {
+        assertTrue(scan("-h").help);
+        assertTrue(scan("a", "b", "--help").help);
+        assertTrue(scan("--zz", "-h").help);
+        assertTrue(scan("--gaps", "a", "--gaps", "b", "-h").help);
+        assertTrue(scan("-h", "--json=1").help);
+        Argv.Scan r = scan("--", "-h");
+        assertFalse(r.help);
+        assertEquals(List.of("-h"), r.positionals);
     }
 
     @Test
-    void aMissingValueAtTheEndIsRefusedAtOnce() {
-        assertNeedsValue("--out", "<value>", "--out");
-        assertNeedsValue("--emit", "<formats>", "--emit");
-        assertNeedsValue("--dir", "<value>", "--dir");
+    void aSingleValuedOptionGivenTwiceIsRefusedARepeatableOneKeepsOrder() {
+        assertRefused(KEY, "flag '--gaps' was given more than once.", "give --gaps once.", "--gaps", "a", "--gaps=a");
+        assertRefused(KEY, "flag '--json' was given more than once.", "give --json once.", "--json", "--json");
+        assertEquals(List.of("b", "a"), scan("--catalog-dir", "b", "--catalog-dir=a").list("--catalog-dir"));
     }
 
     @Test
-    void aMissingValueBeforeAnOptionIsRefusedAtOnce() {
-        assertNeedsValue("--out", "<value>", "--out", "--json");
-        assertNeedsValue("--out", "<value>", "--out", "-h");
-        assertNeedsValue("--out", "<value>", "--out", "--zz");
-        assertNeedsValue("--out", "<value>", "--out", "--emit=md");
-        assertNeedsValue("--out", "<value>", "--out", "-h y"); // a short option with text joined to it
-        // at once: before a deferred unknown flag and before a later -h
-        assertNeedsValue("--out", "<value>", "--zz", "--out", "--json", "-h");
-    }
-
-    @Test
-    void aMissingValueBeforeTheSeparatorIsRefusedAtOnce() {
-        assertNeedsValue("--out", "<value>", "--out", "--", "o");
-    }
-
-    @Test
-    void helpReturnsAtOnceWhereverItSitsBeforeTheSeparator() {
-        assertTrue(scan("-h").help());
-        assertTrue(scan("--help").help());
-        assertTrue(scan("--out", "o", "-h", "--zz").help());
-        assertTrue(scan("--zz", "a", "b", "--help").help()); // deferred refusals never fire
-        assertTrue(scan("-h", "--json=1").help()); // nothing after help is read
-        // after `--`, -h is a positional
-        Argv.Result r = scan("--", "-h");
-        assertFalse(r.help());
-        assertEquals(List.of("-h"), r.positionals());
-    }
-
-    @Test
-    void aFlagWithAValueIsRefusedAtOnce() {
-        assertRefused("input.t_unrecognized_flag", "flag '--json' takes no value.", "drop the value: --json.",
-                "--json=1");
-        assertRefused("input.t_unrecognized_flag", "flag '--json' takes no value.", "drop the value: --json.",
-                "--zz", "--json=");
-    }
-
-    @Test
-    void helpWithAValueIsRefusedInArgparsesWords() {
-        assertRefused("input.t_unrecognized_flag", "argument -h/--help: ignored explicit argument 'x'.",
-                "FLAG-FIX", "--help=x");
-        assertRefused("input.t_unrecognized_flag", "argument -h/--help: ignored explicit argument ''.",
-                "FLAG-FIX", "--zz", "--help=");
-    }
-
-    @Test
-    void aDashANegativeNumberOrATokenWithASpaceIsPositional() {
-        assertEquals(List.of("-"), scan("-").positionals());
-        assertEquals(List.of("-1"), scan("-1").positionals());
-        assertEquals(List.of("-1.5"), scan("-1.5").positionals());
-        assertEquals(List.of("--x y"), scan("--x y").positionals());
-        assertEquals(List.of("--x=a b"), scan("--x=a b").positionals());
-        assertEquals(List.of("plain"), scan("plain").positionals());
-    }
-
-    @Test
-    void anUnknownFlagIsDeferredAndTheFirstIsRefusedAfterTheScan() {
-        assertUnknownFlag("--zz", "--zz", "--yy");
-        assertUnknownFlag("--zz", "--zz", "a", "b");
-        assertUnknownFlag("--zz=1", "--zz=1");
-        assertUnknownFlag("--ou", "--ou", "o"); // no abbreviation
-        assertUnknownFlag("-x", "-x");
-    }
-
-    @Test
-    void anExtraPositionalIsDeferredAndRefusedInArgvOrder() {
-        assertRefused("input.t_unrecognized_flag", "unrecognized argument 'b'.", "EXTRA-FIX", "a", "b", "--zz");
-        assertRefused("input.t_unrecognized_flag", "unrecognized argument 'b'.", "EXTRA-FIX", "a", "--", "b");
-        // a dash-led extra is worded as a flag, as argparse's leftovers are
-        assertUnknownFlag("-2", "-1", "-2");
-        assertUnknownFlag("--out", "--", "a", "--out", "o");
-    }
-
-    @Test
-    void theSeparatorMakesEveryLaterTokenPositional() {
-        Argv.Result r = scan("--out", "o", "--", "--");
-        assertEquals("o", r.value("--out"));
-        assertEquals(List.of("--"), r.positionals());
-        assertRefused("input.t_unrecognized_flag", "unrecognized argument 'a'.", "EXTRA-FIX", "--", "--", "a");
-    }
-
-    @Test
-    void assessGrammarDeclaresEveryOptionInItsUsage() {
-        Map<String, Argv.Kind> options = Cli.ASSESS_GRAMMAR.options();
-        for (String name : options.keySet()) {
-            assertTrue(Cli.ASSESS_USAGE.contains("[" + name) || Cli.ASSESS_USAGE.contains(", " + name), name);
-        }
-        assertEquals(20, options.size());
-        assertEquals(Argv.Kind.APPEND, options.get("--catalog-dir"));
-        assertEquals(Argv.Kind.FLAG, options.get("--package-for-sharing"));
-        assertEquals(Argv.Kind.VALUE, options.get("--report-language"));
-        assertFalse(options.containsKey("--manual"));
-        assertFalse(options.containsKey("--probes"));
-        assertEquals(1, Cli.ASSESS_GRAMMAR.maxPositionals());
+    void aGlobalGivenBeforeTheCommandWordCountsAsGiven() {
         InputError err = assertThrows(InputError.class,
-                () -> Argv.scan(new String[] {"--emit"}, Cli.ASSESS_GRAMMAR));
-        assertEquals("input.assess_flag_needs_value", err.key);
-        assertEquals("pass --emit <formats>.", err.fix);
+                () -> Argv.scan(READINESS, List.of("r", "--json"), List.of("--json"), null, null));
+        assertEquals("flag '--json' was given more than once.", err.reason);
+        assertTrue(Argv.scan(READINESS, List.of("r", "--debug"), List.of("--json"), null, null).flag("--debug"));
+    }
+
+    @Test
+    void aFlagWithAValueIsRefused() {
+        assertRefused(KEY, "flag '--allow-unverified-catalog' takes no value.",
+                "drop the value: --allow-unverified-catalog.", "--allow-unverified-catalog=yes");
+        assertRefused(KEY, "flag '-h' takes no value.", "drop the value: -h.", "-h=x");
+        assertRefused(KEY, "flag '--help' takes no value.", "drop the value: --help.", "--help=");
+    }
+
+    @Test
+    void everyDashTokenThatIsNotASpellingIsAnUnknownFlag() {
+        assertUnknownFlag("--GAPS", "--GAPS", "x");
+        assertUnknownFlag("--gap", "--gap", "x");
+        assertUnknownFlag("-jq", "-jq");
+        assertUnknownFlag("-1", "-1");
+        assertUnknownFlag("-1.5", "-1.5");
+        assertUnknownFlag("-", "-");
+        assertUnknownFlag("-x y", "-x y");
+        assertUnknownFlag("--gaps＝x", "--gaps＝x");
+    }
+
+    @Test
+    void theFirstRefusalInArgvOrderWins() {
+        assertUnknownFlag("--zz", "--zz", "--gaps");
+        assertNeedsValue("--gaps", "--gaps", "--zz");
+        assertRefused(KEY, "unrecognized argument 'b'.", EXTRA_FIX, "a", "b", "--zz");
+    }
+
+    @Test
+    void theSeparatorEndsTheOptions() {
+        Argv.Scan r = scan("--gaps", "g", "--", "--json");
+        assertEquals("g", r.value("--gaps"));
+        assertEquals(List.of("--json"), r.positionals);
+        assertFalse(r.flag("--json"));
+        assertRefused(KEY, "unrecognized flag '--'.", FLAG_FIX, "r", "--");
+        assertRefused(KEY, "unrecognized flag '--'.", FLAG_FIX, "--");
+        assertRefused(KEY, "unrecognized argument 'b'.", EXTRA_FIX, "a", "--", "b");
+        // a level that takes no positional refuses `--` itself
+        InputError err = assertThrows(
+                InputError.class, () -> Argv.scan(Argv.command("quickstart"), List.of("--", "x")));
+        assertEquals("unrecognized flag '--'.", err.reason);
+    }
+
+    @Test
+    void assessHasItsOwnNeedsValueKeyAndHints() {
+        InputError err = assertThrows(InputError.class, () -> Argv.scan(Argv.command("assess"), List.of("--emit")));
+        assertEquals(List.of("input.assess_flag_needs_value", "flag '--emit' needs a value.", "pass --emit <formats>."),
+                List.of(err.key, err.reason, err.fix));
+        assertEquals("nope", Argv.scan(Argv.command("assess"), List.of("--emit", "nope")).value("--emit"));
+        assertEquals(List.of("f"), Argv.scan(Argv.command("assess"), List.of("f", "--json")).positionals);
     }
 }

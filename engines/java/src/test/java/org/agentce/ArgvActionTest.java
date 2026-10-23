@@ -9,39 +9,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** The action level of {@link Argv#scan} (argparse's subparsers, 18.111), each answer checked against
- * what Python's argparse gives the same argv, and the adapters run {@code conformance run --adapters}
+/** The action level of {@link Argv#scan} (SPEC 8.5, conformance's {@code run}), each answer the one
+ * Python's {@code agentce.argv.scan} gives the same argv, and the adapters run {@code conformance run --adapters}
  * folds into the implementation report. */
 class ArgvActionTest {
-    private static Map<String, Argv.Kind> options(String... values) {
-        Map<String, Argv.Kind> options = new LinkedHashMap<>();
-        options.put("-h", Argv.Kind.HELP);
-        options.put("--help", Argv.Kind.HELP);
-        options.put("--json", Argv.Kind.FLAG);
-        for (String value : values) {
-            options.put(value, Argv.Kind.VALUE);
-        }
-        return options;
-    }
+    private static final String KEY = "input.conformance_unrecognized_flag";
+    private static final String FLAG_FIX =
+            "run `agentce conformance run --help` for the flags conformance run takes, or drop the flag.";
+    private static final String ACTION = "the only conformance action is `run`.";
 
-    private static final Argv.Grammar RUN = new Argv.Grammar(
-            options("--engine", "--out"), 0, "input.run_flag", "input.run_flag", "RUN-FIX", "RUN-EXTRA", Map.of(),
-            Map.of("--engine", "input.engine_missing"), Map.of(), false, null);
-
-    private static final Argv.Grammar CMD = new Argv.Grammar(
-            options(), 0, "input.cmd_flag", "input.cmd_flag", "CMD-FIX", "CMD-EXTRA", Map.of(), Map.of(), Map.of(),
-            false,
-            new Argv.Action(Map.of("run", RUN),
-                    () -> new InputError("input.cmd_action", "the only action is `run`.", "ACTION-FIX")));
-
-    private static Argv.Result scan(String... argv) {
-        return Argv.scan(argv, CMD);
+    private static Argv.Scan scan(String... argv) {
+        return Argv.scan(Argv.command("conformance"), List.of(argv), List.of(), null, Cli::conformanceActionError);
     }
 
     private static void assertRefused(String key, String cause, String... argv) {
@@ -51,85 +34,57 @@ class ArgvActionTest {
     }
 
     @Test
-    void theNamedActionsRestIsScannedByItsGrammar() {
-        Argv.Result r = scan("--json", "run", "--engine=e", "--out", "o", "--engine", "f");
-        assertFalse(r.help());
-        assertEquals("run", r.action());
-        assertEquals("f", r.value("--engine")); // last wins
-        assertEquals("o", r.value("--out"));
+    void theNamedActionsRestIsScannedByItsLevel() {
+        Argv.Scan r = scan("--json", "run", "--engine", "e", "--out=o");
+        assertFalse(r.help);
+        assertEquals("run", r.action);
+        assertEquals(Map.of("--engine", "e", "--out", "o"), r.values);
         assertTrue(r.flag("--json")); // the command level's flag is kept
-        assertNull(scan().action());
-        assertNull(scan("--json").action());
+        assertNull(scan().action);
+        assertNull(scan("--json").action);
     }
 
     @Test
-    void anUnknownActionIsRefusedAtOnceBeforeAnEarlierUnknownFlag() {
-        assertRefused("input.cmd_action", "the only action is `run`.", "nope");
-        assertRefused("input.cmd_action", "the only action is `run`.", "--he", "nope");
-        // an unknown flag takes no value, so the next token is the action
-        assertRefused("input.cmd_action", "the only action is `run`.", "--engine", "x", "run");
-        // `--` stands where the action goes, and is no action
-        assertRefused("input.cmd_action", "the only action is `run`.", "--", "run");
-        assertRefused("input.cmd_action", "the only action is `run`.", "-", "run");
+    void anOptionIsGivenOnceAcrossBothLevels() {
+        assertRefused(KEY, "flag '--engine' was given more than once.", "run", "--engine", "e", "--engine", "f");
+        assertRefused(KEY, "flag '--json' was given more than once.", "--json", "run", "--json");
     }
 
     @Test
-    void helpBeforeTheActionNamesTheCommandsUsageAndAfterItTheActions() {
-        Argv.Result before = scan("-h", "run");
-        assertTrue(before.help());
-        assertNull(before.action());
-        assertNull(scan("--help").action());
-        Argv.Result after = scan("run", "--no-such", "--help");
-        assertTrue(after.help());
-        assertEquals("run", after.action());
-        // HELP wins over an unknown flag at the command level too
-        Argv.Result both = scan("--he", "run", "-h");
-        assertTrue(both.help());
-        assertEquals("run", both.action());
-        // a value on HELP is refused at once
-        assertRefused("input.cmd_flag", "argument -h/--help: ignored explicit argument 'x'.", "--help=x", "run");
+    void anUnknownActionIsRefusedInArgvOrder() {
+        assertRefused("input.conformance_action", ACTION, "nope");
+        assertRefused("input.conformance_action", ACTION, "--", "run");
+        // an earlier refusal comes first
+        assertRefused(KEY, "unrecognized flag '--he'.", "--he", "nope");
+        assertRefused(KEY, "unrecognized flag '-'.", "-", "run");
+        assertRefused(KEY, "unrecognized flag '-hx'.", "-hx", "run");
+        // the command level has no --engine: it is unknown there
+        assertRefused(KEY, "unrecognized flag '--engine'.", "--engine", "x", "run");
     }
 
     @Test
-    void theCommandLevelsUnknownFlagIsRefusedBeforeTheActions() {
-        assertRefused("input.cmd_flag", "unrecognized flag '--he'.", "--he", "run", "--no-such");
-        assertRefused("input.run_flag", "unrecognized flag '--no-such'.", "run", "--no-such");
-        assertRefused("input.run_flag", "unrecognized argument 'run'.", "run", "run");
-        assertRefused("input.run_flag", "unrecognized flag '--'.", "run", "--engine", "x", "--", "y");
-        // a missing value in the action is refused at once, before the command level's unknown flag
-        assertRefused("input.engine_missing", "flag '--engine' needs a value.", "--he", "run", "--engine");
+    void helpNamesTheLevelItWasFirstGivenAt() {
+        Argv.Scan before = scan("-h", "run");
+        assertTrue(before.help);
+        assertNull(before.action);
+        Argv.Scan after = scan("--he", "run", "-h");
+        assertTrue(after.help);
+        assertEquals("run", after.action);
+        assertNull(scan("--help", "run", "--help").action);
+        assertRefused(KEY, "flag '--help' takes no value.", "--help=x", "run");
     }
 
     @Test
-    void theClusterPreScanStopsAtTheActionAndTheActionHasItsOwn() {
-        assertRefused("input.cmd_flag", "unrecognized flag '-hx'.", "-hx", "run");
-        assertRefused("input.cmd_flag", "unrecognized flag '-hx'.", "--he", "-hx", "nope");
-        // past the action the command's pre-scan stops, so the action's names the cluster with its key
-        assertRefused("input.run_flag", "unrecognized flag '-hx'.", "run", "-hx");
-        // and an unknown action is still refused first when the cluster comes after it
-        assertRefused("input.cmd_action", "the only action is `run`.", "nope", "-hx");
-    }
-
-    @Test
-    void aGrammarWithNoActionScansAsBefore() {
-        Argv.Grammar plain = new Argv.Grammar(
-                options("--out"), 1, "input.p_flag", "input.p_flag", "P-FIX", "P-EXTRA", Map.of());
-        Argv.Result r = Argv.scan(new String[] {"a", "--out", "o"}, plain);
-        assertNull(r.action());
-        assertEquals(List.of("a"), r.positionals());
-        assertEquals("o", r.value("--out"));
-        // `--` makes the rest positional, a second positional is an extra, -h returns with no action
-        assertEquals(List.of("-h"), Argv.scan(new String[] {"--", "-h"}, plain).positionals());
-        InputError extra = assertThrows(InputError.class, () -> Argv.scan(new String[] {"a", "b"}, plain));
-        assertEquals("unrecognized argument 'b'.", extra.reason);
-        // the cluster pre-scan does not stop at a positional
-        InputError cluster = assertThrows(InputError.class, () -> Argv.scan(new String[] {"a", "-hx"}, plain));
-        assertEquals("unrecognized flag '-hx'.", cluster.reason);
-        Argv.Result help = Argv.scan(new String[] {"a", "--no-such", "-h"}, plain);
-        assertTrue(help.help());
-        assertNull(help.action());
-        // assess's own grammar still reads its folder
-        assertEquals(List.of("f"), Argv.scan(new String[] {"f", "--json"}, Cli.ASSESS_GRAMMAR).positionals());
+    void theActionLevelRefusesItsOwnTokens() {
+        assertRefused(KEY, "unrecognized flag '--no-such'.", "run", "--no-such");
+        assertRefused(KEY, "unrecognized argument 'run'.", "run", "run");
+        assertRefused(KEY, "unrecognized flag '--'.", "run", "--engine", "x", "--", "y");
+        assertRefused(KEY, "unrecognized flag '-hx'.", "run", "-hx");
+        // --engine and --corpus keep their own needs-value keys
+        assertRefused("input.engine_missing", "flag '--engine' needs a value.", "run", "--engine");
+        assertRefused("input.corpus_missing", "flag '--corpus' needs a value.", "run", "--corpus", "--out", "o");
+        assertRefused(KEY, "flag '--out' needs a value.", "run", "--out");
+        assertEquals(FLAG_FIX, assertThrows(InputError.class, () -> scan("--zz")).fix);
     }
 
     // --- conformance run --adapters: the adapters' own orchestrator, folded into the report ---

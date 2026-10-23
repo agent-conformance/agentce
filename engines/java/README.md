@@ -31,8 +31,8 @@ build/install/agentce/bin/agentce conformance run --engine . --corpus ../../corp
 `--adapters <dir>` also runs adapter conformance (SPEC §11.5, §12.3) as the Python engine does. It runs
 the directory's own `conformance.py` through `uv run` and writes the result into the report under
 `adapter_conformance`, with the claim under `adapters`. The run exits 1 unless that claim is `full`.
-`conformance`, `validate`, `diff` and `version` read their command lines through the same declared
-grammar as `assess` (below), so `-h` prints the Python engine's usage and an unknown flag, an extra
+`conformance`, `validate`, `diff` and `version` read their command lines through the same grammar
+scanner as `assess` (below), so `-h` prints the Python engine's usage and an unknown flag, an extra
 argument or an empty value exits 3 with a key.
 
 ## Assess a bundle, or try the bundled quickstart project
@@ -46,10 +46,12 @@ build/install/agentce/bin/agentce quickstart --json
 build/install/agentce/bin/agentce report --from ./out/assertions.json --format md
 ```
 
-`assess` reads its command line through one declared grammar (`Argv.java`, SPEC §8.5) the way the
-Python engine's argparse does: `--<option>=<value>` works for every value option, the last of a repeated
-option wins, `-h`/`--help` prints the usage wherever it sits before `--`, and an unknown flag exits 3
-with `input.assess_unrecognized_flag`. `--report-language de|en` sets the report language (SPEC §9.3).
+One scanner (`Argv.java`, SPEC §8.5) reads every command line. It follows the vendored grammar table
+`src/main/resources/cli/argv-grammar.json`, the same table the Python and TypeScript engines read.
+`--<option>=<value>` works for every value option, and a value in the next token never starts with `-`.
+The scanner refuses an option given twice unless the table marks it repeatable. `-h`/`--help` prints the
+usage wherever it sits before `--`. An unknown flag exits 3 with the command's key
+(`input.assess_unrecognized_flag` for `assess`). `--report-language de|en` sets the report language (SPEC §9.3).
 Until they are ported, `--package-for-sharing` is refused with `input.package_unsupported` and a
 records folder (`agentce assess <folder>`) with `input.records_unsupported`; pass `--bundle` and
 `--profile`, or use the Python engine.

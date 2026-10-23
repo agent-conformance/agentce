@@ -43,8 +43,8 @@ final class Fixtures {
         return coverage;
     }
 
-    /** Runs the real CLI dispatcher ({@link Cli#run}) with {@code --json} appended, captures
-     * stdout, and parses the envelope -- asserting the process exit code matches the envelope's own
+    /** Runs the real CLI dispatcher ({@link Cli#run}) with {@code --json} given before the command word
+     * (so a {@code --} in {@code args} leaves it an option, SPEC 8.5), captures stdout, and parses the envelope -- asserting the process exit code matches the envelope's own
      * {@code exit_code}. */
     static JsonNode runJson(String... args) {
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
@@ -53,8 +53,8 @@ final class Fixtures {
         int exit;
         try {
             String[] withJson = new String[args.length + 1];
-            System.arraycopy(args, 0, withJson, 0, args.length);
-            withJson[args.length] = "--json";
+            withJson[0] = "--json";
+            System.arraycopy(args, 0, withJson, 1, args.length);
             exit = Cli.run(withJson);
         } finally {
             System.setOut(original);

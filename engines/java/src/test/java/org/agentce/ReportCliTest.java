@@ -9,17 +9,28 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/** report's command line (18.110): the grammar additions {@link Argv.Choices} and the per-option
- * needs-value key, read through {@link Cli#REPORT_GRAMMAR}, each answer the one Python's report parser
- * gives the same argv; and {@link Report#renderPublicStatement} against Python's {@code
- * render_public_statement} over the same assertions (expected strings captured from Python once). */
+/** report's command line (18.110, 18.184w): its choices and per-option needs-value keys, read through
+ * the SPEC 8.5 scanner by {@link Cli#parse}, each answer the one Python's report parser gives the same
+ * argv; and {@link Report#renderPublicStatement} against Python's {@code render_public_statement} over
+ * the same assertions (expected strings captured from Python once). */
 class ReportCliTest {
-    private static Argv.Result scan(String... argv) {
-        return Argv.scan(argv, Cli.REPORT_GRAMMAR);
+    private static Cli.Parsed parse(String... argv) {
+        String[] line = new String[argv.length + 1];
+        line[0] = "report";
+        System.arraycopy(argv, 0, line, 1, argv.length);
+        return Cli.parse(line);
+    }
+
+    private static Argv.Scan scan(String... argv) {
+        return parse(argv).scan();
+    }
+
+    private static boolean help(String... argv) {
+        return Cli.REPORT_USAGE.equals(parse(argv).usage());
     }
 
     private static void assertRefused(String key, String cause, String fix, String... argv) {
-        InputError err = assertThrows(InputError.class, () -> scan(argv), String.join(" ", argv));
+        InputError err = assertThrows(Cli.ArgvError.class, () -> parse(argv), String.join(" ", argv)).error;
         assertEquals(key, err.key, String.join(" ", argv));
         assertEquals(cause, err.reason, String.join(" ", argv));
         assertEquals(fix, err.fix, String.join(" ", argv));
@@ -35,22 +46,25 @@ class ReportCliTest {
         assertRefused("input.report_format", "unknown report format ''.", FORMAT_FIX, "--format=");
         assertRefused("input.report_role", "unknown evidence-pack role 'nope'.", ROLE_FIX, "--role=nope");
         assertRefused("input.report_role", "unknown evidence-pack role ''.", ROLE_FIX, "--role", "");
-        // Read in argv order: before a later unknown flag, a later missing value, and a later -h.
+        // Read in argv order: before a later unknown flag and a later missing value.
         assertRefused("input.report_format", "unknown report format 'nope'.", FORMAT_FIX,
                 "--format", "nope", "--no-such-flag");
         assertRefused("input.report_role", "unknown evidence-pack role 'x'.", ROLE_FIX, "--role", "x", "--from");
-        assertRefused("input.report_format", "unknown report format 'nope'.", FORMAT_FIX, "--format", "nope", "-h");
-        // A choice given after help is never read.
-        assertTrue(scan("-h", "--format", "nope").help());
+        // Help wins over every refusal, wherever it sits (SPEC 8.5).
+        assertTrue(help("--format", "nope", "-h"));
+        assertTrue(help("-h", "--format", "nope"));
     }
 
     @Test
-    void aChoiceInsideItsValuesIsReadAndTheLastOneWins() {
-        Argv.Result r = scan("--format", "md", "--format=public", "--role", "deployer");
+    void aChoiceInsideItsValuesIsReadAndAChoiceIsGivenOnce() {
+        Argv.Scan r = scan("--format=public", "--role", "deployer");
         assertEquals("public", r.value("--format"));
         assertEquals("deployer", r.value("--role"));
-        assertRefused("input.report_role", "unknown evidence-pack role 'nope'.", ROLE_FIX,
-                "--role", "provider", "--role", "nope");
+        assertRefused("input.report_unrecognized_flag", "flag '--format' was given more than once.",
+                "give --format once.", "--format", "md", "--format=public");
+        // the repeat is refused before the second value is read
+        assertRefused("input.report_unrecognized_flag", "flag '--role' was given more than once.",
+                "give --role once.", "--role", "provider", "--role", "nope");
     }
 
     @Test
@@ -67,7 +81,7 @@ class ReportCliTest {
                     "pass " + flag + " <value>.", flag);
         }
         assertRefused("input.report_unrecognized_flag", "unrecognized flag '--form'.", FLAG_FIX, "--form", "md");
-        // With no positional to take it, `--` is itself left over, as argparse leaves it.
+        // A level that takes no positional refuses `--` itself.
         assertRefused("input.report_unrecognized_flag", "unrecognized flag '--'.", FLAG_FIX, "--from", "a", "--", "-h");
         assertRefused("input.report_unrecognized_flag", "unrecognized argument 'extra'.",
                 "pass the input with its flag: `agentce report --from <file>` or `--validate <dir>`.", "extra");
@@ -75,10 +89,11 @@ class ReportCliTest {
 
     @Test
     void assessKeepsItsGrammarWithNoChoicesAndOneNeedsValueKey() {
-        InputError err = assertThrows(InputError.class, () -> Argv.scan(new String[] {"--emit"}, Cli.ASSESS_GRAMMAR));
+        InputError err = assertThrows(
+                Cli.ArgvError.class, () -> Cli.parse(new String[] {"assess", "--emit"})).error;
         assertEquals("input.assess_flag_needs_value", err.key);
-        assertEquals("argument --emit: expected one argument", err.reason);
-        assertEquals("nope", Argv.scan(new String[] {"--emit", "nope"}, Cli.ASSESS_GRAMMAR).value("--emit"));
+        assertEquals("flag '--emit' needs a value.", err.reason);
+        assertEquals("nope", Cli.parse(new String[] {"assess", "--emit", "nope"}).scan().value("--emit"));
     }
 
     private static final String W = "\"window\":{\"start\":\"2026-05-01T00:00:00Z\",\"end\":\"2026-08-29T00:00:00Z\"},";
@@ -154,9 +169,9 @@ This statement reports conformance to the named catalog as evaluated by the Agen
 
     @Test
     void theGrammarTakesNoPositionalAndItsUsageIsPythons() {
-        assertEquals(0, Cli.REPORT_GRAMMAR.maxPositionals());
+        assertEquals(0, Argv.command("report").level().maxPositionals());
         assertTrue(Cli.REPORT_USAGE.startsWith(
                 "usage: agentce report [-h] [--json] [--debug] [--quiet] [--from FILE]\n"));
-        assertTrue(scan("--from", "a.json", "--help").help());
+        assertTrue(help("--from", "a.json", "--help"));
     }
 }

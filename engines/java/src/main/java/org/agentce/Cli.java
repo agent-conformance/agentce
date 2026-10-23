@@ -14,7 +14,6 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -24,6 +23,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.TreeSet;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -43,10 +44,6 @@ public final class Cli {
     /** The evidence-pack role variants {@code report --role} takes (SPEC §9.4). */
     private static final List<String> REPORT_ROLES = List.of("provider", "deployer");
     private static final Set<String> VERDICT_OUTCOMES = Set.of("conformant", "non-conformant", "insufficient_evidence");
-    /** The same four flags Python's own top-level parser accepts for every command ({@code
-     * --debug}/{@code --quiet} are silently ignored here too, exactly as they are everywhere else in
-     * both engines today). */
-    private static final Set<String> GLOBAL_BOOLEAN_FLAGS = Set.of("--json", "--debug", "--quiet");
 
     public static void main(String[] args) {
         System.exit(run(args));
@@ -88,143 +85,247 @@ global options:
   --quiet        log warnings and errors only
 """;
 
-    /** The commands Python's parser takes; the ones this engine has not built answer cli.not_implemented. */
-    private static final Set<String> COMMANDS = Set.of(
-            "validate", "verify", "assess", "report", "collect", "ingest", "catalog", "conformance",
-            "diff", "sign", "readiness", "doctor", "quickstart", "init", "config", "version");
-
     private static final String TOP_FIX =
             "name a command: `agentce <command>`; run `agentce --help` for the commands agentce takes.";
     private static final String TOP_FLAG_FIX =
             "run `agentce --help` for the commands and global flags agentce takes.";
+    private static final String TOP_COMMAND_FIX = "run `agentce --help` for the commands agentce takes.";
+    private static final List<String> GLOBAL_FLAGS = List.of("--json", "--debug", "--quiet");
 
-    /** What the tokens before the command ask for: {@code command == null} with {@code help} or
-     * {@code version}, or a command to run with its own arguments and the global flags seen before it. */
-    record TopLevel(boolean help, boolean version, String command, String[] rest, Set<String> globals) {}
+    /** A refusal of the command line (SPEC 8.5), carrying the command whose envelope reports it ({@code
+     * agentce} before a command is read). */
+    static final class ArgvError extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        final String command;
+        final InputError error;
 
-    private static InputError topRefusal(String cause, String fix) {
-        return new InputError("input.unknown_command", cause, fix);
+        ArgvError(String command, InputError error) {
+            super(error.getMessage());
+            this.command = command;
+            this.error = error;
+        }
     }
 
-    /** The tokens before the command, read as Python's {@code _scan_top_level} reads them (18.108): a
-     * short cluster or a value on a flag that takes none is refused at once; -h/--help win when reached;
-     * -V/--version answer only a line of their own; --json/--debug/--quiet are recorded; any other flag
-     * is refused once the scan ends; {@code --} makes the next token the command. Every refusal is
-     * input.unknown_command. */
-    static TopLevel scanTopLevel(String[] argv) {
-        Set<String> globals = new LinkedHashSet<>();
+    private static ArgvError topRefusal(String cause, String fix) {
+        return new ArgvError("agentce", new InputError("input.unknown_command", cause, fix));
+    }
+
+    /** What a command line asks for: a usage to print, the version line, or a command with the global
+     * flags given before it and its scan ({@code null} for a command this engine has not built). */
+    record Parsed(String usage, boolean version, String command, List<String> pre, Argv.Scan scan) {}
+
+    /** Python's {@code _scan_top_level}: the tokens before the command; {@code null} when the line asks
+     * for the usage, otherwise the line without a {@code --} that may come before the command. A short
+     * cluster, a value on a flag that takes none, an unknown flag before the command, -V/--version with
+     * anything else on the line, a {@code --} with nothing after it, and global flags with no command are
+     * refused, each as input.unknown_command; -h/--help win when reached. */
+    static List<String> scanTopLevel(String[] argv) {
+        List<String> args = new ArrayList<>(Arrays.asList(argv));
         String unknown = null;
-        for (int i = 0; i < argv.length; i++) {
-            String token = argv[i];
-            if (token.equals("--") || !token.startsWith("-") || token.equals("-")) {
-                int at = token.equals("--") ? i + 1 : i;
-                if (at == argv.length) {
+        boolean hasCommand = false;
+        for (int i = 0; i < args.size(); i++) {
+            String token = args.get(i);
+            if (token.equals("--")) {
+                if (i + 1 == args.size()) {
                     throw topRefusal("no command given after '--'.", TOP_FIX);
                 }
-                if (unknown != null) {
-                    break;
+                if (args.get(i + 1).startsWith("-")) {
+                    // No command starts with a dash.
+                    throw topRefusal("unrecognized command '" + args.get(i + 1) + "'.", TOP_COMMAND_FIX);
                 }
-                String command = argv[at];
-                if (!COMMANDS.contains(command)) {
-                    throw topRefusal("unrecognized command '" + command + "'.",
-                            "run `agentce --help` for the commands agentce takes.");
-                }
-                return new TopLevel(false, false, command,
-                        Arrays.copyOfRange(argv, at + 1, argv.length), globals);
+                hasCommand = true;
+                args.remove(i);
+                break;
+            }
+            if (!token.startsWith("-") || token.equals("-")) {
+                hasCommand = true;
+                break;
             }
             String name = token.split("=", 2)[0];
             if (!token.startsWith("--") && token.length() > 2) {
                 throw topRefusal("unrecognized flag '" + token + "'.", TOP_FLAG_FIX);
             }
-            boolean help = name.equals("-h") || name.equals("--help");
+            boolean help = Argv.HELP.contains(name);
             boolean version = name.equals("-V") || name.equals("--version");
-            boolean known = help || version || GLOBAL_BOOLEAN_FLAGS.contains(name);
+            boolean known = help || version || GLOBAL_FLAGS.contains(name);
             if (known && token.contains("=")) {
                 throw topRefusal("flag '" + name + "' takes no value.", "drop the value: " + name + ".");
             }
             if (help) {
-                return new TopLevel(true, false, null, null, globals);
+                return null;
             }
             if (version) {
-                if (argv.length != 1) {
+                if (args.size() != 1) {
                     throw topRefusal("'" + name + "' takes no other arguments.",
                             "run `agentce --version` alone, or `agentce version --json` for the JSON envelope.");
                 }
-                return new TopLevel(false, true, null, null, globals);
+                return args;
             }
-            if (known) {
-                globals.add(name);
-            } else if (unknown == null) {
+            if (!known && unknown == null) {
                 unknown = token;
             }
         }
         if (unknown != null) {
             throw topRefusal("unrecognized flag '" + unknown + "'.", TOP_FLAG_FIX);
         }
-        if (argv.length > 0) {
+        if (!hasCommand && !args.isEmpty()) {
             throw topRefusal("no command given.", TOP_FIX);
         }
-        return new TopLevel(true, false, null, null, globals);
+        return args.isEmpty() ? null : args;
+    }
+
+    /** Whether {@code flag} is given before any {@code --}: a refusal is the JSON envelope when {@code
+     * --json} is (SPEC 8.5). */
+    static boolean givenBeforeDoubleDash(String[] args, String flag) {
+        for (String token : args) {
+            if (token.equals("--")) {
+                return false;
+            }
+            if (token.equals(flag)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** A value outside an option's {@code choices}, by command and option: the command's own keyed error
+     * (Python's {@code _CHOICE_ERRORS}). */
+    private static final Map<String, Map<String, Function<String, InputError>>> CHOICE_ERRORS = Map.of(
+            "report", Map.of("--format", Cli::reportFormatError, "--role", Cli::reportRoleError));
+
+    /** The error for an action a command does not have (Python's {@code _ACTION_ERRORS}, the commands this
+     * engine builds). */
+    private static final Map<String, Supplier<InputError>> ACTION_ERRORS =
+            Map.of("conformance", Cli::conformanceActionError);
+
+    /** Python's {@code _usage_error}: argparse's own sentence, under the command's unrecognized key. */
+    private static InputError usageError(String name, String message) {
+        Argv.Command command = Argv.command(name);
+        return new InputError(command.unrecognizedKey(), message + ".", command.flagFix());
+    }
+
+    /** Python's {@code _parse}: read the line under the SPEC 8.5 grammar. Throws {@link ArgvError}. */
+    static Parsed parse(String[] args) {
+        List<String> line = scanTopLevel(args);
+        if (line == null) {
+            return new Parsed(TOP_USAGE, false, null, List.of(), null);
+        }
+        if (line.get(0).equals("-V") || line.get(0).equals("--version")) {
+            return new Parsed(null, true, null, List.of(), null);
+        }
+        int at = 0;
+        while (line.get(at).startsWith("-") && !line.get(at).equals("-")) {
+            at++;
+        }
+        List<String> pre = line.subList(0, at);
+        String name = line.get(at);
+        for (int i = 0; i < pre.size(); i++) {
+            String flag = pre.get(i);
+            if (pre.subList(0, i).contains(flag)) {
+                throw topRefusal("flag '" + flag + "' was given more than once.", "give " + flag + " once.");
+            }
+        }
+        if (!Argv.isCommand(name)) {
+            throw topRefusal("unrecognized command '" + name + "'.", TOP_COMMAND_FIX);
+        }
+        Argv.Command command = Argv.command(name);
+        if (!command.implementedIn().contains("java")) {
+            return new Parsed(null, false, name, List.copyOf(pre), null);
+        }
+        Map<String, Function<String, InputError>> choices = CHOICE_ERRORS.getOrDefault(name, Map.of());
+        Argv.ChoiceError choiceError = (option, value) -> {
+            if (choices.containsKey(option)) {
+                return choices.get(option).apply(value);
+            }
+            String allowed = command.level().options().get(option).choices().stream()
+                    .map(Readiness::pyRepr)
+                    .collect(Collectors.joining(", "));
+            return usageError(name, "argument " + option + ": invalid choice: " + Readiness.pyRepr(value)
+                    + " (choose from " + allowed + ")");
+        };
+        Argv.Scan scan;
+        try {
+            scan = Argv.scan(command, line.subList(at + 1, line.size()), pre, choiceError, ACTION_ERRORS.get(name));
+        } catch (InputError err) {
+            throw new ArgvError(name, err);
+        }
+        if (scan.help) {
+            return new Parsed(usage(name, scan.action), false, name, List.copyOf(pre), null);
+        }
+        return new Parsed(null, false, name, List.copyOf(pre), scan);
+    }
+
+    /** The usage of {@code command} (of its {@code action} when one was read), as Python prints it. */
+    private static String usage(String command, String action) {
+        return switch (command) {
+            case "validate" -> VALIDATE_USAGE;
+            case "verify" -> VERIFY_USAGE;
+            case "assess" -> ASSESS_USAGE;
+            case "report" -> REPORT_USAGE;
+            case "conformance" -> action == null ? CONFORMANCE_USAGE : CONFORMANCE_RUN_USAGE;
+            case "diff" -> DIFF_USAGE;
+            case "sign" -> SIGN_USAGE;
+            case "readiness" -> READINESS_USAGE;
+            case "quickstart" -> QUICKSTART_USAGE;
+            case "version" -> VERSION_USAGE;
+            default -> throw new IllegalStateException("no usage for " + command);
+        };
     }
 
     static int run(String[] rawArgs) {
-        TopLevel top;
+        Parsed parsed;
         try {
-            top = scanTopLevel(rawArgs);
-        } catch (InputError exc) {
-            CommandResult refused = errorResult("agentce", exc);
-            emit(refused, Arrays.asList(rawArgs).contains("--json"));
+            parsed = parse(rawArgs);
+        } catch (ArgvError exc) {
+            CommandResult refused = errorResult(exc.command, exc.error);
+            emit(refused, givenBeforeDoubleDash(rawArgs, "--json"));
             return refused.exitCode();
         }
-        if (top.help()) {
-            // UTF-8 bytes whatever the platform encoding: the usage holds an em dash.
-            byte[] usage = TOP_USAGE.getBytes(StandardCharsets.UTF_8);
+        if (parsed.usage() != null) {
+            // UTF-8 bytes whatever the platform encoding: the top-level usage holds an em dash.
+            byte[] usage = parsed.usage().getBytes(StandardCharsets.UTF_8);
             System.out.write(usage, 0, usage.length);
             System.out.flush();
             return 0;
         }
-        if (top.version()) {
+        if (parsed.version()) {
             System.out.println("agentce " + Version.ENGINE_VERSION);
             return 0;
         }
-        String command = top.command();
-        String[] args = Stream.concat(Stream.of(command), Arrays.stream(top.rest())).toArray(String[]::new);
-
-        boolean json = top.globals().contains("--json") || Arrays.asList(args).contains("--json");
-        boolean debug = top.globals().contains("--debug") || Arrays.asList(args).contains("--debug");
-        String commandName = command;
+        String command = parsed.command();
+        Argv.Scan scan = parsed.scan();
+        boolean json = scan == null
+                ? givenBeforeDoubleDash(rawArgs, "--json")
+                : parsed.pre().contains("--json") || scan.flag("--json");
+        boolean debug = scan == null
+                ? givenBeforeDoubleDash(rawArgs, "--debug")
+                : parsed.pre().contains("--debug") || scan.flag("--debug");
         if (debug) {
-            logDebug(commandName, "command.start", null);
+            logDebug(command, "command.start", null);
         }
         CommandResult result;
         boolean failed = false;
         try {
-            if ("conformance".equals(command)) {
-                result = cmdConformance(args);
-            } else if ("validate".equals(command)) {
-                result = cmdValidate(args);
-            } else if ("assess".equals(command)) {
-                result = cmdAssess(args);
-            } else if ("report".equals(command)) {
-                result = cmdReport(args);
-            } else if ("diff".equals(command)) {
-                result = cmdDiff(args, json);
-            } else if ("readiness".equals(command)) {
-                result = cmdReadiness(args);
-            } else if ("sign".equals(command)) {
-                result = cmdSign(args);
-            } else if ("verify".equals(command)) {
-                result = cmdVerify(args);
-            } else if ("quickstart".equals(command)) {
-                result = cmdQuickstart(args);
-            } else if ("version".equals(command)) {
-                result = cmdVersion(args);
+            if (scan == null) {
+                result = notImplemented(command);
             } else {
-                result = notImplemented(commandName);
+                result = switch (command) {
+                    case "conformance" -> cmdConformance(scan);
+                    case "validate" -> cmdValidate(scan);
+                    case "assess" -> cmdAssess(scan);
+                    case "report" -> cmdReport(scan);
+                    case "diff" -> cmdDiff(scan, json);
+                    case "readiness" -> cmdReadiness(scan);
+                    case "sign" -> cmdSign(scan);
+                    case "verify" -> cmdVerify(scan);
+                    case "quickstart" -> cmdQuickstart(scan);
+                    case "version" -> cmdVersion();
+                    default -> notImplemented(command);
+                };
             }
         } catch (AgentceError exc) {
             failed = true;
-            result = errorResult(commandName, exc);
+            result = errorResult(command, exc);
         } catch (RuntimeException exc) {
             failed = true;
             if (debug) {
@@ -241,15 +342,15 @@ global options:
             // shape (a real, pre-existing, engine-wide difference this does not close).
             String message = exc.getMessage() != null ? exc.getMessage() : exc.getClass().getName();
             result = errorResult(
-                    commandName,
+                    command,
                     new AgentceError(
                             "internal.unexpected",
                             message,
                             "re-run with --debug to see the stack trace, then file an issue for an AgentCE maintainer to investigate."));
         }
         emit(result, json);
-        if (debug && !failed && result.usage == null) {
-            logDebug(commandName, "command.end", result.exitCode());
+        if (debug && !failed) {
+            logDebug(command, "command.end", result.exitCode());
         }
         return result.exitCode();
     }
@@ -266,9 +367,7 @@ global options:
     }
 
     private static void emit(CommandResult result, boolean json) {
-        if (result.usage != null) {
-            System.out.print(result.usage);
-        } else if (json) {
+        if (json) {
             System.out.println(Json.pretty(result.envelope()));
         } else {
             for (String line : result.humanLines) {
@@ -283,93 +382,57 @@ global options:
         return value == null || value.isEmpty() ? null : value;
     }
 
-    private static final List<String> VERIFY_TARGETS = List.of("bundle", "catalog", "release", "report");
+    /** Python's {@code COLUMNS=80 agentce verify --help}, word for word. */
+    static final String VERIFY_USAGE = """
+usage: agentce verify [-h] [--json] [--debug] [--quiet] [--bundle BUNDLE]
+                      [--catalog CATALOG] [--release RELEASE]
+                      [--report REPORT]
+                      [--signer-trust-root SIGNER_TRUST_ROOT]
+                      [--expect-keyid EXPECT_KEYID]
 
-    private record VerifyArgs(Map<String, List<String>> targets, String signerTrustRoot, String expectKeyid) {}
+Integrity or signature verification. `--report <dir>` re-runs a shareable
+report bundle (`assess --package-for-sharing`) offline through nine stages, in
+order, each with its own message key: (1) the claim exists and is signed
+(verify.report_no_claim, verify.report_claim_malformed,
+verify.report_unsigned); (2) the trust root resolves
+(verify.report_no_trust_root, input.trust_root_invalid,
+verify.report_keyid_mismatch); (3) a claimant signature verifies
+(verify.report_signature_invalid); (4) the signed subjects match what's on
+disk (verify.report_subject_missing, verify.report_manifest_tampered,
+verify.report_claim_tampered); (5) the engine build matches
+(verify.report_engine_mismatch); (6) every manifest-tracked output's digest
+matches (verify.report_output_tampered); (7) the packaged evidence, profile,
+domain binding, and catalogs match (verify.report_evidence_tampered); (8) an
+offline re-run reproduces every canonical output byte for byte
+(verify.report_reproduction_mismatch); (9) success (`reproduced: true`).
 
-    private static InputError verifyUnrecognized(String detail, String fix) {
-        return new InputError("input.verify_unrecognized_flag", detail, fix);
-    }
+options:
+  -h, --help            show this help message and exit
+  --bundle BUNDLE       verify an evidence bundle's integrity
+  --catalog CATALOG     verify a catalog's signatures
+  --release RELEASE     verify a release artifact's signatures
+  --report REPORT       re-run a shareable report bundle (assess --package-
+                        for-sharing) offline and check it reproduces byte for
+                        byte, refusing any tampering
+  --signer-trust-root SIGNER_TRUST_ROOT
+                        verify --report's signature against this trust root
+                        file, instead of an embedded trust-root.json inside
+                        the report directory
+  --expect-keyid EXPECT_KEYID
+                        verify --report: refuse unless the claim signature's
+                        keyid matches this value
 
-    /** {@code agentce verify}'s args, read the way Python's {@code verify} subparser (argparse,
-     * {@code allow_abbrev=False}) reads them, so a command line gets one answer from all three engines
-     * (18.65 round 3): the four target flags take one value each and are collected so {@link
-     * #verifyTarget} can refuse a repeat; {@code --signer-trust-root}/{@code --expect-keyid} take one
-     * value (the last one wins); {@code --json}/{@code --debug}/{@code --quiet} take none; a value is
-     * the next token or the {@code =}-joined rest. A flag missing its value or given one it takes none
-     * of refuses at once, as argparse does mid-parse; any other token (an unknown or abbreviated flag,
-     * {@code --}, a positional) refuses after the scan, naming the first one, as argparse reports what
-     * it left unparsed. */
-    private static VerifyArgs parseVerifyArgs(String[] args) {
-        Map<String, List<String>> targets = new LinkedHashMap<>();
-        for (String target : VERIFY_TARGETS) {
-            targets.put(target, new ArrayList<>());
-        }
-        String signerTrustRoot = null;
-        String expectKeyid = null;
-        String unknown = null;
-        for (int i = 1; i < args.length; i++) {
-            String token = args[i];
-            if (!looksLikeOption(token) || token.equals("--")) {
-                unknown = unknown == null ? token : unknown;
-                continue;
-            }
-            int eq = token.indexOf('=');
-            String name = eq >= 0 ? token.substring(0, eq) : token;
-            if (GLOBAL_BOOLEAN_FLAGS.contains(name)) {
-                if (eq >= 0) {
-                    throw verifyUnrecognized("flag '" + name + "' takes no value.", "drop the value: " + name + ".");
-                }
-                continue;
-            }
-            String flag = name.startsWith("--") ? name.substring(2) : "";
-            boolean isTarget = VERIFY_TARGETS.contains(flag);
-            if (!isTarget && !flag.equals("signer-trust-root") && !flag.equals("expect-keyid")) {
-                unknown = unknown == null ? token : unknown;
-                continue;
-            }
-            String value;
-            if (eq >= 0) {
-                value = token.substring(eq + 1);
-            } else {
-                if (i + 1 >= args.length || looksLikeOption(args[i + 1])) {
-                    throw verifyUnrecognized("flag '" + name + "' needs a value.", "pass " + name + " <value>.");
-                }
-                value = args[++i];
-            }
-            if (isTarget) {
-                targets.get(flag).add(value);
-            } else if (flag.equals("signer-trust-root")) {
-                signerTrustRoot = value;
-            } else {
-                expectKeyid = value;
-            }
-        }
-        if (unknown != null) {
-            if (unknown.startsWith("-") && !unknown.equals("-")) {
-                throw verifyUnrecognized(
-                        "unrecognized flag '" + unknown + "'.",
-                        "pass --bundle, --catalog, --release, or --report (with --signer-trust-root or "
-                                + "--expect-keyid for --report), or drop the flag.");
-            }
-            throw verifyUnrecognized(
-                    "unrecognized argument '" + unknown + "'.",
-                    "pass the target with its flag, e.g. `agentce verify --bundle <dir>`.");
-        }
-        return new VerifyArgs(targets, signerTrustRoot, expectKeyid);
-    }
+global options:
+  --json                emit machine-readable JSON on stdout
+  --debug               verbose logs on stderr and a stack trace on unexpected
+                        errors
+  --quiet               log warnings and errors only
+""";
 
-    /** One target flag's value: refuses a repeated {@code --name} (Python's {@code _verify_target_flag}
-     * too, verifier round 2, 18.65) and normalizes an empty value to {@code null} (F4, 18.65). */
-    private static String verifyTarget(VerifyArgs parsed, String name) {
-        List<String> values = parsed.targets().get(name);
-        if (values.size() > 1) {
-            throw new InputError(
-                    "input.verify_target",
-                    "--" + name + " was given more than once.",
-                    "pass --" + name + " <path> once.");
-        }
-        return emptyToNull(values.isEmpty() ? null : values.get(0));
+    /** One target flag's value, an empty value normalized to {@code null} (F4, 18.65): the scanner
+     * already refused a repeated target (SPEC 8.5). */
+    private static String verifyTarget(Argv.Scan parsed, String name) {
+        return emptyToNull(parsed.value("--" + name));
     }
 
     /** The digest assess records for an input it already read and parsed (deviation register, profile,
@@ -794,37 +857,6 @@ global options:
                         + "catalog's controls apply to.");
     }
 
-    /** A grammar of one of the small commands (validate, diff, version, conformance and its run): -h/--help,
-     * the three global flags, then {@code valueOptions}; a missing value is {@code flag '--x' needs a
-     * value.} with the command's unrecognized-flag key unless {@code needsValueKeys} names the option. */
-    private static Argv.Grammar utilityGrammar(
-            String command,
-            List<String> valueOptions,
-            int maxPositionals,
-            String flagFix,
-            String extraArgFix,
-            Map<String, String> needsValueKeys,
-            Argv.Action action) {
-        Map<String, Argv.Kind> options = new LinkedHashMap<>();
-        options.put("-h", Argv.Kind.HELP);
-        options.put("--help", Argv.Kind.HELP);
-        for (String flag : List.of("--json", "--debug", "--quiet")) {
-            options.put(flag, Argv.Kind.FLAG);
-        }
-        for (String name : valueOptions) {
-            options.put(name, Argv.Kind.VALUE);
-        }
-        String key = "input." + command + "_unrecognized_flag";
-        return new Argv.Grammar(
-                Collections.unmodifiableMap(options), maxPositionals, key, key, flagFix, extraArgFix, Map.of(),
-                needsValueKeys, Map.of(), false, action);
-    }
-
-    /** Python's {@code _flag_fix}: the fix of an unknown flag. */
-    private static String flagFix(String command) {
-        return "run `agentce " + command + " --help` for the flags " + command + " takes, or drop the flag.";
-    }
-
     /** Python's {@code COLUMNS=80 agentce conformance --help}, word for word. */
     static final String CONFORMANCE_USAGE = """
 usage: agentce conformance [-h] [--json] [--debug] [--quiet] <action> ...
@@ -869,22 +901,6 @@ global options:
                 "input.conformance_action", "the only conformance action is `run`.", "run `agentce conformance run ...`.");
     }
 
-    /** conformance's declared grammar (Python's conformance parser and its {@code run} subparser): the
-     * action level names {@code run}, whose grammar reads --engine, --corpus, --out and --adapters, with
-     * --engine and --corpus's own missing-value keys; neither level takes a positional. */
-    static final Argv.Grammar CONFORMANCE_GRAMMAR = conformanceGrammar();
-
-    private static Argv.Grammar conformanceGrammar() {
-        String flagFix = flagFix("conformance run");
-        String extraArgFix =
-                "pass the inputs with their flags: `agentce conformance run --engine <dir> --corpus <dir>`.";
-        Argv.Grammar run = utilityGrammar(
-                "conformance", List.of("--engine", "--corpus", "--out", "--adapters"), 0, flagFix, extraArgFix,
-                Map.of("--engine", "input.engine_missing", "--corpus", "input.corpus_missing"), null);
-        return utilityGrammar("conformance", List.of(), 0, flagFix, extraArgFix, Map.of(),
-                new Argv.Action(Map.of("run", run), Cli::conformanceActionError));
-    }
-
     /** Python's {@code _refuse_empty}, the one empty-value rule for a path option the command reads with a
      * default or writes to: an empty value names no path, so it is refused under the role's key before
      * anything is read or written, never read as the working directory, the default, or no value. {@link
@@ -904,16 +920,11 @@ global options:
         }
     }
 
-    /** {@code agentce conformance run}: reads its argv only through {@link #CONFORMANCE_GRAMMAR}, then makes
+    /** {@code agentce conformance run}: reads the SPEC 8.5 scan, then makes
      * Python's {@code cmd_conformance} checks in its order. */
-    private static CommandResult cmdConformance(String[] args) {
-        Argv.Result parsed = Argv.scan(Arrays.copyOfRange(args, 1, args.length), CONFORMANCE_GRAMMAR);
+    private static CommandResult cmdConformance(Argv.Scan parsed) {
         CommandResult result = new CommandResult("conformance");
-        if (parsed.help()) {
-            result.usage = parsed.action() == null ? CONFORMANCE_USAGE : CONFORMANCE_RUN_USAGE;
-            return result;
-        }
-        if (parsed.action() == null) {
+        if (parsed.action == null) {
             throw conformanceActionError(); // the scanner refuses any action but run itself
         }
         String engine = requireDir(parsed.value("--engine"), "engine", "the engine path");
@@ -985,21 +996,9 @@ global options:
   --quiet          log warnings and errors only
 """;
 
-    /** validate's declared grammar (Python's validate subparser): --bundle (its own missing-value key) and
-     * --out, no positional. */
-    static final Argv.Grammar VALIDATE_GRAMMAR = utilityGrammar(
-            "validate", List.of("--bundle", "--out"), 0, flagFix("validate"),
-            "pass the bundle with its flag: `agentce validate --bundle <dir>`.",
-            Map.of("--bundle", "input.bundle_missing"), null);
-
-    /** {@code agentce validate}: reads its argv only through {@link #VALIDATE_GRAMMAR}. */
-    private static CommandResult cmdValidate(String[] args) {
-        Argv.Result parsed = Argv.scan(Arrays.copyOfRange(args, 1, args.length), VALIDATE_GRAMMAR);
+    /** {@code agentce validate}, over its SPEC 8.5 scan. */
+    private static CommandResult cmdValidate(Argv.Scan parsed) {
         CommandResult result = new CommandResult("validate");
-        if (parsed.help()) {
-            result.usage = VALIDATE_USAGE;
-            return result;
-        }
         String bundleDir = requireDir(parsed.value("--bundle"), "bundle", "the evidence bundle");
         String out = parsed.value("--out");
         refuseEmptyOut(out);
@@ -1528,44 +1527,8 @@ global options:
   --quiet               log warnings and errors only
 """;
 
-    /** assess's declared grammar (Python's assess subparser, {@code allow_abbrev=False}): every option the
-     * usage names, and at most one positional, the records folder. */
-    static final Argv.Grammar ASSESS_GRAMMAR = assessGrammar();
-
-    private static Argv.Grammar assessGrammar() {
-        Map<String, Argv.Kind> options = new LinkedHashMap<>();
-        options.put("-h", Argv.Kind.HELP);
-        options.put("--help", Argv.Kind.HELP);
-        for (String flag : List.of("--json", "--debug", "--quiet")) {
-            options.put(flag, Argv.Kind.FLAG);
-        }
-        for (String name : List.of(
-                "--bundle", "--catalog", "--profile", "--deviations", "--domain", "--trust-root", "--out",
-                "--state", "--report-language", "--emit", "--for", "--fail-on")) {
-            options.put(name, Argv.Kind.VALUE);
-        }
-        options.put("--catalog-dir", Argv.Kind.APPEND);
-        options.put("--allow-unverified-catalog", Argv.Kind.FLAG);
-        options.put("--package-for-sharing", Argv.Kind.FLAG);
-        return new Argv.Grammar(
-                Collections.unmodifiableMap(options),
-                1,
-                "input.assess_unrecognized_flag",
-                "input.assess_flag_needs_value",
-                "run `agentce assess --help` for the flags assess takes, or drop the flag.",
-                "pass at most one records folder: `agentce assess <folder>`.",
-                Map.of("--deviations", "<file>", "--fail-on", "<expression>", "--emit", "<formats>", "--for",
-                        "<preset>"));
-    }
-
-    /** {@code agentce assess}: reads its argv only through {@link #ASSESS_GRAMMAR}. */
-    private static CommandResult cmdAssess(String[] args) {
-        Argv.Result parsed = Argv.scan(Arrays.copyOfRange(args, 1, args.length), ASSESS_GRAMMAR);
-        if (parsed.help()) {
-            CommandResult result = new CommandResult("assess");
-            result.usage = ASSESS_USAGE;
-            return result;
-        }
+    /** {@code agentce assess}, over its SPEC 8.5 scan. */
+    private static CommandResult cmdAssess(Argv.Scan parsed) {
         refuseEmptyOut(parsed.value("--out"));
         refuseEmpty(parsed.value("--state"), "input.state_dir_unwritable", "--state",
                 "choose a writable --state directory.", "directory");
@@ -1585,7 +1548,7 @@ global options:
                 parsed.value("--fail-on"),
                 parsed.value("--emit"),
                 parsed.value("--for"),
-                parsed.positionals().isEmpty() ? null : parsed.positionals().get(0),
+                parsed.positionals.isEmpty() ? null : parsed.positionals.get(0),
                 parsed.flag("--package-for-sharing"),
                 parsed.value("--report-language")));
     }
@@ -1604,81 +1567,12 @@ global options:
             "  --quiet     log warnings and errors only",
             "");
 
-    private static InputError quickstartUnrecognized(String cause, String fix) {
-        return new InputError("input.quickstart_unrecognized_flag", cause, fix);
-    }
-
-    /** The parsed quickstart argv: {@code help} for {@code -h}/{@code --help}, else {@code --out}'s value. */
-    private record QuickstartArgs(boolean help, String out) {}
-
-    /**
-     * {@code agentce quickstart}'s argv, read the way Python's quickstart subparser (argparse,
-     * {@code allow_abbrev=False}) reads it, left to right: {@code --out} takes one value (separate or
-     * {@code =}-joined, the last one wins), {@code --json}/{@code --debug}/{@code --quiet} take none,
-     * {@code -h}/{@code --help} stop the scan and ask for the usage. A value-less {@code --out} or a value on
-     * a flag that takes none is refused at once; any other token (an unknown or abbreviated flag, a
-     * positional, a bare {@code --} and all after it) is refused after the scan, so {@code -h} after an
-     * unknown flag is still help, as in argparse. Every refusal is {@code input.quickstart_unrecognized_flag}.
-     */
-    private static QuickstartArgs parseQuickstartArgv(String[] args) {
-        String out = null;
-        String unknown = null;
-        for (int i = 1; i < args.length; i++) {
-            String token = args[i];
-            if (token.equals("--")) {
-                unknown = unknown != null ? unknown : token;
-                break;
-            }
-            if (!looksLikeOption(token)) {
-                unknown = unknown != null ? unknown : token;
-                continue;
-            }
-            int eq = token.indexOf('=');
-            String name = eq >= 0 ? token.substring(0, eq) : token;
-            boolean help = name.equals("-h") || name.equals("--help");
-            if (name.equals("--out")) {
-                if (eq >= 0) {
-                    out = token.substring(eq + 1);
-                } else if (i + 1 >= args.length || looksLikeOption(args[i + 1])) {
-                    throw quickstartUnrecognized("flag '--out' needs a value.", "pass --out <dir>.");
-                } else {
-                    out = args[++i];
-                }
-            } else if (help || GLOBAL_BOOLEAN_FLAGS.contains(name)) {
-                if (eq >= 0) {
-                    throw quickstartUnrecognized(
-                            "flag '" + name + "' takes no value.", "drop the value: " + name + ".");
-                }
-                if (help) {
-                    return new QuickstartArgs(true, null);
-                }
-            } else {
-                unknown = unknown != null ? unknown : token;
-            }
-        }
-        if (unknown == null) {
-            return new QuickstartArgs(false, out);
-        }
-        if (unknown.startsWith("-") && !unknown.equals("-")) {
-            throw quickstartUnrecognized(
-                    "unrecognized flag '" + unknown + "'.",
-                    "run `agentce quickstart --help` for the flags quickstart takes, or drop the flag.");
-        }
-        throw quickstartUnrecognized(
-                "unrecognized argument '" + unknown + "'.",
-                "quickstart takes no other argument: `agentce quickstart --out <dir>`.");
-    }
-
     /** Assess the bundled quickstart project end to end — one command, offline (SPEC §13.4 AX-1). */
-    private static CommandResult cmdQuickstart(String[] args) {
+    private static CommandResult cmdQuickstart(Argv.Scan parsed) {
         CommandResult result = new CommandResult("quickstart");
-        QuickstartArgs parsed = parseQuickstartArgv(args);
-        if (parsed.help()) {
-            result.usage = QUICKSTART_USAGE;
-            return result;
-        }
-        refuseEmptyOut(parsed.out());
-        String out = parsed.out() != null ? parsed.out() : DEFAULT_OUT_DIR;
+        String outArg = parsed.value("--out");
+        refuseEmptyOut(outArg);
+        String out = outArg != null ? outArg : DEFAULT_OUT_DIR;
         Path quickstart = Bundled.quickstartDir();
         if (!Files.isDirectory(quickstart)) {
             throw new InputError(
@@ -1781,49 +1675,12 @@ global options:
     private static final List<String> REPORT_RENDER_FLAGS =
             List.of("--from", "--format", "--role", "--catalog", "--language", "--out");
 
-    /** report's declared grammar (Python's report subparser, {@code allow_abbrev=False}): every option the
-     * usage names and no positional; {@code --format} and {@code --role} are choices refused the moment
-     * they are read; {@code --from} and {@code --validate} have their own missing-value keys. */
-    static final Argv.Grammar REPORT_GRAMMAR = reportGrammar();
-
-    private static Argv.Grammar reportGrammar() {
-        Map<String, Argv.Kind> options = new LinkedHashMap<>();
-        options.put("-h", Argv.Kind.HELP);
-        options.put("--help", Argv.Kind.HELP);
-        for (String flag : List.of("--json", "--debug", "--quiet")) {
-            options.put(flag, Argv.Kind.FLAG);
-        }
-        for (String name : REPORT_RENDER_FLAGS) {
-            options.put(name, Argv.Kind.VALUE);
-        }
-        options.put("--validate", Argv.Kind.VALUE);
-        return new Argv.Grammar(
-                Collections.unmodifiableMap(options),
-                0,
-                "input.report_unrecognized_flag",
-                "input.report_unrecognized_flag",
-                "run `agentce report --help` for the flags report takes, or drop the flag.",
-                "pass the input with its flag: `agentce report --from <file>` or `--validate <dir>`.",
-                Map.of(),
-                Map.of("--from", "input.from_missing", "--validate", "input.validate_missing"),
-                Map.of(
-                        "--format", new Argv.Choices(REPORT_FORMATS, Cli::reportFormatError),
-                        "--role", new Argv.Choices(REPORT_ROLES, Cli::reportRoleError)),
-                false,
-                null);
-    }
-
     /** Re-render a report from a committed {@code assertions.json} (SPEC §9.4), or, with {@code
-     * --validate}, schema-validate every artifact in a report directory (item 18.27). Reads its argv only
-     * through {@link #REPORT_GRAMMAR}, then makes Python's {@code cmd_report} checks in its order (18.110):
+     * --validate}, schema-validate every artifact in a report directory (item 18.27). Reads its SPEC 8.5
+     * scan, then makes Python's {@code cmd_report} checks in its order (18.110):
      * every option is read or refused with a key. */
-    private static CommandResult cmdReport(String[] args) {
-        Argv.Result parsed = Argv.scan(Arrays.copyOfRange(args, 1, args.length), REPORT_GRAMMAR);
+    private static CommandResult cmdReport(Argv.Scan parsed) {
         CommandResult result = new CommandResult("report");
-        if (parsed.help()) {
-            result.usage = REPORT_USAGE;
-            return result;
-        }
         String validate = parsed.value("--validate");
         if (validate != null) {
             for (String flag : REPORT_RENDER_FLAGS) {
@@ -1971,23 +1828,11 @@ global options:
   --quiet          log warnings and errors only
 """;
 
-    /** diff's declared grammar (Python's diff subparser): --format with no choices ({@link #cmdDiff} keeps
-     * input.diff_format, checked after the two files), positionals unbounded so cmdDiff's own count check
-     * gives input.diff_extra_argument, and {@code --} makes the rest positional. */
-    static final Argv.Grammar DIFF_GRAMMAR = utilityGrammar(
-            "diff", List.of("--format"), Integer.MAX_VALUE, "pass --format text|json|md, or drop the flag.",
-            "pass two assertions files: `agentce diff <a> <b>`.", Map.of(), null);
-
     /** {@code agentce diff} (SPEC §9.3, item 18.6): a real, deterministic assertion-set diff, matching
      * the Python reference's {@code cmd_diff} (see {@link Diff}). */
-    private static CommandResult cmdDiff(String[] args, boolean json) {
-        Argv.Result parsed = Argv.scan(Arrays.copyOfRange(args, 1, args.length), DIFF_GRAMMAR);
+    private static CommandResult cmdDiff(Argv.Scan parsed, boolean json) {
         CommandResult result = new CommandResult("diff");
-        if (parsed.help()) {
-            result.usage = DIFF_USAGE;
-            return result;
-        }
-        List<String> positional = parsed.positionals();
+        List<String> positional = parsed.positionals;
         if (positional.size() > 2) {
             throw new InputError(
                     "input.diff_extra_argument",
@@ -2051,93 +1896,43 @@ global options:
         return result;
     }
 
-    /** {@code agentce readiness}'s parsed args (see {@link #parseReadinessArgs}). */
-    private record ReadinessArgs(
-            String reportDir, String gaps, String deviations, List<String> catalogDirs, String trustRoot,
-            boolean allowUnverified) {}
+    /** Python's {@code COLUMNS=80 agentce readiness --help}, word for word. */
+    static final String READINESS_USAGE = """
+usage: agentce readiness [-h] [--json] [--debug] [--quiet] [--gaps GAPS]
+                         [--deviations DEVIATIONS] [--catalog-dir CATALOG_DIR]
+                         [--trust-root TRUST_ROOT]
+                         [--allow-unverified-catalog]
+                         [report_dir]
 
-    /** argparse's {@code ^-\d+$|^-\d*\.\d+$} over a {@code str}: {@code \d} is any Unicode decimal
-     * digit (Nd), and {@code $} also matches before one trailing newline. */
+positional arguments:
+  report_dir            the report directory
 
-    /** A token argparse classifies as an option rather than a value: it starts with {@code -}, is not
-     * a bare {@code -}, does not look like a negative number and holds no space
-     * ({@code argparse._parse_optional}). */
-    private static boolean looksLikeOption(String token) {
-        return token.startsWith("-")
-                && !"-".equals(token)
-                && !Argv.NEGATIVE_NUMBER.matcher(token).matches()
-                && !token.contains(" ");
-    }
+options:
+  -h, --help            show this help message and exit
+  --gaps GAPS           a gaps file listing accepted high-severity evidence
+                        gaps
+  --deviations DEVIATIONS
+                        a deviation register to validate
+  --catalog-dir CATALOG_DIR
+                        a catalog directory whose control severities the
+                        verdict reads (repeatable); verified as assess
+                        verifies it
+  --trust-root TRUST_ROOT
+                        trust root every --catalog-dir signature is verified
+                        against (default: AGENTCE_TRUST_ROOT, else the
+                        vendored development root)
+  --allow-unverified-catalog
+                        read a --catalog-dir catalog whose signature is absent
+                        or does not verify, recording the override as a
+                        limitation in the verdict (SPEC 8.7). Requires
+                        --catalog-dir.
 
-    private static InputError readinessUnrecognized(String detail, String fix) {
-        return new InputError("input.readiness_unrecognized_flag", detail, fix);
-    }
-
-    /** {@code agentce readiness}'s args, read the way Python's {@code readiness} subparser (argparse,
-     * {@code allow_abbrev=False}) reads them: {@code --gaps}/{@code --deviations} take one value
-     * (separate or {@code =}-joined, the last one wins), {@code --catalog-dir} appends, {@code --json}/
-     * {@code --debug}/{@code --quiet} take none, {@code --} ends the options, and there is at most one
-     * positional. Anything argparse would refuse (an unknown or abbreviated flag, a value flag with no
-     * value, a second positional) throws {@code input.readiness_unrecognized_flag} rather than being
-     * skipped, so a mistyped flag can never give a verdict computed without it. An empty
-     * {@code --gaps}/{@code --deviations} value is ignored, as Python's {@code if gaps_path:} does. */
-    private static ReadinessArgs parseReadinessArgs(String[] args) {
-        String flagFix = "pass --gaps, --deviations, --catalog-dir, --trust-root or --allow-unverified-catalog, or drop the flag.";
-        String reportDir = null;
-        String gaps = null;
-        String deviations = null;
-        List<String> catalogDirs = new ArrayList<>();
-        String trustRoot = null;
-        boolean allowUnverified = false;
-        boolean optionsEnded = false;
-        for (int i = 1; i < args.length; i++) {
-            String token = args[i];
-            if (!optionsEnded && "--".equals(token)) {
-                optionsEnded = true;
-                continue;
-            }
-            if (!optionsEnded && looksLikeOption(token)) {
-                int eq = token.indexOf('=');
-                String name = eq >= 0 ? token.substring(0, eq) : token;
-                if (GLOBAL_BOOLEAN_FLAGS.contains(name) || "--allow-unverified-catalog".equals(name)) {
-                    if (eq >= 0) {
-                        throw readinessUnrecognized("flag '" + name + "' takes no value.", "drop the value: " + name + ".");
-                    }
-                    allowUnverified |= "--allow-unverified-catalog".equals(name);
-                    continue;
-                }
-                if (!List.of("--gaps", "--deviations", "--catalog-dir", "--trust-root").contains(name)) {
-                    throw readinessUnrecognized("unrecognized flag '" + token + "'.", flagFix);
-                }
-                String value;
-                if (eq >= 0) {
-                    value = token.substring(eq + 1);
-                } else {
-                    if (i + 1 >= args.length || looksLikeOption(args[i + 1])) {
-                        throw readinessUnrecognized("flag '" + name + "' needs a value.", "pass " + name + " <path>.");
-                    }
-                    value = args[++i];
-                }
-                if ("--catalog-dir".equals(name)) {
-                    catalogDirs.add(value);
-                } else if ("--trust-root".equals(name)) {
-                    trustRoot = value;
-                } else if ("--gaps".equals(name)) {
-                    gaps = value;
-                } else {
-                    deviations = value;
-                }
-                continue;
-            }
-            if (reportDir != null) {
-                throw readinessUnrecognized(
-                        "unrecognized argument '" + token + "'.",
-                        "pass exactly one report directory: `agentce readiness <report-dir>`.");
-            }
-            reportDir = token;
-        }
-        return new ReadinessArgs(reportDir, gaps, deviations, catalogDirs, trustRoot, allowUnverified);
-    }
+global options:
+  --json                emit machine-readable JSON on stdout
+  --debug               verbose logs on stderr and a stack trace on unexpected
+                        errors
+  --quiet               log warnings and errors only
+""";
 
     /** Every control's severity, from the given {@code --catalog-dir}s, else every vendored base
      * catalog (SPEC §13.3.4). Deliberately <b>not</b> a factoring of {@link #vendoredCatalogs}: that
@@ -2200,17 +1995,16 @@ global options:
      * matching the Python reference's {@code cmd_readiness} byte for byte (see {@code Readiness.java}).
      * Exit 0 for READY and READY WITH LIMITATIONS, 1 for NOT READY -- the verdict logic lives in the
      * engine, never in a skill. */
-    private static CommandResult cmdReadiness(String[] args) {
+    private static CommandResult cmdReadiness(Argv.Scan parsed) {
         CommandResult result = new CommandResult("readiness");
-        ReadinessArgs parsed = parseReadinessArgs(args);
         Path reportDir = Paths.get(requireDir(
-                parsed.reportDir(),
+                parsed.positionals.isEmpty() ? null : parsed.positionals.get(0),
                 "report_dir",
                 "the report directory",
                 "pass the report directory: `agentce readiness <report-dir>`."));
         requireEnterable(reportDir, "input.report_dir_unreadable", "the report directory");
         Set<String> gaps = new LinkedHashSet<>();
-        String gapsPath = parsed.gaps();
+        String gapsPath = parsed.value("--gaps");
         if (gapsPath != null) {
             String text;
             try {
@@ -2221,7 +2015,7 @@ global options:
             gaps = Readiness.parseGapsFile(text);
         }
         List<JsonNode> deviations = List.of();
-        String deviationsPath = parsed.deviations();
+        String deviationsPath = parsed.value("--deviations");
         if (deviationsPath != null) {
             deviations = Readiness.loadDeviationRegister(
                     Paths.get(requireFile(deviationsPath, "deviations", "the deviation register")));
@@ -2230,7 +2024,8 @@ global options:
         // --trust-root that is empty, missing or not a trust root is refused, never ignored.
         List<String> catalogLimitations = new ArrayList<>();
         Map<String, String> severities = readinessSeverities(
-                parsed.catalogDirs(), effectiveTrustRoot(parsed.trustRoot()), parsed.allowUnverified(),
+                parsed.list("--catalog-dir"), effectiveTrustRoot(parsed.value("--trust-root")),
+                parsed.flag("--allow-unverified-catalog"),
                 catalogLimitations);
         Readiness.Verdict verdict =
                 Readiness.computeReadiness(reportDir, severities, deviations, gaps, catalogLimitations);
@@ -2302,84 +2097,37 @@ global options:
 
     private static final List<String> SIGN_PROFILES = List.of("sigstore-public", "sigstore-private", "kms");
 
-    /** {@code agentce sign}'s parsed args (see {@link #parseSignArgs}). */
-    private record SignArgs(
-            String reportDir, String asRole, String profile, String key, boolean dryRun, boolean writeTrustRoot) {}
+    /** Python's {@code COLUMNS=80 agentce sign --help}, word for word. */
+    static final String SIGN_USAGE = """
+usage: agentce sign [-h] [--json] [--debug] [--quiet]
+                    [--as {claimant,assessor}]
+                    [--profile {sigstore-public,sigstore-private,kms}]
+                    [--key KEY] [--dry-run] [--write-trust-root]
+                    [report_dir]
 
-    private static InputError signUnrecognized(String detail, String fix) {
-        return new InputError("input.sign_unrecognized_flag", detail, fix);
-    }
+positional arguments:
+  report_dir            the report directory
 
-    /** {@code sign}'s own no-value flags, checked alongside {@link #GLOBAL_BOOLEAN_FLAGS} so
-     * {@link #parseSignArgs} rejects a value on either group with one check. */
-    private static final Set<String> SIGN_BOOLEAN_FLAGS = Set.of("--dry-run", "--write-trust-root");
+options:
+  -h, --help            show this help message and exit
+  --as {claimant,assessor}
+                        the signing role
+  --profile {sigstore-public,sigstore-private,kms}
+                        the signing profile
+  --key KEY             operator Ed25519 private key (PEM) for the kms profile
+  --dry-run             plan only; sign nothing
+  --write-trust-root    write trust-root.json (the signer's public key) into
+                        the report directory, so a recipient can `agentce
+                        verify --report` this bundle without any other key
+                        exchange. Requires --profile kms (the only profile
+                        with an exportable key).
 
-    /** {@code agentce sign}'s args, read the way Python's {@code sign} subparser (argparse,
-     * {@code allow_abbrev=False}) reads them: {@code --as}/{@code --profile}/{@code --key} take one
-     * value (separate or {@code =}-joined, the last one wins), {@code --dry-run}/
-     * {@code --write-trust-root} take none, {@code --} ends the options, and there is at most one
-     * positional -- the same shape {@link #parseReadinessArgs} established for {@code readiness} in
-     * 18.25. Anything argparse would refuse throws {@code input.sign_unrecognized_flag} rather than
-     * being silently skipped. */
-    private static SignArgs parseSignArgs(String[] args) {
-        String flagFix = "pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag.";
-        String reportDir = null;
-        String asRole = null;
-        String profile = null;
-        String key = null;
-        boolean dryRun = false;
-        boolean writeTrustRoot = false;
-        boolean optionsEnded = false;
-        for (int i = 1; i < args.length; i++) {
-            String token = args[i];
-            if (!optionsEnded && "--".equals(token)) {
-                optionsEnded = true;
-                continue;
-            }
-            if (!optionsEnded && looksLikeOption(token)) {
-                int eq = token.indexOf('=');
-                String name = eq >= 0 ? token.substring(0, eq) : token;
-                if (GLOBAL_BOOLEAN_FLAGS.contains(name) || SIGN_BOOLEAN_FLAGS.contains(name)) {
-                    if (eq >= 0) {
-                        throw signUnrecognized("flag '" + name + "' takes no value.", "drop the value: " + name + ".");
-                    }
-                    if ("--dry-run".equals(name)) {
-                        dryRun = true;
-                    } else if ("--write-trust-root".equals(name)) {
-                        writeTrustRoot = true;
-                    }
-                    continue;
-                }
-                if (!"--as".equals(name) && !"--profile".equals(name) && !"--key".equals(name)) {
-                    throw signUnrecognized("unrecognized flag '" + token + "'.", flagFix);
-                }
-                String value;
-                if (eq >= 0) {
-                    value = token.substring(eq + 1);
-                } else {
-                    if (i + 1 >= args.length || looksLikeOption(args[i + 1])) {
-                        throw signUnrecognized("flag '" + name + "' needs a value.", "pass " + name + " <value>.");
-                    }
-                    value = args[++i];
-                }
-                if ("--as".equals(name)) {
-                    asRole = value;
-                } else if ("--profile".equals(name)) {
-                    profile = value;
-                } else {
-                    key = value;
-                }
-                continue;
-            }
-            if (reportDir != null) {
-                throw signUnrecognized(
-                        "unrecognized argument '" + token + "'.",
-                        "pass exactly one report directory: `agentce sign <report-dir> --as claimant|assessor`.");
-            }
-            reportDir = token;
-        }
-        return new SignArgs(reportDir, asRole, profile, key, dryRun, writeTrustRoot);
-    }
+global options:
+  --json                emit machine-readable JSON on stdout
+  --debug               verbose logs on stderr and a stack trace on unexpected
+                        errors
+  --quiet               log warnings and errors only
+""";
 
     /** Python's {@code dict.get(key, default)} restricted to the one shape this call site needs:
      * {@code obj} may be any JSON value (a hostile {@code claim.json} need not carry a mapping at every
@@ -2484,27 +2232,27 @@ global options:
      * {@code kms} profile, matching the Python reference's {@code cmd_sign} byte for byte (see
      * {@code Sign.java}). Refuses to sign unless the report's readiness verdict is not
      * {@code NOT READY} ({@code agentce readiness}'s own gate, computed the same way). */
-    private static CommandResult cmdSign(String[] args) {
+    private static CommandResult cmdSign(Argv.Scan parsed) {
         CommandResult result = new CommandResult("sign");
-        SignArgs parsed = parseSignArgs(args);
         Path reportDir = Paths.get(requireDir(
-                parsed.reportDir(),
+                parsed.positionals.isEmpty() ? null : parsed.positionals.get(0),
                 "report_dir",
                 "the report directory",
                 "pass the report directory: `agentce sign <report-dir> --as claimant|assessor`."));
-        String role = parsed.asRole();
+        String role = parsed.value("--as");
         if (!"claimant".equals(role) && !"assessor".equals(role)) {
             throw new InputError(
                     "input.sign_role", "--as must be `claimant` or `assessor`.", "pass --as claimant|assessor.");
         }
-        String profile = parsed.profile() == null || parsed.profile().isEmpty() ? "sigstore-public" : parsed.profile();
+        String profileArg = parsed.value("--profile");
+        String profile = profileArg == null || profileArg.isEmpty() ? "sigstore-public" : profileArg;
         if (!SIGN_PROFILES.contains(profile)) {
             throw new InputError(
                     "input.sign_profile",
                     "unknown signing profile " + Readiness.pyRepr(Json.nodes().textNode(profile)) + ".",
                     "choose one of: " + String.join(", ", SIGN_PROFILES) + ".");
         }
-        boolean writeTrustRoot = parsed.writeTrustRoot();
+        boolean writeTrustRoot = parsed.flag("--write-trust-root");
         if (writeTrustRoot && !"kms".equals(profile)) {
             throw new InputError(
                     "sign.trust_root_requires_kms",
@@ -2512,7 +2260,7 @@ global options:
                             + Readiness.pyRepr(Json.nodes().textNode(profile)) + " profile has none.",
                     "pass --profile kms --key <ed25519-private-key.pem> --write-trust-root.");
         }
-        boolean dryRun = parsed.dryRun();
+        boolean dryRun = parsed.flag("--dry-run");
         result.data.put("report_dir", reportDir.toString());
         result.data.put("as", role);
         result.data.put("profile", profile);
@@ -2566,7 +2314,7 @@ global options:
         for (Path target : targets) {
             Outputs.check(target.toString(), SIGN_REPORT_FILE);
         }
-        Sign.Signer signer = signSigner(parsed.key(), profile);
+        Sign.Signer signer = signSigner(parsed.value("--key"), profile);
         ArrayNode subjects = Sign.signSubjects(claim, manifest);
         ObjectNode statement = Json.nodes().objectNode();
         statement.put("_type", Sign.INTOTO_STATEMENT_TYPE);
@@ -2622,14 +2370,13 @@ global options:
      * ({@code commands/__init__.py:254-282}); {@code --report} (the 9-stage offline reproduction) is
      * out of scope for this port (18.26's own disposition) and falls to {@link #notImplemented} once
      * validation passes. Mirrors {@code cli.ts}'s {@code cmdVerify} exactly. */
-    private static CommandResult cmdVerify(String[] args) {
+    private static CommandResult cmdVerify(Argv.Scan parsed) {
         CommandResult result = new CommandResult("verify");
         // An empty value (`--catalog ""`) is treated as not provided, matching the Python
         // reference's `if value` truthiness check (`commands/__init__.py:261-269`): an empty string
         // must never fall through to `requireDir`/`Files.exists`, where `Paths.get("")` resolves to
         // the current working directory and a catalog or release check could wrongly verify it (F4,
         // 18.65).
-        VerifyArgs parsed = parseVerifyArgs(args);
         String bundle = verifyTarget(parsed, "bundle");
         String catalog = verifyTarget(parsed, "catalog");
         String release = verifyTarget(parsed, "release");
@@ -2642,8 +2389,8 @@ global options:
                     "verify needs exactly one of --bundle, --catalog, --release, or --report.",
                     "pass exactly one target, e.g. `agentce verify --bundle <dir>`.");
         }
-        String signerTrustRoot = parsed.signerTrustRoot();
-        String expectKeyid = parsed.expectKeyid();
+        String signerTrustRoot = parsed.value("--signer-trust-root");
+        String expectKeyid = parsed.value("--expect-keyid");
         if (report == null && (signerTrustRoot != null || expectKeyid != null)) {
             throw new InputError(
                     "input.verify_target",
@@ -2741,23 +2488,13 @@ global options:
   --quiet     log warnings and errors only
 """;
 
-    /** version's declared grammar (Python's version subparser): the four flags, no positional. */
-    static final Argv.Grammar VERSION_GRAMMAR = utilityGrammar(
-            "version", List.of(), 0, flagFix("version"), "version takes no argument: `agentce version`.",
-            Map.of(), null);
-
     /** {@code agentce version} (SPEC §8.5): the same structured envelope every other command returns,
      * with a real installed-artifact {@code no_ml} self-report (mirrors Python's {@code cmd_version}
      * and the TypeScript port's {@code cmdVersion}). Distinct from the bare {@code --version}/
      * {@code -V} flag, which stays a plain one-line shortcut (handled before this is ever reached,
      * {@link #run}). */
-    private static CommandResult cmdVersion(String[] args) {
-        Argv.Result parsed = Argv.scan(Arrays.copyOfRange(args, 1, args.length), VERSION_GRAMMAR);
+    private static CommandResult cmdVersion() {
         CommandResult result = new CommandResult("version");
-        if (parsed.help()) {
-            result.usage = VERSION_USAGE;
-            return result;
-        }
         NoMl.InstalledResult scan = NoMl.installedSelfReport();
         result.data.put("engine", Version.ENGINE_NAME);
         result.data.put("engine_version", Version.ENGINE_VERSION);
