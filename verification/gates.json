@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.117.0",
+  "suite_version": "0.118.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -1850,6 +1850,64 @@
         }
       ],
       "fix_hint": "Run verification/gates/diff_readiness_parity.sh and read the MISMATCH lines; the checks are tools/diff_parity_check.py and tools/readiness_parity_check.py, and the reference is engines/python/agentce/commands/__init__.py's cmd_diff and engines/python/agentce/readiness.py, ported in engines/typescript/src/diff.ts and readiness.ts and engines/java/src/main/java/org/agentce/Diff.java and Readiness.java"
+    },
+    {
+      "id": "VG-FAST-TIER-REPORT-FILE-PARITY",
+      "title": "three-engine.yml, a fast-tier workflow on every phase push, runs the cross-engine readiness, sign and report --validate agreement checks from source in one unconditional job of 20 minutes or less (18.184v)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/fast_tier_report_file_parity.sh"
+      ],
+      "requires": [
+        "uv"
+      ],
+      "timeout_s": 60,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "the gate reads .github/workflows/three-engine.yml and finds push branches including phase/** with no path or branch filter, no workflow-root defaults or env, exactly one job naming each of tools/readiness_parity_check.py, sign_parity_check.py and report_validate_parity_check.py, that job carrying only name, runs-on, timeout-minutes (1 to 20) and steps, its steps only name, uses, with and run, and each check's --self-test and real run each exactly once as a whole run line",
+        "fail": "phase/** is dropped or filtered, the workflow root gains defaults or env, a check is missing or named in a second job, the job gains if, continue-on-error, strategy, needs, defaults or env, its timeout is over 20 minutes, a step gains if, continue-on-error, shell or env, or a check line is changed (for example given || true) or removed"
+      },
+      "fix_hint": "run verification/gates/fast_tier_report_file_parity.sh and read the FAIL lines; the job is .github/workflows/three-engine.yml's jobs.report-file-parity, copied from quickstart.yml's installed-artifacts-offline check steps",
+      "faults": [
+        {
+          "description": "the readiness check's real run is removed, so only its self-test runs on phase pushes",
+          "file": ".github/workflows/three-engine.yml",
+          "search": "          uv run --project tools --frozen python tools/readiness_parity_check.py\n      - name: Cross-engine agentce sign",
+          "replace": "      - name: Cross-engine agentce sign"
+        },
+        {
+          "description": "the job timeout is raised past the 20-minute fast-tier budget",
+          "file": ".github/workflows/three-engine.yml",
+          "search": "    name: readiness, sign and report --validate agree across engines\n    runs-on: ubuntu-latest\n    timeout-minutes: 20",
+          "replace": "    name: readiness, sign and report --validate agree across engines\n    runs-on: ubuntu-latest\n    timeout-minutes: 45"
+        },
+        {
+          "description": "the job may fail without failing the workflow",
+          "file": ".github/workflows/three-engine.yml",
+          "search": "    name: readiness, sign and report --validate agree across engines\n",
+          "replace": "    name: readiness, sign and report --validate agree across engines\n    continue-on-error: true\n"
+        },
+        {
+          "description": "phase pushes no longer trigger the workflow",
+          "file": ".github/workflows/three-engine.yml",
+          "search": "    branches: [main, \"phase/**\"]",
+          "replace": "    branches: [main]"
+        },
+        {
+          "description": "the report --validate real run is excused with || true",
+          "file": ".github/workflows/three-engine.yml",
+          "search": "          uv run --project tools --frozen python tools/report_validate_parity_check.py\n",
+          "replace": "          uv run --project tools --frozen python tools/report_validate_parity_check.py || true\n"
+        },
+        {
+          "description": "the job waits on another job, so it is skipped and the workflow still succeeds when that job is skipped",
+          "file": ".github/workflows/three-engine.yml",
+          "search": "    name: readiness, sign and report --validate agree across engines\n",
+          "replace": "    name: readiness, sign and report --validate agree across engines\n    needs: [compare]\n"
+        }
+      ]
     },
     {
       "id": "VG-CLAIM-PARITY",

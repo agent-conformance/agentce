@@ -3,6 +3,13 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.118.0
+
+- `VG-FAST-TIER-REPORT-FILE-PARITY` (18.184v, added): `three-engine.yml`, which runs on every phase push, runs the
+  cross-engine readiness, sign and report --validate agreement checks from source in its `report-file-parity` job.
+  The gate holds that job's wiring: phase pushes trigger it, nothing can skip or excuse it, and it finishes within
+  20 minutes.
+
 ## 0.117.0
 
 - `VG-JSON-INTEGER-LIMIT` (18.184q, changed): two seeded faults follow the code they break. Python's
