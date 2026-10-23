@@ -111,7 +111,14 @@ function spaceOrEnd(line: Line, i: number): boolean {
   return i >= line.length || line[i] === " " || line[i] === "\t";
 }
 
-const rstripSpaces = (value: string): string => value.replace(/ +$/, "");
+/** `value` without its trailing spaces (an index walk: a regex anchored at the end backtracks on long inner runs). */
+function rstripSpaces(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === " ") {
+    end -= 1;
+  }
+  return value.slice(0, end);
+}
 
 type BlockKind = "map" | "seq";
 

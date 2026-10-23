@@ -116,7 +116,7 @@ class YamlProfileTest {
         Files.write(path, text.getBytes(StandardCharsets.UTF_8));
         String id = c.get("id").asText();
         if (c.get("expect").asText().equals("accept")) {
-            assertNotNull(Readiness.composeCatalogPyyaml(text), id);
+            assertNotNull(Readiness.composePyyaml(text), id);
             for (Role role : ROLES) {
                 role.load().accept(path);
             }
@@ -125,7 +125,7 @@ class YamlProfileTest {
         String rule = c.get("rule").asText();
         String tail = "is outside the YAML profile: " + rule + " at line " + c.get("line").asInt() + " (SPEC 8.7)";
         YamlProfile.ProfileException caught =
-                assertThrows(YamlProfile.ProfileException.class, () -> Readiness.composeCatalogPyyaml(text), id);
+                assertThrows(YamlProfile.ProfileException.class, () -> Readiness.composePyyaml(text), id);
         assertEquals(tail, caught.violation().message(), id);
         for (Role role : ROLES) {
             InputError refused = assertThrows(InputError.class, () -> role.load().accept(path), id);

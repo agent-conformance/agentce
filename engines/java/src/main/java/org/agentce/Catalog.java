@@ -437,14 +437,14 @@ public final class Catalog {
     }
 
     /** {@code catalog.yaml} or a control file as one YAML mapping (18.184i), read as Python's {@code load_catalog_yaml}
-     * reads it ({@link Readiness#composeCatalogPyyaml}): a file outside the SPEC 8.7 YAML profile (a key written twice
+     * reads it ({@link Readiness#composePyyaml}): a file outside the SPEC 8.7 YAML profile (a key written twice
      * included, 18.184u), YAML the engine refuses to load, or anything but one mapping (an empty file included) is
      * refused naming the file, never read with its last value, as nothing, or skipped. */
     private static JsonNode readMapping(CatalogFiles files, String rel) {
         String text = text(files, rel);
         JsonNode data;
         try {
-            data = Readiness.toJsonNode(Readiness.composeCatalogPyyaml(text));
+            data = Readiness.toJsonNode(Readiness.composePyyaml(text));
         } catch (YamlProfile.ProfileException e) {
             throw fileUnloadable(files.root(), rel, e.violation().message(), e.violation().hint() + ".");
         } catch (StackOverflowError | RuntimeException e) {
