@@ -59,6 +59,7 @@ from ci_demo_coverage_check import (
     _shape_violation_cases,
     _step_wiring_problems,
     _unknown_keys,
+    WORKFLOW_ALLOWED_KEYS,
     workflow_level_problems,
 )
 
@@ -402,13 +403,8 @@ def check_workflow(
         return [f"{workflow_path}: unreadable: {exc}"]
     raw_jobs = doc.get("jobs") if isinstance(doc, dict) else None
     jobs: dict[str, Any] = raw_jobs if isinstance(raw_jobs, dict) else {}
-    root_keys = (
-        {k: v for k, v in doc.items() if k != "concurrency"}
-        if isinstance(doc, dict)
-        else doc
-    )
     problems = (
-        workflow_level_problems(root_keys)
+        workflow_level_problems(doc, WORKFLOW_ALLOWED_KEYS | {"concurrency"})
         + concurrency_problems(doc)
         + trigger_problems(doc)
         + census_list_job_problems(jobs.get(LIST_JOB))

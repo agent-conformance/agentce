@@ -93,12 +93,14 @@ def _unknown_keys(mapping: Collection[Any], allowed: set[str], label: str) -> li
     return [f"{label} has key(s) outside the allowed set {sorted(allowed)}: {extra}"]
 
 
-def workflow_level_problems(doc: Any) -> list[str]:
+def workflow_level_problems(
+    doc: Any, allowed: set[str] = WORKFLOW_ALLOWED_KEYS
+) -> list[str]:
     if not isinstance(doc, dict):
         return []
     # PyYAML reads the bare key `on` as the boolean True (YAML 1.1); other keys are compared as text.
     keys = {"on" if key is True else str(key) for key in doc}
-    return _unknown_keys(keys, WORKFLOW_ALLOWED_KEYS, "the workflow")
+    return _unknown_keys(keys, allowed, "the workflow")
 
 
 # Two arbitrary probe sizes for the generic, total-agnostic partition() function below --
