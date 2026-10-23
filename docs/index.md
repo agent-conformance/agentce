@@ -31,6 +31,7 @@ Generated from the sources, so the documentation and the code never disagree.
 - [Threat model](threat-model.md) — the threats the engine addresses and the check that proves each.
 - [Error catalogue](errors.md) — every message key with its cause and exact fix.
 - [YAML profile](yaml-profile.md) — the YAML every engine reads, and what to quote.
+- [JSON profile](json-profile.md) — the JSON every engine reads, and how numbers are compared and written.
 - [Command line](command-line.md) — the command lines every engine reads, and what they refuse.
 - [Architecture decisions](adr/) — the record of every choice the specification leaves open.
 
