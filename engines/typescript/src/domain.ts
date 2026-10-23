@@ -202,7 +202,7 @@ export class DomainBinding {
   /** Reads the binding as Python's PyYAML `SafeLoader` types it, refusing a key written twice and any other YAML
    * it cannot load with `input.domain_binding_invalid`. */
   static load(path: string): DomainBinding {
-    const data = loadPyyaml(path, "input.domain_binding_invalid", "the domain binding", true);
+    const data = loadPyyaml(path, "input.domain_binding_invalid", "the domain binding");
     if (!isRecord(data)) {
       return DomainBinding.empty();
     }

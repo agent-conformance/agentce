@@ -19,6 +19,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { InputError } from "./errors";
 import {
   DEFAULT_MAX_DEVIATION_DAYS,
   NOT_READY,
@@ -660,7 +661,18 @@ test("a quoted timestamp scalar is never rewritten, byte-identical to the source
   );
 });
 
-test("a << merge key is honoured, an explicit key overrides the merged one (verifier round 2, F3)", () => {
+/** The register at `path` refused as input.deviation_invalid, outside the SPEC 8.7 YAML profile (18.184u). */
+function assertOutside(path: string, rule: string, line: number): void {
+  assert.throws(
+    () => loadDeviationRegister(path),
+    (e: unknown) =>
+      e instanceof InputError &&
+      e.key === "input.deviation_invalid" &&
+      e.cause.endsWith(` is outside the YAML profile: ${rule} at line ${line} (SPEC 8.7).`),
+  );
+}
+
+test("a << merge key is outside the YAML profile (verifier round 2, F3; 18.184u)", () => {
   withTempFile(
     "deviations:\n" +
       "  - <<: &base\n" +
@@ -668,20 +680,14 @@ test("a << merge key is honoured, an explicit key overrides the merged one (veri
       "      owner: alice\n" +
       "    control: OVS-03\n" +
       "    owner: carol\n",
-    (path) => {
-      const [entry] = loadDeviationRegister(path);
-      assert.equal(entry?.rationale, "shared"); // pulled in from the merge source
-      assert.equal(entry?.owner, "carol"); // the explicit local key wins over the merged one
-      assert.equal(entry?.control, "OVS-03");
-    },
+    (path) => assertOutside(path, "merge_key", 2),
   );
 });
 
-test("a duplicate mapping key keeps the last value, matching PyYAML (verifier round 2, F4)", () => {
-  withTempFile("deviations:\n  - control: OVS-03\n    owner: alice\n    owner: carol\n", (path) => {
-    const [entry] = loadDeviationRegister(path);
-    assert.equal(entry?.owner, "carol");
-  });
+test("a duplicate mapping key is refused, never read with its last value (verifier round 2, F4; 18.184u)", () => {
+  withTempFile("deviations:\n  - control: OVS-03\n    owner: alice\n    owner: carol\n", (path) =>
+    assertOutside(path, "duplicate_key", 4),
+  );
 });
 
 test("an unquoted timestamp scalar is pythonized, matching PyYAML's str(datetime) rendering", () => {
@@ -701,15 +707,15 @@ test("a colonless-offset scalar is never resolved as a timestamp, stays a plain 
   );
 });
 
-test("YAML-1.1 booleans resolve unquoted, stay strings quoted", () => {
+test("YAML-1.1 booleans are outside the YAML profile unquoted, stay strings quoted (18.184u)", () => {
   withTempFile(
     'deviations:\n  - control: OVS-03\n    rationale: no\n  - control: OVS-04\n    rationale: "no"\n',
-    (path) => {
-      const [unquoted, quoted] = loadDeviationRegister(path);
-      assert.equal(unquoted?.rationale, false);
-      assert.equal(quoted?.rationale, "no");
-    },
+    (path) => assertOutside(path, "yaml11_bool", 3),
   );
+  withTempFile('deviations:\n  - control: OVS-04\n    rationale: "no"\n', (path) => {
+    const [quoted] = loadDeviationRegister(path);
+    assert.equal(quoted?.rationale, "no");
+  });
 });
 
 test("a Python-falsy top-level value is treated as no deviations, not a shape error", () => {

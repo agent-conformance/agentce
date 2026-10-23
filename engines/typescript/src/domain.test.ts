@@ -93,6 +93,19 @@ function loadText(text: string): DomainBinding {
   return DomainBinding.load(path);
 }
 
+/** `scope` in a task scope refused as input.domain_binding_invalid, outside the SPEC 8.7 YAML profile under `rule`
+ * (18.184u). */
+function assertOutside(scope: string, rule: string): void {
+  assert.throws(
+    () => scopeFromYaml(scope),
+    (e: unknown) =>
+      e instanceof InputError &&
+      e.key === "input.domain_binding_invalid" &&
+      e.cause.endsWith(` is outside the YAML profile: ${rule} at line 2 (SPEC 8.7).`),
+    scope,
+  );
+}
+
 function scopeFromYaml(scope: string): TaskScope {
   return loadText(`task_scopes:\n  - {task_type: a, ${scope}}\n`).taskScopes.get(
     "a",
@@ -112,10 +125,7 @@ test("a non-finite budget limit is unreadable in every dimension (18.184g)", () 
 test("budget limit spellings read as PyYAML types them (18.184g)", () => {
   const cases: [string, number | null][] = [
     ["10", 10],
-    ["1_0", 10],
-    ["010", 8],
     ["0x10", 16],
-    ["1e1", null],
     ['"1e1"', null],
     ["2.5", 2.5],
   ];
@@ -126,10 +136,14 @@ test("budget limit spellings read as PyYAML types them (18.184g)", () => {
       value,
     );
   }
+  // Outside the YAML profile (18.184u): refused, never read as PyYAML types them.
+  assertOutside("budgets: {spend: 1_0}", "underscore_number");
+  assertOutside("budgets: {spend: 010}", "octal");
+  assertOutside("budgets: {spend: 1e1}", "exponent_no_dot");
 });
 
-test("allowed_tools YAML 1.1 booleans name no tool; quoted they are names (18.184g)", () => {
-  assert.deepEqual(scopeFromYaml("allowed_tools: [yes, on, off]").allowedTools, new Set());
+test("allowed_tools YAML 1.1 booleans are outside the YAML profile; quoted they are names (18.184g, 18.184u)", () => {
+  assertOutside("allowed_tools: [yes, on, off]", "yaml11_bool");
   assert.deepEqual(scopeFromYaml('allowed_tools: ["yes"]').allowedTools, new Set(["yes"]));
 });
 
@@ -147,11 +161,16 @@ test("a key written twice, at any depth, or a Python tag is refused input.domain
   }
 });
 
-test("a key a << merge brings in may be written again (18.184g)", () => {
-  const binding = loadText(
-    "base: &b {task_type: a, allowed_tools: [x]}\ntask_scopes:\n  - {<<: *b, allowed_tools: [y]}\n",
+test("a << merge is outside the YAML profile, its anchor refused first (18.184g, 18.184u)", () => {
+  assert.throws(
+    () =>
+      loadText(
+        "base: &b {task_type: a, allowed_tools: [x]}\ntask_scopes:\n  - {<<: *b, allowed_tools: [y]}\n",
+      ),
+    (e: unknown) =>
+      e instanceof InputError &&
+      e.cause.endsWith(" is outside the YAML profile: anchor at line 1 (SPEC 8.7)."),
   );
-  assert.deepEqual(binding.taskScopes.get("a")?.[0].allowedTools, new Set(["y"]));
 });
 
 test("a YAML date is neither text nor a number, and an id renders as Python's str(date) (18.184g)", () => {
@@ -193,43 +212,24 @@ test("a limit past float range is unreadable (18.184g)", () => {
   ]);
 });
 
-test("a tag the file writes decides the type, quoted or not (18.184g)", () => {
-  assert.deepEqual(
-    scopeFromYaml(
-      `allowed_tools: [!!bool "yes", !!bool "true", !!bool 'on', !!int "7", !!str 7, !!str yes, x]`,
-    ).allowedTools,
-    new Set(["7", "yes", "x"]),
-  );
-  assert.deepEqual(scopeFromYaml(`budgets: {tokens: !!str 1000, spend: !!int "10"}`).budgets, [
-    ["tokens", null],
-    ["spend", 10],
-  ]);
+test("a tag the file writes is outside the YAML profile, quoted or not (18.184g, 18.184u)", () => {
+  for (const scope of [
+    `allowed_tools: [!!bool "yes", !!bool "true", !!bool 'on', !!int "7", !!str 7, !!str yes, x]`,
+    `budgets: {tokens: !!str 1000, spend: !!int "10"}`,
+    `budgets: {tokens: !!int "0o10", compute_seconds: !!float "+.5", spend: !!float "inf"}`,
+    `budgets: {tokens: !!int " 5", spend: !!float "5"}`,
+    "allowed_tools: [!!null x]",
+  ]) {
+    assertOutside(scope, "tag");
+  }
 });
 
-test("tagged text reads as Python's int() and float() read it (18.184g)", () => {
-  assert.deepEqual(
-    scopeFromYaml(
-      `budgets: {tokens: !!int "0o10", compute_seconds: !!float "+.5", spend: !!float "inf"}`,
-    ).budgets,
-    [
-      ["tokens", 8],
-      ["compute_seconds", 0.5],
-      ["spend", null],
-    ],
-  );
-  assert.deepEqual(scopeFromYaml(`budgets: {tokens: !!int " 5", spend: !!float "5"}`).budgets, [
-    ["tokens", 5],
-    ["spend", 5],
-  ]);
-  assert.equal(scopeFromYaml("allowed_tools: [!!null x]").allowedTools?.size, 0);
-});
-
-test("a date no calendar holds is text; two date keys stay two keys (18.184g)", () => {
+test("a date no calendar holds is text; a date key is outside the YAML profile (18.184g, 18.184u)", () => {
   assert.deepEqual(
     scopeFromYaml("allowed_tools: [2021-02-29, 2020-02-29]").allowedTools,
     new Set(["2021-02-29"]),
   );
-  assert.deepEqual(scopeFromYaml("budgets: {2020-01-01: 1, 2020-01-02: 2}").budgets, []);
+  assertOutside("budgets: {2020-01-01: 1, 2020-01-02: 2}", "non_string_key");
 });
 
 test("a tag the node cannot take is refused (18.184g)", () => {

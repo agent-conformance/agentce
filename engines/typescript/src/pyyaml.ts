@@ -1,17 +1,22 @@
 /**
- * Emit YAML byte for byte as Python's `yaml.safe_dump(value, sort_keys=False)` does.
+ * Emit YAML byte for byte as Python's `yaml.dump(value, Dumper=_ProfileDumper, sort_keys=False)` does: PyYAML's
+ * `SafeDumper` written inside the SPEC 8.7 YAML profile (18.184u), with no `&idNNN` anchor for a value met twice
+ * (each occurrence written out in full) and text a YAML 1.1 reader would not keep as text ({@link scalarRule})
+ * single-quoted.
  *
  * The Python engine writes a derived applicability profile with PyYAML's default settings (block
  * style, indent 2, width 80, `allow_unicode=False`, `\n` line breaks, no `---`). This module ports
- * the parts of PyYAML 6 that such a value reaches: the safe representer (a list or object met twice
- * by identity becomes one node, so it gets an `&idNNN` anchor and later `*idNNN` aliases), the
- * serializer's anchor walk, the implicit resolver that decides whether a string may stay plain, and
+ * the parts of PyYAML 6 that such a value reaches: the safe representer (one node per occurrence, as
+ * `ignore_aliases` keeps every value from being shared), the implicit resolver that decides whether a string may
+ * stay plain, and
  * the emitter's scalar analysis, style choice and plain, single-quoted and double-quoted writers
  * with their folding at column 80. Text is handled by code point, as Python strings are.
  *
  * Supported values: plain objects with string keys (in `Object.keys` order), arrays, strings, safe
  * integers, booleans and `null`. Anything else throws. No network, no learned component.
  */
+
+import { scalarRule } from "./yamlProfile";
 
 const BEST_INDENT = 2;
 const BEST_WIDTH = 80;
@@ -24,6 +29,8 @@ interface ScalarNode {
   kind: "scalar";
   tag: Tag;
   value: string;
+  /** `'` when the representer asks for single quotes (`_ProfileDumper.represent_str`). */
+  style?: "'";
 }
 
 interface SequenceNode {
@@ -73,56 +80,46 @@ function resolvesToStr(value: string): boolean {
   return !IMPLICIT_RESOLVERS.some(([, re, firsts]) => firsts.includes(first) && re.test(value));
 }
 
-/** The safe representer: one node per value, one shared node per repeated list or object. */
-function represent(value: unknown, seen: Map<object, YamlNode>): YamlNode {
+/** `_ProfileDumper.represent_str`: text a YAML 1.1 reader would not keep as text is single-quoted. */
+function strNode(value: string): ScalarNode {
+  return scalarRule(value) === null
+    ? { kind: "scalar", tag: "str", value }
+    : { kind: "scalar", tag: "str", value, style: "'" };
+}
+
+/** The safe representer with `ignore_aliases`: one node per occurrence, so a value met twice is written twice.
+ * `open` holds the lists and objects being represented; meeting one again inside itself (a cycle, which Python
+ * recurses on until its RecursionError) is refused. */
+function represent(value: unknown, open: Set<object>): YamlNode {
   if (value === null) return { kind: "scalar", tag: "null", value: "null" };
-  if (typeof value === "string") return { kind: "scalar", tag: "str", value };
+  if (typeof value === "string") return strNode(value);
   if (typeof value === "boolean") return { kind: "scalar", tag: "bool", value: String(value) };
   if (typeof value === "number") {
     if (!Number.isSafeInteger(value)) throw new TypeError(`unsupported YAML number: ${value}`);
     return { kind: "scalar", tag: "int", value: String(value) };
   }
   if (typeof value !== "object") throw new TypeError(`unsupported YAML value: ${typeof value}`);
-  const existing = seen.get(value);
-  if (existing !== undefined) return existing;
+  if (open.has(value)) throw new TypeError("unsupported YAML value: a cycle");
   if (Array.isArray(value)) {
-    const node: SequenceNode = { kind: "sequence", items: [] };
-    seen.set(value, node);
-    for (const item of value) node.items.push(represent(item, seen));
+    open.add(value);
+    const node: SequenceNode = {
+      kind: "sequence",
+      items: value.map((item) => represent(item, open)),
+    };
+    open.delete(value);
     return node;
   }
   const proto = Object.getPrototypeOf(value);
   if (proto !== Object.prototype && proto !== null) {
     throw new TypeError("unsupported YAML value: not a plain object");
   }
-  const node: MappingNode = { kind: "mapping", pairs: [] };
-  seen.set(value, node);
-  for (const [key, item] of Object.entries(value)) {
-    node.pairs.push([{ kind: "scalar", tag: "str", value: key }, represent(item, seen)]);
-  }
-  return node;
-}
-
-/** Serializer.anchor_node: a node met a second time gets the next `id%03d` anchor. */
-function assignAnchors(root: YamlNode): Map<YamlNode, string | null> {
-  const anchors = new Map<YamlNode, string | null>();
-  let last = 0;
-  const walk = (node: YamlNode): void => {
-    if (anchors.has(node)) {
-      if (anchors.get(node) === null) anchors.set(node, `id${String(++last).padStart(3, "0")}`);
-      return;
-    }
-    anchors.set(node, null);
-    if (node.kind === "sequence") for (const item of node.items) walk(item);
-    else if (node.kind === "mapping") {
-      for (const [key, item] of node.pairs) {
-        walk(key);
-        walk(item);
-      }
-    }
+  open.add(value);
+  const node: MappingNode = {
+    kind: "mapping",
+    pairs: Object.entries(value).map(([key, item]) => [strNode(key), represent(item, open)]),
   };
-  walk(root);
-  return anchors;
+  open.delete(value);
+  return node;
 }
 
 const isSpaceOrBreakOrNul = (ch: number): boolean =>
@@ -260,18 +257,12 @@ interface Context {
 /** The block-style subset of PyYAML's Emitter, driven by a node walk instead of an event queue. */
 class Emitter {
   private readonly out: string[] = [];
-  private readonly anchors: Map<YamlNode, string | null>;
-  private readonly serialized = new Set<YamlNode>();
   private readonly indents: (number | null)[] = [];
   private indent: number | null = null;
   private column = 0;
   private whitespace = true;
   private indention = true;
   private openEnded = false;
-
-  constructor(anchors: Map<YamlNode, string | null>) {
-    this.anchors = anchors;
-  }
 
   emitDocument(root: YamlNode): string {
     this.expectNode(root, { root: true });
@@ -284,13 +275,6 @@ class Emitter {
   }
 
   private expectNode(node: YamlNode, ctx: Context): void {
-    const anchor = this.anchors.get(node) ?? null;
-    if (this.serialized.has(node)) {
-      this.writeIndicator(`*${anchor}`, true);
-      return;
-    }
-    this.serialized.add(node);
-    if (anchor !== null) this.writeIndicator(`&${anchor}`, true);
     if (node.kind === "scalar") {
       this.expectScalar(node, analyzeScalar(node.value), ctx);
     } else if (node.kind === "sequence") {
@@ -328,12 +312,10 @@ class Emitter {
       // check_simple_key counts the prepared tag (`!!str`, 5 characters) even though it is never
       // written, so a key of 123 or more code points, or an empty or multiline one, goes after `?`.
       if (STR_TAG_LENGTH + analysis.text.length < 128 && !analysis.empty && !analysis.multiline) {
-        this.serialized.add(key);
         this.expectScalar(key, analysis, { mapping: true, simpleKey: true });
         this.writeIndicator(":", false);
       } else {
         this.writeIndicator("?", true, false, true);
-        this.serialized.add(key);
         this.expectScalar(key, analysis, { mapping: true });
         this.writeIndent();
         this.writeIndicator(":", true, false, true);
@@ -360,6 +342,7 @@ class Emitter {
   private chooseScalarStyle(node: ScalarNode, analysis: Analysis, ctx: Context): "" | "'" | '"' {
     const implicitPlain = node.tag !== "str" || resolvesToStr(node.value);
     if (
+      node.style === undefined &&
       implicitPlain &&
       !(ctx.simpleKey && (analysis.empty || analysis.multiline)) &&
       analysis.allowBlockPlain
@@ -558,8 +541,7 @@ class Emitter {
   }
 }
 
-/** The text `yaml.safe_dump(value, sort_keys=False)` returns for `value`. */
+/** The text `yaml.dump(value, Dumper=_ProfileDumper, sort_keys=False)` returns for `value`. */
 export function safeDump(value: unknown): string {
-  const root = represent(value, new Map());
-  return new Emitter(assignAnchors(root)).emitDocument(root);
+  return new Emitter().emitDocument(represent(value, new Set()));
 }

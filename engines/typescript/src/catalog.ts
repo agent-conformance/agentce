@@ -12,11 +12,12 @@ import { load } from "js-yaml";
 import { errorCause, errorFix } from "./errorCatalogue";
 import { AgentceError, InputError, catalogFileUnloadable, catalogUnreadable } from "./errors";
 import { type Shape, parseShapesTtl } from "./psp";
-import { nestedTooDeeply, pyyamlLoad } from "./readiness";
+import { YAML_DEPTH_OPTIONS, nestedTooDeeply, pyyamlLoad } from "./readiness";
 import { insideFolder, isFileFollowingLinks } from "./report";
 import { SOURCE_CLASS_FROM, SOURCE_CLASS_RANK } from "./sourceClass";
 import { byteCompare, decodeUtf8Strict, formatTemplate, joinPath } from "./util";
 import { type CatalogFiles, readCatalogFiles } from "./verify";
+import { YamlProfileError } from "./yamlProfile";
 
 const EVIDENCE_SHAPE_UNRESOLVED = "catalog.evidence_shape.unresolved";
 const SHAPE_UNRESOLVED = "catalog.shape.unresolved";
@@ -311,17 +312,25 @@ function catalogText(files: CatalogFiles, rel: string): string {
   }
 }
 
-/** `catalog.yaml` or a control file as one YAML mapping (18.184i): checked as Python's unique-key `SafeLoader`
- * reads it, so a key written twice, YAML the engine refuses to load, or anything but one mapping (an empty file
- * included) is refused naming the file, never read with its last value, as nothing, or skipped. The values are
- * then read with js-yaml's own load, as before. */
-function catalogMapping(files: CatalogFiles, rel: string): Record<string, unknown> {
+/** `catalog.yaml` or a control file as one YAML mapping (18.184i, 18.184u): checked as Python's
+ * `load_catalog_yaml` reads it, under the SPEC 8.7 YAML profile, so a key written twice, YAML the engine refuses
+ * to load, or anything but one mapping (an empty file included) is refused naming the file, never read with its
+ * last value, as nothing, or skipped. The values are then read with js-yaml's own load, as before. */
+export function catalogMapping(files: CatalogFiles, rel: string): Record<string, unknown> {
   const text = catalogText(files, rel);
   let data: unknown;
   try {
-    pyyamlLoad(text, true);
-    data = load(text);
+    pyyamlLoad(text);
+    data = load(text, YAML_DEPTH_OPTIONS);
   } catch (error) {
+    if (error instanceof YamlProfileError) {
+      throw catalogFileUnloadable(
+        files.root,
+        rel,
+        error.violation.message(),
+        `${error.violation.hint}.`,
+      );
+    }
     throw catalogFileUnloadable(
       files.root,
       rel,

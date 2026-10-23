@@ -65,7 +65,7 @@ test("every YAML node form reads as Python reads it", () => {
       writeFileSync(path, yaml, "utf-8");
       let got: unknown;
       try {
-        got = reading(loadPyyaml(path, "input.domain_binding_invalid", "the domain binding", true));
+        got = reading(loadPyyaml(path, "input.domain_binding_invalid", "the domain binding"));
       } catch (error) {
         got = error instanceof InputError ? { refused: error.key } : { crash: String(error) };
       }

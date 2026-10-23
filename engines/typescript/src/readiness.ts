@@ -10,6 +10,7 @@ import { lstatSync, readFileSync, statSync } from "node:fs";
 import {
   DEFAULT_SCHEMA,
   FAILSAFE_SCHEMA,
+  type LoadOptions,
   YAMLException,
   Type as YamlType,
   load as yamlLoad,
@@ -18,6 +19,7 @@ import { InputError } from "./errors";
 import { jsonlLines, parseReportJson } from "./json";
 import { pyyamlScan } from "./pyyamlScanner";
 import { byteCompare, decodeUtf8Strict, joinPath, normalizePosixPath, pyRepr, pyStr } from "./util";
+import { MAX_DEPTH, ProfileViolation, YamlProfileError, profileViolation } from "./yamlProfile";
 
 export const READY = "READY";
 export const READY_WITH_LIMITATIONS = "READY WITH LIMITATIONS";
@@ -716,7 +718,9 @@ function mergeInPyyamlOrder(mapping: Record<string, unknown>, node: OpenNode): v
 }
 
 /** The scalars written as keys directly inside a mapping node: the ones with no `:` before them. */
-function ownKeys(node: OpenNode): { readonly before: string; readonly value: unknown }[] {
+function ownKeys(
+  node: OpenNode,
+): { readonly before: string; readonly value: unknown; readonly start: number }[] {
   return (node.scalars ?? []).filter((s) => s.before !== ":");
 }
 
@@ -742,18 +746,22 @@ interface OpenNode {
   withoutValueIndicator?: unknown[];
   /** Each scalar directly inside this node, and the indicator before it: if this node is a mapping, the ones with no
    * `:` before them are its keys. */
-  scalars?: { readonly before: string; readonly value: unknown }[];
+  scalars?: { readonly before: string; readonly value: unknown; readonly start: number }[];
+  /** Where this node's own text starts in the input (past spaces, line breaks and comments). */
+  readonly start: number;
 }
 
 /** The PyYAML node rules js-yaml's composer does not follow, applied as each node closes (its `listener` option):
  * a scalar tagged `!` resolves as if untagged whatever its quoting; a sequence or mapping read as a mapping key is
  * refused, as PyYAML cannot hash it (js-yaml would name it by its text); a merge value that is not a mapping or a
- * sequence of mappings is refused; with `uniqueKeys`, a mapping that writes `<<` twice is refused. A node is a key
- * from where it sits among its siblings: after `?`, before `:`, or in a mapping with no `:` before it. */
+ * sequence of mappings is refused. A node is a key from where it sits among its siblings: after `?`, before `:`,
+ * or in a mapping with no `:` before it. Each mapping key that repeats an earlier key of its mapping (by its text, as
+ * Python's `duplicate_key_line` compares the composed scalar nodes) is noted: {@link firstRepeatedKey} is the
+ * earliest. */
 class PyyamlComposer {
   private readonly open: OpenNode[] = [];
-
-  constructor(private readonly uniqueKeys: boolean) {}
+  /** Where the earliest key repeating an earlier key of its mapping starts, or -1. */
+  firstRepeatedKey = -1;
 
   readonly listener = (event: string, composer: unknown): void => {
     const state = composer as ComposerState;
@@ -764,6 +772,7 @@ class PyyamlComposer {
           parent === undefined ? "" : lastIndicator(state.input, parent.childEnd, state.position),
         childEnd: state.position,
         merge: "none",
+        start: skipSeparation(state.input, state.position),
       });
       return;
     }
@@ -783,15 +792,13 @@ class PyyamlComposer {
       if ((node.explicitMerge || (node.mergeSources?.length ?? 0) > 1) && isRecord(result)) {
         mergeInPyyamlOrder(result, node);
       }
-      if (this.uniqueKeys) {
-        const seen = new Set<string>();
-        for (const scalar of ownKeys(node)) {
-          const key = pythonKey(scalar.value);
-          if (seen.has(key)) {
-            throw new YAMLException(`found the key ${pyRepr(scalar.value)} twice`);
-          }
-          seen.add(key);
+      const seen = new Set<string>();
+      for (const scalar of ownKeys(node)) {
+        const key = typeof scalar.value === "string" ? scalar.value : `\0${String(scalar.value)}`;
+        if (seen.has(key) && (this.firstRepeatedKey < 0 || scalar.start < this.firstRepeatedKey)) {
+          this.firstRepeatedKey = scalar.start;
         }
+        seen.add(key);
       }
     }
     if (container === undefined) {
@@ -809,10 +816,6 @@ class PyyamlComposer {
     }
     // js-yaml opens an untagged node around an explicit block key, so a merge key can close inside one.
     if (state.tag === MERGE_TAG || (state.kind === "scalar" && node.merge === "pending")) {
-      if (container.merge === "done" && this.uniqueKeys) {
-        // `<<` is a key too: which of two merges wins is never read (18.184k D1).
-        throw new YAMLException("while constructing a mapping: found the merge key '<<' twice");
-      }
       container.merge = "pending";
       if (node.before === "?") {
         container.explicitMerge = true;
@@ -821,7 +824,7 @@ class PyyamlComposer {
     }
     if (!isCollection(result)) {
       container.scalars ??= [];
-      container.scalars.push({ before: node.before, value: result });
+      container.scalars.push({ before: node.before, value: result, start: node.start });
       return;
     }
     if (node.before === "?" || valueIndicatorFollows(state.input, state.position)) {
@@ -832,37 +835,6 @@ class PyyamlComposer {
       container.withoutValueIndicator.push(result);
     }
   };
-}
-
-/** `key` (a scalar the loader built) as text equal for two keys exactly when Python's dict keys are equal: numbers by
- * value (`1`, `1.0` and `true` one key; every `.nan` one key, as PyYAML returns one shared nan), a string by its text,
- * a date by its date, an aware datetime by its instant, a naive one by its fields; a string, a number, a date and a
- * datetime are never equal to one another. Java's `pythonKey` is the same rule. */
-function pythonKey(key: unknown): string {
-  if (key === null || key === undefined) {
-    return "none";
-  }
-  if (typeof key === "string") {
-    return `str:${key}`;
-  }
-  if (typeof key === "boolean") {
-    return key ? "num:1" : "num:0";
-  }
-  if (typeof key === "number") {
-    return Number.isNaN(key) ? "nan" : `num:${key === 0 ? 0 : key}`;
-  }
-  if (isPyyamlTimestamp(key)) {
-    const text = pythonizeTimestamp(key.pyyamlTimestamp);
-    if (text.length === 10) {
-      return `date:${text}`;
-    }
-    const aware = /^(.*?)(\.\d{6})?([+-]\d\d:\d\d)$/.exec(text);
-    if (aware !== null) {
-      return `aware:${Date.parse(`${(aware[1] ?? "").replace(" ", "T")}${aware[3]}`)}${aware[2] ?? ""}`;
-    }
-    return `naive:${text}`;
-  }
-  return `other:${String(key)}`;
 }
 
 /** PyYAML resolves a `!` scalar by the implicit resolvers; their regexes end in Python's `$`, which also matches
@@ -884,22 +856,58 @@ function resolveNonSpecific(state: ComposerState): void {
   }
 }
 
-/** `text` read with {@link PYYAML_SAFE_SCHEMA}: every load with that schema goes through here, so a `<<`
- * read as a value is refused as SafeLoader refuses it, and {@link PyyamlComposer}'s node rules apply. A repeated key
- * keeps its last value; with `uniqueKeys` it is refused, `<<` included. */
-export function pyyamlLoad(text: string, uniqueKeys = false): unknown {
+/** js-yaml's nesting cap for a file the YAML profile let through: the profile refuses more than {@link MAX_DEPTH}
+ * open collections, and js-yaml counts one level per collection plus the scalar inside, so a file nested exactly
+ * that deep reads. */
+const YAML_LOAD_MAX_DEPTH = 2 * MAX_DEPTH + 2;
+
+/** js-yaml load options raising its nesting cap to {@link YAML_LOAD_MAX_DEPTH} (js-yaml 4.3.2 reads `maxDepth`; its
+ * published types predate it). */
+export const YAML_DEPTH_OPTIONS: LoadOptions = { maxDepth: YAML_LOAD_MAX_DEPTH } as LoadOptions;
+
+/** The line (1-based) of `position` in `text`, counting line breaks as PyYAML's reader does. */
+function pyyamlLineAt(text: string, position: number): number {
+  let line = 1;
+  for (let at = 0; at < position; at += 1) {
+    const ch = text[at];
+    if (ch === "\n" || ch === "\x85" || ch === "\u2028" || ch === "\u2029") {
+      line += 1;
+    } else if (ch === "\r" && text[at + 1] !== "\n") {
+      line += 1;
+    }
+  }
+  return line;
+}
+
+/** `text` as Python's `safe_yaml._load` reads it: checked against the SPEC 8.7 YAML profile ({@link
+ * YamlProfileError}), then read with {@link PYYAML_SAFE_SCHEMA}, refusing a mapping that repeats a key
+ * (`duplicate_key` at the earliest repeating key's line, before any value is refused). Every load with that schema
+ * goes through here, so a `<<` read as a value is refused as SafeLoader refuses it, and {@link PyyamlComposer}'s
+ * node rules apply. */
+export function pyyamlLoad(text: string): unknown {
+  const found = profileViolation(text);
+  if (found !== null) {
+    throw new YamlProfileError(found);
+  }
   const { problem, text: keyed } = pyyamlScan(text);
   if (problem !== null) {
     // js-yaml reads tabs and flow forms PyYAML's scanner refuses (18.184p).
     throw new YAMLException(problem);
   }
-  const composer = new PyyamlComposer(uniqueKeys);
+  const composer = new PyyamlComposer();
   const data = yamlLoad(keyed, {
     schema: PYYAML_SAFE_SCHEMA,
-    // Repeated keys are PyyamlComposer's to decide, by Python's key equality, not js-yaml's by text.
+    // Repeated keys are PyyamlComposer's to decide, by the keys' text, not js-yaml's.
     json: true,
     listener: composer.listener,
+    ...YAML_DEPTH_OPTIONS,
   });
+  if (composer.firstRepeatedKey >= 0) {
+    // pyyamlScan only adds spaces inside lines, so the line is the same in `text`.
+    throw new YamlProfileError(
+      new ProfileViolation("duplicate_key", pyyamlLineAt(keyed, composer.firstRepeatedKey)),
+    );
+  }
   if (holdsMergeValue(data)) {
     throw new YAMLException(
       "could not determine a constructor for the tag 'tag:yaml.org,2002:merge'",
@@ -915,10 +923,9 @@ export function nestedTooDeeply(error: unknown): boolean {
 }
 
 /** The YAML at `path` as Python's `load_untrusted_yaml` reads it (PyYAML's `SafeLoader` typing, PYYAML_SAFE_SCHEMA),
- * refusing a file that is not UTF-8, nests too deeply, or carries YAML it cannot load under `key`. With `uniqueKeys`, a
- * mapping that writes one key twice is refused too (js-yaml's own duplicate-key error); without it the last value wins,
- * as `SafeLoader` keeps it (`json: true`). */
-export function loadPyyaml(path: string, key: string, what: string, uniqueKeys = false): unknown {
+ * refusing a file that is not UTF-8, is outside the SPEC 8.7 YAML profile (a repeated key included), nests too deeply,
+ * or carries YAML it cannot load under `key`. */
+export function loadPyyaml(path: string, key: string, what: string): unknown {
   // Python passes the loader a `Path`, so its errors name `./r.yaml` as `r.yaml`.
   const where = `${what} at ${pyRepr(normalizePosixPath(path))}`;
   let text: string;
@@ -934,8 +941,15 @@ export function loadPyyaml(path: string, key: string, what: string, uniqueKeys =
     );
   }
   try {
-    return pyyamlLoad(text, uniqueKeys);
+    return pyyamlLoad(text);
   } catch (error) {
+    if (error instanceof YamlProfileError) {
+      throw new InputError(
+        key,
+        `${where} ${error.violation.message()}.`,
+        `${error.violation.hint}.`,
+      );
+    }
     if (nestedTooDeeply(error)) {
       throw new InputError(
         key,

@@ -86,11 +86,17 @@ export function unreadableError(
 /** `input.catalog_unreadable` for a catalog file that was read but cannot be loaded (Python's
  * `catalog_file_unloadable`, 18.184i): not UTF-8, YAML the engine refuses (a key written twice included), or not
  * one mapping. `problem` completes "<rel> ...". */
-export function catalogFileUnloadable(dir: string, rel: string, problem: string): InputError {
+export function catalogFileUnloadable(
+  dir: string,
+  rel: string,
+  problem: string,
+  fix?: string,
+): InputError {
   return new InputError(
     "input.catalog_unreadable",
     `the catalog directory ${dir} holds a file that cannot be loaded: ${rel} ${problem}.`,
-    `fix ${rel} so it is UTF-8 text holding one YAML mapping with each key written once, or ask the catalog's publisher for a corrected copy, then re-run.`,
+    fix ??
+      `fix ${rel} so it is UTF-8 text holding one YAML mapping with each key written once, or ask the catalog's publisher for a corrected copy, then re-run.`,
   );
 }
 

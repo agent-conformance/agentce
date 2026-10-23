@@ -33,7 +33,8 @@ const CASES: [string, unknown, string][] = [
     { value: "FALSE", "as key": { FALSE: "v" } },
     "value: 'FALSE'\nas key:\n  'FALSE': v\n",
   ],
-  ["bare y is a string", { value: "y", "as key": { y: "v" } }, "value: y\nas key:\n  y: v\n"],
+  // 18.184u: text the YAML profile reads as a YAML 1.1 value is single-quoted.
+  ["bare y is quoted", { value: "y", "as key": { y: "v" } }, "value: 'y'\nas key:\n  'y': v\n"],
   [
     "null word",
     { value: "null", "as key": { null: "v" } },
@@ -58,9 +59,9 @@ const CASES: [string, unknown, string][] = [
     "value: '017'\nas key:\n  '017': v\n",
   ],
   [
-    "0o is not an int",
+    "0o is not an int, but is quoted as an octal",
     { value: "0o17", "as key": { "0o17": "v" } },
-    "value: 0o17\nas key:\n  0o17: v\n",
+    "value: '0o17'\nas key:\n  '0o17': v\n",
   ],
   [
     "int hex",
@@ -84,9 +85,9 @@ const CASES: [string, unknown, string][] = [
     "value: '1.0e+3'\nas key:\n  '1.0e+3': v\n",
   ],
   [
-    "exponent needs sign",
+    "exponent without a dot is quoted",
     { value: "1e3", "as key": { "1e3": "v" } },
-    "value: 1e3\nas key:\n  1e3: v\n",
+    "value: '1e3'\nas key:\n  '1e3': v\n",
   ],
   [
     "float sexagesimal",
@@ -372,7 +373,7 @@ const CASES: [string, unknown, string][] = [
   [
     "scalars",
     { int: 1, neg: -12, big: 9007199254740991, t: true, f: false, n: null },
-    "int: 1\nneg: -12\nbig: 9007199254740991\nt: true\nf: false\nn: null\n",
+    "int: 1\nneg: -12\nbig: 9007199254740991\nt: true\nf: false\n'n': null\n",
   ],
   [
     "empty list and mapping",
@@ -396,23 +397,29 @@ for (const [name, value, expected] of CASES) {
   });
 }
 
-test("safeDump: a list met twice gets &id001, then *id001", () => {
+test("safeDump: a list met twice is written out in full each time, never anchored (18.184u)", () => {
   const shared = ["a", "b"];
   assert.equal(
     safeDump({ first: shared, second: shared, nested: [shared, { again: shared }] }),
-    "first: &id001\n- a\n- b\nsecond: *id001\nnested:\n- *id001\n- again: *id001\n",
+    "first:\n- a\n- b\nsecond:\n- a\n- b\nnested:\n- - a\n  - b\n- again:\n  - a\n  - b\n",
   );
 });
 
-test("safeDump: an anchored sequence item puts its block on the next line", () => {
+test("safeDump: a sequence met twice as an item is written out in full each time (18.184u)", () => {
   const seq = [{ x: 1 }];
   assert.equal(
     safeDump({ items: [seq, seq], m: { k: seq } }),
-    "items:\n- &id001\n  - x: 1\n- *id001\nm:\n  k: *id001\n",
+    "items:\n- - x: 1\n- - x: 1\nm:\n  k:\n  - x: 1\n",
   );
 });
 
-test("safeDump: a derived profile whose subjects share one evidence_sources list", () => {
+test("safeDump: a list holding itself is refused", () => {
+  const loop: unknown[] = [];
+  loop.push(loop);
+  assert.throws(() => safeDump({ loop }), TypeError);
+});
+
+test("safeDump: a derived profile whose subjects share one evidence_sources list writes it twice (18.184u)", () => {
   const evidenceSources = [
     {
       adapter: "otel-genai",
@@ -448,7 +455,7 @@ test("safeDump: a derived profile whose subjects share one evidence_sources list
   };
   assert.equal(
     safeDump(profile),
-    "profile_version: 1\nobservation_window:\n  start: '2026-01-01T00:00:00Z'\n  end: '2026-03-31T23:59:59Z'\npilot_window: true\ncatalogs:\n- baseline@2026.09\nsubjects:\n- id: agent-records\n  name: Agent records\n  role: deployer\n  evidence_sources: &id001\n  - adapter: otel-genai\n    source: traces/agent.jsonl\n    class: self_reported\n    class_justification: read from the agent's own trace export; the agent could have\n      written anything in it, so it is recorded as self-reported.\n  declared_tools:\n  - search_docs\n  - send_email\n  declared_models:\n  - gpt-4o-2024-08-06\n- id: support-bot\n  name: Support bot\n  role: deployer\n  evidence_sources: *id001\n  declared_tools: []\n  declared_models:\n  - claude-3-5-sonnet\n",
+    "profile_version: 1\nobservation_window:\n  start: '2026-01-01T00:00:00Z'\n  end: '2026-03-31T23:59:59Z'\npilot_window: true\ncatalogs:\n- baseline@2026.09\nsubjects:\n- id: agent-records\n  name: Agent records\n  role: deployer\n  evidence_sources:\n  - adapter: otel-genai\n    source: traces/agent.jsonl\n    class: self_reported\n    class_justification: read from the agent's own trace export; the agent could have\n      written anything in it, so it is recorded as self-reported.\n  declared_tools:\n  - search_docs\n  - send_email\n  declared_models:\n  - gpt-4o-2024-08-06\n- id: support-bot\n  name: Support bot\n  role: deployer\n  evidence_sources:\n  - adapter: otel-genai\n    source: traces/agent.jsonl\n    class: self_reported\n    class_justification: read from the agent's own trace export; the agent could have\n      written anything in it, so it is recorded as self-reported.\n  declared_tools: []\n  declared_models:\n  - claude-3-5-sonnet\n",
   );
 });
 

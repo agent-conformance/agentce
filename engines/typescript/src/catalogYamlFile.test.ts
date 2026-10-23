@@ -1,6 +1,6 @@
 /**
- * Every catalog YAML file is one mapping read as Python's unique-key loader reads it (18.184i): anything else is
- * refused as input.catalog_unreadable naming the file (Python's tests/test_catalog_yaml_files.py, the same cases).
+ * Every catalog YAML file is one mapping read as Python's loader reads it, under the SPEC 8.7 YAML profile
+ * (18.184i, 18.184u): anything else is refused as input.catalog_unreadable naming the file (Python's tests/test_catalog_yaml_files.py, the same cases).
  */
 
 import assert from "node:assert/strict";
@@ -37,6 +37,8 @@ function append(dir: string, rel: string, tail: Buffer): void {
 const NOT_YAML = "is not YAML the engine can load";
 const NOT_MAPPING = "does not hold one YAML mapping";
 const NOT_UTF8 = "is not valid UTF-8";
+/** The SPEC 8.7 YAML profile's refusal naming `rule` (18.184u); the line follows. */
+const outside = (rule: string): string => `is outside the YAML profile: ${rule} at line `;
 
 const CASES: Record<string, [string, (dir: string) => void, string]> = {
   "control key twice, the weaker last": [
@@ -48,12 +50,12 @@ const CASES: Record<string, [string, (dir: string) => void, string]> = {
         "  min_source_class: self_report\n",
         "  min_source_class: independent_system\n  min_source_class: self_report\n",
       ),
-    NOT_YAML,
+    outside("duplicate_key"),
   ],
   "catalog.yaml key twice": [
     "catalog.yaml",
     (d) => edit(d, "catalog.yaml", 'version: "2026.09"\n', 'version: "2026.09"\nversion: "9"\n'),
-    NOT_YAML,
+    outside("duplicate_key"),
   ],
   "catalog.yaml empty": [
     "catalog.yaml",
@@ -89,17 +91,17 @@ const CASES: Record<string, [string, (dir: string) => void, string]> = {
   "control nested too deeply": [
     CONTROL,
     (d) => writeFileSync(join(d, CONTROL), `x: ${"[".repeat(5000)}${"]".repeat(5000)}\n`),
-    "is nested too deeply to read safely",
+    outside("depth_over_100"),
   ],
   "control python tag": [
     CONTROL,
     (d) => writeFileSync(join(d, CONTROL), "id: !!python/object:object {}\n"),
-    NOT_YAML,
+    outside("tag"),
   ],
   "control second document": [
     CONTROL,
     (d) => append(d, CONTROL, Buffer.from("---\nid: DAT-99\n")),
-    NOT_YAML,
+    outside("second_document"),
   ],
 };
 // 18.184o: a tag PyYAML's SafeLoader constructs but no engine reads in a catalog.
@@ -112,10 +114,11 @@ for (const [tag, value] of Object.entries({
   CASES[`control !!${tag}`] = [
     CONTROL,
     (d) => edit(d, CONTROL, "id: DAT-01\n", `id: DAT-01\nextra: !!${tag} ${value}\n`),
-    NOT_YAML,
+    outside("tag"),
   ];
 }
-// 18.184o: a merge source's tag is checked on its own, and a key it writes twice is refused.
+// 18.184o: a merge source's tag is checked on its own, and a key it writes twice is refused; under the YAML profile
+// (18.184u) the `<<` key itself is refused first.
 for (const [name, merge] of Object.entries({
   "!!set": "!!set {min_source_class: self_report}",
   "!!omap": "!!omap [{min_source_class: self_report}]",
@@ -130,13 +133,13 @@ for (const [name, merge] of Object.entries({
   CASES[`control merge source ${name}`] = [
     CONTROL,
     (d) => edit(d, CONTROL, "id: DAT-01\n", `id: DAT-01\nextra:\n  <<: ${merge}\n`),
-    NOT_YAML,
+    outside("merge_key"),
   ];
 }
 CASES["catalog.yaml !!binary"] = [
   "catalog.yaml",
   (d) => edit(d, "catalog.yaml", "id: eu-ai-act\n", "id: eu-ai-act\nextra: !!binary aGVsbG8=\n"),
-  NOT_YAML,
+  outside("tag"),
 ];
 
 function withCatalog(body: (dir: string) => void): void {
@@ -193,72 +196,79 @@ test("every shipped catalog still loads through the check (18.184i)", () => {
 
 const FLOOR = "  min_source_class: self_report\n";
 
-// 18.184o: a merge key in a control is read as PyYAML merges it (Python's
-// test_a_merge_key_in_a_control_is_read_as_pyyaml_merges, the same cases): an explicit key beats a merged one
-// wherever it is written, and the first source of a merge list wins.
+/** `loadCatalog(dir)` refused as input.catalog_unreadable naming `rel` as outside the YAML profile under `rule`. */
+function assertOutside(dir: string, rel: string, rule: string): void {
+  assert.throws(
+    () => loadCatalog(dir),
+    (err: unknown) => {
+      assert.ok(err instanceof InputError);
+      assert.equal(err.key, "input.catalog_unreadable");
+      assert.ok(err.cause.includes(`cannot be loaded: ${rel} ${outside(rule)}`), err.cause);
+      return true;
+    },
+  );
+}
+
+// 18.184o read a merge key in a control as PyYAML merges it; under the YAML profile (18.184u) the merge key, and
+// the anchor or alias that feeds it, is refused instead (the first one written).
 const MERGES: Record<string, [string, string, string]> = {
-  "inline mapping": ["", "  <<: {min_source_class: independent_system}\n", "independent_system"],
-  alias: ["x-b: &b {min_source_class: independent_system}\n", "  <<: *b\n", "independent_system"],
+  "inline mapping": ["", "  <<: {min_source_class: independent_system}\n", "merge_key"],
+  alias: ["x-b: &b {min_source_class: independent_system}\n", "  <<: *b\n", "anchor"],
   "list, stronger first": [
     "",
     "  <<: [{min_source_class: independent_system}, {min_source_class: self_report}]\n",
-    "independent_system",
+    "merge_key",
   ],
   "list, weaker first": [
     "",
     "  <<: [{min_source_class: self_report}, {min_source_class: independent_system}]\n",
-    "self_report",
+    "merge_key",
   ],
   "nested override": [
     "x-a: &a {min_source_class: self_report}\nx-b: &b {<<: *a, min_source_class: independent_system}\n",
     "  <<: *b\n",
-    "independent_system",
+    "anchor",
   ],
   "explicit key after the merge": [
     "",
     `  <<: {min_source_class: independent_system}\n${FLOOR}`,
-    "self_report",
+    "merge_key",
   ],
   "explicit key before the merge": [
     "",
     "  min_source_class: independent_system\n  <<: {min_source_class: self_report}\n",
-    "independent_system",
+    "merge_key",
   ],
 };
 
-for (const [name, [head, floor, expected]] of Object.entries(MERGES)) {
-  test(`a merge key in a control is read as PyYAML merges it: ${name}`, () => {
+for (const [name, [head, floor, rule]] of Object.entries(MERGES)) {
+  test(`a merge key in a control is refused by the YAML profile: ${name}`, () => {
     withCatalog((dir) => {
       const text = readFileSync(join(dir, CONTROL), "utf-8");
       assert.ok(text.includes(FLOOR));
       writeFileSync(join(dir, CONTROL), head + text.replace(FLOOR, floor));
-      const control = loadCatalog(dir).controls.find((c) => c.id === "DAT-01");
-      assert.equal(control?.minSourceClass, expected);
+      assertOutside(dir, CONTROL, rule);
     });
   });
 }
 
-test("a merged value that is not a source class is refused (18.184o)", () => {
+test("a merged value is refused by the YAML profile before its source class is read (18.184u)", () => {
   withCatalog((dir) => {
     edit(dir, CONTROL, FLOOR, "  <<: {min_source_class: trusted}\n");
-    assert.throws(
-      () => loadCatalog(dir),
-      (err: unknown) =>
-        err instanceof InputError && err.key === "catalog.control.min_source_class_unknown",
-    );
+    assertOutside(dir, CONTROL, "merge_key");
   });
 });
 
-test("a merge key in catalog.yaml is read (18.184o)", () => {
+test("a merge key in catalog.yaml is refused by the YAML profile (18.184u)", () => {
   withCatalog((dir) => {
     edit(dir, "catalog.yaml", 'version: "2026.09"\n', '<<: {version: "2026.09"}\n');
-    assert.equal(loadCatalog(dir).version, "2026.09");
+    assertOutside(dir, "catalog.yaml", "merge_key");
   });
 });
 
-test("explicit core tags stay readable (18.184o)", () => {
+test("explicit core tags are refused by the YAML profile (18.184u)", () => {
   withCatalog((dir) => {
     edit(dir, CONTROL, "id: DAT-01\n", "id: !!str DAT-01\nsince: !!timestamp 2026-01-02\n");
-    assert.ok(loadCatalog(dir).controls.some((c) => c.id === "DAT-01"));
+    assertOutside(dir, CONTROL, "tag");
   });
 });
