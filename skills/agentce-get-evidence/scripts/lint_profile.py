@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import datetime
 import sys
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -355,14 +356,26 @@ def _body(argv: list[str]) -> int:
     domain_path = arg_value(argv, "--domain")
     if "--domain" in argv and domain_path is None:
         return _input_error("pass --domain <file>", want_json)
+    from agentce.errors import InputError
+    from agentce.safe_yaml import load_untrusted_yaml
+
     try:
-        profile = yaml.safe_load(open(path, encoding="utf-8"))
+        # Read as the engine reads them: under the SPEC 8.7 YAML profile (18.184u).
+        profile = load_untrusted_yaml(
+            Path(path), key="input.profile_invalid", what="the applicability profile"
+        )
         domain = (
             None
             if domain_path is None
-            else yaml.safe_load(open(domain_path, encoding="utf-8"))
+            else load_untrusted_yaml(
+                Path(domain_path),
+                key="input.domain_binding_invalid",
+                what="the domain binding",
+            )
         )
-    except (OSError, yaml.YAMLError) as exc:
+    except InputError as exc:
+        return _input_error(exc.cause, want_json)
+    except OSError as exc:
         return _input_error(str(exc), want_json)
     findings = lint(profile, domain)
     payload = {

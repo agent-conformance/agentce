@@ -13,7 +13,6 @@ import json
 import sys
 from pathlib import Path
 
-import yaml
 
 from _common import FINDINGS, INPUT_ERROR, OK, Finding, arg_value, emit, run_guarded
 
@@ -59,7 +58,12 @@ def _validate_profile(path: Path) -> list[Finding]:
         .read_text(encoding="utf-8")
     )
     schema = json.loads(schema_text)
-    profile = yaml.safe_load(path.read_text(encoding="utf-8"))
+    from agentce.safe_yaml import load_untrusted_yaml
+
+    # Read as the engine reads it: under the SPEC 8.7 YAML profile (18.184u).
+    profile = load_untrusted_yaml(
+        path, key="input.profile_invalid", what="the applicability profile"
+    )
     validator = jsonschema.validators.validator_for(schema)(schema)
     return [
         Finding(

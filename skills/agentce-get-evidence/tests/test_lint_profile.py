@@ -215,3 +215,12 @@ def test_shipped_applicability_template_lints_clean() -> None:
         / "applicability.template.yaml"
     )
     assert lint_profile.main(["--profile", str(template)]) == lint_profile.OK
+
+
+def test_a_profile_outside_the_yaml_profile_is_an_input_error(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """The lint reads the files as the engine does, under SPEC 8.7 (18.184u)."""
+    profile = tmp_path / "p.yaml"
+    profile.write_text(
+        yaml.safe_dump(_conduct_profile()) + "x-note: &a yes\n", encoding="utf-8"
+    )
+    assert lint_profile.main(["--profile", str(profile)]) == lint_profile.INPUT_ERROR

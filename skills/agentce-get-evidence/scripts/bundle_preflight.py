@@ -14,7 +14,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import yaml
 
 from _common import FINDINGS, INPUT_ERROR, OK, Finding, arg_value, emit, run_guarded
 
@@ -23,7 +22,14 @@ def _profile_source_classes(profile_path: str | None) -> dict[str, str]:
     """Map source id -> declared trust class from a profile's evidence_sources."""
     if not profile_path:
         return {}
-    data = yaml.safe_load(Path(profile_path).read_text(encoding="utf-8"))
+    from agentce.safe_yaml import load_untrusted_yaml
+
+    # Read as the engine reads it: under the SPEC 8.7 YAML profile (18.184u).
+    data = load_untrusted_yaml(
+        Path(profile_path),
+        key="input.profile_invalid",
+        what="the applicability profile",
+    )
     classes: dict[str, str] = {}
     if isinstance(data, dict):
         for subject in data.get("subjects", []) or []:

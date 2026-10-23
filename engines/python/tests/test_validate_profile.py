@@ -92,3 +92,16 @@ def test_main_missing_file_exits_one(tmp_path: Path) -> None:
 
 def test_main_usage_error_exits_two() -> None:
     assert vp.main([]) == 2
+
+
+def test_main_refuses_a_profile_outside_the_yaml_profile(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The validator reads the file as the engine does: an anchor is outside SPEC 8.7 (18.184u)."""
+    path = tmp_path / "p.yaml"
+    path.write_text(
+        _VALID_PROFILE.replace("profile_version: 1", "profile_version: &v 1"),
+        encoding="utf-8",
+    )
+    assert vp.main([str(path)]) == 1
+    assert "outside the YAML profile: anchor at line" in capsys.readouterr().err

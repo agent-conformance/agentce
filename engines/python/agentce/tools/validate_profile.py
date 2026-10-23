@@ -20,9 +20,10 @@ from pathlib import Path
 from typing import Any
 
 import jsonschema
-import yaml
 
 from .. import signing
+from ..errors import InputError
+from ..safe_yaml import load_untrusted_yaml
 
 
 def _schema() -> dict[str, Any]:
@@ -60,12 +61,15 @@ def main(argv: list[str] | None = None) -> int:
         if not signing.is_regular_file(path):
             print(f"PROFILE INVALID: {path} is not a file", file=sys.stderr)
             return 1
-        instance = yaml.safe_load(path.read_text(encoding="utf-8"))
+        # Read as the engine reads it: under the SPEC 8.7 YAML profile (18.184u).
+        instance = load_untrusted_yaml(
+            path, key="input.profile_invalid", what="the applicability profile"
+        )
     except PermissionError:  # the same answer on every Python, no traceback (18.169)
         print(f"PROFILE INVALID: {path} could not be read", file=sys.stderr)
         return 1
-    except yaml.YAMLError as exc:
-        print(f"PROFILE INVALID: not well-formed YAML: {exc}", file=sys.stderr)
+    except InputError as exc:
+        print(f"PROFILE INVALID: {exc.cause}", file=sys.stderr)
         return 1
     errors = validate_profile(instance)
     if errors:
