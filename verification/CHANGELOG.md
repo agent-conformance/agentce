@@ -3,6 +3,14 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.117.0
+
+- `VG-JSON-INTEGER-LIMIT` (18.184q, changed): two seeded faults follow the code they break. Python's
+  `runtime_drift.jsonl` line check now reads each line with `load_report_json` and requires an object, so its fault
+  puts `json.loads` back at that line; TypeScript's `report --validate` now reads every artifact with
+  `parseReportJson`, so its fault drops the digit limit in `json.ts`'s reader instead of in the manifest-only
+  `parseJsonText`.
+
 ## 0.116.0
 
 - `VG-PATHLIB-PREDICATES` (18.169, changed): the baseline now holds only the three sites whose path never comes from

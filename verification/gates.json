@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.116.0",
+  "suite_version": "0.117.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -2617,14 +2617,14 @@
         {
           "description": "Python's runtime_drift.jsonl line check goes back to json.loads, which raises a bare ValueError the JSONError handler does not catch",
           "file": "engines/python/agentce/report.py",
-          "search": "            load_json(line)\n        except JSONError as exc:\n            problems.append(f\"{filename}: line {i}",
-          "replace": "            json.loads(line)\n        except JSONError as exc:\n            problems.append(f\"{path.name}: line {i}"
+          "search": "            if not isinstance(load_report_json(line), dict):\n",
+          "replace": "            if not isinstance(json.loads(line), dict):\n"
         },
         {
-          "description": "TypeScript's report --validate parses with the native JSON.parse alone, which accepts the over-limit literal",
-          "file": "engines/typescript/src/reportValidate.ts",
-          "search": "  parseJson(text); // throws only",
-          "replace": "  // parseJson(text); // throws only"
+          "description": "TypeScript's report-file reader drops the digit limit, so report --validate accepts the over-limit literal",
+          "file": "engines/typescript/src/json.ts",
+          "search": "    if (!fraction && token.length - (token[0] === \"-\" ? 1 : 0) > MAX_INT_STR_DIGITS) {\n",
+          "replace": "    if (!fraction && false) {\n"
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; the rule lives in engines/python/agentce/safe_json.py (load_json), engines/typescript/src/json.ts (parseJson) and engines/java/src/main/java/org/agentce/Json.java (Json.parse); report --validate's TypeScript use is parseJsonText in engines/typescript/src/reportValidate.ts."
