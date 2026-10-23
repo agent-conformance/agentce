@@ -240,12 +240,14 @@ def test_verify_empty_value_with_a_second_real_target_uses_the_real_one(
 def test_verify_repeated_target_flag_refuses(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """`--catalog A --catalog B` used to silently take argparse's default last-value-wins behaviour,
-    which TypeScript's and Java's own first-occurrence argv scan disagreed with for the identical
-    command line; now all three refuse (verifier round 2, 18.65)."""
+    """`--catalog A --catalog B` is a repeated option the SPEC 8.5 grammar refuses, before any
+    target is read (18.184w)."""
     code, env = run(["verify", "--catalog", "a", "--catalog", "b", "--json"], capsys)
     assert code == 3
-    assert env["error"]["key"] == "input.verify_target"
+    assert (env["error"]["key"], env["error"]["cause"]) == (
+        "input.verify_unrecognized_flag",
+        "flag '--catalog' was given more than once.",
+    )
 
 
 def test_verify_equals_form_target_flag(
@@ -1519,7 +1521,7 @@ def test_sign_cli_usage_error_is_the_keyed_envelope(
             ["--catalog", "x", "--signer-trust-root"],
             "flag '--signer-trust-root' needs a value.",
         ),
-        (["--json=1", "--catalog", "x"], "flag '--json' takes no value."),
+        (["--quiet=1", "--catalog", "x"], "flag '--quiet' takes no value."),
     ],
 )
 def test_verify_cli_usage_error_is_the_keyed_envelope(
@@ -1758,11 +1760,12 @@ def test_keyless_cert_window_ignores_the_clock(
             "sign",
             "input.sign_unrecognized_flag",
         ),
-        (["assess", "--out", "-1", "-hx"], "assess", "input.assess_unrecognized_flag"),
+        # A dash-led token is never a value without `=` (SPEC 8.5): needs a value.
+        (["assess", "--out", "-1", "-hx"], "assess", "input.assess_flag_needs_value"),
         (
             ["assess", "--out", "-a b", "-hh"],
             "assess",
-            "input.assess_unrecognized_flag",
+            "input.assess_flag_needs_value",
         ),
         (
             ["quickstart", "--out", "-", "-hx"],
@@ -1782,8 +1785,13 @@ def test_every_argv_error_is_keyed(
     """Every argparse usage error on every command is a keyed exit-3 envelope naming the command
     typed: an unknown flag or command, a value-less flag, a bad choice, an extra argument, an
     abbreviation and a clustered short option (18.107, KD-086)."""
+    before_dashdash = argv[: argv.index("--")] if "--" in argv else argv
     head = (
-        ["--json", *argv] if argv[0].startswith("-") else [argv[0], "--json", *argv[1:]]
+        argv
+        if "--json" in before_dashdash
+        else ["--json", *argv]
+        if argv[0].startswith("-")
+        else [argv[0], "--json", *argv[1:]]
     )
     code, env = run(head, capsys)
     assert (code, env["command"], env["error"]["key"]) == (3, command, key)

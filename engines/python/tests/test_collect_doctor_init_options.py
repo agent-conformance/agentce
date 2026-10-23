@@ -132,7 +132,7 @@ def test_init_without_the_removed_flag_still_writes(
     ]
 
 
-def test_doctor_write_errors_alone_writes_the_catalogue(
+def test_doctor_repeated_write_errors_is_refused_and_writes_nothing(
     tmp_path: Path, capsys, monkeypatch
 ) -> None:
     code, _ = _run(
@@ -141,8 +141,8 @@ def test_doctor_write_errors_alone_writes_the_catalogue(
         tmp_path,
         monkeypatch,
     )
-    assert code == 0
-    assert _files(tmp_path) == ["b.md"]
+    assert code == 3
+    assert _files(tmp_path) == []
 
 
 @pytest.mark.parametrize("out", [["--out", "b"], ["--out=b"]])
