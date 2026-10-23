@@ -962,10 +962,7 @@
         "b"
       ],
       "exit": 3,
-      "key": "input.verify_unrecognized_flag",
-      "engines": [
-        "python"
-      ]
+      "key": "input.verify_unrecognized_flag"
     },
     {
       "id": "verify-repeated-expect-keyid",
@@ -980,10 +977,7 @@
         "k2"
       ],
       "exit": 3,
-      "key": "input.verify_unrecognized_flag",
-      "engines": [
-        "python"
-      ]
+      "key": "input.verify_unrecognized_flag"
     },
     {
       "id": "readiness-repeated-trust-root",
