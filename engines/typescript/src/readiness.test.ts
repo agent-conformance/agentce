@@ -209,6 +209,29 @@ const NOT_JSONL: Record<string, (r: string) => string> = {
   trail_nbsp: (r) => `${r} \n`,
   nbsp_line: (r) => ` \n${r}\n`,
 };
+// The JSON profile rule each line above breaks (SPEC 8.7): FF, NEL, LS, PS and a lone CR are not line
+// ends, so the line runs on past them; VT and NBSP are not whitespace.
+const NOT_JSONL_RULE: Record<string, string> = {
+  vt: "extra_value",
+  ff: "jsonl_line_split",
+  nel: "jsonl_line_split",
+  ls: "jsonl_line_split",
+  ps: "jsonl_line_split",
+  lone_cr: "jsonl_line_split",
+  lone_cr_no_lf: "jsonl_line_split",
+  lead_nbsp: "syntax",
+  lead_bom: "bom",
+  trail_nbsp: "extra_value",
+  nbsp_line: "syntax",
+};
+
+/** The NOT READY reason for an unreadable report file; one outside the JSON profile names the rule
+ * and line (SPEC 8.7, 18.184x). */
+function cannotRead(name: string, rule?: string): string {
+  return rule === undefined
+    ? `cannot read report file ${name}`
+    : `cannot read report file ${name}: outside the JSON profile: ${rule} at line 1 (SPEC 8.7)`;
+}
 const JSONL_OK: Record<string, (r: string) => string> = {
   crlf: (r) => `${r}\r\n`,
   space_tab: (r) => `\t ${r} \t\n`,
@@ -224,7 +247,7 @@ for (const [name, record] of Object.entries(JSONL_RECORD)) {
       const dir = report();
       writeFileSync(join(dir, name), lines(record));
       assert.deepEqual(computeReadiness(dir, { severities: SEVERITIES }).reasons, [
-        `cannot read report file ${name}`,
+        cannotRead(name, NOT_JSONL_RULE[id]),
       ]);
     });
   }
@@ -238,7 +261,7 @@ for (const [name, record] of Object.entries(JSONL_RECORD)) {
       ]),
     );
     assert.deepEqual(computeReadiness(dir, { severities: SEVERITIES }).reasons, [
-      `cannot read report file ${name}`,
+      cannotRead(name, "invalid_utf8"),
     ]);
   });
   for (const [id, lines] of Object.entries(JSONL_OK)) {
@@ -766,13 +789,13 @@ test("normalizeDeviationDates passes a plain string, number, or boolean through 
 
 // A report file that is not JSON of its shape reads NOT READY, never a crash and never READY (inbox
 // row 393, 18.184h), and so does an inner coverage entry of the wrong shape (watch ruling 2026-10-21).
-for (const [name, text] of [
+const MALFORMED: [string, string, string?][] = [
   ["coverage.json", "null"],
   ["coverage.json", "[]"],
   ["coverage.json", '"x"'],
   ["coverage.json", "3"],
-  ["coverage.json", ""],
-  ["coverage.json", "{"],
+  ["coverage.json", "", "syntax"],
+  ["coverage.json", "{", "syntax"],
   ["coverage.json", '{"subjects": []}'],
   ["coverage.json", '{"subjects": null}'],
   ["coverage.json", '{"subjects": {"s": 3}}'],
@@ -781,23 +804,24 @@ for (const [name, text] of [
   ["coverage.json", '{"subjects": {"s": {"event_types": {"t": 3}}}}'],
   ["assertions.json", "null"],
   ["assertions.json", "{}"],
-  ["assertions.json", ""],
+  ["assertions.json", "", "syntax"],
   ["assertions.json", "[3]"],
   ["assertions.json", "[null]"],
-  ["integrity.jsonl", "not json\n"],
+  ["integrity.jsonl", "not json\n", "syntax"],
   ["integrity.jsonl", "3\n"],
   ["applicability.jsonl", "[]\n"],
   ["applicability.jsonl", '{"drift": {"kind": "k", "ref": "r"}}\n'],
   ["applicability.jsonl", '{"drift": "x"}\n'],
   ["applicability.jsonl", '{"drift": null}\n'],
   ["applicability.jsonl", '{"drift": [3]}\n'],
-] as const) {
+];
+for (const [name, text, rule] of MALFORMED) {
   test(`${name} reading ${JSON.stringify(text)} is NOT READY, named (18.184h)`, () => {
     const dir = report();
     writeFileSync(join(dir, name), text);
     const verdict = computeReadiness(dir, { severities: SEVERITIES });
     assert.equal(verdict.verdict, NOT_READY);
-    assert.deepEqual(verdict.reasons, [`cannot read report file ${name}`]);
+    assert.deepEqual(verdict.reasons, [cannotRead(name, rule)]);
   });
 }
 
@@ -805,7 +829,7 @@ test("a coverage.json that is not UTF-8 is NOT READY (18.184h)", () => {
   const dir = report();
   writeFileSync(join(dir, "coverage.json"), Buffer.from('{"subjects": {}}\xff', "latin1"));
   assert.deepEqual(computeReadiness(dir, { severities: SEVERITIES }).reasons, [
-    "cannot read report file coverage.json",
+    cannotRead("coverage.json", "invalid_utf8"),
   ]);
 });
 

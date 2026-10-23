@@ -16,7 +16,7 @@ import {
   load as yamlLoad,
 } from "js-yaml";
 import { InputError } from "./errors";
-import { jsonlLines, parseReportJson } from "./json";
+import { JsonProfileError, decodeProfile, jsonlLines, parseReportJson } from "./json";
 import { byteCompare, decodeUtf8Strict, joinPath, normalizePosixPath, pyRepr, pyStr } from "./util";
 import { MAX_DEPTH, ProfileViolation, YamlProfileError, profileViolation } from "./yamlProfile";
 
@@ -1268,9 +1268,20 @@ function readReportFile(path: string): string | undefined {
   if (!statSync(path).isFile()) {
     throw new Error(`${path} is not a regular file`);
   }
-  // Bytes that are not UTF-8 are unreadable, as Python's strict decode makes them; a BOM is kept, so
-  // JSON.parse refuses it as json.loads does.
-  return decodeUtf8Strict(readFileSync(path));
+  // Bytes that are not UTF-8, or a byte-order mark, put the file outside the JSON profile (SPEC 8.7).
+  return decodeProfile(readFileSync(path), "refuse");
+}
+
+/** The {@link JsonProfileError} at the root of `exc`'s cause chain, if any. */
+function profileCause(exc: unknown): JsonProfileError | undefined {
+  let current = exc;
+  while (current instanceof Error) {
+    if (current instanceof JsonProfileError) {
+      return current;
+    }
+    current = current.cause;
+  }
+  return undefined;
 }
 
 /** Every entry an object, or the file is unreadable (a report file of the wrong shape). */
@@ -1291,7 +1302,7 @@ function strings(record: Record<string, unknown>, ...fields: string[]): Record<s
 }
 
 function parseJsonl(text: string): Record<string, unknown>[] {
-  return objects(jsonlLines(text).map(([, line]) => parseReportJson(line)));
+  return objects(jsonlLines(text).map(([n, line]) => parseReportJson(line, n)));
 }
 
 /** Every status integrity-result.schema.json allows; a record with no status or another one is unreadable. */
@@ -1451,8 +1462,10 @@ export function computeReadiness(
       if (text !== undefined) {
         return parse(text);
       }
-    } catch {
-      reasons.push(`cannot read report file ${name}`);
+    } catch (exc) {
+      // The profile rule and line when the file is outside the JSON profile (SPEC 8.7).
+      const rule = profileCause(exc);
+      reasons.push(`cannot read report file ${name}${rule ? `: ${rule.message}` : ""}`);
       return undefined;
     }
     reasons.push(`missing report file ${name}`);

@@ -108,7 +108,10 @@ test("case 3: invalid JSON is reported as invalid JSON, not a crash", () => {
   try {
     writeFileSync(join(out, "manifest.json"), "not json{");
     const problems = validateReport(out);
-    assert.ok(problems.some((p) => p.startsWith("manifest.json: invalid JSON")));
+    assert.ok(
+      problems.includes("manifest.json: outside the JSON profile: syntax at line 1 (SPEC 8.7)"),
+      problems.join("\n"),
+    );
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
@@ -343,13 +346,10 @@ test("runtime_drift.jsonl is read by the JSON Lines rule, with the same line num
     writeFileSync(drift, '{"subject": "x"}\r\n \t\r\n{"subject":\r"y"}\n');
     assert.deepEqual(ofDrift(), []);
     writeFileSync(drift, '{"subject": "x"}\n\n{"a": 1}\u000b{"b": 2}\n ');
-    assert.deepEqual(
-      ofDrift().map((p) => p.split(" (")[0]),
-      [
-        "runtime_drift.jsonl: line 3 is not valid JSON",
-        "runtime_drift.jsonl: line 4 is not valid JSON",
-      ],
-    );
+    assert.deepEqual(ofDrift(), [
+      "runtime_drift.jsonl: outside the JSON profile: extra_value at line 3 (SPEC 8.7)",
+      "runtime_drift.jsonl: outside the JSON profile: jsonl_line_split at line 4 (SPEC 8.7)",
+    ]);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
@@ -393,7 +393,12 @@ test("case 12/13: runtime_drift.jsonl is fine when every line parses, flagged on
 
     writeFileSync(join(out, "runtime_drift.jsonl"), '{"subject": "x"}\nnot json at all\n');
     const problems = validateReport(out);
-    assert.ok(problems.some((p) => p.startsWith("runtime_drift.jsonl: line 2 is not valid JSON")));
+    assert.ok(
+      problems.includes(
+        "runtime_drift.jsonl: outside the JSON profile: syntax at line 2 (SPEC 8.7)",
+      ),
+      problems.join("\n"),
+    );
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
@@ -597,23 +602,17 @@ test("two keywords at one location order by keyword", () => {
   );
 });
 
-// An integer literal over 4300 digits is invalid JSON, as Python's `json.loads` and Java's
-// `Json.parse` read it (item 18.71); the native `JSON.parse` would accept it.
+// An integer literal over 4300 digits is outside the JSON profile in every engine (SPEC 8.7, 18.184x);
+// the native `JSON.parse` would accept it.
 const BIG = "9".repeat(5000);
-const TOO_LONG = "Integer literal exceeds 4300 digits";
+const OUTSIDE = "outside the JSON profile: integer_digit_limit at line 1 (SPEC 8.7)";
 
-for (const [artifact, prefix] of [
-  ["assertions.json", "assertions.json: invalid JSON ("],
-  ["manifest.json", "manifest.json: invalid JSON ("],
-  ["runtime_drift.jsonl", "runtime_drift.jsonl: line 1 is not valid JSON ("],
-] as const) {
-  test(`an integer literal over 4300 digits in ${artifact} is one invalid-JSON problem`, () => {
+for (const artifact of ["assertions.json", "manifest.json", "runtime_drift.jsonl"]) {
+  test(`an integer literal over 4300 digits in ${artifact} is one profile problem`, () => {
     const out = freshFullReport();
     try {
       writeFileSync(join(out, artifact), `{"n": ${BIG}}\n`);
-      const problems = validateReport(out);
-      assert.equal(problems.length, 1, problems.join("\n"));
-      assert.ok(problems[0].startsWith(prefix) && problems[0].includes(TOO_LONG), problems[0]);
+      assert.deepEqual(validateReport(out), [`${artifact}: ${OUTSIDE}`]);
     } finally {
       rmSync(out, { recursive: true, force: true });
     }
@@ -627,11 +626,7 @@ test("an integer literal over 4300 digits in manifest.json records no outputs", 
       join(out, "manifest.json"),
       `{"outputs": {"runtime_drift.jsonl": "x"}, "n": ${BIG}}`,
     );
-    const problems = validateReport(out);
-    assert.equal(problems.length, 1, problems.join("\n"));
-    assert.ok(
-      problems[0].startsWith("manifest.json: invalid JSON (") && problems[0].includes(TOO_LONG),
-    );
+    assert.deepEqual(validateReport(out), [`manifest.json: ${OUTSIDE}`]);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }

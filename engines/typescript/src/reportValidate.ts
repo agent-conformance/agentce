@@ -403,7 +403,7 @@ function validateJsonl(text: string, filename: string): string[] {
     try {
       value = parseReportJson(line, n);
     } catch (exc) {
-      problems.push(`${filename}: line ${n} is not valid JSON (${(exc as Error).message})`);
+      problems.push(`${filename}: ${(exc as Error).message}`);
       continue;
     }
     if (!isRecord(value)) {
@@ -525,7 +525,7 @@ export function validateReport(outDir: string): string[] {
     try {
       instance = parseReportJson(text);
     } catch (exc) {
-      problems.push(`${filename}: invalid JSON (${(exc as Error).message})`);
+      problems.push(`${filename}: ${(exc as Error).message}`);
       continue;
     }
     if (filename === "assertions.json") {
@@ -566,7 +566,7 @@ export function validateReport(outDir: string): string[] {
       try {
         parseReportJson(text);
       } catch (exc) {
-        problems.push(`${filename}: invalid JSON (${(exc as Error).message})`);
+        problems.push(`${filename}: ${(exc as Error).message}`);
       }
       continue;
     }
