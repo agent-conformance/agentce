@@ -27,6 +27,14 @@ import sys
 from pathlib import Path
 
 import yaml
+
+
+class _NoAliasDumper(yaml.SafeDumper):
+    """Writes a value met twice in full: an anchor is outside the SPEC 8.7 YAML profile."""
+
+    def ignore_aliases(self, data):
+        return True
+
 from fixture_integrity import chain_streams
 
 doc = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
@@ -74,13 +82,13 @@ for name, case in doc["cases"].items():
         if denominators:
             entry["coverage_denominators"] = denominators
         profile["subjects"].append(entry)
-    (case_dir / "applicability.yaml").write_text(yaml.safe_dump(profile, sort_keys=False), encoding="utf-8")
+    (case_dir / "applicability.yaml").write_text(yaml.dump(profile, Dumper=_NoAliasDumper, sort_keys=False), encoding="utf-8")
     (case_dir / "expected.json").write_text(json.dumps(case["expected"]), encoding="utf-8")
     (case_dir / "mode").write_text(case.get("mode", "bundle") + "\n", encoding="utf-8")
     if case.get("deviations"):
-        (case_dir / "deviations.yaml").write_text(yaml.safe_dump(case["deviations"], sort_keys=False), encoding="utf-8")
+        (case_dir / "deviations.yaml").write_text(yaml.dump(case["deviations"], Dumper=_NoAliasDumper, sort_keys=False), encoding="utf-8")
     if case.get("gaps"):
-        (case_dir / "gaps.yaml").write_text(yaml.safe_dump(case["gaps"], sort_keys=False), encoding="utf-8")
+        (case_dir / "gaps.yaml").write_text(yaml.dump(case["gaps"], Dumper=_NoAliasDumper, sort_keys=False), encoding="utf-8")
 PY
 
 for pid in "${builds[@]}"; do

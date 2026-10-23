@@ -35,6 +35,14 @@ from pathlib import Path
 
 import yaml
 
+
+class _NoAliasDumper(yaml.SafeDumper):
+    """Writes a value met twice in full: an anchor is outside the SPEC 8.7 YAML profile."""
+
+    def ignore_aliases(self, data):
+        return True
+
+
 from agentce import cli
 
 work = Path(sys.argv[1])
@@ -48,7 +56,7 @@ def assess(name: str, folder: str, profile: dict | None = None) -> Path:
     argv = ["assess", str(work / folder), "--out", str(out), "--json"]
     if profile is not None:
         path = work / f"{name}.yaml"
-        path.write_text(yaml.safe_dump(profile), encoding="utf-8")
+        path.write_text(yaml.dump(profile, Dumper=_NoAliasDumper), encoding="utf-8")
         argv[2:2] = ["--profile", str(path)]
     with contextlib.redirect_stdout(io.StringIO()) as buf:
         code = cli.main(argv)
