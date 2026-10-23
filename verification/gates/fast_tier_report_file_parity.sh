@@ -18,13 +18,12 @@ ROOT_KEYS = {"name", "on", "concurrency", "permissions", "jobs"}
 
 path = sys.argv[1]
 with open(path, encoding="utf-8") as handle:
-    workflow = yaml.safe_load(handle)
+    workflow = {"on" if key is True else key: value for key, value in yaml.safe_load(handle).items()}  # PyYAML reads `on:` as True
 problems = []
 
-extra = {"on" if key is True else key for key in workflow} - ROOT_KEYS  # PyYAML reads `on:` as True
-if extra:
-    problems.append(f"workflow root carries {sorted(map(str, extra))}, which can change how every run: line executes")
-on = workflow.get("on", workflow.get(True)) or {}
+if set(workflow) - ROOT_KEYS:
+    problems.append(f"workflow root carries {sorted(set(workflow) - ROOT_KEYS)}, which can change how every run: line executes")
+on = workflow.get("on") or {}
 push = on.get("push") if isinstance(on, dict) else None
 if not isinstance(push, dict) or "phase/**" not in (push.get("branches") or []):
     problems.append("on.push.branches does not include phase/**, so phase pushes do not run the checks")
@@ -32,28 +31,32 @@ elif set(push) - {"branches"}:
     problems.append(f"on.push carries a filter {sorted(set(push) - {'branches'})}, so some phase pushes skip the checks")
 
 jobs = workflow.get("jobs") or {}
-owners = {tool: [n for n, j in jobs.items() if f"tools/{tool}_parity_check.py" in yaml.safe_dump(j)] for tool in TOOLS}
-for tool, names in owners.items():
-    if len(names) != 1:
-        problems.append(f"{tool}_parity_check.py is named in {len(names)} jobs {names}, expected exactly one")
-names = {n for found in owners.values() for n in found}
-for name in sorted(names):
+run_lines = {
+    name: [line.strip() for step in job.get("steps") or [] for line in str(step.get("run", "")).splitlines()]
+    for name, job in jobs.items()
+}
+owner_jobs = set()
+for tool in TOOLS:
+    owners = [name for name, lines in run_lines.items() if any(f"tools/{tool}_parity_check.py" in line for line in lines)]
+    if len(owners) != 1:
+        problems.append(f"{tool}_parity_check.py runs in {len(owners)} jobs {owners}, expected exactly one")
+    owner_jobs.update(owners)
+for name in sorted(owner_jobs):
     job = jobs[name]
     if set(job) - JOB_KEYS:
         problems.append(f"job {name} carries {sorted(set(job) - JOB_KEYS)}, which can skip or excuse it")
     minutes = job.get("timeout-minutes")
-    if not isinstance(minutes, int) or isinstance(minutes, bool) or not 0 < minutes <= 20:
+    if type(minutes) is not int or not 0 < minutes <= 20:
         problems.append(f"job {name} timeout-minutes is {minutes!r}, expected 1 to 20")
-    lines = []
     for step in job.get("steps") or []:
         if set(step) - STEP_KEYS:
             problems.append(f"job {name} has a step carrying {sorted(set(step) - STEP_KEYS)}")
-        lines += [line.strip() for line in str(step.get("run", "")).splitlines()]
     for tool in TOOLS:
         command = f"uv run --project tools --frozen python tools/{tool}_parity_check.py"
         for wanted in (f"{command} --self-test", command):
-            if lines.count(wanted) != 1:
-                problems.append(f"job {name} runs `{wanted}` {lines.count(wanted)} times as a whole line, expected once")
+            count = run_lines[name].count(wanted)
+            if count != 1:
+                problems.append(f"job {name} runs `{wanted}` {count} times as a whole line, expected once")
 
 for problem in problems:
     print(f"FAIL: {path}: {problem}")
