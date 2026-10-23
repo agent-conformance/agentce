@@ -49,6 +49,8 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 )
 
 from .canonical import canonicalize
+from .safe_json import MAX_JSON_DEPTH
+from .safe_json import too_deep as _too_deep
 from .error_catalogue import MESSAGE_KEYS
 from .i18n_format import format_message
 
@@ -120,48 +122,12 @@ class UnsignedError(VerificationError):
     """The directory carries no detached signature at all, so there is nothing to verify."""
 
 
-#: The deepest container nesting `parse_untrusted_json` accepts (Jackson's own default limit); all
-#: three engines enforce it with the same byte pre-scan, so they refuse at the same depth.
-MAX_JSON_DEPTH = 1000
-
-
 class JsonTooDeep(ValueError):
     """A document nests containers past :data:`MAX_JSON_DEPTH`. Its text stays "not readable JSON"
     for callers that do not tell depth apart; verify's own readers key it as ``verify.json_too_deep``."""
 
     def __init__(self) -> None:
         super().__init__("not readable JSON")
-
-
-_STRUCTURE = re.compile(rb'["\\\[\]{}]')
-
-
-def _too_deep(raw: bytes) -> bool:
-    """Whether ``raw`` opens more than :data:`MAX_JSON_DEPTH` containers at once, counting ``[``
-    and ``{`` up and ``]`` and ``}`` down outside strings (a backslash in a string skips the next
-    byte). Run before parsing, so depth is found first whatever else is wrong with the bytes."""
-    depth = 0
-    in_string = False
-    escaped_until = -1
-    for match in _STRUCTURE.finditer(raw):
-        i = match.start()
-        if i < escaped_until:
-            continue
-        byte = raw[i]
-        if in_string:
-            if byte == 0x5C:
-                escaped_until = i + 2
-            elif byte == 0x22:
-                in_string = False
-        elif byte == 0x22:
-            in_string = True
-        elif byte in (0x5B, 0x7B):
-            depth += 1
-            if depth > MAX_JSON_DEPTH:
-                return True
-        elif byte in (0x5D, 0x7D):
-            depth -= 1
-    return False
 
 
 _SURROGATE = re.compile("[\ud800-\udfff]")

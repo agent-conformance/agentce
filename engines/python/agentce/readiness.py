@@ -22,7 +22,7 @@ from typing import Any, TypeVar
 import jsonschema
 
 from .coverage import STATUS_UNKNOWN
-from .safe_json import jsonl_lines, refuse_constant
+from .safe_json import JSONError, jsonl_lines, load_report_json
 from .signing import is_regular_file
 
 _T = TypeVar("_T")
@@ -33,6 +33,13 @@ NOT_READY = "NOT READY"
 
 #: Integrity statuses that block a report from being signed (SPEC §13.3.4).
 _BAD_INTEGRITY = frozenset({"failed", "gap", "reordered"})
+#: Every status integrity-result.schema.json allows; a record with no status or another one is unreadable.
+_INTEGRITY_STATUSES = _BAD_INTEGRITY | {
+    "verified",
+    "verified_weak",
+    "unsigned",
+    "time_suspect",
+}
 #: The integrity and coverage family whose findings can never be accepted as a deviation (§13.3.4).
 _INT_FAMILY = "INT"
 #: Default maximum deviation lifetime in days (SPEC §13.3.4; a catalog may set its own).
@@ -69,9 +76,11 @@ class _Unreadable(ValueError):
 
 
 def _parse_json(text: str) -> Any:
+    """One report file's JSON by the rule readiness, sign and ``report --validate`` share
+    (:func:`safe_json.load_report_json`)."""
     try:
-        return json.loads(text, parse_constant=refuse_constant)
-    except ValueError as exc:
+        return load_report_json(text)
+    except JSONError as exc:
         raise _Unreadable(str(exc)) from exc
 
 
@@ -94,8 +103,12 @@ def _jsonl(text: str) -> list[dict[str, Any]]:
 
 
 def _integrity(text: str) -> list[dict[str, Any]]:
-    """integrity.jsonl: one object per line, whose ``status`` (when present) is a string."""
-    return [_strings(record, "status") for record in _jsonl(text)]
+    """integrity.jsonl: one object per line, each with a ``status`` from integrity-result.schema.json's
+    enum. A record without one, or with another value, is unreadable, never read as no break."""
+    records = _jsonl(text)
+    if any(record.get("status") not in _INTEGRITY_STATUSES for record in records):
+        raise _Unreadable("an integrity status is missing or not one the schema allows")
+    return records
 
 
 def _json_object(text: str) -> dict[str, Any]:
@@ -301,6 +314,9 @@ def compute_readiness(
             # type has unknown coverage and masks it in the subject-level roll-up (SPEC §13.3.4).
             if detail.get("status") == "below_threshold":
                 reasons.append(f"coverage shortfall for {subject} {event_type}")
+
+    # Read for its presence and shape only: deleting it must not read READY (SPEC §13.3.4, 18.184q).
+    report_file("quarantine.jsonl", _jsonl)
 
     for statement in report_file("applicability.jsonl", _applicability) or []:
         for drift in statement.get("drift", []):

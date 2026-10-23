@@ -11,6 +11,7 @@ the same on every machine.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from typing import Any
 
@@ -91,3 +92,72 @@ def load_json(text: str | bytes) -> Any:
         raise JSONError(exc.msg, str(exc)) from exc
     except _TooLong:
         raise JSONError(TOO_LONG, TOO_LONG) from None
+
+
+#: The deepest container nesting a strict reader accepts (Jackson's own default limit); all three engines
+#: enforce it with the same byte pre-scan, so they refuse at the same depth.
+MAX_JSON_DEPTH = 1000
+
+_STRUCTURE = re.compile(rb'["\\\[\]{}]')
+
+
+def too_deep(raw: bytes) -> bool:
+    """Whether ``raw`` opens more than :data:`MAX_JSON_DEPTH` containers at once, counting ``[``
+    and ``{`` up and ``]`` and ``}`` down outside strings (a backslash in a string skips the next
+    byte). Run before parsing, so depth is found first whatever else is wrong with the bytes."""
+    depth = 0
+    in_string = False
+    escaped_until = -1
+    for match in _STRUCTURE.finditer(raw):
+        i = match.start()
+        if i < escaped_until:
+            continue
+        byte = raw[i]
+        if in_string:
+            if byte == 0x5C:
+                escaped_until = i + 2
+            elif byte == 0x22:
+                in_string = False
+        elif byte == 0x22:
+            in_string = True
+        elif byte in (0x5B, 0x7B):
+            depth += 1
+            if depth > MAX_JSON_DEPTH:
+                return True
+        elif byte in (0x5D, 0x7D):
+            depth -= 1
+    return False
+
+
+def _unique_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """An ``object_pairs_hook`` that refuses a key written twice in one object. Keys are compared
+    decoded, so ``"st\\u0061tus"`` repeats ``"status"``."""
+    members = dict(pairs)
+    if len(members) != len(pairs):
+        raise ValueError("a key is repeated in one object")
+    return members
+
+
+def load_report_json(text: str) -> Any:
+    """Parse one report file (or one JSON Lines line of one) by the rule every engine's readiness, sign and
+    ``report --validate`` share (SPEC §13.3.4 stage 4): containers nested at most :data:`MAX_JSON_DEPTH`
+    deep, no ``NaN``/``Infinity``/``-Infinity``, integer literals of at most :data:`MAX_INT_STR_DIGITS`
+    digits, and no key repeated within one object. ``json.ts``'s ``parseReportJson`` and
+    ``Json.parseReport`` apply the same rule. Anything else raises :class:`JSONError`."""
+    if too_deep(text.encode("utf-8", "surrogatepass")):
+        raise JSONError(
+            "nested too deep", f"containers nested more than {MAX_JSON_DEPTH} deep"
+        )
+    try:
+        return json.loads(
+            text,
+            parse_constant=refuse_constant,
+            parse_int=_parse_int,
+            object_pairs_hook=_unique_keys,
+        )
+    except json.JSONDecodeError as exc:
+        raise JSONError(exc.msg, str(exc)) from exc
+    except _TooLong:
+        raise JSONError(TOO_LONG, TOO_LONG) from None
+    except ValueError as exc:
+        raise JSONError(str(exc), str(exc)) from exc
