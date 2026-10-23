@@ -21,12 +21,16 @@ import {
   writeFileSync,
 } from "node:fs";
 import { InputError } from "./errors";
+import { JsonProfileError, isJsonInteger, readJson, renderValue } from "./json";
 import { NOT_A_FILE, UNREACHABLE, throughMissingFolder, writeFile } from "./outputs";
 import { byteCompare, joinPath, jsonStringifyAscii, pyRepr, sortKeysDeep } from "./util";
 
 export const STATE_VERSION = 1;
 const STATE_FILE = "state.json";
 const FIX = "choose a writable --state directory.";
+const UNREADABLE_FIX =
+  "restore state.json from the run that wrote it, or move the state directory aside and re-run " +
+  "with --state pointing at a fresh, empty directory.";
 
 type Event = Record<string, unknown>;
 
@@ -108,25 +112,46 @@ export class StateDir {
     if (!isFile(file)) {
       return state;
     }
-    let text: string;
+    let raw: Uint8Array;
     try {
-      text = readFileSync(file, "utf-8");
+      raw = readFileSync(file);
     } catch (err) {
       throw new InputError("input.state_dir_unwritable", (err as Error).message, FIX);
     }
-    const data = JSON.parse(text);
-    const version = Number(data.state_version ?? 0);
-    if (version !== STATE_VERSION) {
+    let parsed: unknown;
+    try {
+      parsed = readJson(raw, "ignore");
+    } catch (err) {
+      if (!(err instanceof JsonProfileError)) {
+        throw err;
+      }
+      throw new InputError(
+        "input.state_unreadable",
+        `the state file ${pyRepr(file)} is ${err.message}.`,
+        UNREADABLE_FIX,
+      );
+    }
+    if (!isRecord(parsed)) {
+      throw new InputError(
+        "input.state_unreadable",
+        `the state file ${pyRepr(file)} does not hold a JSON object.`,
+        UNREADABLE_FIX,
+      );
+    }
+    const data = parsed;
+    const version: unknown = data.state_version ?? 0;
+    // The JSON integer 1 and nothing else (SPEC 8.7): 1.0, "1" and true are not state_version 1.
+    if (!isJsonInteger(version) || version !== STATE_VERSION) {
       throw new InputError(
         "input.state_version_incompatible",
-        `the state directory at ${path} is state_version ${version}, but this engine writes state_version ${STATE_VERSION}.`,
+        `the state directory at ${path} is state_version ${renderValue(version)}, but this engine writes state_version ${STATE_VERSION}.`,
         "there is no migration command: move or delete the state directory and re-run " +
           "with --state pointing at a fresh, empty directory (this discards the prior " +
           "bundle/outcome history recorded there, so late-arriving evidence and drift are " +
           "tracked only from that point forward).",
       );
     }
-    state.version = version;
+    state.version = STATE_VERSION;
     state.bundleDigests = Array.isArray(data.bundle_digests) ? data.bundle_digests.map(String) : [];
     state.lastReportDigest =
       typeof data.last_report_digest === "string" ? data.last_report_digest : null;
