@@ -8,6 +8,7 @@ reason, never dropped, and a folder it can read nothing from is refused before a
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 import shutil
@@ -625,7 +626,8 @@ def test_a_profile_with_several_subjects_never_guesses_an_id_less_record(
     profile = yaml.safe_load((first / "applicability.yaml").read_text(encoding="utf-8"))
     (only,) = profile["subjects"]
     other = "spiffe://corp/agents/other"
-    profile["subjects"] = [only, {**only, "id": other}]
+    # A deep copy, so the dump writes the second subject out in full, not as an alias (SPEC 8.7).
+    profile["subjects"] = [only, {**copy.deepcopy(only), "id": other}]
     two = tmp_path / "two.yaml"
     two.write_text(yaml.safe_dump(profile), encoding="utf-8")
 

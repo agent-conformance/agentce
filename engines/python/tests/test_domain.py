@@ -164,6 +164,23 @@ def _scope_from_yaml(tmp_path: Path, scope: str) -> TaskScope:
     ).task_scopes["a"][0]
 
 
+def _assert_outside_profile(tmp_path: Path, text: str, rule: str, line: int) -> None:
+    """``text`` is refused as the domain binding's key, naming the SPEC 8.7 profile ``rule`` and ``line``."""
+    with pytest.raises(InputError) as caught:
+        _load_text(tmp_path, text)
+    assert caught.value.key == "input.domain_binding_invalid"
+    assert (
+        f"is outside the YAML profile: {rule} at line {line} (SPEC 8.7)"
+        in caught.value.cause
+    )
+
+
+def _assert_scope_outside_profile(tmp_path: Path, scope: str, rule: str) -> None:
+    _assert_outside_profile(
+        tmp_path, f"task_scopes:\n  - {{task_type: a, {scope}}}\n", rule, 2
+    )
+
+
 @pytest.mark.parametrize("value", [".inf", "-.inf", ".nan"])
 @pytest.mark.parametrize("dimension", ["spend", "compute_seconds", "tokens"])
 def test_non_finite_budget_limit_is_unreadable(
@@ -178,32 +195,45 @@ def test_non_finite_budget_limit_is_unreadable(
     ("value", "limit"),
     [
         ("10", 10),
-        ("1_0", 10),
-        ("010", 8),
         ("0x10", 16),
-        ("1e1", None),
         ('"1e1"', None),
         ("2.5", 2.5),
     ],
 )
-def test_budget_limit_spellings_read_as_pyyaml_types_them(
+def test_budget_limit_spellings_in_the_profile_are_read(
     tmp_path: Path, value: str, limit: float | None
 ) -> None:
-    """YAML 1.1 number spellings (18.184g): 1e1 without a dot is a string to PyYAML, so the limit is unreadable."""
+    """A quoted number is text, so the limit is unreadable (18.184g)."""
     assert _scope_from_yaml(tmp_path, f"budgets: {{spend: {value}}}").budgets == (
         ("spend", limit),
     )
 
 
-def test_allowed_tools_yaml11_booleans_are_not_tool_names(tmp_path: Path) -> None:
-    """[yes, on, off] are booleans to PyYAML and name no tool; quoted they are names (18.184g)."""
-    assert (
-        _scope_from_yaml(tmp_path, "allowed_tools: [yes, on, off]").allowed_tools
-        == frozenset()
-    )
+@pytest.mark.parametrize(
+    ("value", "rule"),
+    [
+        ("1_0", "underscore_number"),
+        ("010", "octal"),
+        ("1e1", "exponent_no_dot"),
+        ("1:30", "sexagesimal"),
+    ],
+)
+def test_a_yaml11_budget_limit_spelling_is_refused_outside_the_profile(
+    tmp_path: Path, value: str, rule: str
+) -> None:
+    """A YAML 1.1 number spelling the engines would read differently is refused, never typed (SPEC 8.7)."""
+    _assert_scope_outside_profile(tmp_path, f"budgets: {{spend: {value}}}", rule)
+
+
+@pytest.mark.parametrize("value", ["yes", "on", "off", "n"])
+def test_an_allowed_tools_yaml11_boolean_is_refused_outside_the_profile(
+    tmp_path: Path, value: str
+) -> None:
+    """A YAML 1.1 boolean is refused (SPEC 8.7); quoted it is a tool name (18.184g)."""
+    _assert_scope_outside_profile(tmp_path, f"allowed_tools: [{value}]", "yaml11_bool")
     assert _scope_from_yaml(
-        tmp_path, 'allowed_tools: ["yes"]'
-    ).allowed_tools == frozenset({"yes"})
+        tmp_path, f'allowed_tools: ["{value}"]'
+    ).allowed_tools == frozenset({value})
 
 
 @pytest.mark.parametrize(
@@ -223,13 +253,31 @@ def test_repeated_key_is_refused(tmp_path: Path, text: str) -> None:
     assert caught.value.key == "input.domain_binding_invalid"
 
 
-def test_merge_key_may_be_written_again(tmp_path: Path) -> None:
-    """A key a << merge brings in may be set again, as PyYAML allows (18.184g)."""
-    binding = _load_text(
-        tmp_path,
-        "base: &b {task_type: a, allowed_tools: [x]}\ntask_scopes:\n  - {<<: *b, allowed_tools: [y]}\n",
-    )
-    assert binding.task_scopes["a"][0].allowed_tools == frozenset({"y"})
+@pytest.mark.parametrize(
+    ("text", "rule", "line"),
+    [
+        (
+            "base: &b {task_type: a, allowed_tools: [x]}\ntask_scopes:\n  - {<<: *b, allowed_tools: [z]}\n",
+            "anchor",
+            1,
+        ),
+        (
+            "task_scopes:\n  - {<<: {task_type: a, allowed_tools: [x]}, allowed_tools: [z]}\n",
+            "merge_key",
+            2,
+        ),
+        (
+            "task_scopes:\n  - {allowed_tools: [z], <<: {task_type: a}, budgets: {tokens: 5}}\n",
+            "merge_key",
+            2,
+        ),
+    ],
+)
+def test_a_merge_key_or_anchor_is_refused_outside_the_profile(
+    tmp_path: Path, text: str, rule: str, line: int
+) -> None:
+    """A << merge, with or without an anchor, is refused (SPEC 8.7): which key wins is never read."""
+    _assert_outside_profile(tmp_path, text, rule, line)
 
 
 @pytest.mark.parametrize(
@@ -248,15 +296,14 @@ def test_merge_key_written_twice_is_refused(tmp_path: Path, text: str) -> None:
     assert caught.value.key == "input.domain_binding_invalid"
 
 
-def test_one_merge_key_beside_explicit_keys_still_reads(tmp_path: Path) -> None:
-    """One << with an explicit key written either side still merges, the explicit key winning (18.184k)."""
+def test_the_merged_keys_written_out_in_full_are_read(tmp_path: Path) -> None:
+    """The profile form of a merge: every key written once, in full (SPEC 8.7)."""
     binding = _load_text(
         tmp_path,
-        "b: &b {task_type: a, allowed_tools: [x]}\n"
-        "task_scopes:\n  - {allowed_tools: [y], <<: *b, budgets: {tokens: 5}}\n",
+        "task_scopes:\n  - {allowed_tools: [z], task_type: a, budgets: {tokens: 5}}\n",
     )
     scope = binding.task_scopes["a"][0]
-    assert scope.allowed_tools == frozenset({"y"})
+    assert scope.allowed_tools == frozenset({"z"})
     assert dict(scope.budgets)["tokens"] == 5
 
 
@@ -299,38 +346,57 @@ def test_limit_past_float_range_is_unreadable(tmp_path: Path) -> None:
     ).budgets == (("compute_seconds", None), ("spend", None))
 
 
-def test_explicit_tags_construct_as_safe_loader_does(tmp_path: Path) -> None:
-    """A tag the file writes decides the type, quoted or not (18.184g): the reference Java and TypeScript match."""
-    scope = _scope_from_yaml(
-        tmp_path,
-        'allowed_tools: [!!bool "yes", !!bool "true", !!bool \'on\', !!int "7", !!float "1.5",'
-        " !!str 7, !!str yes, x]",
-    )
+@pytest.mark.parametrize(
+    "scope",
+    [
+        'allowed_tools: [!!bool "yes"]',
+        'allowed_tools: [!!int "7"]',
+        'allowed_tools: [!!float "1.5"]',
+        "allowed_tools: [!!str 7]",
+        "allowed_tools: [!!str yes]",
+        "budgets: {tokens: !!str 1000}",
+        'budgets: {spend: !!int "10"}',
+        'budgets: {compute_seconds: !!float "5"}',
+        'budgets: {tokens: !!int "0o10"}',
+        'budgets: {compute_seconds: !!float "+.5"}',
+        'budgets: {spend: !!float "inf"}',
+        'budgets: {tokens: !!int " 5"}',
+    ],
+)
+def test_an_explicit_core_tag_is_refused_outside_the_profile(
+    tmp_path: Path, scope: str
+) -> None:
+    """A tag never decides a type (SPEC 8.7), so no engine has to match another's int()/float() reading."""
+    _assert_scope_outside_profile(tmp_path, scope, "tag")
+
+
+def test_the_untagged_profile_spellings_are_read(tmp_path: Path) -> None:
+    """Quoting keeps a value text and a plain number is a number, with no tag (SPEC 8.7, 18.184g)."""
+    scope = _scope_from_yaml(tmp_path, 'allowed_tools: ["yes", "7", x]')
     assert scope.allowed_tools == {"7", "x", "yes"}
     assert _scope_from_yaml(
-        tmp_path,
-        'budgets: {tokens: !!str 1000, spend: !!int "10", compute_seconds: !!float "5"}',
+        tmp_path, 'budgets: {tokens: "1000", spend: 10, compute_seconds: 5.0}'
     ).budgets == (("tokens", None), ("compute_seconds", 5.0), ("spend", 10))
 
 
-def test_tagged_text_reads_as_python_int_and_float_do(tmp_path: Path) -> None:
-    """The reference Java and TypeScript match (18.184g): int()/float() spellings, a non-finite limit unreadable."""
-    assert _scope_from_yaml(
-        tmp_path,
-        'budgets: {tokens: !!int "0o10", compute_seconds: !!float "+.5", spend: !!float "inf"}',
-    ).budgets == (("tokens", 8), ("compute_seconds", 0.5), ("spend", None))
-    assert _scope_from_yaml(tmp_path, 'budgets: {tokens: !!int " 5"}').budgets == (
-        ("tokens", 5),
-    )
-
-
 def test_a_date_no_calendar_holds_is_text(tmp_path: Path) -> None:
-    """The reference Java and TypeScript match (18.184g); two date keys stay two keys."""
+    """The reference Java and TypeScript match (18.184g)."""
     assert _scope_from_yaml(
         tmp_path, "allowed_tools: [2021-02-29, 2020-02-29]"
     ).allowed_tools == {"2021-02-29"}
+
+
+def test_a_date_written_as_a_key_is_refused_outside_the_profile(
+    tmp_path: Path,
+) -> None:
+    """A plain date key is not a string key (SPEC 8.7); quoted, it is a key no budget reads."""
+    _assert_scope_outside_profile(
+        tmp_path, "budgets: {2020-01-01: 1, 2020-01-02: 2}", "non_string_key"
+    )
     assert (
-        _scope_from_yaml(tmp_path, "budgets: {2020-01-01: 1, 2020-01-02: 2}").budgets
+        _scope_from_yaml(
+            tmp_path, 'budgets: {"2020-01-01": 1, "2020-01-02": 2}'
+        ).budgets
         == ()
     )
 

@@ -195,26 +195,35 @@ def test_domain_binding_with_calendar_invalid_unquoted_date_does_not_crash(
     DomainBinding.load(path)  # must not raise
 
 
-def test_profile_with_explicit_non_timestamp_tag_does_not_crash(tmp_path: Path) -> None:
-    """An explicit ``!!timestamp`` tag on a value that is not timestamp-shaped at all (``!!timestamp
-    foo``) bypasses the resolver's own shape gate and reaches ``construct_yaml_timestamp`` with no
-    regex match, which raises ``AttributeError`` rather than ``ValueError`` -- a second, narrower
-    crash the calendar-invalid fallback's first ``except ValueError`` alone did not catch (18.17c
-    verifier round 1)."""
+def test_a_profile_with_an_explicit_timestamp_tag_is_refused_outside_the_profile(
+    tmp_path: Path,
+) -> None:
+    """An explicit ``!!timestamp`` tag on a value that is not timestamp-shaped (``!!timestamp foo``) once reached
+    ``construct_yaml_timestamp`` with no regex match (18.17c verifier round 1); a tag is now outside the SPEC 8.7
+    profile, so it is refused under the profile's own key before anything is constructed."""
     path = tmp_path / "profile.yaml"
     path.write_text("observation_window: {start: !!timestamp foo}\n", encoding="utf-8")
 
-    profile = Profile.load(path)
-    assert profile.observation_window["start"] == "foo"
+    with pytest.raises(InputError) as excinfo:
+        Profile.load(path)
+    assert excinfo.value.key == "input.profile_invalid"
+    assert (
+        "is outside the YAML profile: tag at line 1 (SPEC 8.7)" in excinfo.value.cause
+    )
 
 
-def test_domain_binding_with_explicit_non_timestamp_tag_does_not_crash(
+def test_a_domain_binding_with_an_explicit_timestamp_tag_is_refused_outside_the_profile(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "domain.yaml"
     path.write_text("expiry: !!timestamp foo\n", encoding="utf-8")
 
-    DomainBinding.load(path)  # must not raise
+    with pytest.raises(InputError) as excinfo:
+        DomainBinding.load(path)
+    assert excinfo.value.key == "input.domain_binding_invalid"
+    assert (
+        "is outside the YAML profile: tag at line 1 (SPEC 8.7)" in excinfo.value.cause
+    )
 
 
 # An explicit tag bypasses the resolver's own shape gate entirely, so it can reach any of PyYAML's
