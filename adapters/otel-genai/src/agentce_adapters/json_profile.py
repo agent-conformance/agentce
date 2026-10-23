@@ -51,12 +51,6 @@ def _parse_int(token: str) -> int:
     return -value if negative else value
 
 
-def refuse_constant(token: str) -> Any:
-    """A ``parse_constant`` hook that refuses ``NaN``, ``Infinity`` and ``-Infinity``: they are not
-    JSON, and the TypeScript and Java parsers refuse them."""
-    raise ValueError(f"{token} is not JSON")
-
-
 def jsonl_lines(text: str) -> list[tuple[int, str]]:
     """The non-blank JSON Lines of ``text`` as (1-based line number, line), by the profile's line rule
     (:func:`jsonl_records`): LF alone ends a line, a CRLF's CR is dropped, a line holding only spaces
@@ -126,15 +120,6 @@ def too_deep(raw: bytes) -> bool:
         elif byte in (0x5D, 0x7D):
             depth -= 1
     return False
-
-
-def _unique_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    """An ``object_pairs_hook`` that refuses a key written twice in one object. Keys are compared
-    decoded, so ``"st\\u0061tus"`` repeats ``"status"``."""
-    members = dict(pairs)
-    if len(members) != len(pairs):
-        raise ValueError("a key is repeated in one object")
-    return members
 
 
 def load_report_json(text: str, line: int | None = None) -> Any:

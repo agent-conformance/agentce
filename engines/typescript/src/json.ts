@@ -242,11 +242,6 @@ const PYTHON_CONSTANTS = [
   ["-Infinity", "-inf"],
 ] as const;
 
-/** The non-blank JSON Lines of `text` by the profile's line rule ({@link jsonlRecords}). */
-export function jsonlLines(text: string): Array<[number, string]> {
-  return jsonlRecords(text);
-}
-
 /** Parse JSON text like `JSON.parse`, keeping a non-canonical number token as a marker value. With
  * `pythonConstants`, `NaN`, `Infinity` and `-Infinity` are read as Python's `json.loads` reads them
  * (as non-canonical numbers) instead of being refused. */

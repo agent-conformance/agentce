@@ -16,7 +16,7 @@ import {
   load as yamlLoad,
 } from "js-yaml";
 import { InputError } from "./errors";
-import { JsonProfileError, decodeProfile, jsonlLines, parseReportJson } from "./json";
+import { JsonProfileError, decodeProfile, jsonlRecords, parseReportJson } from "./json";
 import { byteCompare, decodeUtf8Strict, joinPath, normalizePosixPath, pyRepr, pyStr } from "./util";
 import { MAX_DEPTH, ProfileViolation, YamlProfileError, profileViolation } from "./yamlProfile";
 
@@ -1302,7 +1302,7 @@ function strings(record: Record<string, unknown>, ...fields: string[]): Record<s
 }
 
 function parseJsonl(text: string): Record<string, unknown>[] {
-  return objects(jsonlLines(text).map(([n, line]) => parseReportJson(line, n)));
+  return objects(jsonlRecords(text).map(([n, line]) => parseReportJson(line, n)));
 }
 
 /** Every status integrity-result.schema.json allows; a record with no status or another one is unreadable. */

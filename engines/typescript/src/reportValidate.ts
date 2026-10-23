@@ -16,7 +16,7 @@ import Ajv2020 from "ajv/dist/2020";
 import anyOfDef from "ajv/dist/vocabularies/applicator/anyOf";
 import oneOfDef from "ajv/dist/vocabularies/applicator/oneOf";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
-import { jsonlLines, parseReportJson, readBundled } from "./json";
+import { jsonlRecords, parseReportJson, readBundled } from "./json";
 import { dataFileProblem } from "./readiness";
 import { byteCompare, decodeUtf8Strict, joinPath } from "./util";
 
@@ -394,11 +394,11 @@ function validateXmlWellformed(text: string, filename: string): string[] {
   return validateXmlSingleRoot(text, filename);
 }
 
-/** Every non-blank line of `text` ({@link jsonlLines}) is one JSON object on its own, read by the
+/** Every non-blank line of `text` ({@link jsonlRecords}) is one JSON object on its own, read by the
  * report-file rule ({@link parseReportJson}). Mirrors `report._validate_jsonl`. */
 function validateJsonl(text: string, filename: string): string[] {
   const problems: string[] = [];
-  for (const [n, line] of jsonlLines(text)) {
+  for (const [n, line] of jsonlRecords(text)) {
     let value: unknown;
     try {
       value = parseReportJson(line, n);
