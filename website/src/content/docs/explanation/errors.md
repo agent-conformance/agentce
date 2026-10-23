@@ -46,7 +46,7 @@ Every message the engine surfaces carries a stable key. This catalogue is genera
 | `input.adapters_root_not_a_directory` | collect or ingest was given an empty --adapters-root, which names no adapters checkout. | pass --adapters-root <dir> (an adapters checkout), or drop it to use ./adapters. |
 | `input.adapters_unreadable` | the adapters directory exists but could not be listed or entered. | make the folder readable and enterable, then re-run. |
 | `input.allow_unverified_requires_catalog_dir` | --allow-unverified-catalog was given without --catalog-dir, so there is no catalog for it to apply to. | add --catalog-dir <dir>, or drop --allow-unverified-catalog. |
-| `input.assess_flag_needs_value` | argument --deviations: expected one argument | pass --deviations <file>. |
+| `input.assess_flag_needs_value` | flag '--deviations' needs a value. | pass --deviations <file>. |
 | `input.assess_unrecognized_flag` | assess was given a flag it does not recognize, or more than one records folder. | run `agentce assess --help` for the flags assess takes, or drop the flag. |
 | `input.bundle_manifest_entry` | a 'files' entry in the manifest is missing 'path' or 'sha256'. | each entry needs {"path": ..., "sha256": ...}. |
 | `input.bundle_manifest_file_too_large` | a manifest-listed file is over the per-file size limit. | split large evidence into more, smaller files, or reference bulk content by an opaque locator instead of inlining it (SPEC R12). |

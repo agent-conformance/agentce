@@ -37,8 +37,9 @@ Each of these exits `3` with the command's keyed error, and the message names th
 | `extra_positional` | `readiness a b` | one report directory |
 | `double_dash_alone` | `readiness out --` | drop the `--`, or put the positionals after it |
 
-`--help` given as an option's value is no help: `verify --report --help` is refused because
-`--report` has no value, and `verify --catalog=--help` reads `--help` as the path.
+`--help` in the place of an option's value is not a request for help. The engines refuse
+`verify --report --help` because `--report` has no value, and `verify --catalog=--help` reads
+`--help` as the path.
 
 The [error catalogue](/explanation/errors/) lists the keys: `input.<command>_unrecognized_flag` for each
 command (and `input.assess_flag_needs_value`, `input.from_missing` and `input.validate_missing` for

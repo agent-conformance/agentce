@@ -11,7 +11,7 @@
   "errors.environment.cryptography_unavailable.fix": "install the engine's dependencies with `uv sync`; where no prebuilt wheel exists, install Rust and OpenSSL 3 first.",
   "errors.environment.python_unsupported.cause": "the running Python is older than the interpreter the engine supports.",
   "errors.environment.python_unsupported.fix": "run the engine under Python 3.12 or newer (`uv python install 3.12`).",
-  "errors.input.assess_flag_needs_value.cause": "argument --deviations: expected one argument",
+  "errors.input.assess_flag_needs_value.cause": "flag '--deviations' needs a value.",
   "errors.input.assess_flag_needs_value.fix": "pass --deviations <file>.",
   "errors.input.bundle_manifest_file_too_large.cause": "a manifest-listed file is over the per-file size limit.",
   "errors.input.bundle_manifest_file_too_large.fix": "split large evidence into more, smaller files, or reference bulk content by an opaque locator instead of inlining it (SPEC R12).",
