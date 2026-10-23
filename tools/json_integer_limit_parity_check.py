@@ -6,12 +6,14 @@ CPython's ``json.loads`` refuses such a literal with a bare ``ValueError`` and o
 JSON. This check drives the built engines the way a user does:
 
 * ``validate --bundle --json --out``: a copy of the quickstart bundle with one extra evidence line. A
-  5000- or 4301-digit literal is quarantined ``schema_invalid`` with a detail starting ``invalid JSON``;
+  5000- or 4301-digit literal is quarantined ``schema_invalid`` with a detail starting ``outside the
+  JSON profile`` (SPEC 8.7);
   4300 digits (with or without a sign) parse. Every engine gives the same exit and counts, and the
   5000-digit line gives what a malformed-JSON line gives.
 * ``assess --bundle``: the 5000-digit line is quarantined and the run finishes the same way in all three.
 * ``report --validate --json``: ``assertions.json``, ``manifest.json`` or ``runtime_drift.jsonl``
-  replaced by a 5000-digit literal is exactly one problem naming the file as invalid JSON, and a
+  replaced by a 5000-digit literal is exactly one problem naming the file and the
+  ``integer_digit_limit`` rule, and a
   4300-digit ``runtime_drift.jsonl`` line is valid. Python's text equals Java's.
 * Python repeats every leg under ``PYTHONINTMAXSTRDIGITS=0`` and ``=640`` and must give the default's
   result.
@@ -52,9 +54,9 @@ LINES = {
     "quoted 4300 digits": ('{"type": %s}' % ("9" * 4300), False),
 }
 ARTIFACTS = {
-    "assertions.json": "assertions.json: invalid JSON (",
-    "manifest.json": "manifest.json: invalid JSON (",
-    "runtime_drift.jsonl": "runtime_drift.jsonl: line 1 is not valid JSON (",
+    "assertions.json": "assertions.json: outside the JSON profile: ",
+    "manifest.json": "manifest.json: outside the JSON profile: ",
+    "runtime_drift.jsonl": "runtime_drift.jsonl: outside the JSON profile: ",
 }
 #: Python's interpreter settings: the default, no limit, and the lowest limit allowed.
 PY_SETTINGS = ("default", "0", "640")
@@ -159,10 +161,10 @@ def check_validate(
             fails.append(
                 f"validate {label}: {key} wrote {len(got['details'])} schema_invalid records, expected 1"
             )
-        elif got["details"][0].startswith("invalid JSON") != refused:
+        elif got["details"][0].startswith("outside the JSON profile") != refused:
             fails.append(
                 f"validate {label}: {key} detail {got['details'][0][:80]!r}, expected "
-                f"{'an' if refused else 'no'} 'invalid JSON' detail"
+                f"{'an' if refused else 'no'} 'outside the JSON profile' detail"
             )
     return fails
 
@@ -170,8 +172,9 @@ def check_validate(
 def check_report(
     label: str, prefix: str | None, outcomes: dict[str, tuple[int, Any]]
 ) -> list[str]:
-    """`prefix` None: the folder must be valid; else exactly one problem with that prefix and `4300`
-    (`malformed` controls carry no `4300`, so the caller passes the prefix and checks it alone)."""
+    """`prefix` None: the folder must be valid; else exactly one problem with that prefix naming the
+    `integer_digit_limit` rule (SPEC 8.7; `malformed` controls name another rule, so the caller passes
+    the prefix and checks it alone)."""
     fails = []
     for key, (code, data) in outcomes.items():
         problems = data.get("problems") if isinstance(data, dict) else None
@@ -189,7 +192,7 @@ def check_report(
             and isinstance(problems, list)
             and len(problems) == 1
             and problems[0].startswith(prefix)
-            and (("4300" in problems[0]) == too_long)
+            and (("integer_digit_limit" in problems[0]) == too_long)
         )
         if not ok:
             fails.append(
@@ -318,7 +321,7 @@ def self_test() -> int:
     good = {
         "exit": 1,
         "counts": {"accepted": 5, "quarantined": 3},
-        "details": ["invalid JSON: x"],
+        "details": ["outside the JSON profile: syntax at line 1 (SPEC 8.7)"],
     }
     assert check_validate("t", True, {"python": good, "java": dict(good)}) == []
     assert check_validate("t", True, {"python": good, "java": {**good, "exit": 3}})
@@ -328,21 +331,28 @@ def self_test() -> int:
         3,
         {
             "valid": False,
-            "problems": ["a.json: invalid JSON (integer literal exceeds 4300 digits)"],
+            "problems": [
+                "a.json: outside the JSON profile: integer_digit_limit at line 1 (SPEC 8.7)"
+            ],
         },
     )
-    assert check_report("a 5000", "a.json: invalid JSON (", {"python": one}) == []
+    assert (
+        check_report("a 5000", "a.json: outside the JSON profile: ", {"python": one})
+        == []
+    )
     assert check_report(
         "a 5000",
-        "a.json: invalid JSON (",
+        "a.json: outside the JSON profile: ",
         {"python": (0, {"valid": True, "problems": []})},
     )
     assert check_report(
         "a 5000",
-        "a.json: invalid JSON (",
+        "a.json: outside the JSON profile: ",
         {"python": (3, {"valid": False, "problems": one[1]["problems"] * 2})},
     )
-    assert check_report("a malformed", "a.json: invalid JSON (", {"python": one})
+    assert check_report(
+        "a malformed", "a.json: outside the JSON profile: ", {"python": one}
+    )
     assert check_report("d", None, {"java": (0, {"valid": True, "problems": []})}) == []
     assert check_report("d", None, {"java": (3, {"valid": False, "problems": ["x"]})})
     assert same_python_text("t", {"java": one, "python": one}) == []

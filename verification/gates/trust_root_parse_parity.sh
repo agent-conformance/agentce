@@ -54,7 +54,7 @@ cases = {
     "nan": b'{"keys":{},"x":NaN}',
     "lone-surrogate": b'{"keys":{},"x":"\\ud800"}',
     "invalid-utf8": b'{"keys":{},"x":"\xff"}',
-    "bom": b'\xef\xbb\xbf{"keys":{}}',
+    "bom": b'\xef\xbb\xbf{"keys":[[]]}',
 }
 for name, raw in cases.items():
     (out / f"{name}.json").write_bytes(raw)
@@ -111,8 +111,11 @@ check deep-object-10000 env "$too_deep"
 echo "trust-root-parse-parity: real CLI, a trust root at the limit reaches the shape stage"
 check keys-999 flag "is not a usable trust root: keys is not a mapping of key id to key entry"
 
-echo "trust-root-parse-parity: real CLI, NaN, a lone surrogate, invalid UTF-8 and a byte-order mark are refused"
-for name in nan lone-surrogate invalid-utf8 bom; do
+echo "trust-root-parse-parity: real CLI, a leading byte-order mark is ignored (SPEC 8.7), so the file reaches the shape stage"
+check bom flag "is not a usable trust root: keys is not a mapping of key id to key entry"
+
+echo "trust-root-parse-parity: real CLI, NaN, a lone surrogate and invalid UTF-8 are refused"
+for name in nan lone-surrogate invalid-utf8; do
   check "$name" flag ""
 done
 
@@ -138,5 +141,5 @@ for via in signer embedded; do
   fi
 done
 
-[ "$status" -eq 0 ] && echo "trust-root-parse-parity: the three engines refuse a trust root past 1000 levels with the same cause, reach the shape stage at 1000, and refuse NaN, lone surrogates, invalid UTF-8 and a byte-order mark alike"
+[ "$status" -eq 0 ] && echo "trust-root-parse-parity: the three engines refuse a trust root past 1000 levels with the same cause, reach the shape stage at 1000, and refuse NaN, lone surrogates and invalid UTF-8 alike"
 exit "$status"
