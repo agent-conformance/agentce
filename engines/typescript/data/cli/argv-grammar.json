@@ -1,0 +1,1010 @@
+{
+  "$schema": "./argv-grammar.schema.json",
+  "version": 1,
+  "rules": [
+    "global_flag_before_command",
+    "version_alone",
+    "help_after_command",
+    "exact_spelling",
+    "abbreviation",
+    "short_cluster",
+    "equals_value_with_spaces",
+    "negative_number_after_equals",
+    "double_dash_ends_options",
+    "repeated_option",
+    "repeatable_option_keeps_order",
+    "needs_value",
+    "needs_value_before_double_dash",
+    "needs_value_before_option",
+    "value_on_flag",
+    "extra_positional",
+    "double_dash_alone",
+    "dash_token_not_option",
+    "unknown_command"
+  ],
+  "globals": [
+    {
+      "names": [
+        "--json"
+      ],
+      "kind": "flag",
+      "repeatable": false
+    },
+    {
+      "names": [
+        "--debug"
+      ],
+      "kind": "flag",
+      "repeatable": false
+    },
+    {
+      "names": [
+        "--quiet"
+      ],
+      "kind": "flag",
+      "repeatable": false
+    }
+  ],
+  "top": {
+    "help": [
+      "-h",
+      "--help"
+    ],
+    "version": [
+      "-V",
+      "--version"
+    ],
+    "keys": {
+      "unrecognized": "input.unknown_command"
+    },
+    "fixes": {
+      "flag": "run `agentce --help` for the commands and global flags agentce takes.",
+      "command": "run `agentce --help` for the commands agentce takes."
+    }
+  },
+  "commands": {
+    "validate": {
+      "options": [
+        {
+          "names": [
+            "--bundle"
+          ],
+          "kind": "value",
+          "repeatable": false,
+          "needs_value_key": "input.bundle_missing"
+        },
+        {
+          "names": [
+            "--out"
+          ],
+          "kind": "value",
+          "repeatable": false
+        }
+      ],
+      "positionals": {
+        "min": 0,
+        "max": 0
+      },
+      "keys": {
+        "unrecognized": "input.validate_unrecognized_flag",
+        "needs_value": "input.validate_unrecognized_flag"
+      },
+      "fixes": {
+        "flag": "run `agentce validate --help` for the flags validate takes, or drop the flag.",
+        "extra": "pass the bundle with its flag: `agentce validate --bundle <dir>`."
+      },
+      "implemented_in": [
+        "python",
+        "typescript",
+        "java"
+      ]
+    },
+    "verify": {
+      "options": [
+        {
+          "names": [
+            "--bundle"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--catalog"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--release"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--report"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--signer-trust-root"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--expect-keyid"
+          ],
+          "kind": "value",
+          "repeatable": false
+        }
+      ],
+      "positionals": {
+        "min": 0,
+        "max": 0
+      },
+      "keys": {
+        "unrecognized": "input.verify_unrecognized_flag",
+        "needs_value": "input.verify_unrecognized_flag"
+      },
+      "fixes": {
+        "flag": "pass --bundle, --catalog, --release, or --report (with --signer-trust-root or --expect-keyid for --report), or drop the flag.",
+        "extra": "pass the target with its flag, e.g. `agentce verify --bundle <dir>`."
+      },
+      "implemented_in": [
+        "python",
+        "typescript",
+        "java"
+      ]
+    },
+    "assess": {
+      "options": [
+        {
+          "names": [
+            "--bundle"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--catalog"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--profile"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--deviations"
+          ],
+          "kind": "value",
+          "repeatable": false,
+          "value_hint": "<file>"
+        },
+        {
+          "names": [
+            "--domain"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--catalog-dir"
+          ],
+          "kind": "value",
+          "repeatable": true
+        },
+        {
+          "names": [
+            "--trust-root"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--allow-unverified-catalog"
+          ],
+          "kind": "flag",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--package-for-sharing"
+          ],
+          "kind": "flag",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--out"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--state"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--report-language"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--emit"
+          ],
+          "kind": "value",
+          "repeatable": false,
+          "value_hint": "<formats>"
+        },
+        {
+          "names": [
+            "--for"
+          ],
+          "kind": "value",
+          "repeatable": false,
+          "value_hint": "<preset>"
+        },
+        {
+          "names": [
+            "--fail-on"
+          ],
+          "kind": "value",
+          "repeatable": false,
+          "value_hint": "<expression>"
+        }
+      ],
+      "positionals": {
+        "min": 0,
+        "max": 1
+      },
+      "keys": {
+        "unrecognized": "input.assess_unrecognized_flag",
+        "needs_value": "input.assess_flag_needs_value"
+      },
+      "fixes": {
+        "flag": "run `agentce assess --help` for the flags assess takes, or drop the flag.",
+        "extra": "pass at most one records folder: `agentce assess <folder>`."
+      },
+      "implemented_in": [
+        "python",
+        "typescript",
+        "java"
+      ]
+    },
+    "report": {
+      "options": [
+        {
+          "names": [
+            "--from"
+          ],
+          "kind": "value",
+          "repeatable": false,
+          "needs_value_key": "input.from_missing"
+        },
+        {
+          "names": [
+            "--format"
+          ],
+          "kind": "value",
+          "repeatable": false,
+          "choices": [
+            "md",
+            "html",
+            "oscal",
+            "sarif",
+            "public",
+            "pack"
+          ]
+        },
+        {
+          "names": [
+            "--role"
+          ],
+          "kind": "value",
+          "repeatable": false,
+          "choices": [
+            "provider",
+            "deployer"
+          ]
+        },
+        {
+          "names": [
+            "--catalog"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--language"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--out"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--validate"
+          ],
+          "kind": "value",
+          "repeatable": false,
+          "needs_value_key": "input.validate_missing"
+        }
+      ],
+      "positionals": {
+        "min": 0,
+        "max": 0
+      },
+      "keys": {
+        "unrecognized": "input.report_unrecognized_flag",
+        "needs_value": "input.report_unrecognized_flag"
+      },
+      "fixes": {
+        "flag": "run `agentce report --help` for the flags report takes, or drop the flag.",
+        "extra": "pass the input with its flag: `agentce report --from <file>` or `--validate <dir>`."
+      },
+      "implemented_in": [
+        "python",
+        "typescript",
+        "java"
+      ]
+    },
+    "collect": {
+      "options": [
+        {
+          "names": [
+            "--config"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--out"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--dry-run"
+          ],
+          "kind": "flag",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--adapters-root"
+          ],
+          "kind": "value",
+          "repeatable": false
+        }
+      ],
+      "positionals": {
+        "min": 0,
+        "max": 0
+      },
+      "keys": {
+        "unrecognized": "input.collect_unrecognized_flag",
+        "needs_value": "input.collect_unrecognized_flag"
+      },
+      "fixes": {
+        "flag": "run `agentce collect --help` for the flags collect takes, or drop the flag.",
+        "extra": "pass the config with its flag: `agentce collect --config <file>`."
+      },
+      "implemented_in": [
+        "python"
+      ]
+    },
+    "ingest": {
+      "options": [
+        {
+          "names": [
+            "--in"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--out"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--adapter"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--adapters-root"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--subject"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--source-class"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--source"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--engine"
+          ],
+          "kind": "value",
+          "repeatable": false
+        }
+      ],
+      "positionals": {
+        "min": 0,
+        "max": 0
+      },
+      "keys": {
+        "unrecognized": "input.ingest_unrecognized_flag",
+        "needs_value": "input.ingest_unrecognized_flag"
+      },
+      "fixes": {
+        "flag": "run `agentce ingest --help` for the flags ingest takes, or drop the flag.",
+        "extra": "pass the export with its flag: `agentce ingest --in <file>`."
+      },
+      "implemented_in": [
+        "python"
+      ]
+    },
+    "catalog": {
+      "options": [],
+      "positionals": {
+        "min": 0,
+        "max": 0
+      },
+      "actions": {
+        "lint": {
+          "options": [
+            {
+              "names": [
+                "--require-verification-flags"
+              ],
+              "kind": "flag",
+              "repeatable": false
+            },
+            {
+              "names": [
+                "--require-provenance"
+              ],
+              "kind": "flag",
+              "repeatable": false
+            },
+            {
+              "names": [
+                "--support-matrix"
+              ],
+              "kind": "value",
+              "repeatable": false
+            }
+          ],
+          "positionals": {
+            "min": 0,
+            "max": 1
+          }
+        },
+        "coverage-matrix": {
+          "options": [
+            {
+              "names": [
+                "--check"
+              ],
+              "kind": "flag",
+              "repeatable": false
+            }
+          ],
+          "positionals": {
+            "min": 0,
+            "max": 1
+          }
+        },
+        "init": {
+          "options": [
+            {
+              "names": [
+                "--id"
+              ],
+              "kind": "value",
+              "repeatable": false
+            },
+            {
+              "names": [
+                "--title"
+              ],
+              "kind": "value",
+              "repeatable": false
+            },
+            {
+              "names": [
+                "--force"
+              ],
+              "kind": "flag",
+              "repeatable": false
+            }
+          ],
+          "positionals": {
+            "min": 1,
+            "max": 1
+          }
+        },
+        "sign": {
+          "options": [
+            {
+              "names": [
+                "--key"
+              ],
+              "kind": "value",
+              "repeatable": false
+            },
+            {
+              "names": [
+                "--new-key"
+              ],
+              "kind": "value",
+              "repeatable": false
+            },
+            {
+              "names": [
+                "--write-trust-root"
+              ],
+              "kind": "value",
+              "repeatable": false
+            },
+            {
+              "names": [
+                "--identity"
+              ],
+              "kind": "value",
+              "repeatable": false
+            },
+            {
+              "names": [
+                "--force"
+              ],
+              "kind": "flag",
+              "repeatable": false
+            }
+          ],
+          "positionals": {
+            "min": 1,
+            "max": 1
+          }
+        }
+      },
+      "keys": {
+        "unrecognized": "input.catalog_unrecognized_flag",
+        "needs_value": "input.catalog_unrecognized_flag"
+      },
+      "fixes": {
+        "flag": "run `agentce catalog <action> --help` for the flags it takes, or drop the flag.",
+        "extra": "pass one catalog directory: `agentce catalog <action> <dir>`."
+      },
+      "implemented_in": [
+        "python"
+      ]
+    },
+    "conformance": {
+      "options": [],
+      "positionals": {
+        "min": 0,
+        "max": 0
+      },
+      "actions": {
+        "run": {
+          "options": [
+            {
+              "names": [
+                "--engine"
+              ],
+              "kind": "value",
+              "repeatable": false,
+              "needs_value_key": "input.engine_missing"
+            },
+            {
+              "names": [
+                "--corpus"
+              ],
+              "kind": "value",
+              "repeatable": false,
+              "needs_value_key": "input.corpus_missing"
+            },
+            {
+              "names": [
+                "--out"
+              ],
+              "kind": "value",
+              "repeatable": false
+            },
+            {
+              "names": [
+                "--adapters"
+              ],
+              "kind": "value",
+              "repeatable": false
+            }
+          ],
+          "positionals": {
+            "min": 0,
+            "max": 0
+          }
+        }
+      },
+      "keys": {
+        "unrecognized": "input.conformance_unrecognized_flag",
+        "needs_value": "input.conformance_unrecognized_flag"
+      },
+      "fixes": {
+        "flag": "run `agentce conformance run --help` for the flags conformance run takes, or drop the flag.",
+        "extra": "pass the inputs with their flags: `agentce conformance run --engine <dir> --corpus <dir>`."
+      },
+      "implemented_in": [
+        "python",
+        "typescript",
+        "java"
+      ]
+    },
+    "diff": {
+      "options": [
+        {
+          "names": [
+            "--format"
+          ],
+          "kind": "value",
+          "repeatable": false
+        }
+      ],
+      "positionals": {
+        "min": 0,
+        "max": null
+      },
+      "keys": {
+        "unrecognized": "input.diff_unrecognized_flag",
+        "needs_value": "input.diff_unrecognized_flag"
+      },
+      "fixes": {
+        "flag": "pass --format text|json|md, or drop the flag.",
+        "extra": "pass two assertions files: `agentce diff <a> <b>`."
+      },
+      "implemented_in": [
+        "python",
+        "typescript",
+        "java"
+      ]
+    },
+    "sign": {
+      "options": [
+        {
+          "names": [
+            "--as"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--profile"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--key"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--dry-run"
+          ],
+          "kind": "flag",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--write-trust-root"
+          ],
+          "kind": "flag",
+          "repeatable": false
+        }
+      ],
+      "positionals": {
+        "min": 0,
+        "max": 1
+      },
+      "keys": {
+        "unrecognized": "input.sign_unrecognized_flag",
+        "needs_value": "input.sign_unrecognized_flag"
+      },
+      "fixes": {
+        "flag": "pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag.",
+        "extra": "pass exactly one report directory: `agentce sign <report-dir> --as claimant|assessor`."
+      },
+      "implemented_in": [
+        "python",
+        "typescript",
+        "java"
+      ]
+    },
+    "readiness": {
+      "options": [
+        {
+          "names": [
+            "--gaps"
+          ],
+          "kind": "value",
+          "repeatable": false,
+          "value_hint": "<path>"
+        },
+        {
+          "names": [
+            "--deviations"
+          ],
+          "kind": "value",
+          "repeatable": false,
+          "value_hint": "<path>"
+        },
+        {
+          "names": [
+            "--catalog-dir"
+          ],
+          "kind": "value",
+          "repeatable": true,
+          "value_hint": "<path>"
+        },
+        {
+          "names": [
+            "--trust-root"
+          ],
+          "kind": "value",
+          "repeatable": false,
+          "value_hint": "<path>"
+        },
+        {
+          "names": [
+            "--allow-unverified-catalog"
+          ],
+          "kind": "flag",
+          "repeatable": false
+        }
+      ],
+      "positionals": {
+        "min": 0,
+        "max": 1
+      },
+      "keys": {
+        "unrecognized": "input.readiness_unrecognized_flag",
+        "needs_value": "input.readiness_unrecognized_flag"
+      },
+      "fixes": {
+        "flag": "pass --gaps, --deviations, --catalog-dir, --trust-root or --allow-unverified-catalog, or drop the flag.",
+        "extra": "pass exactly one report directory: `agentce readiness <report-dir>`."
+      },
+      "implemented_in": [
+        "python",
+        "typescript",
+        "java"
+      ]
+    },
+    "doctor": {
+      "options": [
+        {
+          "names": [
+            "--project"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--write-errors"
+          ],
+          "kind": "value",
+          "repeatable": false
+        }
+      ],
+      "positionals": {
+        "min": 0,
+        "max": 0
+      },
+      "keys": {
+        "unrecognized": "input.doctor_unrecognized_flag",
+        "needs_value": "input.doctor_unrecognized_flag"
+      },
+      "fixes": {
+        "flag": "run `agentce doctor --help` for the flags doctor takes, or drop the flag.",
+        "extra": "pass the project with its flag: `agentce doctor --project <dir>`."
+      },
+      "implemented_in": [
+        "python"
+      ]
+    },
+    "quickstart": {
+      "options": [
+        {
+          "names": [
+            "--out"
+          ],
+          "kind": "value",
+          "repeatable": false,
+          "value_hint": "<dir>"
+        }
+      ],
+      "positionals": {
+        "min": 0,
+        "max": 0
+      },
+      "keys": {
+        "unrecognized": "input.quickstart_unrecognized_flag",
+        "needs_value": "input.quickstart_unrecognized_flag"
+      },
+      "fixes": {
+        "flag": "run `agentce quickstart --help` for the flags quickstart takes, or drop the flag.",
+        "extra": "quickstart takes no other argument: `agentce quickstart --out <dir>`."
+      },
+      "implemented_in": [
+        "python",
+        "typescript",
+        "java"
+      ]
+    },
+    "init": {
+      "options": [
+        {
+          "names": [
+            "--framework"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--subject"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--role"
+          ],
+          "kind": "value",
+          "repeatable": false,
+          "choices": [
+            "deployer",
+            "provider",
+            "both"
+          ]
+        },
+        {
+          "names": [
+            "--out"
+          ],
+          "kind": "value",
+          "repeatable": false
+        },
+        {
+          "names": [
+            "--force"
+          ],
+          "kind": "flag",
+          "repeatable": false
+        }
+      ],
+      "positionals": {
+        "min": 0,
+        "max": 0
+      },
+      "keys": {
+        "unrecognized": "input.init_unrecognized_flag",
+        "needs_value": "input.init_unrecognized_flag"
+      },
+      "fixes": {
+        "flag": "run `agentce init --help` for the flags init takes, or drop the flag.",
+        "extra": "init takes no positional argument: `agentce init --out <dir>`."
+      },
+      "implemented_in": [
+        "python"
+      ]
+    },
+    "config": {
+      "options": [],
+      "positionals": {
+        "min": 0,
+        "max": 0
+      },
+      "actions": {
+        "show": {
+          "options": [],
+          "positionals": {
+            "min": 0,
+            "max": 0
+          }
+        }
+      },
+      "keys": {
+        "unrecognized": "input.config_unrecognized_flag",
+        "needs_value": "input.config_unrecognized_flag"
+      },
+      "fixes": {
+        "flag": "run `agentce config show --help` for the flags config show takes, or drop the flag.",
+        "extra": "config show takes no argument: `agentce config show`."
+      },
+      "implemented_in": [
+        "python"
+      ]
+    },
+    "version": {
+      "options": [],
+      "positionals": {
+        "min": 0,
+        "max": 0
+      },
+      "keys": {
+        "unrecognized": "input.version_unrecognized_flag",
+        "needs_value": "input.version_unrecognized_flag"
+      },
+      "fixes": {
+        "flag": "run `agentce version --help` for the flags version takes, or drop the flag.",
+        "extra": "version takes no argument: `agentce version`."
+      },
+      "implemented_in": [
+        "python",
+        "typescript",
+        "java"
+      ]
+    }
+  }
+}

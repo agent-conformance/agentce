@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-conformance.org/spec/cli/argv-grammar.schema.json",
+  "title": "AgentCE command-line grammar",
+  "description": "The one table every engine reads argv under (SPEC 8.5, 'Command-line grammar'): per command, each option's exact spellings, its kind and whether it may repeat, the positionals the command takes, its actions, and the keys and fix texts of its refusals. Each engine vendors this file byte for byte and loads it as data; tools/argv_grammar.py --check holds the copies and Python's help parser to it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "rules", "globals", "top", "commands"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "version": {"const": 1},
+    "rules": {
+      "description": "The closed rule vocabulary of SPEC 8.5. spec/cli/argv-cases.json holds at least one case per rule; the registry lint fails a rule with none.",
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 1,
+      "items": {"type": "string", "pattern": "^[a-z][a-z_]*$"}
+    },
+    "globals": {
+      "description": "Flags every command takes, before or after the command word, each at most once per line.",
+      "type": "array",
+      "items": {"$ref": "#/$defs/option"}
+    },
+    "top": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["help", "version", "keys", "fixes"],
+      "properties": {
+        "help": {"$ref": "#/$defs/spellings"},
+        "version": {"$ref": "#/$defs/spellings"},
+        "keys": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["unrecognized"],
+          "properties": {"unrecognized": {"$ref": "#/$defs/key"}}
+        },
+        "fixes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["flag", "command"],
+          "properties": {"flag": {"type": "string"}, "command": {"type": "string"}}
+        }
+      }
+    },
+    "commands": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"pattern": "^[a-z][a-z-]*$"},
+      "additionalProperties": {"$ref": "#/$defs/command"}
+    }
+  },
+  "$defs": {
+    "key": {"type": "string", "pattern": "^input\\.[a-z][a-z0-9_]*$"},
+    "spellings": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^--?[A-Za-z][A-Za-z0-9-]*$"}
+    },
+    "positionals": {
+      "description": "The fewest and the most positionals the command (or action) takes; max null means no bound (the command words its own refusal for too many).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min", "max"],
+      "properties": {
+        "min": {"type": "integer", "minimum": 0},
+        "max": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["names", "kind", "repeatable"],
+      "properties": {
+        "names": {"$ref": "#/$defs/spellings"},
+        "kind": {"enum": ["flag", "value"]},
+        "repeatable": {"type": "boolean"},
+        "needs_value_key": {"$ref": "#/$defs/key"},
+        "value_hint": {"type": "string", "pattern": "^<[a-z-]+>$"},
+        "choices": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "flag"}}},
+          "then": {
+            "properties": {"repeatable": {"const": false}},
+            "not": {
+              "anyOf": [
+                {"required": ["needs_value_key"]},
+                {"required": ["value_hint"]},
+                {"required": ["choices"]}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["options", "positionals"],
+      "properties": {
+        "options": {"type": "array", "items": {"$ref": "#/$defs/option"}},
+        "positionals": {"$ref": "#/$defs/positionals"}
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["options", "positionals", "keys", "fixes", "implemented_in"],
+      "properties": {
+        "options": {"type": "array", "items": {"$ref": "#/$defs/option"}},
+        "positionals": {"$ref": "#/$defs/positionals"},
+        "actions": {
+          "description": "The command's actions: the first positional names one, and its options and positionals read every later token.",
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {"pattern": "^[a-z][a-z-]*$"},
+          "additionalProperties": {"$ref": "#/$defs/action"}
+        },
+        "keys": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["unrecognized", "needs_value"],
+          "properties": {
+            "unrecognized": {"$ref": "#/$defs/key"},
+            "needs_value": {"$ref": "#/$defs/key"}
+          }
+        },
+        "fixes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["flag", "extra"],
+          "properties": {"flag": {"type": "string"}, "extra": {"type": "string"}}
+        },
+        "implemented_in": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["python", "typescript", "java"]}
+        }
+      }
+    }
+  }
+}
