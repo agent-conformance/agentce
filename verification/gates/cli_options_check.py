@@ -181,12 +181,14 @@ def run(
                     t = t.replace(place, value)
                 argv.append(t)
         # --json goes right after the first token by default, so a case can end on a value-less flag or
-        # put tokens after `--`; "front" puts it first, "none" leaves it out (18.108, top-level rows).
+        # put tokens after `--`; "front" puts it first, "none" leaves it out (18.108, top-level rows). A
+        # line that already holds --json before `--` gets no second one, which SPEC 8.5 refuses (18.184w).
+        head = argv[: argv.index("--")] if "--" in argv else argv
         placed = {
             "after": argv[:1] + ["--json"] + argv[1:],
             "front": ["--json", *argv],
             "none": argv,
-        }[case.get("json", "after")]
+        }["none" if "--json" in head else case.get("json", "after")]
         p = run_cli([*cmd, *placed], tmp, case.get("late_reader", 0))
         written = (
             sorted(str(f.relative_to(out)) for f in out.rglob("*") if f.is_file())
