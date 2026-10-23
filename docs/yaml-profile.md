@@ -36,7 +36,7 @@ deviation register, manual evaluation records and `.agentce.yaml`.
 | `underscore_number` | `limit: 1_000` | `limit: 1000`, or `"1_000"` for text |
 | `sexagesimal` | `time: 1:30` | `time: "1:30"` |
 | `octal` | `mode: 0755`, `mode: 0o755` | `mode: "0755"` |
-| `exponent_no_dot` | `tokens: 1e3` | `tokens: 1.0e3`, or `"1e3"` for text |
+| `exponent_no_dot` | `tokens: 1e3` | `tokens: 1000`, or `"1e3"` for text |
 | `flow_scalar_indicator_start` | `tools: [?x, :y]` | `tools: ["?x", ":y"]` |
 | `flow_line_not_indented` | a `[...]` or `{...}` continued onto a line at or left of its key | indent the continuation past the key, or keep the list on one line |
 | `depth_over_100` | mappings or lists nested 101 deep | at most 100 levels |
