@@ -279,7 +279,9 @@ SCENARIOS: list[Scenario] = [
     ),
     Scenario("5-deviations", _scenario_5_deviations, NOT_READY, 1),
     Scenario("6-date-grammar", _scenario_6_date_grammar, NOT_READY, 1),
-    Scenario("7-calendar-invalid-date", _scenario_7_calendar_invalid_date, NOT_READY, 1),
+    Scenario(
+        "7-calendar-invalid-date", _scenario_7_calendar_invalid_date, NOT_READY, 1
+    ),
 ]
 
 
@@ -332,10 +334,10 @@ def _absent_vectors(directory: Path) -> list[tuple[str, list[str]]]:
 
 
 def _argv_vectors(directory: Path) -> list[tuple[str, list[str], int]]:
-    """Argv shapes argparse reads in a particular way (18.25 round 3): each is (name, argv, the exit
-    code Python's `readiness` subparser gives). Over scenario 3's report (a high-severity control with
+    """Argv shapes the SPEC 8.5 grammar reads one way in every engine (18.25 round 3, 18.184w): each
+    is (name, argv, the exit code). Over scenario 3's report (a high-severity control with
     insufficient evidence), a gaps file naming it gives READY WITH LIMITATIONS (0) and an empty one
-    NOT READY (1), so a repeated flag shows which value an engine kept. Exit 3 is a refusal: the
+    NOT READY (1). Exit 3 is a refusal, a repeated flag among them: the
     keyed `input.readiness_unrecognized_flag` in every engine, or `input.gaps_not_a_file` for an empty
     gaps value (18.178), its key and text compared."""
     directory = directory / "argv"
@@ -347,16 +349,8 @@ def _argv_vectors(directory: Path) -> list[tuple[str, list[str], int]]:
     empty.write_text("", encoding="utf-8")
     r, g, e, c = str(report), str(named), str(empty), str(CATALOG_DIR)
     return [
-        (
-            "repeated-flag-last-wins-limitations",
-            [r, "--gaps", e, "--gaps", g, "--catalog-dir", c],
-            0,
-        ),
-        (
-            "repeated-flag-last-wins-not-ready",
-            [r, "--gaps", g, "--gaps", e, "--catalog-dir", c],
-            1,
-        ),
+        # SPEC 8.5: an option given twice is refused, never last-wins (18.184w).
+        ("repeated-flag-refused", [r, "--gaps", e, "--gaps", g, "--catalog-dir", c], 3),
         ("equals-joined-value", [r, f"--gaps={g}", f"--catalog-dir={c}"], 0),
         ("empty-value-refused", [r, "--gaps", "", "--catalog-dir", c], 3),
         ("equals-empty-value-refused", [r, "--gaps=", "--catalog-dir", c], 3),
@@ -641,14 +635,18 @@ def run_real_check() -> int:
             runs = _run_engines(argv)
             codes = {engine: code for engine, (_, code) in runs}
             if set(codes.values()) != {1}:
-                failures.append(f"absent:{name}: expected exit 1 in all three engines, got {codes}")
+                failures.append(
+                    f"absent:{name}: expected exit 1 in all three engines, got {codes}"
+                )
                 continue
             envs = [json.loads(out) for _, (out, _) in runs]
             if f"missing report file {name}" not in envs[0].get("reasons", []):
                 failures.append(f"absent:{name}: python does not name the missing file")
             for key in ("verdict", "reasons", "limitations"):
                 compare_ports(
-                    f"absent:{name}:{key}", [json.dumps(env.get(key)) for env in envs], failures
+                    f"absent:{name}:{key}",
+                    [json.dumps(env.get(key)) for env in envs],
+                    failures,
                 )
 
     for failure in failures:

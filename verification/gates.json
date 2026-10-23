@@ -2147,9 +2147,9 @@
         },
         {
           "description": "Python's assess parser prefix-matches again, so --em md runs as --emit md in Python alone",
-          "file": "engines/python/agentce/cli.py",
-          "search": "never --emit or --for in Python alone (18.105).\n        allow_abbrev=False,\n",
-          "replace": "never --emit or --for in Python alone (18.105).\n        allow_abbrev=True,\n"
+          "file": "engines/python/agentce/argv.py",
+          "search": "        opt = level.options.get(name)\n",
+          "replace": "        opt = level.options.get(name) or next(\n            (o for n, o in level.options.items() if cmd.name == \"assess\" and n.startswith(name) and len(name) > 3),\n            None,\n        )\n"
         },
         {
           "description": "Java stops refusing an unknown or abbreviated assess flag and runs the assessment without it (the state before 18.105)",
@@ -2159,9 +2159,9 @@
         },
         {
           "description": "Python's quickstart parser prefix-matches again, so --ou o runs as --out o in Python alone",
-          "file": "engines/python/agentce/cli.py",
-          "search": "never --out in Python alone, and every argv error is keyed (18.106).\n        allow_abbrev=False,\n",
-          "replace": "never --out in Python alone, and every argv error is keyed (18.106).\n        allow_abbrev=True,\n"
+          "file": "engines/python/agentce/argv.py",
+          "search": "        opt = level.options.get(name)\n",
+          "replace": "        opt = level.options.get(name) or next(\n            (o for n, o in level.options.items() if cmd.name == \"quickstart\" and n.startswith(name) and len(name) > 3),\n            None,\n        )\n"
         },
         {
           "description": "TypeScript quickstart stops refusing an unknown flag or argument and runs without it (the state before 18.106)",
@@ -2183,15 +2183,15 @@
         },
         {
           "description": "Python stops refusing a clustered short option, so -hx prints the usage and drops the x (KD-086)",
-          "file": "engines/python/agentce/cli.py",
-          "search": "            self._refuse_short_clusters(list(args))\n",
-          "replace": "            pass\n"
+          "file": "engines/python/agentce/argv.py",
+          "search": "            elif len(token) > 2:\n                unrecognized(\"short_cluster\", token)\n",
+          "replace": "            elif len(token) > 2 and token[:2] in HELP:\n                help_seen = True\n            elif len(token) > 2:\n                unrecognized(\"short_cluster\", token)\n"
         },
         {
           "description": "Python's diff parser loses its keyed argv errors, so diff -hx prints the usage and diff --no-such-flag gives argparse's unkeyed sentence",
           "file": "engines/python/agentce/cli.py",
-          "search": "            p._argv_errors = _ARGV[name]\n",
-          "replace": "            p._argv_errors = None if name == \"diff\" else _ARGV[name]\n"
+          "search": "        raise _ArgvError(name, err.key, err.cause, err.fix) from None\n",
+          "replace": "        if name == \"diff\":\n            raise SystemExit(2) from None\n        raise _ArgvError(name, err.key, err.cause, err.fix) from None\n"
         }
       ],
       "fix_hint": "run verification/gates/cli_options.sh and read the FAIL lines (case, engine, exit and key). The reference is _parse_emit and _resolve_emit in engines/python/agentce/commands/__init__.py; TypeScript and Java refuse in refuseEmitAndFor (engines/typescript/src/cli.ts, engines/java/src/main/java/org/agentce/Cli.java) and read the values in assessValueFlags. An unknown or abbreviated flag is refused in refuseUnknownAssessArgs (TypeScript, Java) and by allow_abbrev=False plus _assess_unknown_error in engines/python/agentce/cli.py. quickstart: allow_abbrev=False plus _quickstart_usage_error/_quickstart_unknown_error in engines/python/agentce/cli.py, parseQuickstartArgv in TypeScript and Java, --debug records in logDebug (main), -h usage through CommandResult.usage."
@@ -2868,9 +2868,9 @@
         },
         {
           "description": "Python accepts --manual again and never reads it",
-          "file": "engines/python/agentce/cli.py",
-          "search": "    p.add_argument(\n        \"--package-for-sharing\",\n",
-          "replace": "    p.add_argument(\"--manual\")\n    p.add_argument(\n        \"--package-for-sharing\",\n"
+          "file": "engines/python/agentce/data/cli/argv-grammar.json",
+          "search": "          \"names\": [\n            \"--package-for-sharing\"\n",
+          "replace": "          \"names\": [\n            \"--manual\"\n          ],\n          \"kind\": \"value\",\n          \"repeatable\": false\n        },\n        {\n          \"names\": [\n            \"--package-for-sharing\"\n"
         },
         {
           "description": "Python accepts an unknown --report-language again and writes an English report",
@@ -3714,9 +3714,9 @@
       "faults": [
         {
           "description": "Python init takes --non-interactive again and does nothing with it",
-          "file": "engines/python/agentce/cli.py",
-          "search": "    p.add_argument(\n        \"--framework\", help=\"the agent framework, e.g. custom-loop, langgraph\"\n    )\n",
-          "replace": "    p.add_argument(\"--non-interactive\", dest=\"non_interactive\", action=\"store_true\")\n    p.add_argument(\n        \"--framework\", help=\"the agent framework, e.g. custom-loop, langgraph\"\n    )\n"
+          "file": "engines/python/agentce/data/cli/argv-grammar.json",
+          "search": "          \"names\": [\n            \"--framework\"\n",
+          "replace": "          \"names\": [\n            \"--non-interactive\"\n          ],\n          \"kind\": \"flag\",\n          \"repeatable\": false\n        },\n        {\n          \"names\": [\n            \"--framework\"\n"
         },
         {
           "description": "Python doctor drops --project beside --write-errors again and writes the catalogue",
