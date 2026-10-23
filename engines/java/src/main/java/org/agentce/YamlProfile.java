@@ -49,7 +49,9 @@ public final class YamlProfile {
         h.put("underscore_number", "quote the value to keep it as text, or write the number without _");
         h.put("sexagesimal", "quote the value to keep it as text");
         h.put("octal", "quote the value to keep it as text");
-        h.put("exponent_no_dot", "quote the value to keep it as text, or write the number with a dot (1.0e3)");
+        h.put("exponent_no_dot", "quote the value to keep it as text, or write the number with a dot and a sign (1.0e+3)");
+        h.put("leading_zero", "quote the value to keep it as text, or write the number without the leading zero");
+        h.put("exponent_no_sign", "quote the value to keep it as text, or give the exponent a sign (1.0e+3)");
         h.put("flow_scalar_indicator_start", "quote the value to keep it as text");
         h.put("flow_line_not_indented", "indent the line further than the key the list or mapping belongs to");
         h.put("depth_over_100", "flatten the nesting to at most 100 levels");
@@ -62,6 +64,8 @@ public final class YamlProfile {
     private static final Pattern SEXAGESIMAL = Pattern.compile("[-+]?[0-9][0-9_]*(:[0-5]?[0-9])+(\\.[0-9_]*)?");
     private static final Pattern OCTAL = Pattern.compile("[-+]?0[0-7]+|0o[0-7]+");
     private static final Pattern EXPONENT_NO_DOT = Pattern.compile("[-+]?[0-9]+[eE][-+]?[0-9]+");
+    private static final Pattern LEADING_ZERO = Pattern.compile("[-+]?0[0-9]+");
+    private static final Pattern EXPONENT_NO_SIGN = Pattern.compile("[-+]?([0-9]+\\.[0-9]*|\\.[0-9]+)[eE][0-9]+");
     /** A plain key in this list does not read as a string (the written list of SPEC 8.7's "every mapping key is a
      * string"). */
     private static final Pattern NON_STRING_KEY = Pattern.compile(
@@ -130,6 +134,12 @@ public final class YamlProfile {
         }
         if (EXPONENT_NO_DOT.matcher(text).matches()) {
             return "exponent_no_dot";
+        }
+        if (LEADING_ZERO.matcher(text).matches()) {
+            return "leading_zero";
+        }
+        if (EXPONENT_NO_SIGN.matcher(text).matches()) {
+            return "exponent_no_sign";
         }
         return null;
     }

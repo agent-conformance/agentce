@@ -32,7 +32,9 @@ HINTS: dict[str, str] = {
     "underscore_number": "quote the value to keep it as text, or write the number without _",
     "sexagesimal": "quote the value to keep it as text",
     "octal": "quote the value to keep it as text",
-    "exponent_no_dot": "quote the value to keep it as text, or write the number with a dot (1.0e3)",
+    "exponent_no_dot": "quote the value to keep it as text, or write the number with a dot and a sign (1.0e+3)",
+    "leading_zero": "quote the value to keep it as text, or write the number without the leading zero",
+    "exponent_no_sign": "quote the value to keep it as text, or give the exponent a sign (1.0e+3)",
     "flow_scalar_indicator_start": "quote the value to keep it as text",
     "flow_line_not_indented": "indent the line further than the key the list or mapping belongs to",
     "depth_over_100": "flatten the nesting to at most 100 levels",
@@ -45,6 +47,8 @@ _UNDERSCORE_NUMBER = re.compile(
 _SEXAGESIMAL = re.compile(r"[-+]?[0-9][0-9_]*(:[0-5]?[0-9])+(\.[0-9_]*)?")
 _OCTAL = re.compile(r"[-+]?0[0-7]+|0o[0-7]+")
 _EXPONENT_NO_DOT = re.compile(r"[-+]?[0-9]+[eE][-+]?[0-9]+")
+_LEADING_ZERO = re.compile(r"[-+]?0[0-9]+")
+_EXPONENT_NO_SIGN = re.compile(r"[-+]?([0-9]+\.[0-9]*|\.[0-9]+)[eE][0-9]+")
 # A plain key in this list does not read as a string (the written list of SPEC 8.7's "every mapping key is a string").
 _NON_STRING_KEY = re.compile(
     r"|~|null|Null|NULL|true|True|TRUE|false|False|FALSE"
@@ -88,6 +92,8 @@ def scalar_rule(text: str) -> str | None:
         ("sexagesimal", _SEXAGESIMAL),
         ("octal", _OCTAL),
         ("exponent_no_dot", _EXPONENT_NO_DOT),
+        ("leading_zero", _LEADING_ZERO),
+        ("exponent_no_sign", _EXPONENT_NO_SIGN),
     ):
         if pattern.fullmatch(text) and (rule != "underscore_number" or "_" in text):
             return rule

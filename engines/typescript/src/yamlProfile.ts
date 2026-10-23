@@ -27,7 +27,10 @@ export const HINTS: Readonly<Record<string, string>> = {
   underscore_number: "quote the value to keep it as text, or write the number without _",
   sexagesimal: "quote the value to keep it as text",
   octal: "quote the value to keep it as text",
-  exponent_no_dot: "quote the value to keep it as text, or write the number with a dot (1.0e3)",
+  exponent_no_dot:
+    "quote the value to keep it as text, or write the number with a dot and a sign (1.0e+3)",
+  leading_zero: "quote the value to keep it as text, or write the number without the leading zero",
+  exponent_no_sign: "quote the value to keep it as text, or give the exponent a sign (1.0e+3)",
   flow_scalar_indicator_start: "quote the value to keep it as text",
   flow_line_not_indented: "indent the line further than the key the list or mapping belongs to",
   depth_over_100: "flatten the nesting to at most 100 levels",
@@ -39,6 +42,8 @@ const UNDERSCORE_NUMBER =
 const SEXAGESIMAL = /^(?:[-+]?[0-9][0-9_]*(:[0-5]?[0-9])+(\.[0-9_]*)?)$/;
 const OCTAL = /^(?:[-+]?0[0-7]+|0o[0-7]+)$/;
 const EXPONENT_NO_DOT = /^(?:[-+]?[0-9]+[eE][-+]?[0-9]+)$/;
+const LEADING_ZERO = /^(?:[-+]?0[0-9]+)$/;
+const EXPONENT_NO_SIGN = /^(?:[-+]?([0-9]+\.[0-9]*|\.[0-9]+)[eE][0-9]+)$/;
 /** A plain key in this list does not read as a string (the written list of SPEC 8.7's "every mapping key is a
  * string"). */
 const NON_STRING_KEY = new RegExp(
@@ -60,6 +65,8 @@ const SCALAR_RULES: readonly (readonly [string, RegExp])[] = [
   ["sexagesimal", SEXAGESIMAL],
   ["octal", OCTAL],
   ["exponent_no_dot", EXPONENT_NO_DOT],
+  ["leading_zero", LEADING_ZERO],
+  ["exponent_no_sign", EXPONENT_NO_SIGN],
 ];
 
 export class ProfileViolation {
