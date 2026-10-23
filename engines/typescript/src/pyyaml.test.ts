@@ -258,7 +258,7 @@ const CASES: [string, unknown, string][] = [
           "v",
       },
     },
-    "value: word000 word001 word002 word003 word004 word005 word006 word007 word008 word009\n  word010 word011 word012 word013 word014 word015 word016 word017 word018 word019\n  word020 word021 word022 word023 word024\nas key:\n  ? word000 word001 word002 word003 word004 word005 word006 word007 word008 word009\n    word010 word011 word012 word013 word014 word015 word016 word017 word018 word019\n    word020 word021 word022 word023 word024\n  : v\n",
+    "value: word000 word001 word002 word003 word004 word005 word006 word007 word008 word009\n  word010 word011 word012 word013 word014 word015 word016 word017 word018 word019\n  word020 word021 word022 word023 word024\nas key:\n  word000 word001 word002 word003 word004 word005 word006 word007 word008 word009 word010 word011 word012 word013 word014 word015 word016 word017 word018 word019 word020 word021 word022 word023 word024: v\n",
   ],
   [
     "200 chars without spaces",
@@ -270,7 +270,7 @@ const CASES: [string, unknown, string][] = [
           "v",
       },
     },
-    "value: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nas key:\n  ? xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n  : v\n",
+    "value: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nas key:\n  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: v\n",
   ],
   [
     "200 chars with spaces and a quote",
@@ -282,7 +282,7 @@ const CASES: [string, unknown, string][] = [
           "v",
       },
     },
-    "value: 'it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s\n  it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s\n  it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s '\nas key:\n  ? 'it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s\n    it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s\n    it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s\n    it''s '\n  : v\n",
+    "value: 'it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s\n  it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s\n  it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s '\nas key:\n  'it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s ': v\n",
   ],
   [
     "200 chars with spaces and a tab",
@@ -294,7 +294,7 @@ const CASES: [string, unknown, string][] = [
           "v",
       },
     },
-    'value: "ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\t\\\n  cd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\t\\\n  cd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab"\nas key:\n  ? "ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd\\\n    \\ ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\t\\\n    cd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab"\n  : v\n',
+    'value: "ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\t\\\n  cd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\t\\\n  cd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab"\nas key:\n  "ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab\\tcd ef ab": v\n',
   ],
   [
     "200 chars non-ASCII",
@@ -306,7 +306,7 @@ const CASES: [string, unknown, string][] = [
           "v",
       },
     },
-    'value: "\\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9\\\n  t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9\\\n  t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9\\\n  t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9\\\n  t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9\\\n  t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9\\\n  t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 "\nas key:\n  ? "\\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9\\\n    \\ \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9\\\n    \\ \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9\\\n    \\ \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9\\\n    \\ \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9\\\n    \\ \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9\\\n    \\ \\xE9t\\xE9 \\xE9t\\xE9 "\n  : v\n',
+    'value: "\\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9\\\n  t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9\\\n  t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9\\\n  t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9\\\n  t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9\\\n  t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9\\\n  t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 "\nas key:\n  "\\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 \\xE9t\\xE9 ": v\n',
   ],
   [
     "double spaces at fold",
@@ -318,7 +318,7 @@ const CASES: [string, unknown, string][] = [
           "v",
       },
     },
-    "value: abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  ab\nas key:\n  ? abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  ab\n  : v\n",
+    "value: abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  ab\nas key:\n  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  abcdefghi  ab: v\n",
   ],
   ["leading -", { value: "-x", "as key": { "-x": "v" } }, "value: -x\nas key:\n  -x: v\n"],
   ["leading ?", { value: "?x", "as key": { "?x": "v" } }, "value: ?x\nas key:\n  ?x: v\n"],
@@ -361,12 +361,11 @@ const CASES: [string, unknown, string][] = [
     },
     "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk: 1\n",
   ],
+  ["key of 999 code points stays a plain key", { ["k".repeat(999)]: 1 }, `${"k".repeat(999)}: 1\n`],
   [
-    "key of 123 code points goes after ?",
-    {
-      kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk: 1,
-    },
-    "? kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk\n: 1\n",
+    "key of 1000 code points goes after ?",
+    { ["k".repeat(1000)]: 1 },
+    `? ${"k".repeat(1000)}\n: 1\n`,
   ],
   ["multiline key goes after ?", { "a\nb": 1 }, "? 'a\n\n  b'\n: 1\n"],
   ["empty key goes after ?", { "": "x" }, "? ''\n: x\n"],
@@ -467,4 +466,9 @@ test("safeDump: refuses values PyYAML's safe profile shape does not hold", () =>
   for (const bad of [1.5, Number.NaN, 2 ** 53, undefined, () => 1, Symbol("s"), 1n, new Date(0)]) {
     assert.throws(() => safeDump({ k: bad }), TypeError);
   }
+});
+
+test("safeDump: a one-line key of 200 characters is a plain key, never an explicit ? key (18.184u)", () => {
+  const key = `spiffe://corp/agents/${"a".repeat(179)}`;
+  assert.equal(safeDump({ [key]: "v" }), `${key}: v\n`);
 });

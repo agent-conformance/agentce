@@ -171,6 +171,19 @@ class _ProfileDumper(yaml.SafeDumper):
     def ignore_aliases(self, data: Any) -> bool:
         return True
 
+    def check_simple_key(self) -> bool:
+        # An explicit `? ` key is outside the profile, so a one-line key is written plain or quoted up to 1000
+        # characters (PyYAML's own cut is 128; its scanner reads a simple key up to 1024).
+        if isinstance(self.event, yaml.ScalarEvent):
+            if self.analysis is None:
+                self.analysis = self.analyze_scalar(self.event.value)
+            return (
+                not self.analysis.empty
+                and not self.analysis.multiline
+                and len(self.analysis.scalar) < 1000
+            )
+        return bool(super().check_simple_key())
+
     def represent_str(self, data: str) -> yaml.ScalarNode:
         if scalar_rule(data) is not None:
             return self.represent_scalar("tag:yaml.org,2002:str", data, style="'")

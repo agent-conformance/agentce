@@ -20,8 +20,6 @@ import { scalarRule } from "./yamlProfile";
 
 const BEST_INDENT = 2;
 const BEST_WIDTH = 80;
-/** `len(prepare_tag('tag:yaml.org,2002:str'))`, i.e. `!!str`. */
-const STR_TAG_LENGTH = 5;
 
 type Tag = "str" | "int" | "bool" | "null";
 
@@ -309,9 +307,9 @@ class Emitter {
     for (const [key, value] of node.pairs) {
       this.writeIndent();
       const analysis = analyzeScalar(key.value);
-      // check_simple_key counts the prepared tag (`!!str`, 5 characters) even though it is never
-      // written, so a key of 123 or more code points, or an empty or multiline one, goes after `?`.
-      if (STR_TAG_LENGTH + analysis.text.length < 128 && !analysis.empty && !analysis.multiline) {
+      // `_ProfileDumper.check_simple_key`: an explicit `? ` key is outside the SPEC 8.7 profile, so a one-line
+      // key is written plain or quoted up to 1000 characters; an empty or multiline one still goes after `?`.
+      if (analysis.text.length < 1000 && !analysis.empty && !analysis.multiline) {
         this.expectScalar(key, analysis, { mapping: true, simpleKey: true });
         this.writeIndicator(":", false);
       } else {

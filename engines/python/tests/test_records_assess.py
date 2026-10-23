@@ -1367,3 +1367,17 @@ def test_fail_on_opts_a_records_run_into_failing_on_evidence_gaps(
     )
     assert code == 0 and env["exit_status"] == ["ok"]
     assert env["fail_on"]["matched"] == 0
+
+
+def test_a_long_one_line_key_is_written_as_a_plain_key_inside_the_yaml_profile() -> (
+    None
+):
+    """A derived profile key of 200 characters is a plain key, never an explicit ``? `` key (18.184u)."""
+    import yaml
+
+    from agentce.records import _ProfileDumper
+
+    key = "spiffe://corp/agents/" + "a" * 179
+    assert (
+        yaml.dump({key: "v"}, Dumper=_ProfileDumper, sort_keys=False) == f"{key}: v\n"
+    )
