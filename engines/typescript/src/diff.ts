@@ -7,6 +7,7 @@
  */
 
 import { InputError } from "./errors";
+import { renderValue } from "./json";
 import { sanitizeForMarkdown } from "./report";
 import { byteCompare } from "./util";
 
@@ -43,7 +44,7 @@ function stringField(entry: Record<string, unknown>, field: string): string {
   if (typeof value !== "string") {
     throw new InputError(
       "input.diff_field_not_string",
-      `assertion field '${field}' must be a string, not ${JSON.stringify(value)}.`,
+      `assertion field '${field}' must be a string, not ${renderValue(value)}.`,
       "emit control/subject/outcome as JSON strings.",
     );
   }

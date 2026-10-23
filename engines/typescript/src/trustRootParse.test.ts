@@ -55,7 +55,6 @@ const otherRefusals: [string, Buffer][] = [
     "invalid-utf8",
     Buffer.concat([Buffer.from('{"keys":{},"x":"'), Buffer.from([0xff]), Buffer.from('"}')]),
   ],
-  ["bom", Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('{"keys":{}}')])],
   ["not-json", Buffer.from("{not json")],
 ];
 for (const [name, raw] of otherRefusals) {
@@ -67,9 +66,26 @@ for (const [name, raw] of otherRefusals) {
   });
 }
 
-test("a lone surrogate has no parser suffix", () => {
+test("a lone surrogate names the profile rule", () => {
   assert.equal(
     refusal("s", Buffer.from('{"keys":{},"x":"\\ud800"}')),
-    "<path> is not readable JSON",
+    "<path> is not readable JSON: outside the JSON profile: lone_surrogate at line 1 (SPEC 8.7)",
   );
+});
+
+test("a leading byte-order mark is ignored", () => {
+  // An adopter's tool may write the trust root with one (SPEC 8.7: an input's mark is ignored).
+  const work = mkdtempSync(join(tmpdir(), "agentce-trust-parse-"));
+  try {
+    const plain = join(work, "plain.json");
+    const marked = join(work, "bom.json");
+    writeFileSync(plain, '{"keys":{}}');
+    writeFileSync(
+      marked,
+      Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('{"keys":{}}')]),
+    );
+    assert.deepEqual(loadTrustRoot(marked), loadTrustRoot(plain));
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
 });

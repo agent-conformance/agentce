@@ -22,7 +22,13 @@ import type { Bundle } from "./bundle";
 import { CanonicalizationError, canonicalString } from "./canonical";
 import { InputError } from "./errors";
 import { text } from "./graph";
-import { MAX_JSON_DEPTH, parseJson } from "./json";
+import {
+  JsonProfileError,
+  MAX_JSON_DEPTH,
+  jsonlByteRecords,
+  readJsonlLine,
+  stripBom,
+} from "./json";
 import { QuarantineReason, type QuarantineRecord } from "./quarantine";
 import { eventTypes, validateEvent } from "./schema";
 import { SOURCE_CLASS_RANK } from "./sourceClass";
@@ -36,34 +42,10 @@ const MEMORY_WRITE_TYPE = "org.agent-conformance.evidence.MemoryWrite";
 /** The whitespace JSON itself allows around a value (RFC 8259 §2); nothing else is trimmed. */
 const JSON_WHITESPACE_EDGES = /^[ \t\r\n]+|[ \t\r\n]+$/g;
 
-/**
- * One line rule the three engines share (18.65, Python's `bytes.splitlines`): a line ends at \n,
- * \r\n or a lone \r. Split on bytes, before decoding, so each line is decoded (and refused) on its
- * own; \r and \n never occur inside a multi-byte UTF-8 sequence.
- */
-export function splitLines(raw: Uint8Array): Uint8Array[] {
-  const lines: Uint8Array[] = [];
-  let start = 0;
-  for (let i = 0; i < raw.length; i++) {
-    const byte = raw[i];
-    if (byte === 0x0a || byte === 0x0d) {
-      lines.push(raw.subarray(start, i));
-      if (byte === 0x0d && raw[i + 1] === 0x0a) {
-        i++;
-      }
-      start = i + 1;
-    }
-  }
-  if (start < raw.length) {
-    lines.push(raw.subarray(start));
-  }
-  return lines;
-}
-
-function tooDeep(): InputError {
+function tooDeep(line: number): InputError {
   return new InputError(
     "input.event_structure_too_deep",
-    "an evidence event line is nested too deeply to parse safely.",
+    `an evidence event line is nested too deeply to parse safely: ${new JsonProfileError("depth_over_limit", line).message}.`,
     "flatten the event's structure; reference deeply nested content by an opaque locator instead (SPEC R12).",
   );
 }
@@ -270,21 +252,27 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
   const ownerRank = new Map<string, number>();
 
   for (const path of bundle.eventFiles) {
-    // The bytes load_bundle checked and hashed, never a second read of the name (18.184f).
-    for (const rawLine of splitLines(bundle.contents.get(path) as Buffer)) {
+    // The JSON profile's line rule, the same in the three engines (SPEC 8.7): a leading byte-order
+    // mark is ignored, LF alone ends a line (a CRLF's CR is whitespace), a blank line is skipped,
+    // and each line is strict UTF-8 on its own. A line outside the profile is quarantined naming
+    // the rule, instead of the whole file failing. The bytes are the ones load_bundle checked and
+    // hashed (18.184f).
+    for (const [number, rawLine] of jsonlByteRecords(
+      stripBom(bundle.contents.get(path) as Buffer),
+    )) {
       let raw: string;
       try {
         raw = decodeUtf8Strict(rawLine);
       } catch {
         records.push(
-          unreadable({ reason: QuarantineReason.SCHEMA_INVALID, detail: "invalid UTF-8" }),
+          unreadable({
+            reason: QuarantineReason.SCHEMA_INVALID,
+            detail: new JsonProfileError("invalid_utf8", number).message,
+          }),
         );
         continue;
       }
       const line = trimJsonWhitespace(raw);
-      if (!line) {
-        continue;
-      }
       if (Buffer.byteLength(line, "utf-8") > maxEventBytes) {
         records.push(
           unreadable({
@@ -296,15 +284,16 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
       }
       // The bracket count bounds the nesting, so most lines skip the character scan.
       if (bracketCount(line) > MAX_JSON_DEPTH && maxNesting(line) > MAX_JSON_DEPTH) {
-        throw tooDeep();
+        throw tooDeep(number);
       }
       let event: unknown;
       try {
-        event = parseJson(line);
+        event = readJsonlLine(line, number);
       } catch (exc) {
-        records.push(
-          unreadable({ reason: QuarantineReason.SCHEMA_INVALID, detail: `invalid JSON: ${exc}` }),
-        );
+        if (!(exc instanceof JsonProfileError)) {
+          throw exc;
+        }
+        records.push(unreadable({ reason: QuarantineReason.SCHEMA_INVALID, detail: exc.message }));
         continue;
       }
       if (!isRecord(event)) {

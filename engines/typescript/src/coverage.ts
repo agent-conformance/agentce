@@ -11,9 +11,9 @@
 
 import { MAX_COUNT } from "./domain";
 import { InputError } from "./errors";
-import { NonCanonicalNumber, parseJson } from "./json";
+import { JsonProfileError, NonCanonicalNumber, readJson, renderValue } from "./json";
 import type { CoverageDenominator, Profile, Subject } from "./profile";
-import { byteCompare, decodeUtf8Strict } from "./util";
+import { byteCompare } from "./util";
 
 export const STATUS_COVERED = "covered";
 const STATUS_BELOW = "below_threshold";
@@ -56,15 +56,15 @@ function invalidManifest(name: string, why: string): InputError {
   );
 }
 
-/** The manifest's JSON, read as every engine reads it: strict UTF-8 and standard JSON only (18.184j). */
+/** The manifest's JSON, read under the JSON profile (SPEC 8.7) as every engine reads it. */
 function loadManifest(name: string, raw: Buffer): unknown {
   try {
-    return parseJson(decodeUtf8Strict(raw));
+    return readJson(raw, "ignore");
   } catch (exc) {
-    throw invalidManifest(
-      name,
-      `is not JSON (${exc instanceof Error ? exc.message : String(exc)})`,
-    );
+    if (exc instanceof JsonProfileError) {
+      throw invalidManifest(name, `is ${exc.message}`);
+    }
+    throw exc;
   }
 }
 
@@ -84,10 +84,9 @@ function manifestCounts(
   }
   for (const [type, count] of Object.entries(declared)) {
     if (typeof count !== "number" || !Number.isSafeInteger(count) || count < 0) {
-      const shown = count instanceof NonCanonicalNumber ? count.source : JSON.stringify(count);
       throw invalidManifest(
         name,
-        `counts '${type}' as ${shown}, not a whole number from 0 to ${MAX_COUNT}`,
+        `counts '${type}' as ${renderValue(count)}, not a whole number from 0 to ${MAX_COUNT}`,
       );
     }
   }

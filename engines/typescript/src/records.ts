@@ -19,7 +19,8 @@ import { confineToRoot, resolveLoose, safeIsFile } from "./bundle";
 import { DEFAULT_LENS } from "./bundled";
 import { CanonicalizationError, canonicalString } from "./canonical";
 import { InputError } from "./errors";
-import { maxNesting, splitLines } from "./ingest";
+import { maxNesting } from "./ingest";
+import { jsonlByteRecords } from "./json";
 import { type AdaptResult, OtelGenaiAdapterError, adapt } from "./otelGenai";
 import { writeFile } from "./outputs";
 import { type Profile, profileFromDict } from "./profile";
@@ -55,10 +56,6 @@ const MAX_LISTED_LINES = 20;
  * `MAX_RECORD_DEPTH`), counted on its raw bytes outside JSON strings. */
 export const MAX_RECORD_DEPTH = 256;
 const NESTED_TOO_DEEPLY = "nested too deeply to parse safely";
-const FIXED_DETAIL = new Map([
-  ["invalid_json", "invalid_json: not valid JSON"],
-  ["invalid_encoding", "invalid_encoding: not valid UTF-8"],
-]);
 const LONE_SURROGATE =
   "invalid_encoding: a string holds a lone surrogate, which UTF-8 cannot carry";
 /** Matches only an unpaired surrogate: in `u` mode a valid pair is one code point. */
@@ -245,7 +242,8 @@ function adaptDocument(payload: Uint8Array, subject: string): AdaptResult {
     }
   } catch (exc) {
     if (exc instanceof OtelGenaiAdapterError) {
-      throw new NotRecord(FIXED_DETAIL.get(exc.reason) ?? exc.message);
+      // A document outside the JSON profile names the rule and line, the same in every engine (SPEC 8.7).
+      throw new NotRecord(exc.message);
     }
     if (exc instanceof CanonicalizationError) {
       throw new NotRecord(exc.message);
@@ -390,10 +388,6 @@ function candidates(
 }
 
 /** Python's `bytes.strip()` is non-empty: the line holds a byte other than ASCII whitespace. */
-function hasContent(line: Uint8Array): boolean {
-  return line.some((b) => !(b === 0x20 || (b >= 0x09 && b <= 0x0d)));
-}
-
 interface FileRead {
   results: AdaptResult[];
   badLines: Array<[number, string]>;
@@ -412,11 +406,7 @@ function readRecordFile(path: string, subject: string): FileRead | string {
     return `could not be read: ${strerror(err)}`;
   }
   const documents: Array<[number, Uint8Array]> =
-    suffix(basename(path)) === ".json"
-      ? [[1, raw]]
-      : splitLines(raw)
-          .map((line, i): [number, Uint8Array] => [i + 1, line])
-          .filter(([, line]) => hasContent(line));
+    suffix(basename(path)) === ".json" ? [[1, raw]] : jsonlByteRecords(raw);
   const read: FileRead = { results: [], badLines: [] };
   for (const [number, document] of documents) {
     try {

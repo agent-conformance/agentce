@@ -32,6 +32,7 @@ from ..errors import InputError
 from ..outputs import OUT_DIR, UNREACHABLE, write_file
 from ..ingest import _max_nesting
 from ..profile import Profile
+from ..safe_json import jsonl_records
 from ..yaml_profile import scalar_rule
 from . import otel_genai
 
@@ -316,11 +317,7 @@ def _read(path: Path, subject: str) -> _FileRead | str:
         raw = path.read_bytes()
     except OSError as exc:
         return f"could not be read: {exc.strerror}"
-    documents = (
-        [(1, raw)]
-        if path.suffix.lower() == ".json"
-        else [(n, line) for n, line in enumerate(raw.splitlines(), 1) if line.strip()]
-    )
+    documents = [(1, raw)] if path.suffix.lower() == ".json" else jsonl_records(raw)
     read = _FileRead()
     for number, document in documents:
         try:

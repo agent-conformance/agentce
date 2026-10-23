@@ -66,7 +66,7 @@ import {
   verifyBundle,
   verifyStreams,
 } from "./integrity";
-import { notValid } from "./json";
+import { JsonProfileError, asParsed, isJsonInteger, notValid, readJson } from "./json";
 import { DEFAULT_LANGUAGE, availableLanguages, catalogue } from "./messages";
 import { installedNoMl } from "./noMl";
 import {
@@ -262,6 +262,54 @@ function requireFile(
     );
   }
   return raw;
+}
+
+/** An engine-written JSON file {@link requireFile} accepted, read under the JSON profile (SPEC 8.7, a
+ * byte-order mark refused); outside it is `input.<key>_unreadable` naming the rule. Mirrors Python's
+ * `_read_input_json`. */
+function readInputJson(path: string, key: string, what: string): unknown {
+  try {
+    return readJson(readFileSync(path), "refuse");
+  } catch (exc) {
+    if (!(exc instanceof JsonProfileError)) {
+      throw exc;
+    }
+    throw new InputError(
+      `input.${key}_unreadable`,
+      `${what} ${pyRepr(path)} is ${exc.message}.`,
+      "re-run the command that wrote it, or correct the JSON at that line.",
+    );
+  }
+}
+
+/** Each assertion's `rung` and `population` counts, where present, are JSON integers (SPEC 8.7
+ * `integer_field_float_form`): `1.5`, `1e20` or `true` is refused, never truncated. Mirrors Python's
+ * `_require_integer_fields`. */
+function requireIntegerFields(path: string, data: unknown): void {
+  (Array.isArray(data) ? data : []).forEach((item, i) => {
+    if (item === null || typeof item !== "object" || Array.isArray(item)) {
+      return;
+    }
+    const entry = item as Record<string, unknown>;
+    const population = entry.population;
+    const fields: Array<[string, unknown]> = [["rung", "rung" in entry ? entry.rung : 0]];
+    if (population !== null && typeof population === "object" && !Array.isArray(population)) {
+      const counts = population as Record<string, unknown>;
+      for (const name of ["applicable", "failed"]) {
+        fields.push([`population.${name}`, name in counts ? counts[name] : 0]);
+      }
+    }
+    for (const [name, value] of fields) {
+      if (!isJsonInteger(value)) {
+        throw new InputError(
+          "input.from_unreadable",
+          `the assertions file ${pyRepr(path)} is outside the JSON profile: ` +
+            `integer_field_float_form at [${i}].${name} (SPEC 8.7).`,
+          "re-run the command that wrote it, or correct the JSON at that line.",
+        );
+      }
+    }
+  });
 }
 
 /** A folder the command reads files inside must be listable and enterable, else `key`. */
@@ -1547,7 +1595,9 @@ function cmdReport(args: Scan): CommandResult {
       );
     }
   }
-  const parsed = JSON.parse(readFileSync(source, "utf-8"));
+  const loaded = readInputJson(source, "from", "the assertions file");
+  requireIntegerFields(source, loaded);
+  const parsed = asParsed(loaded);
   const assertions: Assertion[] = Array.isArray(parsed) ? parsed.map(assertionFromJson) : [];
   const counts = aggregate(assertions);
   const language = languageFlag || DEFAULT_LANGUAGE;
@@ -1641,8 +1691,14 @@ function cmdDiff(args: Scan, json: boolean): CommandResult {
   }
   result.data.report_a = normalizePosixPath(reportA);
   result.data.report_b = normalizePosixPath(reportB);
-  const a = JSON.parse(readFileSync(reportA, "utf-8")) as Record<string, unknown>[];
-  const b = JSON.parse(readFileSync(reportB, "utf-8")) as Record<string, unknown>[];
+  const a = readInputJson(reportA, "report_a", "the first assertion set") as Record<
+    string,
+    unknown
+  >[];
+  const b = readInputJson(reportB, "report_b", "the second assertion set") as Record<
+    string,
+    unknown
+  >[];
   const changes = diffAssertionSets(a, b);
   const grouped = whatChanged(changes);
   result.data.changed = changes.length;

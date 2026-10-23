@@ -36,7 +36,7 @@ import { InputError, isPermissionError } from "./errors";
 import { pyStrip } from "./failOn";
 import { ingest } from "./ingest";
 import { integrityCaps, verifyStreams } from "./integrity";
-import { NonCanonicalNumber, asParsed, parseJson } from "./json";
+import { JsonProfileError, NonCanonicalNumber, asParsed, parseJson, readJson } from "./json";
 import { installedNoMl } from "./noMl";
 import { parsePythonIntGrammar, toBigIntFromInt } from "./otelGenai";
 import { OUT_DIR, writeFile, writingInto } from "./outputs";
@@ -306,9 +306,16 @@ function parseManifest(
 ): { manifest: Record<string, unknown>; projects: Array<Record<string, unknown>> } {
   let manifest: unknown;
   try {
-    manifest = JSON.parse(decodeUtf8Strict(bytes));
-  } catch {
-    manifest = undefined;
+    manifest = asParsed(readJson(bytes, "ignore"));
+  } catch (exc) {
+    if (exc instanceof JsonProfileError) {
+      throw new InputError(
+        "input.corpus_unreadable",
+        `${manifestPath} in the corpus folder ${corpusDir} is ${exc.message}.`,
+        "regenerate the corpus manifest, then re-run.",
+      );
+    }
+    throw exc;
   }
   const projects: unknown = !isRecord(manifest)
     ? undefined

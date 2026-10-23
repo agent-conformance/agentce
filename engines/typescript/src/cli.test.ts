@@ -1243,7 +1243,7 @@ test("diff: missing report_b gives input.report_b_missing with the diff-specific
   }
 });
 
-test("diff: a malformed (not-JSON) input file gives a keyed internal.unexpected result, never a crash", () => {
+test("diff: an input file outside the JSON profile is input.report_a_unreadable naming the rule (SPEC 8.7)", () => {
   const dir = mkdtempSync(join(tmpdir(), "agentce-cli-diff-"));
   try {
     const a = join(dir, "a.json");
@@ -1251,24 +1251,9 @@ test("diff: a malformed (not-JSON) input file gives a keyed internal.unexpected 
     const b = diffFixture(dir, "b.json", []);
     const { exitCode, envelope } = runJson(["diff", a, b]);
     assert.equal(exitCode, 3);
-    const error = envelope.error as { message_key: string; fix: string };
-    assert.equal(error.message_key, "internal.unexpected");
-    assert.equal(
-      error.fix,
-      "re-run with --debug to see the stack trace, then file an issue for an AgentCE maintainer to investigate.",
-    );
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test("diff: --debug on a malformed input file re-throws instead of returning a keyed envelope", () => {
-  const dir = mkdtempSync(join(tmpdir(), "agentce-cli-diff-"));
-  try {
-    const a = join(dir, "a.json");
-    writeFileSync(a, "not json");
-    const b = diffFixture(dir, "b.json", []);
-    assert.throws(() => main(["diff", a, b, "--debug"]));
+    const error = envelope.error as { message_key: string; detail: string };
+    assert.equal(error.message_key, "input.report_a_unreadable");
+    assert.match(error.detail, /is outside the JSON profile: syntax at line 1 \(SPEC 8\.7\)\.$/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -2105,11 +2090,15 @@ test("sign: a missing claim.json gives sign.no_claim", () => {
   }
 });
 
+// A claim.json outside the JSON profile names the rule (SPEC 8.7, 18.184x).
+const outside = (rule: string): string =>
+  `claim.json is outside the JSON profile: ${rule} at line 1 (SPEC 8.7).`;
+
 for (const [raw, cause] of [
-  [Buffer.from('{"a": "\xff"}', "latin1"), "claim.json is not valid JSON."],
-  [Buffer.from('{"a": '), "claim.json is not valid JSON."],
-  [Buffer.from("{} GARBAGE"), "claim.json is not valid JSON."],
-  [Buffer.from('{"a": "\\ud800"}'), "claim.json is not valid JSON."],
+  [Buffer.from('{"a": "\xff"}', "latin1"), outside("invalid_utf8")],
+  [Buffer.from('{"a": '), outside("syntax")],
+  [Buffer.from("{} GARBAGE"), outside("extra_value")],
+  [Buffer.from('{"a": "\\ud800"}'), outside("lone_surrogate")],
   [Buffer.from("[1, 2]"), "claim.json is not an object."],
   [Buffer.from('{"signatures": null}'), "claim.json's signatures field is not a list."],
   [Buffer.from('{"signatures": "x"}'), "claim.json's signatures field is not a list."],

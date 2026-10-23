@@ -51,6 +51,7 @@ from ..safe_json import (
     load_json,
     not_valid,
     read_json,
+    render_value,
 )
 from ..applicability import resolve as resolve_applicability
 from ..assertions import Assertion, aggregate
@@ -3212,7 +3213,7 @@ def _diff_string_field(entry: dict[str, Any], field: str) -> str:
     if not isinstance(value, str):
         raise InputError(
             "input.diff_field_not_string",
-            f"assertion field {field!r} must be a string, not {value!r}.",
+            f"assertion field {field!r} must be a string, not {render_value(value)}.",
             "emit control/subject/outcome as JSON strings.",
         )
     return value

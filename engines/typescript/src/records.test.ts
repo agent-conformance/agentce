@@ -257,13 +257,13 @@ test("a document nested 256 deep is read and one nested 257 deep is not, also in
   );
 });
 
-test("a lone surrogate the events would carry names the file; a valid pair or a dropped attribute is read", () => {
+test("a lone surrogate anywhere names the file (SPEC 8.7: the profile refuses it); a valid pair is read", () => {
   const text = (digit: string) => JSON.stringify(session(digit));
   const root = folder({
     "lone-service.json": swap(text("1"), '"credit-underwriter"}', '"cr\\ud800edit"}'),
     "lone-agent.json": swap(text("2"), `"${UNDERWRITER}"`, '"spiffe://corp/agents/cr\\udc00"'),
     "pair.json": swap(text("3"), '"credit-underwriter"}', '"cr\\ud83d\\ude00edit"}'),
-    // An attribute the adapter never maps: the lone surrogate never reaches an event.
+    // An attribute the adapter never maps: the JSON profile refuses the document before mapping.
     "dropped.json": swap(
       text("4"),
       '{"key":"gen_ai.operation.name"',
@@ -276,19 +276,21 @@ test("a lone surrogate the events would carry names the file; a valid pair or a 
   const { summary } = scanRecords(root);
   assert.deepEqual(
     summary.files.map((f) => f.path),
-    ["dropped.json", "pair.json"],
+    ["pair.json"],
   );
-  const lone = "invalid_encoding: a string holds a lone surrogate, which UTF-8 cannot carry";
+  const outside = (reason: string, rule: string) =>
+    `${reason}: outside the JSON profile: ${rule} at line 1 (SPEC 8.7)`;
   assert.deepEqual(summary.unrecognised, [
-    { path: "empty.json", reason: "invalid_json: not valid JSON" },
-    { path: "junk.json", reason: "invalid_json: not valid JSON" },
-    { path: "latin1.json", reason: "invalid_encoding: not valid UTF-8" },
-    { path: "lone-agent.json", reason: lone },
-    { path: "lone-service.json", reason: lone },
+    { path: "dropped.json", reason: outside("invalid_json", "lone_surrogate") },
+    { path: "empty.json", reason: outside("invalid_json", "syntax") },
+    { path: "junk.json", reason: outside("invalid_json", "syntax") },
+    { path: "latin1.json", reason: outside("invalid_encoding", "invalid_utf8") },
+    { path: "lone-agent.json", reason: outside("invalid_json", "lone_surrogate") },
+    { path: "lone-service.json", reason: outside("invalid_json", "lone_surrogate") },
   ]);
 });
 
-test("JSON Lines split at CRLF, CR and LF, skip blank lines, and list 20 bad lines while counting all", () => {
+test("JSON Lines split at LF alone (a CRLF's CR is dropped, a lone CR is not a line end), skip blank lines, and list 20 bad lines while counting all", () => {
   const flat = JSON.stringify(session("1"));
   const root = folder({
     "bad.jsonl": `${Array(25).fill("not json").join("\n")}\n${flat}\n`,
@@ -299,15 +301,16 @@ test("JSON Lines split at CRLF, CR and LF, skip blank lines, and list 20 bad lin
     summary.files.map((f) => [f.path, f.spans]),
     [
       ["bad.jsonl", 5],
-      ["crlf.jsonl", 10],
+      ["crlf.jsonl", 5],
     ],
   );
+  // `nope\r{...}` is one line under SPEC 8.7, so session 3 is not read.
   assert.equal(summary.lines_unrecognised, 26);
   assert.equal(summary.unrecognised_lines.length, 20);
   assert.deepEqual(summary.unrecognised_lines[19], {
     path: "bad.jsonl",
     line: 20,
-    reason: "invalid_json: not valid JSON",
+    reason: "invalid_json: outside the JSON profile: syntax at line 1 (SPEC 8.7)",
   });
 });
 

@@ -5,8 +5,8 @@
  * `bytes -> (events, AdapterReport)` over an OTLP/JSON trace export; no network, no learned component.
  */
 
-import { MAX_INT_STR_DIGITS, NonCanonicalNumber, parseJson } from "./json";
-import { byteCompare, decodeUtf8Strict } from "./util";
+import { JsonProfileError, MAX_INT_STR_DIGITS, NonCanonicalNumber, readJson } from "./json";
+import { byteCompare } from "./util";
 
 export const BASE_CONTEXT = "https://agent-conformance.org/contexts/evidence/v1";
 
@@ -750,28 +750,19 @@ export function adapt(payload: Uint8Array, opts: AdaptOptions): AdaptResult {
     throw new OtelGenaiAdapterError("bad_source_class", sourceClass);
   }
 
-  let bytes = payload;
-  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
-    bytes = bytes.subarray(3); // UTF-8 BOM, matching Python's `utf-8-sig` auto-detection
-  }
-  let text: string;
-  try {
-    // `decodeUtf8Strict` keeps a leading BOM rather than stripping it, so a doubled-BOM payload's
-    // second BOM survives into `text` as a literal U+FEFF and fails `parseJson` the same way
-    // Python's `json.loads` rejects it ("Unexpected UTF-8 BOM") after `utf-8-sig` strips only the
-    // first one (18.29 verifier round 1, F2) -- the same decoder `decodeUtf8Strict` uses.
-    text = decodeUtf8Strict(bytes);
-  } catch {
-    throw new OtelGenaiAdapterError("invalid_encoding", "payload is not valid UTF-8");
-  }
   let document: unknown;
   try {
-    // Python's `json.loads` reads `NaN`, `Infinity` and `-Infinity`; so does this adapter.
-    document = parseJson(text, { pythonConstants: true });
+    // The JSON profile (SPEC 8.7): a leading byte-order mark is ignored, NaN, a repeated key or a
+    // lone surrogate is refused, the same in every engine.
+    document = readJson(payload, "ignore");
   } catch (exc) {
+    if (!(exc instanceof JsonProfileError)) {
+      throw exc;
+    }
+    // Bytes that are not UTF-8 at all are a decode failure, not a JSON syntax failure.
     throw new OtelGenaiAdapterError(
-      "invalid_json",
-      exc instanceof Error ? exc.message : String(exc),
+      exc.rule === "invalid_utf8" ? "invalid_encoding" : "invalid_json",
+      exc.message,
     );
   }
   if (!isPlainObject(document)) {

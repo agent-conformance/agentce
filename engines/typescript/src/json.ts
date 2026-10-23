@@ -657,6 +657,28 @@ export function jsonlRecords(text: string): Array<[number, string]> {
   return out;
 }
 
+/** {@link jsonlRecords} on bytes (a byte-order mark already handled), so each line is decoded, and
+ * refused, on its own: LF never occurs inside a multi-byte UTF-8 sequence. Mirrors Python's
+ * `safe_json.jsonl_records`. */
+export function jsonlByteRecords(raw: Uint8Array): Array<[number, Uint8Array]> {
+  const out: Array<[number, Uint8Array]> = [];
+  let start = 0;
+  let number = 1;
+  for (let i = 0; i <= raw.length; i++) {
+    if (i === raw.length || raw[i] === 0x0a) {
+      let end = i;
+      if (end > start && raw[end - 1] === 0x0d) end -= 1;
+      const line = raw.subarray(start, end);
+      if (line.some((b) => b !== 0x20 && b !== 0x09)) {
+        out.push([number, line]);
+      }
+      start = i + 1;
+      number += 1;
+    }
+  }
+  return out;
+}
+
 /** One JSON Lines line (`line` is its number in the file) under the profile, number kinds kept. */
 export function readJsonlLine(text: string, line: number): unknown {
   checkProfile(text, line);

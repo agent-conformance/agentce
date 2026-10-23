@@ -119,7 +119,12 @@ def check_hardened_input(root: Path, *, adapters_root: Path | None = None) -> st
             ]
         )
         cause = str(_error_of(env).get("cause", ""))
-        if code == 0 or "Traceback (most recent call last)" in cause or "too deep" not in cause:
+        # The JSON profile names the rule it refuses (SPEC 8.7, 18.184x).
+        if (
+            code == 0
+            or "Traceback (most recent call last)" in cause
+            or "depth_over_limit" not in cause
+        ):
             return f"a deeply nested ingest export did not get a deliberate refusal: exit {code}, {cause!r}"
 
     with tempfile.TemporaryDirectory() as tmp:
