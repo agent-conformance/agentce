@@ -1,14 +1,11 @@
 # The full tier of `ci`: the jobs that are not needed to know a commit is sound, so they stay off the
-# per-push fast tier. It runs on push to main, on every pull request, every four hours against
-# `phase/18`, and by hand. The fast tier is ci.yml. Every action is pinned by commit SHA.
+# per-push fast tier. It runs on push to main, on every pull request, and by hand. The fast tier is ci.yml. Every action is pinned by commit SHA.
 name: ci-full
 
 on:
   push:
     branches: [main]
   pull_request:
-  schedule:
-    - cron: "23 */4 * * *"
   workflow_dispatch:
 
 permissions:
@@ -37,8 +34,6 @@ jobs:
             wheel: prebuilt
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'phase/18' || github.sha }}
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -77,8 +72,6 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'phase/18' || github.sha }}
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh

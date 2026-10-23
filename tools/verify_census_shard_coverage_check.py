@@ -97,7 +97,6 @@ ALLOWED_OUTSIDE_CENSUS = {SCENARIOS_RUN, SELF_TEST_RUNS[1], LIST_LINE}
 EXPECTED_TRIGGERS: dict[str, Any] = {
     "push": {"branches": ["main"]},
     "pull_request": None,
-    "schedule": [{"cron": "23 */4 * * *"}],
     "workflow_dispatch": None,
 }
 REFUSAL_TIMEOUT_S = 60

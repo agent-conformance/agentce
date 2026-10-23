@@ -2,7 +2,7 @@
 # each engine runs end to end within five minutes — the Python engine assesses the vendored quickstart
 # project; the TypeScript and Java engines, which implement `conformance run`, run the conformance suite
 # and must write one assertions.json per project — and the engine container image builds and runs the quickstart with no network. Runs on every
-# push to main or a phase branch and on every pull request, and can still be dispatched by hand; every
+# push to main and on every pull request, and can be dispatched by hand; every
 # action is pinned by commit SHA (AGENTS.md quality gates). No image is pushed. The
 # installed-artifacts-offline job builds the wheel, sdist, npm tarball and runnable jar from the current
 # sources, installs each outside the checkout and runs it from an empty directory with the network cut.
@@ -12,8 +12,6 @@ on:
   push:
     branches: [main]
   pull_request:
-  schedule:
-    - cron: "23 */4 * * *"
   workflow_dispatch:
 
 permissions:
@@ -26,8 +24,6 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'phase/18' || github.sha }}
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -42,8 +38,6 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'phase/18' || github.sha }}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
@@ -92,8 +86,6 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'phase/18' || github.sha }}
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
@@ -140,8 +132,6 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'phase/18' || github.sha }}
       - name: Build the engine image without pushing
         run: docker build -f engines/python/Dockerfile -t agentce/agentce:dev .
       - name: Run the quickstart in the image with no network, as the caller's own user id
@@ -171,8 +161,6 @@ jobs:
       sha256: ${{ steps.list.outputs.sha256 }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'phase/18' || github.sha }}
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -201,8 +189,6 @@ jobs:
         shard: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'phase/18' || github.sha }}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
@@ -230,8 +216,6 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'phase/18' || github.sha }}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
@@ -257,8 +241,6 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'phase/18' || github.sha }}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"

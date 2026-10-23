@@ -1,5 +1,5 @@
-# The full tier of the verification suite: every pull request, push to main, a four-hourly run against
-# `phase/18`, and by hand. Every phase push runs the quick tier alone, in verification-quick.yml.
+# The full tier of the verification suite: every pull request, push to main, and by hand. Every phase
+# push runs the quick tier alone, in verification-quick.yml.
 # The suite, run the way anyone would run it from a fresh clone:
 # the registry check, the quick tier, and each gate's seeded-fault demo. Every action is pinned by commit SHA.
 #
@@ -16,8 +16,6 @@ on:
   push:
     branches: [main]
   pull_request:
-  schedule:
-    - cron: "23 */4 * * *"
   workflow_dispatch:
 
 permissions:
@@ -29,8 +27,6 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'phase/18' || github.sha }}
       - uses: ./.github/actions/setup-verification-env
       - name: Lint and type-check the runner
         run: |
@@ -52,8 +48,6 @@ jobs:
         lane: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'phase/18' || github.sha }}
       - uses: ./.github/actions/setup-verification-env
       - name: This shard's quick-tier gates
         run: python3 verification/shard.py --quick "${{ strategy.job-index }}" "${{ strategy.job-total }}"
@@ -69,8 +63,6 @@ jobs:
         lane: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'phase/18' || github.sha }}
       - uses: ./.github/actions/setup-verification-env
       - name: This shard's seeded-fault demos
         run: python3 verification/shard.py "${{ strategy.job-index }}" "${{ strategy.job-total }}"

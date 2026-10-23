@@ -13,7 +13,7 @@ fails if a gate in `gates.json` is not named in this file.
 - `VG-DEMO-SHARD-COVERAGE` (CI tiers, changed): the check also reads `verification-quick.yml`, the fast tier that runs
   the quick tier on every phase push, and holds its `quick-tier` job to the same exact wiring as `verification.yml`'s.
 - `VG-VERIFY-CENSUS-SHARD-COVERAGE` (CI tiers, changed): the expected triggers of `quickstart.yml` are now push to
-  main, pull request, the four-hourly schedule and manual dispatch, and the paths-ignore seeded fault searches for the
+  main, pull request and manual dispatch, and the paths-ignore seeded fault searches for the
   new `branches: [main]` line.
 
 ## 0.116.0

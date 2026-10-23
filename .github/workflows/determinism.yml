@@ -7,8 +7,6 @@ on:
   push:
     branches: [main]
   pull_request:
-  schedule:
-    - cron: "23 */4 * * *"
   workflow_dispatch:
 
 permissions:
@@ -28,8 +26,6 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ github.event_name == 'schedule' && 'phase/18' || github.sha }}
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh

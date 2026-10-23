@@ -1,12 +1,11 @@
 # The fast tier of the verification suite: the quick tier alone, sharded the way verification.yml shards
-# it, on every push to main or a phase branch and every pull request. The seeded-fault demos and the
-# `quick` required check stay in verification.yml (the full tier). Every action is pinned by commit SHA.
+# it, on every push to a phase branch. verification.yml runs the quick tier on main and on pull requests,
+# with the seeded-fault demos and the `quick` required check (the full tier). Every action is pinned by commit SHA.
 name: verification-quick
 
 on:
   push:
-    branches: [main, "phase/**"]
-  pull_request:
+    branches: ["phase/**"]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
