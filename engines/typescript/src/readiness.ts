@@ -482,6 +482,28 @@ const PYYAML_EXPLICIT_SCALAR_TYPES = [
 
 /** A `<<` merge scalar read anywhere but as a mapping key. */
 const PYYAML_MERGE_VALUE = Object.freeze({ pyyamlMergeValue: true });
+/** A plain `=`: as a key it is renamed `=` ({@link readValueKeys}, as `flatten_mapping` retags it to str), as a value
+ * refused. A string, since js-yaml names every object key `[object Object]`. */
+const PYYAML_VALUE_VALUE = "\u0000pyyaml-value=";
+
+/** Renames each `=` key back to its text and refuses a `=` value; each shared (aliased) node is visited once. */
+function readValueKeys(value: unknown, seen = new Set<object>()): void {
+  if (value === PYYAML_VALUE_VALUE) {
+    throw new YAMLException(`could not determine a constructor for the tag '${VALUE_TAG}'`);
+  }
+  if (typeof value !== "object" || value === null || seen.has(value)) {
+    return;
+  }
+  seen.add(value);
+  if (!Array.isArray(value) && Object.hasOwn(value, PYYAML_VALUE_VALUE)) {
+    const mapping = value as Record<string, unknown>;
+    mapping["="] = mapping[PYYAML_VALUE_VALUE];
+    delete mapping[PYYAML_VALUE_VALUE];
+  }
+  for (const child of Object.values(value)) {
+    readValueKeys(child, seen);
+  }
+}
 
 /** Whether `value` holds {@link PYYAML_MERGE_VALUE}; each shared (aliased) node is visited once. */
 function holdsMergeValue(value: unknown, seen = new Set<object>()): boolean {
@@ -545,9 +567,7 @@ export const PYYAML_SAFE_SCHEMA = FAILSAFE_SCHEMA.extend({
     new YamlType(VALUE_TAG, {
       kind: "scalar",
       resolve: (data: unknown) => data === "=",
-      construct: () => {
-        throw new Error(`could not determine a constructor for the tag '${VALUE_TAG}'`);
-      },
+      construct: () => PYYAML_VALUE_VALUE,
     }),
   ],
   explicit: PYYAML_EXPLICIT_SCALAR_TYPES,
@@ -913,6 +933,7 @@ export function pyyamlLoad(text: string): unknown {
       "could not determine a constructor for the tag 'tag:yaml.org,2002:merge'",
     );
   }
+  readValueKeys(data);
   return data;
 }
 
