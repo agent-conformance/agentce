@@ -12,7 +12,6 @@ used as its own denominator.
 
 from __future__ import annotations
 
-import json
 from collections import defaultdict
 from collections.abc import Mapping
 from decimal import ROUND_HALF_EVEN, Decimal
@@ -21,7 +20,7 @@ from typing import Any
 from .domain import MAX_COUNT
 from .errors import InputError
 from .profile import CoverageDenominator, Profile, Subject
-from .safe_json import too_deep
+from .safe_json import JsonProfileError, read_json, render_value, too_deep
 
 STATUS_COVERED = "covered"
 STATUS_BELOW = "below_threshold"
@@ -118,16 +117,12 @@ def _invalid_manifest(name: str, why: str) -> InputError:
     )
 
 
-def _reject_constant(token: str) -> Any:
-    raise ValueError(f"{token} is not JSON")
-
-
 def _load_manifest(name: str, raw: bytes) -> Any:
-    """The manifest's JSON, read as every engine reads it: strict UTF-8 and standard JSON only (no NaN or Infinity)."""
+    """The manifest's JSON, read under the JSON profile (SPEC 8.7) as every engine reads it."""
     try:
-        return json.loads(raw.decode("utf-8"), parse_constant=_reject_constant)
-    except (UnicodeDecodeError, ValueError) as exc:
-        raise _invalid_manifest(name, f"is not JSON ({exc})") from None
+        return read_json(raw, bom="ignore")
+    except JsonProfileError as exc:
+        raise _invalid_manifest(name, f"is {exc}") from None
 
 
 def _counts(name: str, data: dict[str, Any], key: str) -> dict[str, int]:
@@ -146,7 +141,7 @@ def _counts(name: str, data: dict[str, Any], key: str) -> dict[str, int]:
         ):
             raise _invalid_manifest(
                 name,
-                f"counts '{event_type}' as {json.dumps(count)}, not a whole number from 0 to {MAX_COUNT}",
+                f"counts '{event_type}' as {render_value(count)}, not a whole number from 0 to {MAX_COUNT}",
             )
     return {str(k): v for k, v in declared.items()}
 

@@ -28,7 +28,7 @@ from .canonical import CanonicalizationError, sha256_hex
 from .errors import InputError
 from .graph import UnreadableWrite, _text
 from .quarantine import QuarantineReason, QuarantineRecord
-from .safe_json import JSONError, load_json
+from .safe_json import BOM, JsonProfileError, jsonl_records, read_jsonl_line
 from .schema import event_types, validate_event
 from .safe_json import MAX_JSON_DEPTH
 from .source_class import SOURCE_CLASS_RANK
@@ -121,25 +121,28 @@ def ingest(
     owner_rank: dict[str, int] = {}
 
     for path in bundle.event_files:
-        # One line rule the three engines share (18.65): lines end at \n, \r\n or a lone \r
-        # (`bytes.splitlines`), each line is strict UTF-8 on its own, and only JSON's own whitespace
-        # is trimmed. A line that is not UTF-8 is quarantined like a line that is not JSON, instead
-        # of the whole file failing to decode. The bytes are the ones load_bundle checked and hashed (18.184f).
-        for raw_line in bundle.contents[path].splitlines():
+        # The JSON profile's line rule, the same in the three engines (SPEC 8.7): a leading byte-order
+        # mark is ignored, LF alone ends a line (a CRLF's CR is whitespace), a blank line is skipped,
+        # and each line is strict UTF-8 on its own. A line outside the profile is quarantined naming
+        # the rule, instead of the whole file failing. The bytes are the ones load_bundle checked and
+        # hashed (18.184f).
+        contents = bundle.contents[path]
+        if contents.startswith(BOM):
+            contents = contents[len(BOM) :]
+        for number, raw_line in jsonl_records(contents):
             try:
                 raw = raw_line.decode("utf-8")
             except UnicodeDecodeError:
                 records.append(
                     _unreadable(
                         QuarantineRecord(
-                            QuarantineReason.SCHEMA_INVALID, detail="invalid UTF-8"
+                            QuarantineReason.SCHEMA_INVALID,
+                            detail=str(JsonProfileError("invalid_utf8", number)),
                         )
                     )
                 )
                 continue
             line = raw.strip(_JSON_WHITESPACE)
-            if not line:
-                continue
             if len(line.encode("utf-8")) > max_event_bytes:
                 records.append(
                     _unreadable(
@@ -155,21 +158,18 @@ def ingest(
                 line.count("[") + line.count("{") > MAX_JSON_DEPTH
                 and _max_nesting(line) > MAX_JSON_DEPTH
             ):
-                raise _too_deep()
+                raise _too_deep(number)
             try:
-                event = load_json(line)
-            except JSONError as exc:
+                event = read_jsonl_line(line, number)
+            except JsonProfileError as exc:
                 records.append(
                     _unreadable(
                         QuarantineRecord(
-                            QuarantineReason.SCHEMA_INVALID,
-                            detail=f"invalid JSON: {exc.msg}",
+                            QuarantineReason.SCHEMA_INVALID, detail=str(exc)
                         )
                     )
                 )
                 continue
-            except RecursionError as exc:
-                raise _too_deep() from exc
             if not isinstance(event, dict):
                 records.append(
                     _unreadable(
@@ -401,10 +401,11 @@ def _unreadable_write(event: dict[str, Any]) -> UnreadableWrite | None:
     return UnreadableWrite(_text(data.get("record_ref")), _text(data.get("store")))
 
 
-def _too_deep() -> InputError:
+def _too_deep(line: int) -> InputError:
     return InputError(
         "input.event_structure_too_deep",
-        "an evidence event line is nested too deeply to parse safely.",
+        "an evidence event line is nested too deeply to parse safely: "
+        f"{JsonProfileError('depth_over_limit', line)}.",
         "flatten the event's structure; reference deeply nested content by an "
         "opaque locator instead (SPEC R12).",
     )

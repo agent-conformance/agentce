@@ -10,7 +10,6 @@ manual-protocol linters the ``agentce-prepare-to-share`` skill wraps; each retur
 
 from __future__ import annotations
 
-import json
 import os
 import re
 from datetime import date, datetime
@@ -23,7 +22,13 @@ import jsonschema
 
 from .coverage import STATUS_UNKNOWN
 from .integrity import IntegrityStatus
-from .safe_json import JSONError, jsonl_lines, load_report_json
+from .safe_json import (
+    JSONError,
+    JsonProfileError,
+    jsonl_lines,
+    load_report_json,
+    read_bundled,
+)
 from .signing import is_regular_file
 
 _T = TypeVar("_T")
@@ -57,27 +62,40 @@ def _read_report_file(path: Path) -> str | None:
     ``OSError``: readiness reports it as a blocking reason rather than reading it as absent, which
     would let a coverage gap or an integrity break stop blocking. ``os.stat`` answers the same on
     every supported Python, as ``signing.is_regular_file`` does, where ``Path.is_file`` does not.
-    The bytes are decoded without newline translation, so a lone CR stays a CR for :func:`jsonl_lines`."""
+    The bytes are decoded without newline translation, so a lone CR stays a CR for :func:`jsonl_lines`;
+    bytes that are not UTF-8 raise :class:`_Unreadable` naming the profile rule and line."""
     try:
         os.lstat(path)
     except FileNotFoundError:
         return None
     if not is_regular_file(path):
         raise OSError(f"{path} is not a regular file")
-    return path.read_bytes().decode("utf-8")
+    raw = path.read_bytes()
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        line = raw[: exc.start].count(b"\n") + 1
+        raise _Unreadable("not UTF-8") from JsonProfileError("invalid_utf8", line)
 
 
 class _Unreadable(ValueError):
     """A report file whose content is not JSON of the shape readiness reads."""
 
 
-def _parse_json(text: str) -> Any:
-    """One report file's JSON by the rule readiness, sign and ``report --validate`` share
-    (:func:`safe_json.load_report_json`)."""
+def _parse_json(text: str, line: int | None = None) -> Any:
+    """One report file's JSON (or its JSON Lines line ``line``) by the rule readiness, sign and
+    ``report --validate`` share (:func:`safe_json.load_report_json`)."""
     try:
-        return load_report_json(text)
+        return load_report_json(text, line)
     except JSONError as exc:
         raise _Unreadable(str(exc)) from exc
+
+
+def _profile_cause(exc: BaseException) -> JsonProfileError | None:
+    """The :class:`JsonProfileError` at the root of ``exc``'s cause chain, if any."""
+    while exc is not None and not isinstance(exc, JsonProfileError):
+        exc = exc.__cause__  # type: ignore[assignment]
+    return exc
 
 
 def _objects(values: list[Any]) -> list[dict[str, Any]]:
@@ -95,7 +113,7 @@ def _strings(record: dict[str, Any], *fields: str) -> dict[str, Any]:
 
 
 def _jsonl(text: str) -> list[dict[str, Any]]:
-    return _objects([_parse_json(line) for _, line in jsonl_lines(text)])
+    return _objects([_parse_json(line, n) for n, line in jsonl_lines(text)])
 
 
 def _integrity(text: str) -> list[dict[str, Any]]:
@@ -201,9 +219,9 @@ def _schema(name: str) -> dict[str, Any]:
     text = (
         resources.files("agentce.data.schemas")
         .joinpath(f"{name}.schema.json")
-        .read_text("utf-8")
+        .read_bytes()
     )
-    parsed: dict[str, Any] = json.loads(text)
+    parsed: dict[str, Any] = read_bundled(text)
     return parsed
 
 
@@ -307,8 +325,12 @@ def compute_readiness(
             text = _read_report_file(report_dir / name)
             if text is not None:
                 return parse(text)
-        except (OSError, UnicodeDecodeError, _Unreadable):
-            reasons.append(f"cannot read report file {name}")
+        except (OSError, _Unreadable) as exc:
+            # The profile rule and line when the file is outside the JSON profile (SPEC 8.7).
+            rule = _profile_cause(exc)
+            reasons.append(
+                f"cannot read report file {name}" + (f": {rule}" if rule else "")
+            )
             return None
         reasons.append(f"missing report file {name}")
         return None

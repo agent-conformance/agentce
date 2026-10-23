@@ -217,6 +217,7 @@ _KINDS: dict[str, str] = {
     "input.corpus_not_found": "error",
     "input.corpus_unreadable": "error",
     "input.state_version_incompatible": "error",
+    "input.state_unreadable": "error",
     "input.state_dir_unwritable": "error",
     "input.verify_target": "error",
     "input.out_missing": "error",

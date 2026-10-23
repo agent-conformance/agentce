@@ -11,7 +11,6 @@ command. The scan never reads the file system. Mirrors ``engines/typescript/src/
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from functools import cache
@@ -19,6 +18,7 @@ from typing import Any
 
 from . import bundled
 from .errors import InputError
+from .safe_json import read_bundled
 
 HELP = ("-h", "--help")
 
@@ -106,8 +106,7 @@ def _level(raw: Mapping[str, Any], globals_: Sequence[Option]) -> Level:
 @cache
 def grammar() -> Mapping[str, Any]:
     """The vendored grammar file, as data."""
-    with bundled.argv_grammar_path().open(encoding="utf-8") as fh:
-        loaded: Mapping[str, Any] = json.load(fh)
+    loaded: Mapping[str, Any] = read_bundled(bundled.argv_grammar_path().read_bytes())
     return loaded
 
 

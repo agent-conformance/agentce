@@ -14,10 +14,10 @@ selects which of these strings render into ``report.md``/``report.html`` (SPEC Â
 
 from __future__ import annotations
 
-import json
 import re
 
 from . import bundled
+from .safe_json import read_bundled
 
 _PLURAL_RE = re.compile(
     r"^\{(?P<var>[A-Za-z_][A-Za-z0-9_]*),\s*plural,\s*(?P<body>.*)\}$", re.DOTALL
@@ -69,5 +69,5 @@ def load_catalog(language: str) -> dict[str, str]:
     path = bundled.i18n_dir() / f"messages.{language}.json"
     if not path.is_file():
         return {}
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = read_bundled(path.read_bytes())
     return {str(key): str(value) for key, value in data.items()}

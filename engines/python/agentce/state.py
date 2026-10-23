@@ -28,6 +28,8 @@ from pathlib import Path
 from typing import Any
 
 from . import signing
+from .error_catalogue import MESSAGE_KEYS
+from .safe_json import JsonProfileError, is_json_integer, read_json, render_value
 from .assertions import Assertion
 from .errors import InputError
 from .outputs import NOT_A_FILE, UNREACHABLE, through_missing_folder, write_file
@@ -101,18 +103,33 @@ class StateDir:
         if not has_state:
             return cls(path=path)
         try:
-            text = state_file.read_text(encoding="utf-8")
+            raw = state_file.read_bytes()
         except OSError as exc:
             raise InputError(
                 "input.state_dir_unwritable", exc.strerror or str(exc), _FIX
             ) from exc
-        data = json.loads(text)
-        version = int(data.get("state_version", 0))
-        if version != STATE_VERSION:
+        try:
+            data = read_json(raw, bom="ignore")
+        except JsonProfileError as exc:
+            raise InputError(
+                "input.state_unreadable",
+                f"the state file {str(state_file)!r} is {exc}.",
+                MESSAGE_KEYS["input.state_unreadable"].fix,
+            ) from exc
+        if not isinstance(data, dict):
+            raise InputError(
+                "input.state_unreadable",
+                f"the state file {str(state_file)!r} does not hold a JSON object.",
+                MESSAGE_KEYS["input.state_unreadable"].fix,
+            )
+        version = data.get("state_version", 0)
+        # The JSON integer 1 and nothing else (SPEC 8.7): 1.0, "1" and true are not state_version 1.
+        if not is_json_integer(version) or version != STATE_VERSION:
             raise InputError(
                 "input.state_version_incompatible",
                 (
-                    f"the state directory at {path} is state_version {version}, "
+                    f"the state directory at {path} is state_version "
+                    f"{render_value(version)}, "
                     f"but this engine writes state_version {STATE_VERSION}."
                 ),
                 (

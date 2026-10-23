@@ -14,7 +14,6 @@ verdict.
 from __future__ import annotations
 
 import functools
-import json
 from importlib import resources
 from typing import Any
 
@@ -27,6 +26,7 @@ from .assess import (
 from .assertions import Assertion
 from .catalog import Catalog, ControlSpec
 from .profile import Profile
+from .safe_json import read_bundled
 
 #: The seven OpenTelemetry-GenAI-shaped trace events (RFC 0008 Sec.3): a self-report requirement for
 #: one of these is rung 1 ("what happened"); every other self-report requirement is rung 2 (the
@@ -69,9 +69,9 @@ def _event_producers() -> dict[str, dict[str, str]]:
     text = (
         resources.files("agentce.data.support_matrices")
         .joinpath("event_producers.json")
-        .read_text(encoding="utf-8")
+        .read_bytes()
     )
-    parsed: dict[str, Any] = json.loads(text)
+    parsed: dict[str, Any] = read_bundled(text)
     return parsed
 
 

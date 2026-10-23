@@ -42,7 +42,7 @@ from .integrity import integrity_caps, verify_streams
 from .outputs import OUT_DIR, write_file, writing_into
 from .profile import Profile
 from .report import write_report
-from .safe_json import JSONError, load_json, refuse_constant
+from .safe_json import JSONError, JsonProfileError, load_json, read_json
 
 #: Stable provenance for ECS assessments, so per-project manifests are identical across machines
 #: except for the timestamp and host fingerprint (SPEC §11.5 determinism, P1.2).
@@ -192,10 +192,14 @@ def _adapter_claim(detail: dict[str, Any]) -> str:
     return "none"
 
 
-def _manifest_not_an_object(manifest_path: Path, corpus_dir: Path) -> InputError:
+def _manifest_not_an_object(
+    manifest_path: Path,
+    corpus_dir: Path,
+    why: str = "is not a JSON object with a projects array",
+) -> InputError:
     return InputError(
         "input.corpus_unreadable",
-        f"{manifest_path} in the corpus folder {corpus_dir} is not a JSON object with a projects array.",
+        f"{manifest_path} in the corpus folder {corpus_dir} {why}.",
         "regenerate the corpus manifest, then re-run.",
     )
 
@@ -223,17 +227,15 @@ def run_ecs(
 
     manifest_path = corpus_root / "corpus-manifest.json"
     try:
-        manifest = json.loads(
-            manifest_path.read_text(encoding="utf-8"), parse_constant=refuse_constant
-        )
+        manifest = read_json(manifest_path.read_bytes(), bom="ignore")
     except OSError as exc:
         raise InputError(
             "input.corpus_unreadable",
             f"{manifest_path} in the corpus folder {corpus_dir} could not be read ({exc.strerror}).",
             "make the corpus folder readable and enterable, then re-run.",
         ) from exc
-    except ValueError as exc:  # not UTF-8 or not JSON
-        raise _manifest_not_an_object(manifest_path, corpus_dir) from exc
+    except JsonProfileError as exc:
+        raise _manifest_not_an_object(manifest_path, corpus_dir, f"is {exc}") from exc
     projects = manifest.get("projects", []) if isinstance(manifest, dict) else None
     if not isinstance(projects, list) or not all(isinstance(p, dict) for p in projects):
         raise _manifest_not_an_object(manifest_path, corpus_dir)

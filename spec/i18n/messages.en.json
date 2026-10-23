@@ -345,6 +345,8 @@
   "errors.input.corpus_unreadable.fix": "make the corpus folder readable and enterable, then re-run.",
   "errors.input.state_version_incompatible.cause": "the state directory was written by an incompatible state_version.",
   "errors.input.state_version_incompatible.fix": "there is no migration command: move or delete the state directory and re-run with --state pointing at a fresh, empty directory (this discards the prior bundle/outcome history recorded there, so late-arriving evidence and drift are tracked only from that point forward).",
+  "errors.input.state_unreadable.cause": "the state directory's state.json is outside the JSON profile (SPEC 8.7), so the prior run it records cannot be read.",
+  "errors.input.state_unreadable.fix": "restore state.json from the run that wrote it, or move the state directory aside and re-run with --state pointing at a fresh, empty directory.",
   "errors.input.state_dir_unwritable.cause": "the --state directory could not be created or written to, or --state was empty.",
   "errors.input.state_dir_unwritable.fix": "choose a writable --state directory.",
   "errors.input.bundle_manifest_invalid.cause": "manifest.json is not valid JSON, or is not an object.",

@@ -61,7 +61,7 @@ from .catalog import Catalog, ControlSpec, catalog_provenance_digest
 from .outputs import write_file
 from .profile import Profile, Subject
 from .readiness import data_file_problem
-from .safe_json import JSONError, jsonl_lines, load_json, load_report_json
+from .safe_json import JSONError, jsonl_lines, load_report_json, read_bundled
 from .project import (
     blind_spots_by_subject,
     compute_project_view,
@@ -3659,9 +3659,9 @@ def _load_schema(name: str) -> dict[str, Any]:
     text = (
         resources.files("agentce.data.schemas")
         .joinpath(f"{name}.schema.json")
-        .read_text("utf-8")
+        .read_bytes()
     )
-    parsed: dict[str, Any] = json.loads(text)
+    parsed: dict[str, Any] = read_bundled(text)
     return parsed
 
 
@@ -3821,7 +3821,7 @@ def _validate_jsonl(filename: str, text: str) -> list[str]:
     problems = []
     for i, line in jsonl_lines(text):
         try:
-            if not isinstance(load_report_json(line), dict):
+            if not isinstance(load_report_json(line, i), dict):
                 problems.append(f"{filename}: line {i} is not a JSON object")
         except JSONError as exc:
             problems.append(f"{filename}: line {i} is not valid JSON ({exc.msg})")
@@ -3881,7 +3881,7 @@ def _recorded_outputs(out_dir: Path) -> dict[str, str]:
     that cannot be read records nothing here; the schema check reports it."""
     try:
         text = _read_artifact_text(out_dir / "manifest.json")
-        manifest = load_json(text) if text is not None else None
+        manifest = load_report_json(text) if text is not None else None
     except (_CannotRead, JSONError):
         return {}
     outputs = manifest.get("outputs") if isinstance(manifest, dict) else None

@@ -10,7 +10,6 @@ verdict: each oracle is an exact rule over the recorded events or output.
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field as dataclass_field
 from decimal import Decimal
 from fractions import Fraction
@@ -22,6 +21,7 @@ from . import numerics
 from .domain import DomainBinding
 from .graph import build_graph
 from .psp import Shape, parse_shapes_ttl
+from .safe_json import read_bundled
 from .structural import evaluate_shape
 
 DEFAULT_ALPHA = Decimal("0.05")
@@ -76,7 +76,7 @@ def _event_field(event: dict[str, Any], name: str) -> Any:
 
 def load_corpus(path: Path) -> ProbeCorpus:
     """Load a frozen probe corpus, verifying every prompt hash and the sign-off (SPEC §7.2)."""
-    manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
+    manifest = read_bundled((path / "manifest.json").read_bytes())
     sign_off = manifest.get("sign_off")
     if (
         not isinstance(sign_off, dict)
@@ -87,7 +87,7 @@ def load_corpus(path: Path) -> ProbeCorpus:
     cases: list[ProbeCase] = []
     for entry in manifest.get("cases", []):
         case_path = path / str(entry["file"])
-        case = json.loads(case_path.read_text(encoding="utf-8"))
+        case = read_bundled(case_path.read_bytes())
         prompt = str(case.get("prompt", ""))
         digest = sha256(prompt.encode("utf-8")).hexdigest()
         if digest != entry.get("prompt_sha256"):

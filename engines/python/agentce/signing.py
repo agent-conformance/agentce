@@ -33,7 +33,6 @@ from __future__ import annotations
 import base64
 import errno
 import hashlib
-import json
 import os
 import re
 import stat
@@ -49,7 +48,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 )
 
 from .canonical import canonicalize
-from .safe_json import MAX_JSON_DEPTH
+from .safe_json import MAX_JSON_DEPTH, JsonProfileError, read_bundled, read_json
 from .safe_json import too_deep as _too_deep
 from .error_catalogue import MESSAGE_KEYS
 from .i18n_format import format_message
@@ -130,41 +129,23 @@ class JsonTooDeep(ValueError):
         super().__init__("not readable JSON")
 
 
-_SURROGATE = re.compile("[\ud800-\udfff]")
 _PLAIN_ASCII = re.compile(r"[ !#-&(-\[\]-~]*")
 
 
-def _refuse_constant(token: str) -> Any:
-    raise ValueError(f"non-standard JSON token {token}")
-
-
-def parse_untrusted_json(raw: bytes) -> Any:
+def parse_untrusted_json(raw: bytes, *, bom: str = "refuse") -> Any:
     """Parse JSON that `verify` reads from an untrusted file or signed payload, or raise ``ValueError``.
 
-    One rule set the three engines share, so the same bytes are refused or accepted alike: strict
-    UTF-8 with no byte-order mark, standard JSON only (no ``NaN``/``Infinity``, no trailing data),
-    containers nested at most :data:`MAX_JSON_DEPTH` deep, and every string and key well-formed
-    Unicode (an escaped lone surrogate such as ``"\\ud800"`` is refused). Callers turn the
-    ``ValueError`` into their own fixed reason text; its message is never shown. A document too
-    deep raises the :class:`JsonTooDeep` subclass, whatever else is wrong with it."""
+    The JSON profile (SPEC 8.7, :func:`safe_json.read_json`), so the three engines refuse or accept
+    the same bytes. ``bom`` is ``"refuse"`` for a file an engine wrote (claim.json, envelopes) and
+    ``"ignore"`` for one an adopter's tool may have written (a bundle manifest, a trust root). The
+    ``ValueError``'s cause is the :class:`JsonProfileError` naming the rule. A document too deep
+    raises the :class:`JsonTooDeep` subclass, whatever else is wrong with it."""
     if _too_deep(raw):
         raise JsonTooDeep()
     try:
-        value = json.loads(raw.decode("utf-8"), parse_constant=_refuse_constant)
-    except (ValueError, RecursionError) as exc:
+        return read_json(raw, bom=bom)
+    except JsonProfileError as exc:
         raise ValueError("not readable JSON") from exc
-    stack: list[Any] = [value]
-    while stack:
-        node = stack.pop()
-        if isinstance(node, str):
-            if _SURROGATE.search(node):
-                raise ValueError("not readable JSON")
-        elif isinstance(node, dict):
-            stack.extend(node.values())
-            stack.extend(node)
-        elif isinstance(node, list):
-            stack.extend(node)
-    return value
 
 
 def parse_verify_input(raw: bytes, unreadable_key: str, what: str) -> Any:
@@ -918,9 +899,7 @@ def vendored_trust_path() -> Path:
 
 def vendored_trust() -> TrustRoot:
     """Load the trust root vendored in the engine package."""
-    import json
-
-    return TrustRoot.from_dict(json.loads(vendored_trust_path().read_text("utf-8")))
+    return TrustRoot.from_dict(read_bundled(vendored_trust_path().read_bytes()))
 
 
 def load_trust_root(path: Path) -> TrustRoot:
@@ -930,7 +909,7 @@ def load_trust_root(path: Path) -> TrustRoot:
     so the three engines accept the same files (18.81). Past :data:`MAX_JSON_DEPTH` the text is fixed;
     any other refusal names the parser's own error, if it has one."""
     try:
-        data = parse_untrusted_json(path.read_bytes())
+        data = parse_untrusted_json(path.read_bytes(), bom="ignore")
     except OSError as exc:
         raise VerificationError(f"{path} is not readable JSON: {exc}") from exc
     except JsonTooDeep as exc:

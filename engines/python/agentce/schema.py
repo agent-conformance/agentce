@@ -10,7 +10,6 @@ model.
 from __future__ import annotations
 
 import functools
-import json
 from importlib import resources
 from typing import Any
 
@@ -18,6 +17,7 @@ import jsonschema
 from jsonschema.protocols import Validator
 
 from .domain import MAX_COUNT
+from .safe_json import read_bundled
 
 
 @functools.lru_cache(maxsize=1)
@@ -26,9 +26,9 @@ def evidence_schema() -> dict[str, Any]:
     text = (
         resources.files("agentce.data")
         .joinpath("agentce-evidence.schema.json")
-        .read_text(encoding="utf-8")
+        .read_bytes()
     )
-    parsed: dict[str, Any] = json.loads(text)
+    parsed: dict[str, Any] = read_bundled(text)
     return parsed
 
 

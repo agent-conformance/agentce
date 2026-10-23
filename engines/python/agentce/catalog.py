@@ -32,6 +32,7 @@ from .errors import InputError, catalog_file_unloadable, catalog_unreadable
 from .graph import build_graph
 from .i18n_format import format_message
 from .psp import PropertyShape, Shape, parse_shapes_ttl
+from .safe_json import JsonProfileError, read_bundled, read_jsonl
 from .safe_yaml import YamlProfileError, load_catalog_yaml
 from .source_class import SOURCE_CLASS_FROM, SOURCE_CLASS_RANK
 from .structural import evaluate_control, evaluate_shape
@@ -398,9 +399,9 @@ def _load_control_schema() -> dict[str, Any]:
     text = (
         resources.files("agentce.data.schemas")
         .joinpath("control.schema.json")
-        .read_text("utf-8")
+        .read_bytes()
     )
-    parsed: dict[str, Any] = json.loads(text)
+    parsed: dict[str, Any] = read_bundled(text)
     return parsed
 
 
@@ -413,12 +414,23 @@ def _load_test_domain(directory: Path) -> DomainBinding:
     )
 
 
-def _load_events(path: Path) -> list[dict[str, Any]]:
+def _load_events(directory: Path, rel: str) -> list[dict[str, Any]]:
+    """A test fixture's events, read as JSON Lines under the JSON profile (SPEC 8.7); a line outside it
+    refuses the catalog as input.catalog_unreadable naming the rule."""
     events = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if line:
-            events.append(json.loads(line))
+    try:
+        lines = read_jsonl((directory / rel).read_bytes(), bom="ignore")
+    except JsonProfileError as exc:
+        lines = [(exc.line, exc)]
+    for _, value in lines:
+        if isinstance(value, JsonProfileError):
+            raise catalog_file_unloadable(
+                directory,
+                rel,
+                f"is {value}",
+                f"fix {rel} so each line holds one JSON value inside the JSON profile, then re-run.",
+            )
+        events.append(value)
     return events
 
 
@@ -476,7 +488,8 @@ def _fixture_fingerprint(directory: Path, control: ControlSpec) -> tuple[Any, ..
         events: tuple[str, ...] | None = None
         if signing.is_regular_file(path):
             events = tuple(
-                json.dumps(event, sort_keys=True) for event in _load_events(path)
+                json.dumps(event, sort_keys=True)
+                for event in _load_events(directory, case["fixture"])
             )
         cases.append((case["id"], case.get("expected"), events))
     return tuple(cases)
@@ -729,7 +742,7 @@ def _lint_case(
             return [f"{control.id}/{case['id']}: fixture {case['fixture']} not found"]
         if shape is None or case["expected"] not in _EXPECTED_TO_CHECK:
             return []
-        events = _load_events(fixture)
+        events = _load_events(catalog.directory, case["fixture"])
     except OSError as exc:  # unreadable, never "not found", on every Python (18.169)
         return [
             f"{control.id}/{case['id']}: fixture {case['fixture']} could not be read ({exc.strerror})"

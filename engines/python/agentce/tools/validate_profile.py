@@ -13,7 +13,6 @@ usage error. No network, no learned component.
 
 from __future__ import annotations
 
-import json
 import sys
 from importlib import resources
 from pathlib import Path
@@ -23,6 +22,7 @@ import jsonschema
 
 from .. import signing
 from ..errors import InputError
+from ..safe_json import read_bundled
 from ..safe_yaml import load_untrusted_yaml
 
 
@@ -30,9 +30,9 @@ def _schema() -> dict[str, Any]:
     text = (
         resources.files("agentce.data.schemas")
         .joinpath("applicability-profile.schema.json")
-        .read_text(encoding="utf-8")
+        .read_bytes()
     )
-    parsed: dict[str, Any] = json.loads(text)
+    parsed: dict[str, Any] = read_bundled(text)
     return parsed
 
 

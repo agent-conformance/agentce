@@ -20,6 +20,7 @@ from . import canonical
 from .errors import InputError, UnreadableError
 from .error_catalogue import MESSAGE_KEYS
 from . import signing
+from .safe_json import not_valid
 from .signing import parse_untrusted_json
 
 #: Ceiling on any single manifest-listed file's byte size, checked with `stat()` before the file is
@@ -210,13 +211,13 @@ def load_bundle(bundle_dir: Path) -> Bundle:
         )
     try:
         manifest_bytes = read_confined(bundle_dir, "manifest.json", manifest_path)
-        parsed = parse_untrusted_json(manifest_bytes)
+        parsed = parse_untrusted_json(manifest_bytes, bom="ignore")
     except PermissionError as exc:
         raise _unreadable(bundle_dir, "manifest.json") from exc
     except (OSError, ValueError) as exc:
         raise InputError(
             "input.bundle_manifest_invalid",
-            "manifest.json is not valid JSON.",
+            not_valid("manifest.json", exc),
             "regenerate the bundle so its manifest.json is well-formed.",
         ) from exc
     if not isinstance(parsed, dict):

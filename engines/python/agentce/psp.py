@@ -12,7 +12,6 @@ not parse, under a stable message key before a shape ever reaches the evaluator 
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from importlib import resources
 from typing import Any
@@ -23,6 +22,7 @@ from rdflib.collection import Collection
 from .error_catalogue import MESSAGE_KEYS
 from .errors import InputError
 from .i18n_format import format_message
+from .safe_json import read_bundled
 
 SH = "http://www.w3.org/ns/shacl#"
 AGENTCE = "https://agent-conformance.org/vocab/evidence/v1#"
@@ -212,8 +212,8 @@ def parse_shapes(graph: Graph) -> dict[str, Shape]:
 #: refuses exactly the shapes the authoring-time checker refuses (18.78). Left unchecked, an excluded
 #: predicate parses as ordinary Turtle and the reads above, which only ever ask for the predicates they
 #: name, drop it silently: the shape would be evaluated as if the construct were not there.
-_TERMS: dict[str, Any] = json.loads(
-    resources.files("agentce.data").joinpath("psp-terms.json").read_text("utf-8")
+_TERMS: dict[str, Any] = read_bundled(
+    resources.files("agentce.data").joinpath("psp-terms.json").read_bytes()
 )
 _ALLOWED = frozenset(_TERMS["allowed"])
 _PRIORITY_DENY: tuple[str, ...] = tuple(_TERMS["priority_deny"])

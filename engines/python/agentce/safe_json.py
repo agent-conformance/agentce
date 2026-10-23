@@ -58,18 +58,16 @@ def refuse_constant(token: str) -> Any:
 
 
 def jsonl_lines(text: str) -> list[tuple[int, str]]:
-    """The JSON Lines of ``text`` as (1-based line number, line), blank lines left out: LF alone ends a
-    line, and a line holding only space, tab or CR is blank. Every other line is returned as it stands
-    for a strict JSON parser, which accepts only JSON's whitespace around a value (so a CRLF pair reads
-    as LF) and refuses a VT, FF, NEL, U+2028, no-break space or byte-order mark outside a string, and
-    two values joined by a lone CR. ``json.ts`` and ``Json.java`` apply the same rule. Report files are the
-    engines' own JSON Lines output; evidence input keeps ingest's wider rule (18.65), where a lone CR also
-    ends a line."""
-    return [
-        (n, line)
-        for n, line in enumerate(text.split("\n"), start=1)
-        if line.strip(" \t\r")
-    ]
+    """The non-blank JSON Lines of ``text`` as (1-based line number, line), by the profile's line rule
+    (:func:`jsonl_records`): LF alone ends a line, a CRLF's CR is dropped, a line holding only spaces
+    and tabs is blank. ``json.ts`` and ``Json.java`` apply the same rule."""
+    out: list[tuple[int, str]] = []
+    for number, line in enumerate(text.split("\n"), start=1):
+        if line.endswith("\r"):
+            line = line[:-1]
+        if line.strip(" \t"):
+            out.append((number, line))
+    return out
 
 
 def load_json(text: str | bytes) -> Any:
@@ -139,29 +137,16 @@ def _unique_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return members
 
 
-def load_report_json(text: str) -> Any:
-    """Parse one report file (or one JSON Lines line of one) by the rule every engine's readiness, sign and
-    ``report --validate`` share (SPEC §13.3.4 stage 4): containers nested at most :data:`MAX_JSON_DEPTH`
-    deep, no ``NaN``/``Infinity``/``-Infinity``, integer literals of at most :data:`MAX_INT_STR_DIGITS`
-    digits, and no key repeated within one object. ``json.ts``'s ``parseReportJson`` and
-    ``Json.parseReport`` apply the same rule. Anything else raises :class:`JSONError`."""
-    if too_deep(text.encode("utf-8", "surrogatepass")):
-        raise JSONError(
-            "nested too deep", f"containers nested more than {MAX_JSON_DEPTH} deep"
-        )
+def load_report_json(text: str, line: int | None = None) -> Any:
+    """Parse one report file (or, with ``line``, that JSON Lines line of one) under the JSON profile
+    with a byte-order mark refused (SPEC 8.7, §13.3.4 stage 4): every engine's readiness, sign and
+    ``report --validate`` read report files by this rule. Outside it raises :class:`JSONError`, whose
+    ``msg`` is the profile phrase and whose cause is the :class:`JsonProfileError`."""
     try:
-        return json.loads(
-            text,
-            parse_constant=refuse_constant,
-            parse_int=_parse_int,
-            object_pairs_hook=_unique_keys,
-        )
-    except json.JSONDecodeError as exc:
-        raise JSONError(exc.msg, str(exc)) from exc
-    except _TooLong:
-        raise JSONError(TOO_LONG, TOO_LONG) from None
-    except ValueError as exc:
+        check_profile(text, jsonl_line=line)
+    except JsonProfileError as exc:
         raise JSONError(str(exc), str(exc)) from exc
+    return _value(text)
 
 
 # --- The JSON profile (SPEC 8.7) -------------------------------------------------------------------
@@ -170,17 +155,19 @@ def load_report_json(text: str) -> Any:
 # sees the text, so a file outside the profile is refused with the rule and line whatever the library
 # would have done. Rule ids are the ``rule`` values of ``spec/report/json-cases.json``.
 
-_BOM = b"\xef\xbb\xbf"
+BOM = b"\xef\xbb\xbf"
 _WS = " \t\n\r"
 _ESCAPES = '"\\/bfnrt'
-_LINE_BREAKS = "\f\x85  "
+_LINE_BREAKS = "\f\x85\u2028\u2029"
 
 
 class JsonProfileError(ValueError):
-    """Text outside the JSON profile: ``rule`` is a case-table rule id, ``line`` is 1-based."""
+    """Text outside the JSON profile: ``rule`` is a case-table rule id, ``line`` is 1-based. ``str()``
+    is the phrase every engine's refusal carries: ``outside the JSON profile: <rule> at line <n>
+    (SPEC 8.7)``."""
 
     def __init__(self, rule: str, line: int) -> None:
-        super().__init__(f"{rule} at line {line}")
+        super().__init__(f"outside the JSON profile: {rule} at line {line} (SPEC 8.7)")
         self.rule = rule
         self.line = line
 
@@ -294,7 +281,7 @@ def check_profile(text: str, *, jsonl_line: int | None = None) -> None:
                 raise JsonProfileError("syntax", line)
             return
         c = text[i]
-        if c == "﻿":
+        if c == "\ufeff":
             raise JsonProfileError("bom", line)
         if c == "/":
             raise JsonProfileError("comment", line)
@@ -380,10 +367,10 @@ def check_profile(text: str, *, jsonl_line: int | None = None) -> None:
 
 
 def _decode(raw: bytes, bom: str) -> str:
-    if raw.startswith(_BOM):
+    if raw.startswith(BOM):
         if bom == "refuse":
             raise JsonProfileError("bom", 1)
-        raw = raw[len(_BOM) :]
+        raw = raw[len(BOM) :]
     try:
         return raw.decode("utf-8")
     except UnicodeDecodeError as exc:
@@ -405,27 +392,58 @@ def read_json(raw: bytes, *, bom: str) -> Any:
     return _value(text)
 
 
+def jsonl_records(raw: bytes) -> list[tuple[int, bytes]]:
+    """The non-blank JSON Lines of ``raw`` (its byte-order mark already handled) as (1-based line
+    number, line bytes): LF alone ends a line and a CRLF's CR is dropped, so a lone CR, FF, NEL or
+    U+2028 stays inside its line; a line holding only spaces and tabs is blank and left out."""
+    out: list[tuple[int, bytes]] = []
+    for number, line in enumerate(raw.split(b"\n"), start=1):
+        if line.endswith(b"\r"):
+            line = line[:-1]
+        if line.strip(b" \t"):
+            out.append((number, line))
+    return out
+
+
+def read_jsonl_line(text: str, number: int) -> Any:
+    """One JSON Lines line (``number`` is its line in the file) under the profile."""
+    check_profile(text, jsonl_line=number)
+    return _value(text)
+
+
 def read_jsonl(raw: bytes, *, bom: str) -> list[tuple[int, Any]]:
-    """JSON Lines under the profile: (line number, value) per record, LF alone ending a line, a blank
-    line (empty, spaces, tabs) skipped. A ``JsonProfileError`` takes the place of the value of a line
-    outside the profile, so a caller can quarantine that line and read on; bytes that are not UTF-8
-    or a byte-order mark refused by ``bom`` raise for the whole file."""
+    """JSON Lines under the profile: (line number, value) per record (:func:`jsonl_records`). A
+    ``JsonProfileError`` takes the place of the value of a line outside the profile, so a caller can
+    quarantine that line and read on; bytes that are not UTF-8 or a byte-order mark refused by
+    ``bom`` raise for the whole file."""
     text = _decode(raw, bom)
     out: list[tuple[int, Any]] = []
-    for number, line in enumerate(text.split("\n"), start=1):
-        if not line.strip(" \t"):
-            continue
+    for number, line in jsonl_records(text.encode("utf-8")):
         try:
-            check_profile(line, jsonl_line=number)
-            out.append((number, _value(line)))
+            out.append((number, read_jsonl_line(line.decode("utf-8"), number)))
         except JsonProfileError as exc:
             out.append((number, exc))
     return out
 
 
+def not_valid(noun: str, exc: BaseException) -> str:
+    """The refusal sentence for ``noun`` that ``exc`` (or its cause) failed to read: the profile rule
+    when it names one, else ``<noun> is not valid JSON.``"""
+    cause = exc if isinstance(exc, JsonProfileError) else exc.__cause__
+    if isinstance(cause, JsonProfileError):
+        return f"{noun} is {cause}."
+    return f"{noun} is not valid JSON."
+
+
 def read_bundled(raw: bytes) -> Any:
     """Data shipped inside the package, under the same profile; a failure is a build defect."""
     return read_json(raw, bom="refuse")
+
+
+def is_json_integer(value: Any) -> bool:
+    """Whether ``value`` read as a JSON integer (SPEC 8.7: the form is by syntax, so ``0.0``, ``1e2``,
+    ``true`` and ``"3"`` are not)."""
+    return isinstance(value, int) and not isinstance(value, bool)
 
 
 def render_number(value: int | float) -> str:
@@ -435,6 +453,27 @@ def render_number(value: int | float) -> str:
     if isinstance(value, bool):
         raise TypeError("a boolean is not a JSON number")
     return str(value) if isinstance(value, int) else repr(value)
+
+
+def render_value(value: Any) -> str:
+    """A JSON value as reason text: numbers by :func:`render_number`, ``true``/``false``/``null`` as
+    JSON writes them, a string JSON-quoted, a container as compact JSON with its keys sorted."""
+    if isinstance(value, bool) or value is None:
+        return json.dumps(value)
+    if isinstance(value, (int, float)):
+        return render_number(value)
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)
+    if isinstance(value, list):
+        return "[" + ",".join(render_value(v) for v in value) + "]"
+    return (
+        "{"
+        + ",".join(
+            f"{json.dumps(k, ensure_ascii=False)}:{render_value(value[k])}"
+            for k in sorted(value)
+        )
+        + "}"
+    )
 
 
 def json_equal(left: Any, right: Any) -> bool:

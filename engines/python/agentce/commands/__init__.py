@@ -44,7 +44,14 @@ from .. import (
     verdict,
 )
 from ..activity import summarize_activity
-from ..safe_json import JSONError, load_json
+from ..safe_json import (
+    JSONError,
+    JsonProfileError,
+    is_json_integer,
+    load_json,
+    not_valid,
+    read_json,
+)
 from ..applicability import resolve as resolve_applicability
 from ..assertions import Assertion, aggregate
 from ..assess import (
@@ -378,6 +385,41 @@ def _require_file(
     return path
 
 
+def _read_input_json(raw: str | None, path: Path, *, key: str, what: str) -> Any:
+    """An engine-written JSON file ``_require_file`` accepted, read under the JSON profile (SPEC 8.7,
+    a byte-order mark refused); outside it is ``input.<key>_unreadable`` naming the rule."""
+    try:
+        return read_json(path.read_bytes(), bom="refuse")
+    except JsonProfileError as exc:
+        raise InputError(
+            f"input.{key}_unreadable",
+            f"{what} {raw!r} is {exc}.",
+            "re-run the command that wrote it, or correct the JSON at that line.",
+        ) from exc
+
+
+def _require_integer_fields(raw: str | None, data: Any) -> None:
+    """Each assertion's ``rung`` and ``population`` counts, where present, are JSON integers (SPEC 8.7
+    ``integer_field_float_form``): ``1.5``, ``1e20`` or ``true`` is refused, never truncated."""
+    for i, item in enumerate(data if isinstance(data, list) else []):
+        if not isinstance(item, dict):
+            continue
+        population = item.get("population")
+        fields = [("rung", item.get("rung", 0))] + [
+            (f"population.{name}", population.get(name, 0))
+            for name in ("applicable", "failed")
+            if isinstance(population, dict)
+        ]
+        for name, value in fields:
+            if not is_json_integer(value):
+                raise InputError(
+                    "input.from_unreadable",
+                    f"the assertions file {raw!r} is outside the JSON profile: "
+                    f"integer_field_float_form at [{i}].{name} (SPEC 8.7).",
+                    "re-run the command that wrote it, or correct the JSON at that line.",
+                )
+
+
 def _digest_of(path: Path) -> str:
     """The digest assess records for an input it already read and parsed (deviation register,
     profile, domain file); a read that fails now gets its own key, not ``internal.unexpected``."""
@@ -641,7 +683,7 @@ def _parse_untrusted_object(
     try:
         parsed = signing.parse_untrusted_json(data)
     except ValueError as exc:
-        raise InputError(key, f"{noun} is not valid JSON.", fix) from exc
+        raise InputError(key, not_valid(noun, exc), fix) from exc
     if not isinstance(parsed, dict):
         raise InputError(key, f"{noun} is not an object.", fix)
     return parsed
@@ -2385,9 +2427,8 @@ def cmd_report(ns: argparse.Namespace) -> CommandResult:
     )
     if _opt_str(ns, "out") is not None:
         check_output(str(_opt_str(ns, "out")), REPORT_OUT)
-    source = _require_file(
-        _opt_str(ns, "from_"), key="from", what="the assertions file"
-    )
+    source_raw = _opt_str(ns, "from_")
+    source = _require_file(source_raw, key="from", what="the assertions file")
     fmt = _opt_str(ns, "format") or "md"
     if fmt not in REPORT_FORMATS:
         raise report_format_error(fmt)
@@ -2418,7 +2459,11 @@ def cmd_report(ns: argparse.Namespace) -> CommandResult:
                 "pass the labels comma-separated with none empty, "
                 "e.g. --catalog eu-ai-act,nist-ai-rmf.",
             )
-    assertions = [Assertion.from_json(a) for a in json.loads(source.read_text("utf-8"))]
+    loaded = _read_input_json(
+        source_raw, source, key="from", what="the assertions file"
+    )
+    _require_integer_fields(source_raw, loaded)
+    assertions = [Assertion.from_json(a) for a in loaded]
     counts = aggregate(assertions)
     language = language or "en"
     rendering: str
@@ -3302,8 +3347,12 @@ def cmd_diff(ns: argparse.Namespace) -> CommandResult:
             "pass --format text|json|md.",
         )
     result.data.update({"report_a": str(left), "report_b": str(right)})
-    a = json.loads(left.read_text("utf-8"))
-    b = json.loads(right.read_text("utf-8"))
+    a = _read_input_json(
+        _opt_str(ns, "report_a"), left, key="report_a", what="the first assertion set"
+    )
+    b = _read_input_json(
+        _opt_str(ns, "report_b"), right, key="report_b", what="the second assertion set"
+    )
     changes = _diff_assertion_sets(a, b)
     what_changed = _what_changed(changes)
     result.data["changed"] = len(changes)
