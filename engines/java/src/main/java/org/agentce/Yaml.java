@@ -27,7 +27,7 @@ public final class Yaml {
      * {@link #parseFile} does. Returns {@code null} for empty input. */
     private static JsonNode parse(String text, Path shown) {
         try {
-            return MAPPER.readTree(text);
+            return Json.readTreeWith(MAPPER, text);
         } catch (IOException e) {
             throw new IllegalArgumentException("cannot read YAML " + shown + ": " + e.getMessage(), e);
         }
