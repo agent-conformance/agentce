@@ -3,6 +3,18 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.120.0
+
+- `VG-ARGV-GRAMMAR` (18.184w, added): every engine reads its command line under the SPEC 8.5 grammar. The gate
+  checks that every rule in `spec/cli/argv-grammar.json` keeps a case in `spec/cli/argv-cases.json` (the registry
+  lint now fails a rule with none), runs `tools/argv_grammar.py --check` over the vendored copies and the engines'
+  option spellings, runs each engine's case-table test, and runs every case through the three real CLIs with
+  `tools/argv_parity_check.py`, which also checks that a refused run, a refused sign included, writes nothing.
+- `VG-CLI-ASSESS`, `VG-CLI-REPORT`, `VG-CLI-UTILITY`, `VG-CLI-COLLECT-DOCTOR-INIT`, `VG-DEVIATIONS-PARITY` and
+  `VG-FAIL-ON-PARITY` (18.184w, changed): an option given twice is refused in every engine, where these gates had
+  expected the last one to win. `VG-CLI-UTILITY`'s diff fault now drops the `=` form of `--format`, since a
+  repeated `--format` no longer reaches the command.
+
 ## 0.119.0
 
 - `VG-YAML-PROFILE` (18.184u, added): every engine reads YAML under the SPEC 8.7 profile. The gate checks that the

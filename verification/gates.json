@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.119.0",
+  "suite_version": "0.120.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -1107,7 +1107,7 @@
       "timeout_s": 900,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
-        "pass": "over 30 scenarios run through each engine's real CLI (no register, the auditor-view fixture's register, lint and shape refusals, a missing path and a directory, malformed YAML, unquoted dates, an empty register, only an expired entry, two subjects, --deviations=<path>, a bare or mid-argv --deviations, non-UTF-8 bytes, a custom tag, an alias that expands to a duplicate, 5000-deep nesting, a quoted path, a `.` segment in the register path, the flag given twice in both orders, and register entries on controls that fail the SPEC §10.4 human-actor rule: an approval with no session_ref (S24) an override made in the agent's own session (S25), and a third-party catalog whose ToolCall shapes reach that approval through a sequence path or a nested sh:node or qualified shape (S26), and one whose paths repeat agentce:derivedFrom before agentce:approvedBy, directly or across a nested sh:node (S27)) TypeScript and Java give Python's exit code, error key, cause (up to the parser's own text for malformed YAML, a custom tag and non-UTF-8) and fix, or write assertions.json, oscal-ar.json, activity.json and blind-spots.json (and the two-subject run's project.json) byte-identical to Python's with the same manifest limitations and deviation_register_digest; a run with no register carries no digest and no OSCAL risks; the last of two registers wins; in S24 and S25 every engine leaves CND-02, OVS-01, OVS-08, RSK-02 and OVS-07 non_conformant with no deviation and one not-applied limitation each, while OVS-05 still reads partial with its deviation; in S26 TPX-01, TPX-02, TPX-04, TPX-05 and TPX-06 stay non_conformant in the same way, while TPX-03 (approvedByProxy) reads partial; in S27 PRB-01, PRB-02 and PRB-03 stay non_conformant in the same way, while PRB-04 (approvedByProxy) reads partial; a --deviations with no value exits 3 with argparse's sentence (key input.assess_flag_needs_value in TypeScript and Java); and each engine's auditor-view seam prints the bytes of Python's compute_auditor_view over three fixtures in run order and reversed, which also equal the auditor.json Python's assess --for auditor writes",
+        "pass": "over 30 scenarios run through each engine's real CLI (no register, the auditor-view fixture's register, lint and shape refusals, a missing path and a directory, malformed YAML, unquoted dates, an empty register, only an expired entry, two subjects, --deviations=<path>, a bare or mid-argv --deviations, non-UTF-8 bytes, a custom tag, an alias that expands to a duplicate, 5000-deep nesting, a quoted path, a `.` segment in the register path, the flag given twice in both orders (refused), and register entries on controls that fail the SPEC §10.4 human-actor rule: an approval with no session_ref (S24) an override made in the agent's own session (S25), and a third-party catalog whose ToolCall shapes reach that approval through a sequence path or a nested sh:node or qualified shape (S26), and one whose paths repeat agentce:derivedFrom before agentce:approvedBy, directly or across a nested sh:node (S27)) TypeScript and Java give Python's exit code, error key, cause (up to the parser's own text for malformed YAML, a custom tag and non-UTF-8) and fix, or write assertions.json, oscal-ar.json, activity.json and blind-spots.json (and the two-subject run's project.json) byte-identical to Python's with the same manifest limitations and deviation_register_digest; a run with no register carries no digest and no OSCAL risks; --deviations given twice is refused with input.assess_unrecognized_flag (SPEC 8.5); in S24 and S25 every engine leaves CND-02, OVS-01, OVS-08, RSK-02 and OVS-07 non_conformant with no deviation and one not-applied limitation each, while OVS-05 still reads partial with its deviation; in S26 TPX-01, TPX-02, TPX-04, TPX-05 and TPX-06 stay non_conformant in the same way, while TPX-03 (approvedByProxy) reads partial; in S27 PRB-01, PRB-02 and PRB-03 stay non_conformant in the same way, while PRB-04 (approvedByProxy) reads partial; a --deviations with no value exits 3 with argparse's sentence (key input.assess_flag_needs_value in TypeScript and Java); and each engine's auditor-view seam prints the bytes of Python's compute_auditor_view over three fixtures in run order and reversed, which also equal the auditor.json Python's assess --for auditor writes",
         "fail": "any engine applies, ignores or refuses a register differently from Python, differs in exit code, key, cause, fix, an output file's bytes, the limitations or the digest, writes assertions.json for a refused run, applies an entry to a control failing the SPEC §10.4 human-actor rule, or computes a different auditor view"
       },
       "faults": [
@@ -1966,6 +1966,85 @@
           "file": "spec/rules/yaml-profile-cases.json",
           "search": "\"id\": \"anchor-1\",\n      \"rule\": \"anchor\",\n      \"expect\": \"refuse\",",
           "replace": "\"id\": \"anchor-1\",\n      \"rule\": \"anchor\",\n      \"expect\": \"accept\","
+        }
+      ]
+    },
+    {
+      "id": "VG-ARGV-GRAMMAR",
+      "title": "every engine reads its command line under the SPEC 8.5 grammar: the hand-written table spec/cli/argv-grammar.json holds each engine's vendored copy and option spellings, the shared case table keeps a case for every rule, each engine's case-table test and the three real CLIs give every case's exit code and key, help prints the same usage in all three, and a refused run writes nothing (18.184w)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/argv_grammar.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java"
+      ],
+      "timeout_s": 900,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every rule in spec/cli/argv-grammar.json keeps a case in spec/cli/argv-cases.json and the registry lint names a rule that loses its last; tools/argv_grammar.py --check finds the three vendored copies byte-identical, Python's help parser matching the table, and no TypeScript or Java hand-written option table or spelling outside it; tests/test_argv_cases.py, src/argvCases.test.ts and org.agentce.ArgvCasesTest pass over every case; tools/argv_parity_check.py --self-test reports its planted key, message and help drift, and the full run gives every case's exit code and key in the real Python, TypeScript (npm bin) and Java CLIs, with and without --json, the same first message line in all three, a byte-identical usage for every help case, and no file written by a refused run (a refused sign leaves the report directory byte-identical with no signature)",
+        "fail": "a rule has no case, a vendored copy or an engine's option list drifts from the table, or an engine accepts a repeated non-repeatable option, an abbreviation, a short-flag cluster or help in a value slot, splits an = value, drops a repeatable option's earlier values, refuses help after a command, gives another exit code, key or usage, or writes anything on a refused run"
+      },
+      "fix_hint": "run verification/gates/argv_grammar.sh and read the first failing step; the scanners are engines/python/agentce/argv.py, engines/typescript/src/argv.ts and engines/java/src/main/java/org/agentce/Argv.java, the table spec/cli/argv-grammar.json (vendored into each engine's data) and the cases spec/cli/argv-cases.json",
+      "faults": [
+        {
+          "description": "Python's scanner lets a repeated value option overwrite the first (last-wins) instead of refusing it",
+          "file": "engines/python/agentce/argv.py",
+          "search": "        if opt.name in given and not opt.repeatable:\n",
+          "replace": "        if opt.name in given and not opt.repeatable and opt.kind == \"flag\":\n"
+        },
+        {
+          "description": "TypeScript's scanner matches an option by a prefix of its name, so --gap reads as --gaps",
+          "file": "engines/typescript/src/argv.ts",
+          "search": "    const opt = lvl.options.get(name);\n",
+          "replace": "    const opt =\n      lvl.options.get(name) ??\n      [...lvl.options.entries()].find(([k]) => name.length > 3 && k.startsWith(name))?.[1];\n"
+        },
+        {
+          "description": "Java splits an = value at its first space, so --catalog=<dir with a space> reads a different path",
+          "file": "engines/java/src/main/java/org/agentce/Argv.java",
+          "search": "                    value = token.substring(eq + 1);\n",
+          "replace": "                    value = token.substring(eq + 1).split(\" \", 2)[0];\n"
+        },
+        {
+          "description": "TypeScript's readiness refuses -h as a flag that takes no value instead of printing its usage",
+          "file": "engines/typescript/src/argv.ts",
+          "search": "    if (HELP.includes(token)) {\n      if (!helpSeen) {\n",
+          "replace": "    if (HELP.includes(token) && !(cmd.name === \"readiness\" && token === \"-h\")) {\n      if (!helpSeen) {\n"
+        },
+        {
+          "description": "Java keeps only the last --catalog-dir of a repeatable option",
+          "file": "engines/java/src/main/java/org/agentce/Argv.java",
+          "search": "                    out.lists.computeIfAbsent(opt.name(), k -> new ArrayList<>()).add(value);\n",
+          "replace": "                    out.lists.put(opt.name(), new ArrayList<>(List.of(value)));\n"
+        },
+        {
+          "description": "a TypeScript command regains a hand-written option table that adds --extra",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "function cmdVerify(args: Scan): CommandResult {\n",
+          "replace": "const VERIFY_GRAMMAR = [\"--report\", \"--catalog\", \"--extra\"];\nfunction cmdVerify(args: Scan): CommandResult {\n"
+        },
+        {
+          "description": "the grammar names a rule the case table has no case for",
+          "file": "spec/cli/argv-grammar.json",
+          "search": "\"rules\": [\n",
+          "replace": "\"rules\": [\n    \"short_cluster_after_value\",\n"
+        },
+        {
+          "description": "TypeScript treats --help in a value slot as help, so verify --report --help exits 0 having verified nothing",
+          "file": "engines/typescript/src/argv.ts",
+          "search": "      if (next !== undefined && HELP.includes(next)) {\n        i++; // help in a value slot is no help (SPEC 8.5)\n      }\n",
+          "replace": ""
+        },
+        {
+          "description": "Java's sign keeps the last --as, signing under a role the user did not mean",
+          "file": "engines/java/src/main/java/org/agentce/Argv.java",
+          "search": "                if (given.contains(opt.name()) && !opt.repeatable()) {\n",
+          "replace": "                if (given.contains(opt.name()) && !opt.repeatable()\n                        && !(cmd.name().equals(\"sign\") && name.equals(\"--as\"))) {\n"
         }
       ]
     },
@@ -2838,8 +2917,8 @@
       "timeout_s": 600,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/cli_options/assess.json gives its expected exit code and --json refusal key in the real Python, TypeScript (through the npm bin) and Java CLIs, and a refused run writes nothing: -h and --help alone, beside --bundle and --out, and before or after an unknown flag print a byte-identical usage and write nothing; -h after -- and a cluster are refused; --manual, --probes, --records, --format, --ou, a value on a flag and a second folder get input.assess_unrecognized_flag; a value-less --out or --report-language gets input.assess_flag_needs_value; the = form of all 13 value options gets each option's own refusal for a bad value and runs for a good one; the last of a repeated --out, --bundle and --profile wins; --report-language xx, '' and ../x get input.report_language_unknown and de writes the German report.md; a bare --allow-unverified-catalog gets input.allow_unverified_requires_catalog_dir; --package-for-sharing writes bundle/ in Python and gets input.package_unsupported in TypeScript and Java; the records-folder rows give Python's keys (Java: input.records_unsupported for an existing folder)",
-        "fail": "any engine gives another exit code or key for a case, prints another usage, writes under --out on a refused run, takes the first of a repeated option, ignores an = form, or writes an English report for --report-language de"
+        "pass": "every case in verification/gates/fixtures/cli_options/assess.json gives its expected exit code and --json refusal key in the real Python, TypeScript (through the npm bin) and Java CLIs, and a refused run writes nothing: -h and --help alone, beside --bundle and --out, and before or after an unknown flag print a byte-identical usage and write nothing; -h after -- and a cluster are refused; --manual, --probes, --records, --format, --ou, a value on a flag and a second folder get input.assess_unrecognized_flag; a value-less --out or --report-language gets input.assess_flag_needs_value; the = form of all 13 value options gets each option's own refusal for a bad value and runs for a good one; a repeated --out, --bundle or --profile is refused (SPEC 8.5); --report-language xx, '' and ../x get input.report_language_unknown and de writes the German report.md; a bare --allow-unverified-catalog gets input.allow_unverified_requires_catalog_dir; --package-for-sharing writes bundle/ in Python and gets input.package_unsupported in TypeScript and Java; the records-folder rows give Python's keys (Java: input.records_unsupported for an existing folder)",
+        "fail": "any engine gives another exit code or key for a case, prints another usage, writes under --out on a refused run, accepts a repeated option, ignores an = form, or writes an English report for --report-language de"
       },
       "faults": [
         {
@@ -2947,8 +3026,8 @@
       "timeout_s": 600,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/cli_options/report.json gives its expected exit code and --json refusal key in the real Python, TypeScript (through the npm bin) and Java CLIs over the committed report/assertions.json, and a refused run writes nothing: -h and --help alone, beside --from and after an unknown flag print a byte-identical usage; -h after --, a cluster, a value on a flag, an unknown or abbreviated flag and an extra positional get input.report_unrecognized_flag; a value-less --from or --validate gets input.from_missing or input.validate_missing and every other value-less option input.report_unrecognized_flag; the = form of every value option is read, and its empty form gets that option's own key (--out= and --out '' get internal.unexpected in all three); the last of a repeated --from, --format, --role, --language and --validate wins, and a bad --role is refused the moment it is read; --format nope and '' get input.report_format naming public, before --from is checked and before a later unknown flag; --role nope and '' get input.report_role; --format public is byte-identical across engines, with and without --catalog, and names both deviations, the Conduct section and the sanitised subject; an empty, whitespace-only or trailing-comma --catalog label gets input.report_catalog_label_empty; --format pack is byte-identical with no role and with --role provider and deployer, each naming its role; --language de writes the German title to --out and html names lang=\"de\"; --language xx, '' and ../x get input.report_language_unknown; --role, --catalog and --language with a format that does not read them, and every rendering option beside --validate, get input.report_flag_unused; --validate '' gets input.validate_not_a_directory; a rendering over 64 KiB (--format oscal --json) reaches a pipe as one whole --json envelope",
-        "fail": "any engine gives another exit code or key for a case, prints another usage, public statement or pack, writes under --out on a refused run, takes the first of a repeated option, ignores an = form, accepts an unknown --role or --language or an option its format does not read, writes English for --language de, or cuts a piped rendering"
+        "pass": "every case in verification/gates/fixtures/cli_options/report.json gives its expected exit code and --json refusal key in the real Python, TypeScript (through the npm bin) and Java CLIs over the committed report/assertions.json, and a refused run writes nothing: -h and --help alone, beside --from and after an unknown flag print a byte-identical usage; -h after --, a cluster, a value on a flag, an unknown or abbreviated flag and an extra positional get input.report_unrecognized_flag; a value-less --from or --validate gets input.from_missing or input.validate_missing and every other value-less option input.report_unrecognized_flag; the = form of every value option is read, and its empty form gets that option's own key (--out= and --out '' get internal.unexpected in all three); a repeated --from, --format, --role, --language or --validate is refused (SPEC 8.5), and a bad --role is refused the moment it is read; --format nope and '' get input.report_format naming public, before --from is checked and before a later unknown flag; --role nope and '' get input.report_role; --format public is byte-identical across engines, with and without --catalog, and names both deviations, the Conduct section and the sanitised subject; an empty, whitespace-only or trailing-comma --catalog label gets input.report_catalog_label_empty; --format pack is byte-identical with no role and with --role provider and deployer, each naming its role; --language de writes the German title to --out and html names lang=\"de\"; --language xx, '' and ../x get input.report_language_unknown; --role, --catalog and --language with a format that does not read them, and every rendering option beside --validate, get input.report_flag_unused; --validate '' gets input.validate_not_a_directory; a rendering over 64 KiB (--format oscal --json) reaches a pipe as one whole --json envelope",
+        "fail": "any engine gives another exit code or key for a case, prints another usage, public statement or pack, writes under --out on a refused run, accepts a repeated option, ignores an = form, accepts an unknown --role or --language or an option its format does not read, writes English for --language de, or cuts a piped rendering"
       },
       "faults": [
         {
@@ -3014,8 +3093,8 @@
       "timeout_s": 600,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/cli_options/utility.json gives its expected exit code and --json refusal key in the real Python, TypeScript (through the npm bin) and Java CLIs, and a refused run writes nothing: for validate, diff, version, conformance and conformance run, -h and --help alone, after an unknown flag and beside good options print a byte-identical usage (conformance -h run the command's, conformance --he run -h the action's); -h after -- is refused as Python refuses it (diff reads it as the second file); a cluster, --he, an unknown flag, --help=x, --json=1 and an extra positional get the command's unrecognized-flag key, and a third diff file, before or after -- or after --format, input.diff_extra_argument; a value-less validate --bundle gets input.bundle_missing, conformance run --engine input.engine_missing (checked before --corpus), --corpus input.corpus_missing, and every other value-less option the command's unrecognized-flag key; the = form of every value option is read (validate --out= writes quarantine.jsonl, conformance run --out= the implementation report); an empty --bundle, --engine, --corpus or --adapters gets that option's not-a-directory key, an empty --out input.out_dir_unwritable and an empty diff --format input.diff_format; the last of a repeated --bundle, --format and --engine wins; diff reads its files around --format and after --, rendering the same Markdown in all three; conformance with no action, an unknown action (also after an unknown flag, after a value-taking flag it does not have, and after --) gets input.conformance_action, an unknown flag before the action is refused before the action's own, and conformance --json run is read; conformance run --adapters /nonexistent gets input.adapters_not_a_directory; over the empty corpus the run exits 1 with claim none, and with the sample adapters directory it prints `adapters: 1/1 identical; round_trip True; claim full`, writes out/implementation-report.json naming adapter_conformance and the orchestrator's out/adapters/sample/implementation-report.json, also for a relative --out, which resolves under the working directory; over the one-project corpus (ECS claim full) the run exits 0 with the passing adapters, and exits 1 with claim partial for adapters identical without their round trip and claim none for an orchestrator that prints no JSON; version alone prints its --json envelope; a red run stops at its first failure and skips the runs not yet started",
-        "fail": "any engine gives another exit code or key for a case, prints another usage, diff rendering or conformance summary, writes under --out on a refused run, takes the first of a repeated option, ignores an = form, reads an empty value as the working directory, accepts an unknown flag, argument or action, ignores --adapters or its claim, or writes the adapters' reports anywhere but under --out"
+        "pass": "every case in verification/gates/fixtures/cli_options/utility.json gives its expected exit code and --json refusal key in the real Python, TypeScript (through the npm bin) and Java CLIs, and a refused run writes nothing: for validate, diff, version, conformance and conformance run, -h and --help alone, after an unknown flag and beside good options print a byte-identical usage (conformance -h run the command's, conformance --he run -h the action's); -h after -- is refused as Python refuses it (diff reads it as the second file); a cluster, --he, an unknown flag, --help=x, --json=1 and an extra positional get the command's unrecognized-flag key, and a third diff file, before or after -- or after --format, input.diff_extra_argument; a value-less validate --bundle gets input.bundle_missing, conformance run --engine input.engine_missing (checked before --corpus), --corpus input.corpus_missing, and every other value-less option the command's unrecognized-flag key; the = form of every value option is read (validate --out= writes quarantine.jsonl, conformance run --out= the implementation report); an empty --bundle, --engine, --corpus or --adapters gets that option's not-a-directory key, an empty --out input.out_dir_unwritable and an empty diff --format input.diff_format; a repeated --bundle, --format or --engine is refused (SPEC 8.5); diff reads its files around --format and after --, rendering the same Markdown in all three; conformance with no action, an unknown action (also after an unknown flag, after a value-taking flag it does not have, and after --) gets input.conformance_action, an unknown flag before the action is refused before the action's own, and conformance --json run is read; conformance run --adapters /nonexistent gets input.adapters_not_a_directory; over the empty corpus the run exits 1 with claim none, and with the sample adapters directory it prints `adapters: 1/1 identical; round_trip True; claim full`, writes out/implementation-report.json naming adapter_conformance and the orchestrator's out/adapters/sample/implementation-report.json, also for a relative --out, which resolves under the working directory; over the one-project corpus (ECS claim full) the run exits 0 with the passing adapters, and exits 1 with claim partial for adapters identical without their round trip and claim none for an orchestrator that prints no JSON; version alone prints its --json envelope; a red run stops at its first failure and skips the runs not yet started",
+        "fail": "any engine gives another exit code or key for a case, prints another usage, diff rendering or conformance summary, writes under --out on a refused run, accepts a repeated option, ignores an = form, reads an empty value as the working directory, accepts an unknown flag, argument or action, ignores --adapters or its claim, or writes the adapters' reports anywhere but under --out"
       },
       "faults": [
         {
@@ -3055,10 +3134,10 @@
           "replace": "      }\n      positional(token);\n"
         },
         {
-          "description": "TypeScript's diff takes the first --format again, reading argv instead of the scan",
+          "description": "TypeScript's diff reads --format from argv instead of the scan, so the = form --format=md is ignored and text is rendered",
           "file": "engines/typescript/src/cli.ts",
           "search": "  const format = args.values[\"--format\"] ?? \"text\";\n",
-          "replace": "  const format = argv.includes(\"--format\")\n    ? (argv[argv.indexOf(\"--format\") + 1] as string)\n    : (args.values[\"--format\"] ?? \"text\");\n"
+          "replace": "  const format = argv.includes(\"--format\") ? (argv[argv.indexOf(\"--format\") + 1] as string) : \"text\";\n"
         },
         {
           "description": "TypeScript's adapters claim ignores round_trip, so adapters identical without their round trip claim full",
@@ -3156,7 +3235,7 @@
       "timeout_s": 600,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
-        "pass": "over 46 scenarios run through each engine's real CLI with LC_ALL=C.UTF-8 (matches and misses, and before precedence, a single-quoted literal with an escape, --fail-on=<expression>, the flag given twice in both orders, matches after --deviations, the insufficient-evidence project with and without a match, Unicode whitespace, a 3000-clause chain, refusals including a dunder-import call, an astral character before the error position and a non-ASCII digit in a field name, a missing value trailing, mid-argv, before another option and as the first of two value flags, values that start with `-` including a non-ASCII digit, the refusal order against a missing bundle or profile, an unknown --catalog and a missing --deviations register, an outcome, severity or mode value outside its closed vocabulary (a typo, a case variant, an empty value, in a later OR group, in both --fail-on spellings) refused with input.fail_on_invalid_expression, a syntax error or unknown field reported before such a value, and an escaped and a hyphenated closed value still accepted) TypeScript and Java give Python's exit code, exit_status and fail_on, or Python's key, cause and fix with no assertions.json written; a value flag with no value exits 3 with argparse's sentence (key input.assess_flag_needs_value in TypeScript and Java); Python's own results match python-reference.md; and Python's parse_fail_on and the TypeScript and Java fail-on-check seams print byte-identical refusals or match vectors for 6,559 expressions (R1-R31, F1-F14, D1, D2, V1-V8 and 6,500 fuzzed from a fixed seed, 500 of them comparing outcome, severity and mode mostly against their own values) over seven assertions that cover every field",
+        "pass": "over 46 scenarios run through each engine's real CLI with LC_ALL=C.UTF-8 (matches and misses, and before precedence, a single-quoted literal with an escape, --fail-on=<expression>, the flag given twice in both orders (refused), matches after --deviations, the insufficient-evidence project with and without a match, Unicode whitespace, a 3000-clause chain, refusals including a dunder-import call, an astral character before the error position and a non-ASCII digit in a field name, a missing value trailing, mid-argv, before another option and as the first of two value flags, values that start with `-` including a non-ASCII digit, the refusal order against a missing bundle or profile, an unknown --catalog and a missing --deviations register, an outcome, severity or mode value outside its closed vocabulary (a typo, a case variant, an empty value, in a later OR group, in both --fail-on spellings) refused with input.fail_on_invalid_expression, a syntax error or unknown field reported before such a value, and an escaped and a hyphenated closed value still accepted) TypeScript and Java give Python's exit code, exit_status and fail_on, or Python's key, cause and fix with no assertions.json written; a value flag with no value exits 3 with argparse's sentence (key input.assess_flag_needs_value in TypeScript and Java); Python's own results match python-reference.md; and Python's parse_fail_on and the TypeScript and Java fail-on-check seams print byte-identical refusals or match vectors for 6,559 expressions (R1-R31, F1-F14, D1, D2, V1-V8 and 6,500 fuzzed from a fixed seed, 500 of them comparing outcome, severity and mode mostly against their own values) over seven assertions that cover every field",
         "fail": "any engine evaluates, counts or refuses an expression differently from Python, accepts an outcome, severity or mode value outside its closed vocabulary, differs in exit code, exit_status, fail_on, key, cause or fix, reads a value flag differently, refuses in a different order, writes assertions.json for a refused run, or prints a different line for any corpus expression"
       },
       "faults": [
@@ -3708,7 +3787,7 @@
       "timeout_s": 600,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/cli_options/collect_doctor_init.json gives its expected exit code and --json key in the real Python CLI, and TypeScript and Java give exit 3 cli.not_implemented (the commands are Python only); a refused run writes nothing: init --non-interactive, alone, with --out and in = form, gets input.init_unrecognized_flag and init --out writes the profile; doctor --project beside --write-errors, in either order and whatever --project names (a missing directory, '' or =), gets input.doctor_flag_unused, also before an empty --write-errors; --write-errors alone writes the catalogue (the last repeat wins) and an empty, = , directory or unwritable --write-errors gets input.write_errors_unwritable; collect --dry-run --out (also = form) writes collect-plan.json and manifest.json, a dry run with no --out writes nothing, an empty --out gets input.out_dir_unwritable with or without --dry-run (checked before --adapters-root), --adapters-root beside --dry-run gets input.collect_flag_unused and an empty --adapters-root in a real run input.adapters_root_not_a_directory; init --out '' gets input.out_dir_unwritable and an empty --subject or --framework input.init_value_empty",
+        "pass": "every case in verification/gates/fixtures/cli_options/collect_doctor_init.json gives its expected exit code and --json key in the real Python CLI, and TypeScript and Java give exit 3 cli.not_implemented (the commands are Python only); a refused run writes nothing: init --non-interactive, alone, with --out and in = form, gets input.init_unrecognized_flag and init --out writes the profile; doctor --project beside --write-errors, in either order and whatever --project names (a missing directory, '' or =), gets input.doctor_flag_unused, also before an empty --write-errors; --write-errors alone writes the catalogue (a repeat is refused, SPEC 8.5) and an empty, = , directory or unwritable --write-errors gets input.write_errors_unwritable; collect --dry-run --out (also = form) writes collect-plan.json and manifest.json, a dry run with no --out writes nothing, an empty --out gets input.out_dir_unwritable with or without --dry-run (checked before --adapters-root), --adapters-root beside --dry-run gets input.collect_flag_unused and an empty --adapters-root in a real run input.adapters_root_not_a_directory; init --out '' gets input.out_dir_unwritable and an empty --subject or --framework input.init_value_empty",
         "fail": "any engine gives another exit code or key for a case, a refused run writes a file, init accepts --non-interactive, doctor drops --project or an empty --write-errors, collect drops an empty --out or --adapters-root, or a dry run with --out does not write its plan and manifest"
       },
       "faults": [

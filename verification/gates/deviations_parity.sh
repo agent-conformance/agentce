@@ -4,7 +4,7 @@
 # register (S0), the auditor-view fixture's register (S1), lint and shape refusals (S2-S9, S12),
 # unquoted dates (S10), an empty register (S11), only an expired entry (S13), two subjects (S14), the
 # `--deviations=<path>` spelling (S15), a missing value (S16, S23), hostile and mistaken register bytes
-# (S17-S21), a `.` segment in the register path (S2D, S6D), the flag given twice (S22, S22b) and an entry on a
+# (S17-S21), a `.` segment in the register path (S2D, S6D), the flag given twice, refused (S22, S22b) and an entry on a
 # control that fails the SPEC §10.4 human-actor rule, which the register cannot waive (S24, S25, S26 through a
 # third-party catalog whose sequence paths reach the failing decision from the action, and S27 through paths that
 # repeat a predicate) -- and must give Python's exit code, error key, cause
@@ -173,17 +173,16 @@ import sys
 
 work = sys.argv[1]
 ENGINES = ("python", "typescript", "java")
-SENTENCE = "argument --deviations: expected one argument"
+SENTENCE = "flag '--deviations' needs a value."
 # A refusal's cause carries a parser's own text after these prefixes, which differs per engine.
 PREFIX = {
     "S9": "carries a YAML construct the engine refuses to load",
     "S17": "is not valid UTF-8",
     "S18": "carries a YAML construct the engine refuses to load",
 }
-REFUSALS = ["S2", "S2D", "S3", "S4", "S5", "S6", "S6D", "S7", "S8", "S9", "S12", "S17", "S18", "S19", "S20", "S21"]
-SUCCESSES = ["S0", "S1", "S10", "S11", "S13", "S14", "S15", "S22", "S22b"]
+REFUSALS = ["S2", "S2D", "S3", "S4", "S5", "S6", "S6D", "S7", "S8", "S9", "S12", "S17", "S18", "S19", "S20", "S21", "S22", "S22b"]
+SUCCESSES = ["S0", "S1", "S10", "S11", "S13", "S14", "S15"]
 FILES = ("assertions.json", "oscal-ar.json", "activity.json", "blind-spots.json")
-DIGEST = {"S22": "sha256:1c8bd1ab", "S22b": "sha256:ec70a21e"}
 # SPEC §10.4: the register cannot waive the human-actor rule. Per scenario, the controls whose entry is not applied
 # (non-conformant, no deviation, one limitation each) and the ones it still waives (partial, the control's id).
 # S26's TPX-01 and TPX-04 reach the failing decision from the ToolCall that executes it through a sequence path, TPX-05
@@ -249,7 +248,7 @@ for s in ("S16", "S23"):
     for engine in ENGINES:
         check(code(engine, s) == 3, f"{s}: {engine} exited {code(engine, s)}, not 3")
         check(not os.path.exists(f"{work}/{engine}/{s}/assertions.json"), f"{s}: {engine} wrote assertions.json")
-    # Python keys it too since 18.107, with argparse's own sentence as the cause.
+    # Every engine keys it with the grammar's needs-value cause (SPEC 8.5).
     for engine in ENGINES:
         e = error(engine, s)
         check(e["key"] == "input.assess_flag_needs_value" and e["cause"] == SENTENCE,
@@ -274,8 +273,6 @@ for s in SUCCESSES:
         check(digest is None and risks is None, f"S0: a run with no register carries digest {digest} or risks")
     if s in ("S1", "S14", "S15"):
         check(bool(risks) and digest, f"{s}: the register was not applied (risks {risks}, digest {digest})")
-    if s in DIGEST:
-        check(str(digest).startswith(DIGEST[s]), f"{s}: digest {digest} is not the last register's")
 
 for s, (kept, waived, exit_code) in HUMAN_ACTOR.items():
     for engine in ENGINES:

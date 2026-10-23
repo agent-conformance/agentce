@@ -40,6 +40,8 @@ TAIL_LINES = 20
 # the id of the gate a demo has a seeded fault applied to, for the runs that demo makes
 DEMO_FAULT_ENV = "VERIFICATION_DEMO_FAULT"
 CLAIMS_REGISTER = Path("tools/claims/register.yaml")
+ARGV_GRAMMAR = Path("spec/cli/argv-grammar.json")
+ARGV_CASES = Path("spec/cli/argv-cases.json")
 
 
 def load_registry(path: Path) -> dict[str, Any]:
@@ -132,7 +134,21 @@ def lint_registry(registry: dict[str, Any], root: Path) -> list[str]:
             problems.extend(lint_fault(gid, fault, root, gid == demoed))
         if gid not in changelog:
             problems.append(f"registry.gate_not_in_changelog: {gid}")
+    problems.extend(lint_argv_cases(root))
     return problems
+
+
+def lint_argv_cases(root: Path) -> list[str]:
+    """SPEC 8.5: every rule the command-line grammar names keeps at least one case in the shared table."""
+    try:
+        rules = json.loads((root / ARGV_GRAMMAR).read_text(encoding="utf-8"))["rules"]
+        cases = json.loads((root / ARGV_CASES).read_text(encoding="utf-8"))["cases"]
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return [f"registry.argv_table_unreadable: {exc}"]
+    have = {case.get("rule") for case in cases if isinstance(case, dict)}
+    return [
+        f"registry.argv_rule_without_case: {rule}" for rule in rules if rule not in have
+    ]
 
 
 def lint_fault(

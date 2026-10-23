@@ -9,8 +9,8 @@
 # V1-V6: refused, since such a gate could never match; a syntax error or an unknown field is reported
 # first) next to closed values that must still be accepted (V7 an escape, V8 a hyphenated mode). Each
 # engine must give Python's exit code, exit_status and --json fail_on,
-# or Python's refusal (key, cause, fix) with no assertions.json written; a missing value must be
-# argparse's own sentence. Some results are also checked against python-reference.md itself, so the
+# or Python's refusal (key, cause, fix) with no assertions.json written; a missing value, or a next token
+# that starts with `-` (M3, M5-M9), must be the SPEC 8.5 grammar's needs-value refusal. Some results are also checked against python-reference.md itself, so the
 # gate fails when all three engines agree on a wrong answer.
 #
 # (2) The parser alone, one process per engine: Python's parse_fail_on and the TypeScript and Java
@@ -344,7 +344,7 @@ SUCCESSES = {
     "F0": (1, ["findings"], None), "F1": (1, ["findings"], 2),
     "F3": (1, ["findings"], 1), "F4": (1, ["findings"], 1), "F4b": (0, ["ok"], 0),
     "F5": (1, ["findings"], 1), "F6": (1, ["findings"], 1),
-    "F8": (0, ["ok"], 0), "F8b": (1, ["findings"], 1), "F9": (1, ["findings"], 1),
+    "F9": (1, ["findings"], 1),
     "F9b": (0, ["ok"], 0), "F9c": (1, ["findings"], 1),
     "F10": (2, ["findings", "insufficient_evidence"], None),
     "F10b": (2, ["insufficient_evidence"], 0),
@@ -355,6 +355,9 @@ SUCCESSES = {
 }
 # Refusals: key and the end of Python's cause.
 REFUSALS = {
+    # SPEC 8.5: --fail-on given twice is refused in every engine, never last-wins (18.184w).
+    "F8": ("input.assess_unrecognized_flag", "flag '--fail-on' was given more than once."),
+    "F8b": ("input.assess_unrecognized_flag", "flag '--fail-on' was given more than once."),
     "R1": ("input.fail_on_invalid_expression", EMPTY),
     "R4": ("input.fail_on_invalid_expression", UNKNOWN_FOO),
     "R11": ("input.fail_on_invalid_expression", "unexpected character '(' at position 10"),
@@ -362,9 +365,6 @@ REFUSALS = {
     "R24": ("input.fail_on_invalid_expression",
             "unknown field 'a²'; choose from: control, family, mode, outcome, rung, severity, subject"),
     "M4": ("input.fail_on_invalid_expression", DASH),
-    "M7": ("input.fail_on_invalid_expression", DASH),
-    "M8": ("input.fail_on_invalid_expression", DASH),
-    "M9": ("input.fail_on_invalid_expression", DASH),
     "O1": ("input.bundle_not_a_directory", "is not an existing directory."),
     "O2": ("input.profile_not_a_file", "is not an existing file."),
     "O3": ("input.fail_on_invalid_expression", UNKNOWN_FOO),
@@ -378,9 +378,13 @@ REFUSALS = {
     "V5": ("input.fail_on_invalid_expression", "unexpected token 'foo' after a complete expression"),
     "V6": ("input.fail_on_invalid_expression", UNKNOWN_FOO),
 }
-# A value flag with no value: argparse's sentence and the TypeScript/Java fix.
+# A value flag with no value, or with a next token that starts with `-` (SPEC 8.5: such a value needs the = form):
+# the grammar's sentence and fix in every engine.
 FLAG_FIX = {"--fail-on": "pass --fail-on <expression>.", "--deviations": "pass --deviations <file>."}
-NEEDS_VALUE = {"M1": "--fail-on", "M2": "--fail-on", "M3": "--fail-on", "M5": "--fail-on", "M6": "--deviations"}
+NEEDS_VALUE = {
+    "M1": "--fail-on", "M2": "--fail-on", "M3": "--fail-on", "M5": "--fail-on", "M6": "--deviations",
+    "M7": "--fail-on", "M8": "--fail-on", "M9": "--fail-on",
+}
 failures = []
 
 
@@ -421,7 +425,7 @@ for s, (exit_code, status, matched) in SUCCESSES.items():
         got = run(engine, s)
         check(got == ref, f"{s}: {engine} {got} != python {ref}")
 EXPR = json.load(open(f"{work}/expressions.json", encoding="utf-8"))["expr"]
-for s in ("F8", "F8b", "V7"):  # the last --fail-on of each is EXPR[s]
+for s in ("V7",):
     check((run("python", s)[2] or {}).get("expression") == EXPR[s], f"{s}: python's fail_on.expression is not {EXPR[s]!r}")
 
 for s, (key, tail) in REFUSALS.items():
@@ -438,16 +442,16 @@ for s, (key, tail) in REFUSALS.items():
 
 for s, flag in NEEDS_VALUE.items():
     fix = FLAG_FIX[flag]
-    sentence = f"argument {flag}: expected one argument"
+    sentence = f"flag '{flag}' needs a value."
     for engine in ENGINES:
         code = run(engine, s)[0]
         check(code == 3, f"{s}: {engine} exited {code}, not 3")
         check(not wrote(engine, s), f"{s}: {engine} wrote assertions.json")
-    # Python keys it too since 18.107, with argparse's own sentence as the cause.
+    # Every engine keys it with the grammar's needs-value cause (SPEC 8.5).
     for engine in ENGINES:
         e = run(engine, s)[3]
         check(e == {"key": "input.assess_flag_needs_value", "cause": sentence, "fix": fix},
-              f"{s}: {engine} refused with {e}, not argparse's {sentence!r}")
+              f"{s}: {engine} refused with {e}, not {sentence!r}")
 
 # Part (2): the parser corpus.
 expressions = json.load(open(f"{work}/expressions.json", encoding="utf-8"))
