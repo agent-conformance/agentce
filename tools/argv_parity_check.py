@@ -100,7 +100,8 @@ def run_case(engine: str, case: dict, json_mode: bool, places: dict[str, str]) -
         for name in KEYS:
             shutil.copy(KEY_FILE, work / name)
         report = run / "report"
-        shutil.copytree(places["{report}"], report)
+        if any("{report}" in token for token in case["argv"]):
+            shutil.copytree(places["{report}"], report)
         fill = {"{report}": str(report), "{space}": places["{space}"]}
         argv = []
         for token in case["argv"]:
@@ -109,7 +110,7 @@ def run_case(engine: str, case: dict, json_mode: bool, places: dict[str, str]) -
             argv.append(token)
         if json_mode:
             argv = ["--json", *argv]
-        before = _digest(report)
+        before = _digest(report) if case.get("unchanged") else None
         proc = subprocess.run(
             [*_command(engine), *argv],
             cwd=work,
@@ -121,7 +122,7 @@ def run_case(engine: str, case: dict, json_mode: bool, places: dict[str, str]) -
         )
         key, message = _read(proc, run)
         wrote = sorted(str(p.relative_to(work)) for p in work.rglob("*") if p.name not in KEYS)
-        if case.get("unchanged") and _digest(report) != before:
+        if before is not None and _digest(report) != before:
             wrote.append("{report} changed")
         stdout = proc.stdout.replace(str(run), "<run>")
         return Result(proc.returncode, key, message, stdout, tuple(wrote))
@@ -174,7 +175,7 @@ def check() -> int:
                 jobs.append((case, mode, engine))
     with tempfile.TemporaryDirectory(prefix="argv-parity-") as tmp:
         places = _places(Path(tmp))
-        with ThreadPoolExecutor(max_workers=8) as pool:
+        with ThreadPoolExecutor(max_workers=os.cpu_count() or 8) as pool:
             outputs = list(
                 pool.map(lambda j: run_case(j[2], j[0], j[1] == "json", places), jobs)
             )

@@ -40,7 +40,6 @@ class _ArgvErrors:
     command: str
     key: str
     flag_fix: str
-    extra_arg_hint: str
 
     def error(self, cause: str, fix: str, key: str | None = None) -> _ArgvError:
         return _ArgvError(self.command, key or self.key, cause, fix)
@@ -67,7 +66,6 @@ _TOP_ARGV = _ArgvErrors(
     "agentce",
     "input.unknown_command",
     "run `agentce --help` for the commands and global flags agentce takes.",
-    "run `agentce --help` for the commands agentce takes.",
 )
 
 #: A value outside an option's `choices`, by command and option: the command's own keyed error.
@@ -719,10 +717,8 @@ def _wants_json(args: Sequence[str]) -> bool:
 
 
 def _usage_error(name: str, message: str) -> _ArgvError:
-    raw = argv.grammar()["commands"][name]
-    return _ArgvError(
-        name, raw["keys"]["unrecognized"], f"{message}.", raw["fixes"]["flag"]
-    )
+    cmd = argv.command(name)
+    return _ArgvError(name, cmd.unrecognized_key, f"{message}.", cmd.flag_fix)
 
 
 def _namespace(

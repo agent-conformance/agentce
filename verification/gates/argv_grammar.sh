@@ -21,8 +21,9 @@ from pathlib import Path
 loader = importlib.machinery.SourceFileLoader("verification_run", "verification/run")
 run = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
 loader.exec_module(run)
-if run.lint_argv_cases(Path(".")):
-    print("FAIL", *run.lint_argv_cases(Path(".")))
+problems = run.lint_argv_cases(Path("."))
+if problems:
+    print("FAIL", *problems)
     sys.exit(1)
 with tempfile.TemporaryDirectory() as tmp:
     for rel in (run.ARGV_GRAMMAR, run.ARGV_CASES):
@@ -32,8 +33,9 @@ with tempfile.TemporaryDirectory() as tmp:
     table = json.loads(cases.read_text(encoding="utf-8"))
     table["cases"] = [c for c in table["cases"] if c["rule"] != "double_dash_alone"]
     cases.write_text(json.dumps(table), encoding="utf-8")
-    if run.lint_argv_cases(Path(tmp)) != ["registry.argv_rule_without_case: double_dash_alone"]:
-        print("FAIL the registry lint does not name a rule left with no case:", run.lint_argv_cases(Path(tmp)))
+    problems = run.lint_argv_cases(Path(tmp))
+    if problems != ["registry.argv_rule_without_case: double_dash_alone"]:
+        print("FAIL the registry lint does not name a rule left with no case:", problems)
         sys.exit(1)
 print("PASS every grammar rule keeps a case, and the registry lint names one that loses its last")
 PY
@@ -49,10 +51,10 @@ echo "PASS python case-table test"
   tail -n 8
 echo "PASS typescript case-table test"
 
-(cd engines/java && ./gradlew --no-daemon --quiet test --rerun --tests org.agentce.ArgvCasesTest)
+# One Gradle start for the case-table test and the runnable jar the parity check runs.
+(cd engines/java && ./gradlew --no-daemon --quiet test --rerun --tests org.agentce.ArgvCasesTest :assemble)
 echo "PASS java case-table test"
 
 env -u VIRTUAL_ENV uv run --project tools --frozen python tools/argv_parity_check.py --self-test | tail -n 3
 (cd engines/typescript && pnpm build >/dev/null)
-(cd engines/java && ./gradlew --no-daemon --quiet :assemble)
 env -u VIRTUAL_ENV uv run --project tools --frozen python tools/argv_parity_check.py | tail -n 5

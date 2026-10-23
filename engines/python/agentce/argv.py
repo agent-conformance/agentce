@@ -106,9 +106,7 @@ def _level(raw: Mapping[str, Any], globals_: Sequence[Option]) -> Level:
 @cache
 def grammar() -> Mapping[str, Any]:
     """The vendored grammar file, as data."""
-    with (bundled._data_root() / "cli" / "argv-grammar.json").open(
-        encoding="utf-8"
-    ) as fh:
+    with bundled.argv_grammar_path().open(encoding="utf-8") as fh:
         loaded: Mapping[str, Any] = json.load(fh)
     return loaded
 

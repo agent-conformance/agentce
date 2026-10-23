@@ -68,6 +68,11 @@ def templates_dir() -> Path:
     return _data_root() / "templates"
 
 
+def argv_grammar_path() -> Path:
+    """The vendored SPEC 8.5 command-line grammar (the hand-written original is `spec/cli/argv-grammar.json`)."""
+    return _data_root() / "cli" / "argv-grammar.json"
+
+
 def i18n_dir() -> Path:
     """The vendored ICU MessageFormat catalogue (the language-neutral original lives in `spec/i18n/`)."""
     return _data_root() / "i18n"

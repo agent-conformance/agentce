@@ -69,8 +69,7 @@ def test_case_through_the_cli(
     before = _digest(unchanged) if unchanged else None
     code = cli.main(line)
     out, err = capsys.readouterr()
-    head = line[: line.index("--")] if "--" in line else line
-    if "--json" in head and code != 0:
+    if cli._wants_json(line) and code != 0:
         key = json.loads(out)["error"]["key"]
     else:
         found = KEY.search(err)
