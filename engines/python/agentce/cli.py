@@ -11,13 +11,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
-from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
-from typing import Any, NoReturn
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from typing import Any
 
-from . import __version__, commands, exit_codes, logsetup
+from . import __version__, argv, commands, exit_codes, logsetup
 from .errors import AgentceError, InputError
 from .exit_codes import ExitCode
 from .result import CommandResult
@@ -36,25 +35,12 @@ class _ArgvError(InputError):
 
 @dataclass(frozen=True)
 class _ArgvErrors:
-    """How one command words its argv errors: every one is a keyed `_ArgvError` (exit 3), never
-    argparse's bare usage text. ``key`` is the default; ``value_keys`` and ``choice_errors`` reuse the
-    more specific key TypeScript and Java already give for the same argv (18.107)."""
+    """How the top level words its argv errors: every one is a keyed `_ArgvError` (exit 3)."""
 
     command: str
     key: str
     flag_fix: str
     extra_arg_hint: str
-    value_hint: str = "<value>"
-    #: A value-less flag's key, by flag; "*" for every flag of the command.
-    value_keys: Mapping[str, str] = field(default_factory=dict)
-    #: Per-flag value hints for the fix ("pass --fail-on <expression>.").
-    value_hints: Mapping[str, str] = field(default_factory=dict)
-    #: Keep argparse's own sentence as the cause of a value-less flag (assess: TypeScript and Java do).
-    argparse_value_cause: bool = False
-    #: A bad choice's error, by argparse's label for the argument (`--format`, `<action>`), given the value.
-    choice_errors: Mapping[str, Callable[[str], tuple[str, str, str]]] = field(
-        default_factory=dict
-    )
 
     def error(self, cause: str, fix: str, key: str | None = None) -> _ArgvError:
         return _ArgvError(self.command, key or self.key, cause, fix)
@@ -62,120 +48,17 @@ class _ArgvErrors:
     def no_value(self, flag: str) -> _ArgvError:
         return self.error(f"flag '{flag}' takes no value.", f"drop the value: {flag}.")
 
-    def usage(self, message: str) -> _ArgvError:
-        """Map argparse's own message to the keyed error."""
-        if m := re.fullmatch(r"argument (--[\w-]+): expected one argument", message):
-            flag = m.group(1)
-            key = self.value_keys.get(flag, self.value_keys.get("*", self.key))
-            cause = (
-                message
-                if self.argparse_value_cause
-                else f"flag '{flag}' needs a value."
-            )
-            hint = self.value_hints.get(flag, self.value_hint)
-            return self.error(cause, f"pass {flag} {hint}.", key)
-        if m := re.fullmatch(
-            r"argument (--[\w-]+): ignored explicit argument .*", message
-        ):
-            return self.no_value(m.group(1))
-        if m := re.fullmatch(
-            r"argument (\S+): invalid choice: (.*?) \(choose from .*\)", message
-        ):
-            label, raw = m.groups()
-            value = raw[1:-1] if raw[:1] in "'\"" else raw
-            if (choice_error := self.choice_errors.get(label)) is not None:
-                key, cause, fix = choice_error(value)
-                return self.error(cause, fix, key)
-        return self.error(f"{message}.", self.flag_fix)
-
     def unknown(self, token: str) -> _ArgvError:
-        """A token argparse left unparsed."""
-        if token.startswith("-") and token != "-":
-            return self.error(f"unrecognized flag '{token}'.", self.flag_fix)
-        return self.error(f"unrecognized argument '{token}'.", self.extra_arg_hint)
+        return self.error(f"unrecognized flag '{token}'.", self.flag_fix)
 
 
 class _Parser(argparse.ArgumentParser):
-    """An ``ArgumentParser`` whose usage errors exit ``3`` (input error), per the CLI scheme, as the
-    command's keyed `_ArgvError` (English text: argparse is not localised here)."""
+    """An ``ArgumentParser`` used only to render ``--help`` and to name each option's destination:
+    argv itself is read by `agentce.argv` under the SPEC 8.5 grammar (18.184w)."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        # Exact flags only on every parser (TRADEOFFS 2026-10-06 18.50, option b; 18.107): `--bun x`
-        # is an unrecognized flag in all three engines, never --bundle in Python alone.
         kwargs.setdefault("allow_abbrev", False)
         super().__init__(*args, **kwargs)
-        # Set per command by `_key_argv_errors` once the tree is built.
-        self._argv_errors: _ArgvErrors | None = None
-
-    def error(self, message: str) -> NoReturn:
-        if self._argv_errors is not None:
-            raise self._argv_errors.usage(message)
-        self.print_usage(sys.stderr)
-        self.exit(int(ExitCode.INPUT_ERROR), f"{self.prog}: error: {message}\n")
-        raise AssertionError("unreachable")  # pragma: no cover
-
-    def parse_known_args(  # type: ignore[override]
-        self, args: Sequence[str] | None = None, namespace: Any = None
-    ) -> tuple[argparse.Namespace, list[str]]:
-        if self._argv_errors is not None and args is not None:
-            self._refuse_short_clusters(list(args))
-        return super().parse_known_args(args, namespace)
-
-    def _refuse_short_clusters(self, args: list[str]) -> None:
-        """agentce has no clustered short options, so `-hx` or `-hh` is refused with the command's key,
-        never read as -h with the rest dropped (KD-086). Scans this parser's own tokens up to `--`, and
-        up to the command or action name for a parser with subcommands. A token argparse itself takes
-        as an option's value (`--out -1`, `--out -`) is skipped; where an option needs a value and the
-        next token is an option, argparse refuses the missing value first."""
-        pending: argparse.Action | None = None
-        for token in args:
-            if token == "--":
-                if self._subparsers is not None and pending is None:
-                    self._refuse_dashdash_action()
-                return
-            if pending is not None:
-                needs_value, pending = pending.nargs not in ("?", "*"), None
-                if self._parse_optional(token) is None:
-                    continue
-                if needs_value:
-                    return
-            action = self._option_string_actions.get(token)
-            if action is not None and action.nargs != 0:
-                pending = action
-            if not token.startswith("-"):
-                if self._subparsers is not None:
-                    return
-            elif (
-                not token.startswith("--")
-                and len(token) > 2
-                and action is None
-                and not self._negative_number_matcher.match(token)
-            ):
-                assert self._argv_errors is not None
-                raise self._argv_errors.unknown(token)
-
-    def _refuse_dashdash_action(self) -> NoReturn:
-        """A `--` where the action goes is an unknown action, as on Python 3.12.3 and in TypeScript
-        and Java. argparse in 3.12.10 and 3.13+ drops it and reads the next token as the action."""
-        assert self._argv_errors is not None
-        key, cause, fix = self._argv_errors.choice_errors["<action>"]("--")
-        raise self._argv_errors.error(cause, fix, key)
-
-
-def _flag_fix(command: str) -> str:
-    return f"run `agentce {command} --help` for the flags {command} takes, or drop the flag."
-
-
-def _action_error(
-    make: Callable[[], InputError],
-) -> Callable[[str], tuple[str, str, str]]:
-    """An unknown action is the error `cmd_<command>` gives for no action."""
-
-    def error(value: str) -> tuple[str, str, str]:
-        err = make()
-        return err.key, err.cause, err.fix
-
-    return error
 
 
 _TOP_FIX = "name a command: `agentce <command>`; run `agentce --help` for the commands agentce takes."
@@ -185,128 +68,22 @@ _TOP_ARGV = _ArgvErrors(
     "input.unknown_command",
     "run `agentce --help` for the commands and global flags agentce takes.",
     "run `agentce --help` for the commands agentce takes.",
-    choice_errors={
-        "<command>": lambda v: (
-            "input.unknown_command",
-            f"unrecognized command '{v}'.",
-            "run `agentce --help` for the commands agentce takes.",
-        )
-    },
 )
 
-_ARGV: dict[str, _ArgvErrors] = {
-    "readiness": _ArgvErrors(
-        "readiness",
-        "input.readiness_unrecognized_flag",
-        "pass --gaps, --deviations, --catalog-dir, --trust-root or --allow-unverified-catalog, or drop the flag.",
-        "pass exactly one report directory: `agentce readiness <report-dir>`.",
-        value_hint="<path>",
-    ),
-    "sign": _ArgvErrors(
-        "sign",
-        "input.sign_unrecognized_flag",
-        "pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag.",
-        "pass exactly one report directory: `agentce sign <report-dir> --as claimant|assessor`.",
-    ),
-    "assess": _ArgvErrors(
-        "assess",
-        "input.assess_unrecognized_flag",
-        _flag_fix("assess"),
-        "pass at most one records folder: `agentce assess <folder>`.",
-        value_keys={"*": "input.assess_flag_needs_value"},
-        value_hints={
-            "--deviations": "<file>",
-            "--fail-on": "<expression>",
-            "--emit": "<formats>",
-            "--for": "<preset>",
-        },
-        argparse_value_cause=True,
-    ),
-    "quickstart": _ArgvErrors(
-        "quickstart",
-        "input.quickstart_unrecognized_flag",
-        _flag_fix("quickstart"),
-        "quickstart takes no other argument: `agentce quickstart --out <dir>`.",
-        value_hint="<dir>",
-    ),
-    "verify": _ArgvErrors(
-        "verify",
-        "input.verify_unrecognized_flag",
-        "pass --bundle, --catalog, --release, or --report (with --signer-trust-root or "
-        "--expect-keyid for --report), or drop the flag.",
-        "pass the target with its flag, e.g. `agentce verify --bundle <dir>`.",
-    ),
-    "diff": _ArgvErrors(
-        "diff",
-        "input.diff_unrecognized_flag",
-        "pass --format text|json|md, or drop the flag.",
-        "pass two assertions files: `agentce diff <a> <b>`.",
-    ),
-    "validate": _ArgvErrors(
-        "validate",
-        "input.validate_unrecognized_flag",
-        _flag_fix("validate"),
-        "pass the bundle with its flag: `agentce validate --bundle <dir>`.",
-        value_keys={"--bundle": "input.bundle_missing"},
-    ),
-    "report": _ArgvErrors(
-        "report",
-        "input.report_unrecognized_flag",
-        _flag_fix("report"),
-        "pass the input with its flag: `agentce report --from <file>` or `--validate <dir>`.",
-        value_keys={
-            "--from": "input.from_missing",
-            "--validate": "input.validate_missing",
-        },
-        choice_errors={
-            "--format": lambda v: (
-                (err := commands.report_format_error(v)).key,
-                err.cause,
-                err.fix,
-            ),
-            "--role": lambda v: (
-                (err := commands.report_role_error(v)).key,
-                err.cause,
-                err.fix,
-            ),
-        },
-    ),
-    "conformance": _ArgvErrors(
-        "conformance",
-        "input.conformance_unrecognized_flag",
-        _flag_fix("conformance run"),
-        "pass the inputs with their flags: `agentce conformance run --engine <dir> --corpus <dir>`.",
-        value_keys={
-            "--engine": "input.engine_missing",
-            "--corpus": "input.corpus_missing",
-        },
-        choice_errors={"<action>": _action_error(commands.conformance_action_error)},
-    ),
-    "catalog": _ArgvErrors(
-        "catalog",
-        "input.catalog_unrecognized_flag",
-        "run `agentce catalog <action> --help` for the flags it takes, or drop the flag.",
-        "pass one catalog directory: `agentce catalog <action> <dir>`.",
-        choice_errors={"<action>": _action_error(commands.catalog_action_error)},
-    ),
-    "config": _ArgvErrors(
-        "config",
-        "input.config_unrecognized_flag",
-        _flag_fix("config show"),
-        "config show takes no argument: `agentce config show`.",
-        choice_errors={"<action>": _action_error(commands.config_action_error)},
-    ),
+#: A value outside an option's `choices`, by command and option: the command's own keyed error.
+_CHOICE_ERRORS: dict[str, dict[str, Callable[[str], InputError]]] = {
+    "report": {
+        "--format": commands.report_format_error,
+        "--role": commands.report_role_error,
+    },
 }
-for _name, _extra in (
-    ("collect", "pass the config with its flag: `agentce collect --config <file>`."),
-    ("ingest", "pass the export with its flag: `agentce ingest --in <file>`."),
-    ("doctor", "pass the project with its flag: `agentce doctor --project <dir>`."),
-    ("init", "init takes no positional argument: `agentce init --out <dir>`."),
-    ("version", "version takes no argument: `agentce version`."),
-):
-    _ARGV[_name] = _ArgvErrors(
-        _name, f"input.{_name}_unrecognized_flag", _flag_fix(_name), _extra
-    )
+
+#: The error for an action a command does not have (`catalog`, `conformance`, `config`).
+_ACTION_ERRORS: dict[str, Callable[[], InputError]] = {
+    "conformance": commands.conformance_action_error,
+    "catalog": commands.catalog_action_error,
+    "config": commands.config_action_error,
+}
 
 
 def _common_flags() -> _Parser:
@@ -374,19 +151,11 @@ def build_parser() -> argparse.ArgumentParser:
         "every canonical output byte for byte (verify.report_reproduction_mismatch); "
         "(9) success (`reproduced: true`).",
     )
-    # `action="append"` (rather than the default `store`, which would silently keep only the last
-    # value) lets `cmd_verify` detect and refuse a repeated target flag instead of picking a winner
-    # TypeScript/Java don't agree on (verifier round 2, 18.65).
-    p.add_argument(
-        "--bundle", action="append", help="verify an evidence bundle's integrity"
-    )
-    p.add_argument("--catalog", action="append", help="verify a catalog's signatures")
-    p.add_argument(
-        "--release", action="append", help="verify a release artifact's signatures"
-    )
+    p.add_argument("--bundle", help="verify an evidence bundle's integrity")
+    p.add_argument("--catalog", help="verify a catalog's signatures")
+    p.add_argument("--release", help="verify a release artifact's signatures")
     p.add_argument(
         "--report",
-        action="append",
         help="re-run a shareable report bundle (assess --package-for-sharing) offline and check "
         "it reproduces byte for byte, refusing any tampering",
     )
@@ -849,7 +618,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.set_defaults(func=commands.cmd_version)
 
-    _key_argv_errors(parser)
     return parser
 
 
@@ -862,15 +630,6 @@ def _subparsers(parser: argparse.ArgumentParser) -> dict[str, Any]:
         ),
         {},
     )
-
-
-def _key_argv_errors(parser: argparse.ArgumentParser) -> None:
-    """Give every parser its command's keyed argv errors: the top level, each command and each
-    action under it (`catalog lint` answers with catalog's key)."""
-    parser._argv_errors = _TOP_ARGV  # type: ignore[attr-defined]
-    for name, command in _subparsers(parser).items():
-        for p in (command, *_subparsers(command).values()):
-            p._argv_errors = _ARGV[name]
 
 
 def _emit_result(result: CommandResult, *, want_json: bool) -> None:
@@ -954,25 +713,134 @@ def _scan_top_level(args: Sequence[str]) -> list[str] | None:
     return list(args) if args else None
 
 
-def _take_diff_positionals(
-    parser: argparse.ArgumentParser, ns: argparse.Namespace, leftover: list[str]
-) -> list[str]:
-    """argparse (3.12) leaves a positional after an option over (`diff A --format md B` leaves B);
-    read such tokens, in order, as report_a, report_b, then extra, as TypeScript and Java do
-    (18.111). Returns what is still left over (an unrecognized flag). A newer argparse that assigns
-    intermixed positionals itself leaves nothing over here."""
-    diff = _subparsers(parser)["diff"]
-    rest: list[str] = []
-    for token in leftover:
-        if diff._parse_optional(token) is not None:
-            rest.append(token)
-        elif ns.report_a is None:
-            ns.report_a = token
-        elif ns.report_b is None:
-            ns.report_b = token
-        else:
-            ns.extra = [*(ns.extra or []), token]
-    return rest
+def _wants_json(args: Sequence[str]) -> bool:
+    """A refusal is the JSON envelope when `--json` comes before any `--` (SPEC 8.5)."""
+    return "--json" in (args[: args.index("--")] if "--" in args else args)
+
+
+def _usage_error(name: str, message: str) -> _ArgvError:
+    raw = argv.grammar()["commands"][name]
+    return _ArgvError(
+        name, raw["keys"]["unrecognized"], f"{message}.", raw["fixes"]["flag"]
+    )
+
+
+def _namespace(
+    parser: argparse.ArgumentParser, name: str, scan: argv.Scan, pre: Sequence[str]
+) -> argparse.Namespace:
+    """The Namespace a command's handler reads, built from the scan: each argparse action of the
+    command (and of its action) by its destination, defaults kept for what the line does not give."""
+    sub = _subparsers(parser)[name]
+    levels = [sub]
+    ns = argparse.Namespace(command=name)
+    if scan.action is not None:
+        action_dest = next(
+            a.dest for a in sub._actions if isinstance(a, argparse._SubParsersAction)
+        )
+        setattr(ns, action_dest, scan.action)
+        levels.append(_subparsers(sub)[scan.action])
+    for flag in (*pre, *scan.flags):
+        if flag in _GLOBAL_FLAGS:
+            setattr(ns, flag[2:], True)
+    positionals = list(scan.positionals)
+    for level in levels:
+        for key, value in level._defaults.items():
+            setattr(ns, key, value)
+        for action in level._actions:
+            if isinstance(action, (argparse._HelpAction, argparse._SubParsersAction)):
+                continue
+            if not action.option_strings:
+                if action.nargs == "*":
+                    taken, positionals = positionals, []
+                    setattr(ns, action.dest, taken)
+                elif positionals:
+                    setattr(ns, action.dest, positionals.pop(0))
+                elif action.nargs is None:
+                    raise _usage_error(
+                        name, f"the following arguments are required: {action.dest}"
+                    )
+                else:
+                    setattr(ns, action.dest, None)
+                continue
+            option = action.option_strings[-1]
+            if option in _GLOBAL_FLAGS:
+                continue
+            if action.nargs == 0:
+                setattr(ns, action.dest, option in scan.flags)
+            elif isinstance(action, argparse._AppendAction):
+                setattr(ns, action.dest, scan.lists.get(option))
+            else:
+                setattr(ns, action.dest, scan.values.get(option, action.default))
+        for group in level._mutually_exclusive_groups:
+            given = [
+                a.option_strings[-1]
+                for a in group._group_actions
+                if getattr(ns, a.dest)
+            ]
+            if len(given) > 1:
+                raise _usage_error(
+                    name, f"argument {given[1]}: not allowed with argument {given[0]}"
+                )
+            if group.required and not given:
+                names = " ".join(a.option_strings[-1] for a in group._group_actions)
+                raise _usage_error(name, f"one of the arguments {names} is required")
+    return ns
+
+
+def _parse(
+    parser: argparse.ArgumentParser, args: list[str]
+) -> argparse.Namespace | int:
+    """Read the line under the SPEC 8.5 grammar: the Namespace to run, or the exit code of a usage
+    or version line already printed."""
+    line = _scan_top_level(args)
+    if line is None:
+        parser.print_help()
+        return int(ExitCode.OK)
+    if line[0] in ("-V", "--version"):
+        print(f"agentce {__version__}")
+        return int(ExitCode.OK)
+    at = next(
+        i for i, token in enumerate(line) if not token.startswith("-") or token == "-"
+    )
+    pre, name = line[:at], line[at]
+    for i, flag in enumerate(pre):
+        if flag in pre[:i]:
+            raise _TOP_ARGV.error(
+                f"flag '{flag}' was given more than once.", f"give {flag} once."
+            )
+    if name not in argv.grammar()["commands"]:
+        raise _TOP_ARGV.error(
+            f"unrecognized command '{name}'.",
+            "run `agentce --help` for the commands agentce takes.",
+        )
+    choices = _CHOICE_ERRORS.get(name, {})
+
+    def choice_error(option: str, value: str) -> InputError:
+        if option in choices:
+            return choices[option](value)
+        allowed = ", ".join(
+            repr(c) for c in argv.command(name).level.options[option].choices or ()
+        )
+        return _usage_error(
+            name,
+            f"argument {option}: invalid choice: {value!r} (choose from {allowed})",
+        )
+
+    try:
+        scan = argv.scan(
+            argv.command(name),
+            line[at + 1 :],
+            seen=pre,
+            choice_error=choice_error,
+            action_error=_ACTION_ERRORS.get(name),
+        )
+    except InputError as err:
+        raise _ArgvError(name, err.key, err.cause, err.fix) from None
+    if scan.help:
+        sub = _subparsers(parser)[name]
+        (_subparsers(sub)[scan.action] if scan.action else sub).print_help()
+        return int(ExitCode.OK)
+    return _namespace(parser, name, scan, pre)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -983,21 +851,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = list(sys.argv[1:] if argv is None else argv)
     try:
-        parse = _scan_top_level(args)
-        if parse is None:
-            parser.print_help()
-            return int(ExitCode.OK)
-        ns, unknown = parser.parse_known_args(parse)
-        if getattr(ns, "command", None) == "diff":
-            unknown = _take_diff_positionals(parser, ns, unknown)
-        if unknown:
-            errors = _ARGV.get(getattr(ns, "command", "") or "", _TOP_ARGV)
-            raise errors.unknown(unknown[0])
-    except SystemExit as exc:  # argparse: -h/--version exit 0
-        return exc.code if isinstance(exc.code, int) else int(ExitCode.INPUT_ERROR)
-    # Every usage error is keyed (`_Parser`, 18.107).
+        parsed = _parse(parser, args)
+    # Every usage error is keyed (SPEC 8.5).
     except _ArgvError as err:
-        return _emit_error(err, command=err.command, want_json="--json" in args)
+        return _emit_error(err, command=err.command, want_json=_wants_json(args))
+    if isinstance(parsed, int):
+        return parsed
+    ns = parsed
 
     debug = bool(getattr(ns, "debug", False))
     quiet = bool(getattr(ns, "quiet", False))

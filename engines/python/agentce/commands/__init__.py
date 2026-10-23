@@ -210,20 +210,10 @@ def _opt_str(ns: argparse.Namespace, name: str) -> str | None:
 
 
 def _verify_target_flag(ns: argparse.Namespace, name: str) -> str | None:
-    """`cmd_verify`'s own target flags (`--bundle`/`--catalog`/`--release`/`--report`) are
-    `action="append"` (see `cli.py`), so an empty value normalizes the same way `_opt_str_nonempty`
-    would (TypeScript's/Java's `emptyToUndefined`, verifier round 1, 18.65), and a repeated flag
-    refuses instead of argparse's default `store` silently keeping only the last value -- `--catalog A
-    --catalog B` must not give a different, unlabelled answer from TypeScript's/Java's own refusal for
-    the same command line (verifier round 2, 18.65)."""
-    values: list[str] | None = getattr(ns, name, None)
-    if values and len(values) > 1:
-        raise InputError(
-            "input.verify_target",
-            f"--{name} was given more than once.",
-            f"pass --{name} <path> once.",
-        )
-    return (values[0] or None) if values else None
+    """`cmd_verify`'s own target flags (`--bundle`/`--catalog`/`--release`/`--report`): an empty value
+    is not given (TypeScript's/Java's `emptyToUndefined`, verifier round 1, 18.65). A repeated target
+    never reaches here: the command-line grammar refuses it (SPEC 8.5, 18.184w)."""
+    return _opt_str(ns, name) or None
 
 
 def _flag(ns: argparse.Namespace, name: str) -> bool:
