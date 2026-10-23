@@ -9,7 +9,7 @@
     {"id": "assess-help-after-unknown", "argv": ["assess", "--no-such-flag", "--help"], "exit": 0, "key": null, "says": "usage: agentce assess [-h]", "same_stdout": true, "writes": null},
     {"id": "assess-help-then-unknown", "argv": ["assess", "-h", "--no-such-flag"], "exit": 0, "key": null, "says": "usage: agentce assess [-h]", "same_stdout": true, "writes": null},
     {"id": "assess-help-after-dashdash", "argv": ["assess", "--out", "{out}", "--", "-h"], "exit": 3, "key": "input.records_not_a_directory", "writes": null},
-    {"id": "assess-cluster-before-help", "argv": ["assess", "{B}", "-hx", "-h"], "exit": 3, "key": "input.assess_unrecognized_flag", "says": "-hx", "writes": null},
+    {"id": "assess-cluster-before-help", "argv": ["assess", "{B}", "-hx", "-h"], "exit": 0, "key": null, "says": "usage: agentce assess [-h]", "same_stdout": true, "writes": null},
     {"id": "assess-help-with-value", "argv": ["assess", "--help=x"], "exit": 3, "key": "input.assess_unrecognized_flag", "writes": null},
     {"id": "assess-json-with-value", "argv": ["assess", "{B}", "--json=1", "--out", "{out}"], "exit": 3, "key": "input.assess_unrecognized_flag", "writes": null},
     {"id": "assess-allow-unverified-with-value", "argv": ["assess", "{B}", "--allow-unverified-catalog=1", "--out", "{out}"], "exit": 3, "key": "input.assess_unrecognized_flag", "writes": null},
@@ -40,10 +40,10 @@
     {"id": "assess-fail-on-equals-bad", "argv": ["assess", "{B}", "--fail-on=bogus(", "--out", "{out}"], "exit": 3, "key": "input.fail_on_invalid_expression", "writes": null},
     {"id": "assess-out-equals-good", "argv": ["assess", "{B}", "--out=d"], "exit": 0, "key": null, "writes": "d"},
     {"id": "assess-bundle-profile-equals-good", "argv": ["assess", "--bundle={root}/corpus/quickstart/evidence", "--profile={root}/corpus/quickstart/applicability.yaml", "--out=d"], "exit": 0, "key": null, "writes": "d"},
-    {"id": "assess-out-last-wins", "argv": ["assess", "{B}", "--out", "a", "--out", "b"], "exit": 0, "key": null, "writes": "b"},
-    {"id": "assess-bundle-last-wins-good", "argv": ["assess", "--bundle", "{root}/no-such-dir", "--bundle", "{root}/corpus/quickstart/evidence", "--profile", "{root}/corpus/quickstart/applicability.yaml", "--out", "{out}"], "exit": 0, "key": null, "writes": "out"},
-    {"id": "assess-bundle-last-wins-bad", "argv": ["assess", "--bundle", "{root}/corpus/quickstart/evidence", "--bundle", "{root}/no-such-dir", "--profile", "{root}/corpus/quickstart/applicability.yaml", "--out", "{out}"], "exit": 3, "key": "input.bundle_not_a_directory", "writes": null},
-    {"id": "assess-profile-last-wins", "argv": ["assess", "--bundle", "{root}/corpus/quickstart/evidence", "--profile", "{root}/no-such-file", "--profile", "{root}/corpus/quickstart/applicability.yaml", "--out", "{out}"], "exit": 0, "key": null, "writes": "out"},
+    {"id": "assess-out-repeated", "argv": ["assess", "{B}", "--out", "a", "--out", "b"], "exit": 3, "key": "input.assess_unrecognized_flag", "says": "was given more than once", "writes": null},
+    {"id": "assess-bundle-repeated-good", "argv": ["assess", "--bundle", "{root}/no-such-dir", "--bundle", "{root}/corpus/quickstart/evidence", "--profile", "{root}/corpus/quickstart/applicability.yaml", "--out", "{out}"], "exit": 3, "key": "input.assess_unrecognized_flag", "says": "was given more than once", "writes": null},
+    {"id": "assess-bundle-repeated-bad", "argv": ["assess", "--bundle", "{root}/corpus/quickstart/evidence", "--bundle", "{root}/no-such-dir", "--profile", "{root}/corpus/quickstart/applicability.yaml", "--out", "{out}"], "exit": 3, "key": "input.assess_unrecognized_flag", "says": "was given more than once", "writes": null},
+    {"id": "assess-profile-repeated", "argv": ["assess", "--bundle", "{root}/corpus/quickstart/evidence", "--profile", "{root}/no-such-file", "--profile", "{root}/corpus/quickstart/applicability.yaml", "--out", "{out}"], "exit": 3, "key": "input.assess_unrecognized_flag", "says": "was given more than once", "writes": null},
     {"id": "assess-report-language-xx", "argv": ["assess", "{B}", "--report-language", "xx", "--out", "{out}"], "exit": 3, "key": "input.report_language_unknown", "writes": null},
     {"id": "assess-report-language-empty", "argv": ["assess", "{B}", "--report-language", "", "--out", "{out}"], "exit": 3, "key": "input.report_language_unknown", "writes": null},
     {"id": "assess-report-language-path", "argv": ["assess", "{B}", "--report-language", "../x", "--out", "{out}"], "exit": 3, "key": "input.report_language_unknown", "writes": null},
@@ -55,7 +55,7 @@
     {"id": "assess-records-missing", "argv": ["assess", "{root}/no-such-records", "--out", "{out}"], "exit": 3, "key": "input.records_not_a_directory", "writes": null},
     {"id": "assess-records-with-bundle", "argv": ["assess", "{root}/verification/gates/fixtures/quick_path/records", "{B}", "--out", "{out}"], "exit": 3, "key": "input.records_source_ambiguous", "writes": null},
     {"id": "assess-records-with-package", "argv": ["assess", "{root}/verification/gates/fixtures/quick_path/records", "--package-for-sharing", "--out", "{out}"], "exit": 3, "key": "input.package_requires_bundle", "writes": null},
-    {"id": "assess-negative-number-positional", "argv": ["assess", "{B}", "-1", "--out", "{out}"], "exit": 3, "key": "input.records_source_ambiguous", "writes": null},
-    {"id": "assess-spaced-positional", "argv": ["assess", "{B}", "--x y", "--out", "{out}"], "exit": 3, "key": "input.records_source_ambiguous", "writes": null}
+    {"id": "assess-negative-number-positional", "argv": ["assess", "{B}", "-1", "--out", "{out}"], "exit": 3, "key": "input.assess_unrecognized_flag", "says": "-1", "writes": null},
+    {"id": "assess-spaced-positional", "argv": ["assess", "{B}", "--x y", "--out", "{out}"], "exit": 3, "key": "input.assess_unrecognized_flag", "writes": null}
   ]
 }

@@ -2821,7 +2821,7 @@
     },
     {
       "id": "VG-CLI-ASSESS",
-      "title": "assess's command line is read the same way in all three engines: -h and --help print the same usage anywhere before --, every value option takes its = form and its last repeat, an unknown or removed flag, a missing value and a value on a flag are refused with a key, --report-language is read or refused, and Java refuses a records folder with its own key",
+      "title": "assess's command line is read the same way in all three engines: -h and --help print the same usage anywhere before --, every value option takes its = form, an option given twice is refused, an unknown or removed flag, a missing value and a value on a flag are refused with a key, --report-language is read or refused, and Java refuses a records folder with its own key",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -2930,7 +2930,7 @@
     },
     {
       "id": "VG-CLI-REPORT",
-      "title": "report's command line is read the same way in all three engines: -h and --help print the same usage anywhere before --, every value option takes its = form and its last repeat, an unknown flag, a missing value, a bad choice, an unknown --language, an empty --catalog label and an option the format does not read are refused with a key, and --format public, the --role packs and --language render as Python does",
+      "title": "report's command line is read the same way in all three engines: -h and --help print the same usage anywhere before --, every value option takes its = form, an option given twice is refused, an unknown flag, a missing value, a bad choice, an unknown --language, an empty --catalog label and an option the format does not read are refused with a key, and --format public, the --role packs and --language render as Python does",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -2997,7 +2997,7 @@
     },
     {
       "id": "VG-CLI-UTILITY",
-      "title": "validate, diff, version and conformance read their command lines the same way in all three engines: -h and --help print the same usage anywhere before --, every value option takes its = form and its last repeat, an unknown flag, an extra argument, a missing or empty value and an unknown conformance action are refused with a key, diff reads its two files on either side of --format, and conformance run --adapters runs the adapters' own orchestrator and folds its claim into the exit code",
+      "title": "validate, diff, version and conformance read their command lines the same way in all three engines: -h and --help print the same usage anywhere before --, every value option takes its = form, an option given twice is refused, an unknown flag, an extra argument, a missing or empty value and an unknown conformance action are refused with a key, diff reads its two files on either side of --format, and conformance run --adapters runs the adapters' own orchestrator and folds its claim into the exit code",
       "tier": "quick",
       "cwd": ".",
       "cmd": [

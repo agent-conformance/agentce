@@ -8,7 +8,7 @@
     {"id": "assess-for-unknown-emit", "argv": ["assess", "{B}", "--for", "bogus", "--emit", "md", "--out", "{out}"], "exit": 3, "key": "input.for_emit_ambiguous"},
     {"id": "assess-emit-unknown", "argv": ["assess", "{B}", "--emit", "bogus", "--out", "{out}"], "exit": 3, "key": "input.emit_format"},
     {"id": "assess-emit-some-unknown", "argv": ["assess", "{B}", "--emit", "md,bogus,x", "--out", "{out}"], "exit": 3, "key": "input.emit_format"},
-    {"id": "assess-emit-last-wins", "argv": ["assess", "{B}", "--emit", "md", "--emit", "bogus", "--out", "{out}"], "exit": 3, "key": "input.emit_format"},
+    {"id": "assess-emit-repeated", "argv": ["assess", "{B}", "--emit", "md", "--emit", "bogus", "--out", "{out}"], "exit": 3, "key": "input.assess_unrecognized_flag", "says": "was given more than once", "writes": null},
     {"id": "assess-for-emit-unknown", "argv": ["assess", "{B}", "--for", "auditor", "--emit", "bogus", "--out", "{out}"], "exit": 3, "key": "input.emit_format"},
     {"id": "assess-for-unknown", "argv": ["assess", "{B}", "--for", "bogus", "--out", "{out}"], "exit": 3, "key": "input.for_preset"},
     {"id": "assess-for-empty", "argv": ["assess", "{B}", "--for=", "--out", "{out}"], "exit": 3, "key": "input.for_preset"},
@@ -24,9 +24,7 @@
     {"id": "assess-for-known", "argv": ["assess", "{B}", "--for", "auditor", "--out", "{out}"], "exit": 0, "key": null,
      "engines": {"typescript": {"exit": 3, "key": "input.emit_unsupported"}, "java": {"exit": 3, "key": "input.emit_unsupported"}},
      "why": "TypeScript and Java refuse rather than ignore --for until 18.16b ports every preset"},
-    {"id": "assess-for-last-wins", "argv": ["assess", "{B}", "--for", "bogus", "--for", "auditor", "--out", "{out}"], "exit": 0, "key": null,
-     "engines": {"typescript": {"exit": 3, "key": "input.emit_unsupported"}, "java": {"exit": 3, "key": "input.emit_unsupported"}},
-     "why": "as assess-for-known; the last --for wins in every engine, so none refuses 'bogus'"},
+    {"id": "assess-for-repeated", "argv": ["assess", "{B}", "--for", "bogus", "--for", "auditor", "--out", "{out}"], "exit": 3, "key": "input.assess_unrecognized_flag", "says": "was given more than once", "writes": null},
     {"id": "assess-plain", "argv": ["assess", "{B}", "--out", "{out}"], "exit": 0, "key": null},
     {"id": "assess-emit-abbreviated", "argv": ["assess", "{B}", "--em", "md", "--out", "{out}"], "exit": 3, "key": "input.assess_unrecognized_flag"},
     {"id": "assess-for-abbreviated", "argv": ["assess", "{B}", "--fo", "ci", "--out", "{out}"], "exit": 3, "key": "input.assess_unrecognized_flag"},
@@ -39,7 +37,7 @@
     {"id": "quickstart-out", "argv": ["quickstart", "--out", "d"], "exit": 0, "key": null, "writes": "d"},
     {"id": "quickstart-out-equals", "argv": ["quickstart", "--out=d"], "exit": 0, "key": null, "writes": "d"},
     {"id": "quickstart-out-empty", "argv": ["quickstart", "--out="], "exit": 3, "key": "input.out_dir_unwritable", "writes": null},
-    {"id": "quickstart-out-repeated", "argv": ["quickstart", "--out", "a", "--out", "b"], "exit": 0, "key": null, "writes": "b"},
+    {"id": "quickstart-out-repeated", "argv": ["quickstart", "--out", "a", "--out", "b"], "exit": 3, "key": "input.quickstart_unrecognized_flag", "says": "was given more than once", "writes": null},
     {"id": "quickstart-quiet", "argv": ["quickstart", "--quiet"], "exit": 0, "key": null, "writes": "out"},
     {"id": "quickstart-debug", "argv": ["quickstart", "--debug"], "exit": 0, "key": null, "writes": "out", "debug_log": "quickstart"},
     {"id": "quickstart-help-short", "argv": ["quickstart", "-h"], "exit": 0, "key": null, "writes": null, "says": "usage: agentce quickstart", "same_stdout": true},
@@ -93,7 +91,7 @@
     {"id": "version-hx", "argv": ["version", "-hx"], "exit": 3, "key": "input.version_unrecognized_flag"},
     {"id": "version-abbreviated-help", "argv": ["version", "--he"], "exit": 3, "key": "input.version_unrecognized_flag"},
     {"id": "unknown-command", "argv": ["nope"], "exit": 3, "key": "input.unknown_command"},
-    {"id": "assess-hx-after-dash-value", "argv": ["assess", "{B}", "--out", "-1", "-hx"], "exit": 3, "key": "input.assess_unrecognized_flag", "says": "-hx"},
-    {"id": "quickstart-hx-after-dash-value", "argv": ["quickstart", "--out", "-", "-hx"], "exit": 3, "key": "input.quickstart_unrecognized_flag", "writes": null, "says": "-hx"}
+    {"id": "assess-hx-after-dash-value", "argv": ["assess", "{B}", "--out", "-1", "-hx"], "exit": 3, "key": "input.assess_flag_needs_value", "says": "--out", "writes": null},
+    {"id": "quickstart-hx-after-dash-value", "argv": ["quickstart", "--out", "-", "-hx"], "exit": 3, "key": "input.quickstart_unrecognized_flag", "says": "--out", "writes": null}
   ]
 }
