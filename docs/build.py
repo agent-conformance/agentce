@@ -1166,11 +1166,14 @@ def _site_explanation_pages() -> dict[Path, str]:
         "threat-model": DOCS / "threat-model.md",
         "verification": DOCS / "verification.md",
         "errors": DOCS / "errors.md",
+        "yaml-profile": DOCS / "yaml-profile.md",
     }
     # The only cross-links between these pages, rewritten to the site's absolute routes.
     rewrites = {
         "(verification.md)": "(/explanation/verification/)",
         "(./threat-model.md)": "(/explanation/threat-model/)",
+        "(errors.md)": "(/explanation/errors/)",
+        "(../spec/rules/yaml-profile-cases.json)": "(https://github.com/agent-conformance/agentce/blob/main/spec/rules/yaml-profile-cases.json)",
     }
     pages: dict[Path, str] = {}
     titles: dict[str, str] = {}
@@ -1191,8 +1194,8 @@ def _site_explanation_pages() -> dict[Path, str]:
     )
     pages[SITE_EXPLANATION / "index.md"] = _frontmatter(
         "Explanation",
-        "Understanding-oriented material: the threat model, the verification procedure, and the "
-        "message-key catalogue.",
+        "Understanding-oriented material: the threat model, the verification procedure, the "
+        "message-key catalogue, and the YAML profile.",
     ) + (
         "Understanding-oriented material published from `docs/` (SPEC §13.4).\n\n"
         "| Page |\n|---|\n"

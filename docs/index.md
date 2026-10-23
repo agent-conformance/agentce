@@ -30,6 +30,7 @@ Generated from the sources, so the documentation and the code never disagree.
   signed catalog, corpus, or release offline.
 - [Threat model](threat-model.md) — the threats the engine addresses and the check that proves each.
 - [Error catalogue](errors.md) — every message key with its cause and exact fix.
+- [YAML profile](yaml-profile.md) — the YAML every engine reads, and what to quote.
 - [Architecture decisions](adr/) — the record of every choice the specification leaves open.
 
 ## Governance and conformance
