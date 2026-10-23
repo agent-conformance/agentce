@@ -140,11 +140,13 @@ function declaredCounts(
     // The bytes loadBundle checked and hashed, never a second read of the name (18.184f).
     const name = denominator.manifest;
     const data = loadManifest(name, raw);
-    // A root that is not an object (a number token included) declares no counts: fall through, as Python and Java do.
-    if (isRecord(data) && !(data instanceof NonCanonicalNumber)) {
-      const declared = ["counts", "expected"].map((key) => manifestCounts(name, data, key));
-      return declared.find((found) => Object.keys(found).length > 0) ?? {};
+    // A listed manifest is one JSON object (SPEC 6.5); any other root (a number token included) is refused, never
+    // read as declaring no counts, which could raise coverage (18.184r).
+    if (!isRecord(data) || data instanceof NonCanonicalNumber) {
+      throw invalidManifest(name, "is not a JSON object");
     }
+    const declared = ["counts", "expected"].map((key) => manifestCounts(name, data, key));
+    return declared.find((found) => Object.keys(found).length > 0) ?? {};
   }
   // Otherwise count the denominator source's own ingested events, per type.
   const counts: Record<string, number> = {};

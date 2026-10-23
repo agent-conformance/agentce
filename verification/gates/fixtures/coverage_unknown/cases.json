@@ -1104,22 +1104,10 @@
           ]
         }
       ],
-      "why": "a manifest whose root is not an object declares no counts",
+      "why": "a listed manifest whose root is not an object is refused, never read as declaring no counts (SPEC 6.5, 18.184r)",
       "expected": {
-        "control": "INT-01",
-        "outcome": "insufficient_evidence",
-        "outcomes": {
-          "INT-01": "insufficient_evidence",
-          "REC-04": "insufficient_evidence",
-          "OVS-03": "conformant"
-        },
-        "exit": 2,
-        "coverage_unknown": [
-          "spiffe://corp/agents/a INT-01",
-          "spiffe://corp/agents/a REC-04"
-        ],
-        "readiness": "NOT READY",
-        "reason": "coverage unknown for subject spiffe://corp/agents/a: no independent denominator"
+        "exit": 3,
+        "refusal": "input.coverage_denominator_manifest_invalid"
       }
     },
     "denominator-manifest-escapes": {

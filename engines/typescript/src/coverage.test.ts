@@ -305,9 +305,16 @@ for (const [raw, expected] of [
 }
 
 for (const raw of ["[1]", '"counts"', "null", "3", "1.5", "5e3", "9007199254740993"]) {
-  test(`a denominator manifest whose root is ${raw} falls through to the source's own events`, () => {
-    // Not an object, so it declares no counts: the two ToolCalls from the denominator source are expected, as in
-    // Python and Java (a number token that reads as a NonCanonicalNumber is not an object either).
-    assert.equal(expectedToolCalls(coverageWithManifest(raw)), 2);
+  test(`a denominator manifest whose root is ${raw} is refused, never read as declaring no counts`, () => {
+    // SPEC 6.5: a listed manifest is one JSON object; falling through to the source's own events could raise
+    // coverage (18.184r; a number token that reads as a NonCanonicalNumber is not an object either).
+    assert.throws(
+      () => coverageWithManifest(raw),
+      (exc: unknown) =>
+        exc instanceof InputError &&
+        exc.key === "input.coverage_denominator_manifest_invalid" &&
+        exc.cause.includes("reference/counts.json") &&
+        exc.cause.includes("is not a JSON object"),
+    );
   });
 }

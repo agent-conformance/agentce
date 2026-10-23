@@ -192,6 +192,15 @@ class CoverageTest {
         assertTrue(error.reason.contains(LISTED), error.reason);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"[1]", "\"counts\"", "null", "3", "1.5", "5e3", "9007199254740993"})
+    void denominatorManifestWhoseRootIsNotAnObjectIsRefused(String raw) {
+        // SPEC 6.5: a listed manifest is one JSON object, never read as declaring no counts (18.184r).
+        InputError error = assertThrows(InputError.class, () -> manifestCounts(raw));
+        assertEquals("input.coverage_denominator_manifest_invalid", error.key);
+        assertTrue(error.reason.contains(LISTED + "' is not a JSON object"), error.reason);
+    }
+
     @Test
     void denominatorManifestThatIsNotUtf8IsRefused() {
         byte[] good = "{\"counts\": {\"ToolCall\": 1}}".getBytes(StandardCharsets.UTF_8);

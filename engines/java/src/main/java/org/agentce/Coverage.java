@@ -116,12 +116,14 @@ public final class Coverage {
             }
             // The bytes Bundle.load checked and hashed, never a second read of the name (18.184f).
             JsonNode data = loadManifest(denominator.manifest, raw);
-            // A root that is not an object declares no counts: fall through, as Python and TypeScript do.
-            if (data != null && data.isObject()) {
-                Map<String, Long> counts = manifestCounts(denominator.manifest, data, "counts");
-                Map<String, Long> expected = manifestCounts(denominator.manifest, data, "expected");
-                return counts.isEmpty() ? expected : counts;
+            // A listed manifest is one JSON object (SPEC 6.5); any other root is refused, never read as declaring no
+            // counts, which could raise coverage (18.184r).
+            if (data == null || !data.isObject()) {
+                throw invalidManifest(denominator.manifest, "is not a JSON object");
             }
+            Map<String, Long> counts = manifestCounts(denominator.manifest, data, "counts");
+            Map<String, Long> expected = manifestCounts(denominator.manifest, data, "expected");
+            return counts.isEmpty() ? expected : counts;
         }
         Map<String, Long> counts = new LinkedHashMap<>();
         Map<String, Integer> inner = bySource.get(denominator.source);

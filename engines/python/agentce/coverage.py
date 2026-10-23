@@ -94,12 +94,14 @@ def _declared_counts(
                 "nesting depth.",
             )
         data = _load_manifest(denominator.manifest, raw)
-        # A root that is not an object declares no counts: fall through, as TypeScript and Java do.
-        if isinstance(data, dict):
-            # Both are checked before either is used, as TypeScript and Java do.
-            declared = _counts(denominator.manifest, data, "counts")
-            expected = _counts(denominator.manifest, data, "expected")
-            return declared or expected
+        # A listed manifest is one JSON object (SPEC 6.5); any other root is refused, never read as declaring no
+        # counts, which could raise coverage (18.184r).
+        if not isinstance(data, dict):
+            raise _invalid_manifest(denominator.manifest, "is not a JSON object")
+        # Both are checked before either is used, as TypeScript and Java do.
+        declared = _counts(denominator.manifest, data, "counts")
+        expected = _counts(denominator.manifest, data, "expected")
+        return declared or expected
     # Otherwise count the denominator source's own ingested events, per type.
     counts: dict[str, int] = {}
     for (source, event_type), count in by_source_type.items():

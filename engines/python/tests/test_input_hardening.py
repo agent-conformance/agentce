@@ -537,28 +537,6 @@ def test_coverage_denominator_manifest_past_the_depth_limit_is_refused(
     assert excinfo.value.key == "input.coverage_denominator_manifest_invalid"
 
 
-@pytest.mark.parametrize("root", ["[1]", "7", '"counts"', "null"])
-def test_coverage_denominator_manifest_that_is_not_an_object_counts_the_source(
-    tmp_path: Path, root: str
-) -> None:
-    bundle_root = tmp_path / "bundle"
-    (bundle_root / "reference").mkdir(parents=True)
-    (bundle_root / "reference" / "counts.json").write_text(root, encoding="utf-8")
-    denominator = CoverageDenominator(
-        kind="registry",
-        source="urn:src:egress",
-        covers=["ToolCall"],
-        manifest="reference/counts.json",
-    )
-    by_source_type = {
-        ("urn:src:egress", "ToolCall"): 3,
-        ("urn:src:other", "ToolCall"): 9,
-    }
-    assert _denominator_counts(
-        denominator, _SUBJECT, by_source_type, _members(bundle_root)
-    ) == {"ToolCall": 3}
-
-
 def test_coverage_denominator_manifest_with_deep_json_is_refused(
     tmp_path: Path,
 ) -> None:
@@ -645,3 +623,25 @@ def test_coverage_denominator_manifest_whole_counts_are_read(
     tmp_path: Path, raw: bytes, expected: dict[str, int]
 ) -> None:
     assert _manifest_counts(tmp_path, raw) == expected
+
+
+@pytest.mark.parametrize(
+    "raw", ["[1]", '"counts"', "null", "3", "1.5", "5e3", "9007199254740993"]
+)
+def test_coverage_denominator_manifest_root_not_an_object_is_refused(
+    tmp_path: Path, raw: str
+) -> None:
+    """SPEC 6.5: a listed manifest is one JSON object, never read as declaring no counts (18.184r)."""
+    bundle_root = tmp_path / "bundle"
+    (bundle_root / "reference").mkdir(parents=True)
+    (bundle_root / "reference" / "counts.json").write_text(raw, encoding="utf-8")
+    denominator = CoverageDenominator(
+        kind="registry",
+        source="urn:src:egress",
+        covers=["ToolCall"],
+        manifest="reference/counts.json",
+    )
+    with pytest.raises(InputError) as excinfo:
+        _denominator_counts(denominator, _SUBJECT, {}, _members(bundle_root))
+    assert excinfo.value.key == "input.coverage_denominator_manifest_invalid"
+    assert "'reference/counts.json' is not a JSON object" in str(excinfo.value)
