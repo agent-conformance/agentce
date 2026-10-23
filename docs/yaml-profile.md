@@ -37,11 +37,13 @@ deviation register, manual evaluation records and `.agentce.yaml`.
 | `sexagesimal` | `time: 1:30` | `time: "1:30"` |
 | `octal` | `mode: 0755`, `mode: 0o755` | `mode: "0755"` |
 | `exponent_no_dot` | `tokens: 1e3` | `tokens: 1000`, or `"1e3"` for text |
+| `leading_zero` | `day: 08`, `code: 09` | `day: 8`, or `"08"` for text |
+| `exponent_no_sign` | `tokens: 1.0e3` | `tokens: 1.0e+3`, or `"1.0e3"` for text |
 | `flow_scalar_indicator_start` | `tools: [?x, :y]` | `tools: ["?x", ":y"]` |
 | `flow_line_not_indented` | a `[...]` or `{...}` continued onto a line at or left of its key | indent the continuation past the key, or keep the list on one line |
 | `depth_over_100` | mappings or lists nested 101 deep | at most 100 levels |
 
-The YAML 1.1 forms in the table (`yes`, `on`, `1_000`, `1:30`, `0755`, `1e3`) are the ones YAML 1.1
+The YAML 1.1 forms in the table (`yes`, `on`, `1_000`, `1:30`, `0755`, `08`, `1e3`, `1.0e3`) are the ones YAML 1.1
 and YAML 1.2 libraries read differently: one engine would read `yes` as true and another as the text
 `yes`. Quoting the value makes every engine read the same text.
 
