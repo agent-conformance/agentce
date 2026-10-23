@@ -925,11 +925,6 @@ public final class Readiness {
     static Object composePyyaml(String text) {
         // The SPEC 8.7 profile first (18.184u): a file outside it is a YamlProfile.ProfileException.
         YamlProfile.check(text);
-        String scannerProblem = PyyamlScanner.problem(text);
-        if (scannerProblem != null) {
-            // SnakeYAML reads tabs and flow forms PyYAML's scanner refuses (18.184p).
-            throw new IllegalArgumentException(scannerProblem);
-        }
         LoaderOptions options = new LoaderOptions();
         options.setNestingDepthLimit(DEVIATION_REGISTER_MAX_DEPTH);
         // PyYAML has no alias cap; the composer shares an aliased value, so many aliases cost no more than one.
@@ -941,12 +936,6 @@ public final class Readiness {
         YamlProfile.checkDuplicateKeys(root);
         checkTree(root, Collections.newSetFromMap(new IdentityHashMap<>()));
         return composeValue(root);
-    }
-
-    /** {@code text} read as a catalog file: {@link #composePyyaml}, as Python's {@code load_catalog_yaml} reads it
-     * (18.184o, 18.184u). */
-    static Object composeCatalogPyyaml(String text) {
-        return composePyyaml(text);
     }
 
     /** Whether {@code e}, thrown by {@link #composePyyaml}, is SnakeYAML's nesting cap or the recursion it
@@ -974,45 +963,6 @@ public final class Readiness {
                 checkTree(tuple.getValueNode(), visited);
             }
         }
-    }
-
-    /** {@code key} (a scalar {@link #composeValue} built) as a value whose equality is Python's for the dict key PyYAML
-     * builds: numbers by value ({@code 1}, {@code 1.0} and {@code true} one key; every {@code .nan} one key, as PyYAML
-     * returns one shared nan), a string by its text, a date by its date, an aware datetime by its instant, a naive one by
-     * its fields; a string, a number, a date and a datetime are never equal to one another. */
-    private static Object pythonKey(Object key) {
-        if (key == null) {
-            return List.of("none");
-        }
-        if (key instanceof String text) {
-            return List.of("str", text);
-        }
-        if (key instanceof Boolean b) {
-            return List.of("num", b ? BigDecimal.ONE : BigDecimal.ZERO);
-        }
-        if (key instanceof BigInteger bi) {
-            return List.of("num", new BigDecimal(bi).stripTrailingZeros());
-        }
-        if (key instanceof Double d) {
-            if (d.isNaN()) {
-                return List.of("nan");
-            }
-            if (d.isInfinite()) {
-                return List.of("inf", d > 0);
-            }
-            return List.of("num", d == 0 ? BigDecimal.ZERO : new BigDecimal(d).stripTrailingZeros());
-        }
-        if (key instanceof PyyamlTimestamp ts) {
-            String text = pythonizeTimestamp(ts.text());
-            if (text.length() == 10) {
-                return List.of("date", text);
-            }
-            if (text.matches(".*[+-][0-9]{2}:[0-9]{2}$")) {
-                return List.of("aware", java.time.OffsetDateTime.parse(text.replace(' ', 'T')).toInstant());
-            }
-            return List.of("naive", text);
-        }
-        return List.of("other", String.valueOf(key));
     }
 
     /** {@link #flattenMapping} never composes a merge source, so {@link #composeValue}'s tag check does not reach it. */

@@ -12,7 +12,6 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { InputError } from "./errors";
 import { loadProfile } from "./profile";
-import { scannerProblem } from "./pyyamlScanner";
 import { deviationLint, pyyamlLoad } from "./readiness";
 import { YamlProfileError } from "./yamlProfile";
 
@@ -27,7 +26,7 @@ function withFile(text: string, read: (path: string) => void): void {
   }
 }
 
-test("the scanner refuses what PyYAML's scanner refuses", () => {
+test("forms PyYAML's scanner refuses are refused", () => {
   for (const text of [
     "a: [a?, b]\n",
     "a: [a ?, b]\n",
@@ -49,20 +48,6 @@ test("the scanner refuses what PyYAML's scanner refuses", () => {
     "a: {a: 1, : 2}\n",
   ]) {
     assert.throws(() => pyyamlLoad(text), Error, text);
-  }
-  for (const text of [
-    "a: a?\n",
-    'a: ["a?", b]\n',
-    "a: [? a]\n",
-    'a: "b\tc"\n',
-    "a: b # c\td\n",
-    "a: |\n  x\ty\n",
-    "a: [b, c]\n",
-    "a: {b: c,\n  d: e}\n",
-    "? [a, b]\n: c\n",
-    "a: &x {k: v}\nb: *x\n",
-  ]) {
-    assert.equal(scannerProblem(text), null, text);
   }
 });
 
@@ -137,8 +122,7 @@ test("a flow `?` or `:` starting a token is outside the YAML profile (18.184u)",
 
 test("a long flow list is read, never a stack overflow", () => {
   const items = Array.from({ length: 200000 }, (_, i) => i);
-  assert.equal(scannerProblem(`a: [${items.join(",")}]\n`), null);
-  assert.equal(scannerProblem(`%${"X".repeat(300000)} a\n---\nb: 1\n`), null);
+  assert.equal((pyyamlLoad(`a: [${items.join(",")}]\n`) as { a: unknown[] }).a.length, 200000);
 });
 
 test("an explicit merge key and a later one are outside the YAML profile (18.184u)", () => {

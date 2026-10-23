@@ -22,17 +22,12 @@ class UntrustedYamlFormsTest {
     }
 
     @Test
-    void theScannerRefusesWhatPyyamlsScannerRefuses() {
+    void formsPyyamlsScannerRefusesAreRefused() {
         for (String text : List.of(
                 "a: [a?, b]\n", "a: [a ?, b]\n", "a: {a?: 1}\n", "a: [a ?]\n", "a: [a?b]\n", "a: [lookup ?,\n \"yes\"]\n",
                 "a: b\t\n", "a: 'b'\t\n", "a: [b]\t\n", "a\t: b\n", "a:\tb\n", "-\ta\n", "a: |\t\n  x\n",
                 "a: [b,\tc]\n", "a: b\t# c\n", "a: {: 1}\n", "a: [: 1]\n", "a: {a: 1, : 2}\n")) {
             assertThrows(IllegalArgumentException.class, () -> Readiness.composePyyaml(text), text);
-        }
-        for (String text : List.of(
-                "a: a?\n", "a: [\"a?\", b]\n", "a: [? a]\n", "a: \"b\tc\"\n", "a: b # c\td\n", "a: |\n  x\ty\n",
-                "a: [b, c]\n", "a: {b: c,\n  d: e}\n", "? [a, b]\n: c\n", "a: &x {k: v}\nb: *x\n")) {
-            assertEquals(null, PyyamlScanner.problem(text), text);
         }
     }
 

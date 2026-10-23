@@ -17,7 +17,6 @@ import {
 } from "js-yaml";
 import { InputError } from "./errors";
 import { jsonlLines, parseReportJson } from "./json";
-import { pyyamlScan } from "./pyyamlScanner";
 import { byteCompare, decodeUtf8Strict, joinPath, normalizePosixPath, pyRepr, pyStr } from "./util";
 import { MAX_DEPTH, ProfileViolation, YamlProfileError, profileViolation } from "./yamlProfile";
 
@@ -909,13 +908,8 @@ export function pyyamlLoad(text: string): unknown {
   if (found !== null) {
     throw new YamlProfileError(found);
   }
-  const { problem, text: keyed } = pyyamlScan(text);
-  if (problem !== null) {
-    // js-yaml reads tabs and flow forms PyYAML's scanner refuses (18.184p).
-    throw new YAMLException(problem);
-  }
   const composer = new PyyamlComposer();
-  const data = yamlLoad(keyed, {
+  const data = yamlLoad(text, {
     schema: PYYAML_SAFE_SCHEMA,
     // Repeated keys are PyyamlComposer's to decide, by the keys' text, not js-yaml's.
     json: true,
@@ -923,9 +917,8 @@ export function pyyamlLoad(text: string): unknown {
     ...YAML_DEPTH_OPTIONS,
   });
   if (composer.firstRepeatedKey >= 0) {
-    // pyyamlScan only adds spaces inside lines, so the line is the same in `text`.
     throw new YamlProfileError(
-      new ProfileViolation("duplicate_key", pyyamlLineAt(keyed, composer.firstRepeatedKey)),
+      new ProfileViolation("duplicate_key", pyyamlLineAt(text, composer.firstRepeatedKey)),
     );
   }
   if (holdsMergeValue(data)) {
