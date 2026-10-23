@@ -14,6 +14,7 @@ import {
   lstatSync,
   openSync,
   readFileSync,
+  readSync,
   readlinkSync,
   realpathSync,
   statSync,
@@ -184,6 +185,10 @@ export function permissionDenied(path: string): boolean {
   return false;
 }
 
+/** The per-file ceiling on a manifest member (SPEC R12), decided from the stat before the member is read, as
+ * Python's `DEFAULT_MAX_MANIFEST_FILE_BYTES`. A field, not a constant, so unit tests can lower it (18.184r). */
+export const bundleLimits = { maxManifestFileBytes: 512 * 1024 * 1024 };
+
 /** Test seams for 18.184f: `afterConfine` runs once a member's confinement check has passed and before it is
  * opened, `afterCheck` once the open file has been checked again and before it is read. */
 export const bundleReadHooks: {
@@ -204,9 +209,10 @@ function changedWhileRead(rel: string): InputError {
  * once that file is open, `rel` still resolves inside `root` to the very file opened (same device and inode). A
  * member swapped between the confinement check and the read (for a link outside the bundle, or for any other file)
  * is refused with `input.bundle_manifest_path` and its bytes are never used, as Python's `read_confined` (18.184f).
- * An error from opening or reading propagates for the caller to report.
+ * At most `limit + 1` bytes are read when `limit` is set, so the caller can refuse an oversize file. An error from
+ * opening or reading propagates for the caller to report.
  */
-export function readConfined(root: string, rel: string, member: string): Buffer {
+export function readConfined(root: string, rel: string, member: string, limit?: number): Buffer {
   bundleReadHooks.afterConfine?.(rel, member);
   const fd = openSync(member, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
   try {
@@ -225,10 +231,26 @@ export function readConfined(root: string, rel: string, member: string): Buffer 
       throw changedWhileRead(rel);
     }
     bundleReadHooks.afterCheck?.(rel, member);
-    return readFileSync(fd);
+    return limit === undefined ? readFileSync(fd) : readAtMost(fd, limit + 1);
   } finally {
     closeSync(fd);
   }
+}
+
+/** Up to `max` bytes from the open file `fd`, stopping at end of file. */
+function readAtMost(fd: number, max: number): Buffer {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  while (total < max) {
+    const chunk = Buffer.alloc(Math.min(max - total, 1 << 20));
+    const n = readSync(fd, chunk, 0, chunk.length, null);
+    if (n === 0) {
+      break;
+    }
+    chunks.push(n === chunk.length ? chunk : chunk.subarray(0, n));
+    total += n;
+  }
+  return Buffer.concat(chunks, total);
 }
 
 function safeMember(root: string, rel: string): string {
@@ -354,14 +376,40 @@ export function loadBundle(bundleDir: string): Bundle {
         "regenerate the bundle so its files match the manifest.",
       );
     }
-    let data: Buffer;
+    // Python's order: the size from the stat, then a bounded read, so a member over the limit is never read.
+    const limit = bundleLimits.maxManifestFileBytes;
+    let size: number;
     try {
-      data = readConfined(bundleDir, rel, member);
+      size = statSync(member).size;
     } catch (err) {
       if (isPermissionError(err)) {
         throw bundleUnreadable(bundleDir, rel);
       }
-      throw err;
+      throw new InputError(
+        "input.bundle_manifest_mismatch",
+        `manifest lists ${rel}, which could not be safely accessed.`,
+        "regenerate the bundle so its files match the manifest.",
+      );
+    }
+    let data = Buffer.alloc(0);
+    if (size <= limit) {
+      try {
+        data = readConfined(bundleDir, rel, member, limit);
+      } catch (err) {
+        if (isPermissionError(err)) {
+          throw bundleUnreadable(bundleDir, rel);
+        }
+        throw err;
+      }
+      // A file that grew past the limit after the stat is refused the same way.
+      size = Math.max(size, data.length);
+    }
+    if (size > limit) {
+      throw new InputError(
+        "input.bundle_manifest_file_too_large",
+        `${rel} is ${size} bytes, over the ${limit}-byte per-file limit.`,
+        "split large evidence into more, smaller files, or reference bulk content by an opaque locator instead of inlining it (SPEC R12).",
+      );
     }
     if (createHash("sha256").update(data).digest("hex") !== normaliseDigest(entry.sha256)) {
       throw new InputError(

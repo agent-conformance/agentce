@@ -18,6 +18,8 @@ from typing import Any
 
 import pytest
 
+from agentce import bundle as bundle_module
+
 from agentce import safe_yaml
 from agentce.bundle import confine_to_root, load_bundle
 from agentce.coverage import _denominator_counts
@@ -121,6 +123,68 @@ def test_manifest_file_under_the_size_ceiling_loads(
 
     bundle = load_bundle(root)
     assert bundle.event_files == (small,)
+
+
+def test_manifest_file_exactly_at_the_size_ceiling_loads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Census odd-inputs line 91 (18.184r): at the limit is not over it.
+    monkeypatch.setattr("agentce.bundle.DEFAULT_MAX_MANIFEST_FILE_BYTES", 8)
+    root = tmp_path / "bundle"
+    (root / "events").mkdir(parents=True)
+    member = root / "events" / "a.jsonl"
+    member.write_text("0123456\n", encoding="utf-8")  # exactly 8 bytes
+    _write_manifest(root, [{"path": "events/a.jsonl", "sha256": _sha256_hex(member)}])
+
+    assert load_bundle(root).event_files == (member,)
+
+
+def test_manifest_file_over_the_size_ceiling_is_never_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("agentce.bundle.DEFAULT_MAX_MANIFEST_FILE_BYTES", 8)
+    root = tmp_path / "bundle"
+    (root / "events").mkdir(parents=True)
+    big = root / "events" / "big.jsonl"
+    big.write_text("0123456789\n", encoding="utf-8")
+    _write_manifest(root, [{"path": "events/big.jsonl", "sha256": _sha256_hex(big)}])
+    read: list[str] = []
+    real = bundle_module.read_confined
+
+    def spy(root_: Path, rel: str, member: Path, limit: int | None = None) -> bytes:
+        read.append(rel)
+        return real(root_, rel, member, limit)
+
+    monkeypatch.setattr(bundle_module, "read_confined", spy)
+    with pytest.raises(InputError) as excinfo:
+        load_bundle(root)
+    assert excinfo.value.key == "input.bundle_manifest_file_too_large"
+    assert str(excinfo.value).endswith(
+        "events/big.jsonl is 11 bytes, over the 8-byte per-file limit."
+    )
+    assert read == ["manifest.json"]
+
+
+def test_manifest_file_that_grows_past_the_ceiling_during_the_read_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("agentce.bundle.DEFAULT_MAX_MANIFEST_FILE_BYTES", 8)
+    root = tmp_path / "bundle"
+    (root / "events").mkdir(parents=True)
+    member = root / "events" / "a.jsonl"
+    member.write_text("0123\n", encoding="utf-8")
+    _write_manifest(root, [{"path": "events/a.jsonl", "sha256": _sha256_hex(member)}])
+    real = bundle_module.read_confined
+
+    def grow(root_: Path, rel: str, path: Path, limit: int | None = None) -> bytes:
+        if rel == "events/a.jsonl":
+            path.write_text("0123456789abcdef\n", encoding="utf-8")
+        return real(root_, rel, path, limit)
+
+    monkeypatch.setattr(bundle_module, "read_confined", grow)
+    with pytest.raises(InputError) as excinfo:
+        load_bundle(root)
+    assert excinfo.value.key == "input.bundle_manifest_file_too_large"
 
 
 # --- YAML hazards: a disallowed tag, or a pathologically deep structure -------------------------

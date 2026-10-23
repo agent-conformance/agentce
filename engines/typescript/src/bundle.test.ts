@@ -24,7 +24,14 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { bundleReadHooks, confineToRoot, loadBundle, readConfined, safeIsFile } from "./bundle";
+import {
+  bundleLimits,
+  bundleReadHooks,
+  confineToRoot,
+  loadBundle,
+  readConfined,
+  safeIsFile,
+} from "./bundle";
 import { AgentceError } from "./errors";
 import { ingest } from "./ingest";
 
@@ -388,5 +395,78 @@ test("manifest.json unreadable at the read is input.bundle_unreadable, never not
       bundleReadHooks.afterConfine = undefined;
       chmodSync(join(root, "manifest.json"), 0o644);
     }
+  });
+});
+
+/** Run `body` with the per-file limit lowered to `limit` bytes and the read seams cleared afterwards. */
+function withLimit(limit: number, body: () => void): void {
+  const saved = bundleLimits.maxManifestFileBytes;
+  bundleLimits.maxManifestFileBytes = limit;
+  try {
+    body();
+  } finally {
+    bundleLimits.maxManifestFileBytes = saved;
+    bundleReadHooks.afterConfine = undefined;
+  }
+}
+
+function sizedBundle(dir: string, contents: string): string {
+  const root = join(dir, "b");
+  mkdirSync(join(root, "events"), { recursive: true });
+  writeFileSync(join(root, "events", "a.jsonl"), contents, "utf-8");
+  writeManifest(root, [{ path: "events/a.jsonl", sha256: sha256File(contents) }]);
+  return root;
+}
+
+test("a manifest member exactly at the per-file limit is read", () => {
+  // Census odd-inputs line 91 (18.184r): Python's order, the size from the stat, then a bounded read.
+  withTempDir((dir) => {
+    const root = sizedBundle(dir, "0123456\n");
+    withLimit(8, () => {
+      assert.equal(loadBundle(root).eventFiles.length, 1);
+    });
+  });
+});
+
+test("a manifest member over the per-file limit is refused from the stat, never read", () => {
+  withTempDir((dir) => {
+    const root = sizedBundle(dir, "0123456789\n");
+    const read: string[] = [];
+    let message = "";
+    withLimit(8, () => {
+      bundleReadHooks.afterConfine = (rel) => {
+        read.push(rel);
+      };
+      assert.equal(
+        inputErrorKey(() => {
+          try {
+            loadBundle(root);
+          } catch (exc) {
+            message = String((exc as Error).message);
+            throw exc;
+          }
+        }),
+        "input.bundle_manifest_file_too_large",
+      );
+    });
+    assert.deepEqual(read, ["manifest.json"]);
+    assert.match(message, /events\/a\.jsonl is 11 bytes, over the 8-byte per-file limit\.$/);
+  });
+});
+
+test("a manifest member that grows past the per-file limit during the read is refused with the size key", () => {
+  withTempDir((dir) => {
+    const root = sizedBundle(dir, "0123\n");
+    withLimit(8, () => {
+      bundleReadHooks.afterConfine = (rel, member) => {
+        if (rel === "events/a.jsonl") {
+          writeFileSync(member, "0123456789abcdef\n", "utf-8");
+        }
+      };
+      assert.equal(
+        inputErrorKey(() => loadBundle(root)),
+        "input.bundle_manifest_file_too_large",
+      );
+    });
   });
 });

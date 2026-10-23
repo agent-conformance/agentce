@@ -246,6 +246,12 @@ public final class Bundle {
     static BiConsumer<String, Path> afterConfine;
     static BiConsumer<String, Path> afterCheck;
 
+    /**
+     * The per-file ceiling on a manifest member (SPEC R12), decided from the stat before the member is read, as
+     * Python's {@code DEFAULT_MAX_MANIFEST_FILE_BYTES}. A field, not a constant, so unit tests can lower it (18.184r).
+     */
+    static long maxManifestFileBytes = 512L * 1024 * 1024;
+
     private static InputError changedWhileRead(String rel) {
         return new InputError(
                 "input.bundle_manifest_path",
@@ -264,6 +270,14 @@ public final class Bundle {
      * {@link IOException} from opening or reading ({@link AccessDeniedException} included) propagates.
      */
     static byte[] readConfined(Path root, String rel, Path member) throws IOException {
+        return readConfined(root, rel, member, -1);
+    }
+
+    /**
+     * As {@link #readConfined(Path, String, Path)}, reading at most {@code limit + 1} bytes when {@code limit} is
+     * not negative, so the caller can refuse an oversize file.
+     */
+    static byte[] readConfined(Path root, String rel, Path member, long limit) throws IOException {
         if (afterConfine != null) {
             afterConfine.accept(rel, member);
         }
@@ -290,7 +304,9 @@ public final class Bundle {
             if (afterCheck != null) {
                 afterCheck.accept(rel, member);
             }
-            data = Channels.newInputStream(channel).readAllBytes();
+            data = limit < 0
+                    ? Channels.newInputStream(channel).readAllBytes()
+                    : Channels.newInputStream(channel).readNBytes((int) Math.min(limit + 1, Integer.MAX_VALUE - 8));
         } catch (AccessDeniedException e) {
             throw e;
         } catch (IOException e) {
@@ -414,16 +430,40 @@ public final class Bundle {
                         "manifest lists " + rel + ", which is missing from the bundle.",
                         "regenerate the bundle so its files match the manifest.");
             }
-            if (cannotOpen(member)) {
-                throw bundleUnreadable(bundleDir, rel);
-            }
-            byte[] data;
+            // Python's order: the size from the stat, then a bounded read, so a member over the limit is never read.
+            long limit = maxManifestFileBytes;
+            long size;
             try {
-                data = readConfined(bundleDir, rel, member);
+                size = Files.size(member);
             } catch (AccessDeniedException e) {
                 throw bundleUnreadable(bundleDir, rel);
             } catch (IOException e) {
-                throw new IllegalStateException("cannot read " + member + ": " + e.getMessage(), e);
+                throw new InputError(
+                        "input.bundle_manifest_mismatch",
+                        "manifest lists " + rel + ", which could not be safely accessed.",
+                        "regenerate the bundle so its files match the manifest.");
+            }
+            byte[] data = new byte[0];
+            if (size <= limit) {
+                if (cannotOpen(member)) {
+                    throw bundleUnreadable(bundleDir, rel);
+                }
+                try {
+                    data = readConfined(bundleDir, rel, member, limit);
+                } catch (AccessDeniedException e) {
+                    throw bundleUnreadable(bundleDir, rel);
+                } catch (IOException e) {
+                    throw new IllegalStateException("cannot read " + member + ": " + e.getMessage(), e);
+                }
+                // A file that grew past the limit after the stat is refused the same way.
+                size = Math.max(size, data.length);
+            }
+            if (size > limit) {
+                throw new InputError(
+                        "input.bundle_manifest_file_too_large",
+                        rel + " is " + size + " bytes, over the " + limit + "-byte per-file limit.",
+                        "split large evidence into more, smaller files, or reference bulk content by an opaque "
+                                + "locator instead of inlining it (SPEC R12).");
             }
             if (!Canonical.sha256Hex(data).equals(normaliseDigest(entry.get("sha256").asText()))) {
                 throw new InputError(
