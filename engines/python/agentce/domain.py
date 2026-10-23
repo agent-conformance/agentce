@@ -190,7 +190,6 @@ class DomainBinding:
                 path,
                 key="input.domain_binding_invalid",
                 what="the domain binding",
-                unique_keys=True,
             )
             or {}
         )

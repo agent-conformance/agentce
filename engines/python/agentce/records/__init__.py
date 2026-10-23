@@ -32,6 +32,7 @@ from ..errors import InputError
 from ..outputs import OUT_DIR, UNREACHABLE, write_file
 from ..ingest import _max_nesting
 from ..profile import Profile
+from ..yaml_profile import scalar_rule
 from . import otel_genai
 
 #: File suffixes read as trace exports: one OTLP/JSON document per ``.json`` file, one per line in
@@ -151,7 +152,7 @@ class ScannedRecords:
                     out_dir / DERIVED_PROFILE_FILE,
                     "# The default profile `agentce assess <folder>` derived from the records it found.\n"
                     "# Edit it (declare your agents, oversight and catalogs) and pass it back with --profile.\n"
-                    + yaml.safe_dump(self.profile, sort_keys=False),
+                    + yaml.dump(self.profile, Dumper=_ProfileDumper, sort_keys=False),
                 )
         except OSError as exc:
             raise InputError(
@@ -160,6 +161,23 @@ class ScannedRecords:
                 "choose a writable --out directory.",
             ) from exc
         return root
+
+
+class _ProfileDumper(yaml.SafeDumper):
+    """``yaml.safe_dump`` written inside the SPEC 8.7 YAML profile the engines read it back under (18.184u): no
+    ``&id001`` anchor for a value met twice, and text a YAML 1.1 reader would not keep as text (``y``, ``1e3``,
+    ``0o12``) single-quoted."""
+
+    def ignore_aliases(self, data: Any) -> bool:
+        return True
+
+    def represent_str(self, data: str) -> yaml.ScalarNode:
+        if scalar_rule(data) is not None:
+            return self.represent_scalar("tag:yaml.org,2002:str", data, style="'")
+        return super().represent_str(data)
+
+
+_ProfileDumper.add_representer(str, _ProfileDumper.represent_str)
 
 
 NO_GENAI_SPANS = "spans found, but none is a GenAI operation the adapter maps"

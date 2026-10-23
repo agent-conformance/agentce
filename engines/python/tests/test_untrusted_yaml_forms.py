@@ -14,11 +14,13 @@ import yaml
 
 from agentce.safe_yaml import (
     UNICODE_15_DIGITS,
+    YamlProfileError,
     _PermissiveTimestampSafeLoader,
-    _UniqueKeySafeLoader,
+    load_catalog_yaml,
 )
 
-_LOADERS = [_PermissiveTimestampSafeLoader, _UniqueKeySafeLoader]
+# The loader below the SPEC 8.7 profile check; the check itself refuses every tag and merge key first (18.184u).
+_LOADERS = [_PermissiveTimestampSafeLoader]
 
 _REPO = Path(__file__).resolve().parents[3]
 
@@ -71,11 +73,12 @@ def test_a_digit_newer_than_unicode_15_is_refused_on_every_python(
         yaml.load(text, Loader=loader)
 
 
-def test_two_merges_read_last_wins_where_repeated_keys_are_allowed() -> None:
-    text = "{<<: {a: 1}, <<: {a: 2}}\n"
-    assert yaml.load(text, Loader=_PermissiveTimestampSafeLoader) == {"a": 2}
-    with pytest.raises(yaml.constructor.ConstructorError, match="'<<' twice"):
-        yaml.load(text, Loader=_UniqueKeySafeLoader)
+@pytest.mark.parametrize(
+    "text", ['a: !!int "10"\n', "a: !!set {x: null}\n", "{<<: {a: 1}, <<: {a: 2}}\n"]
+)
+def test_the_profile_refuses_tags_and_merge_keys_before_the_loader(text: str) -> None:
+    with pytest.raises(YamlProfileError):
+        load_catalog_yaml(text)
 
 
 def _decimal_ranges() -> list[tuple[int, int]]:

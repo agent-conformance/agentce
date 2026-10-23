@@ -10,10 +10,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
 
 from . import signing
 from .catalog import load_catalog
+from .safe_yaml import load_catalog_yaml
 
 MATRIX_FILE = "automation-coverage.md"
 _MODES = ("automated", "semi-automated", "manual")
@@ -21,7 +21,8 @@ _MODES = ("automated", "semi-automated", "manual")
 
 def _family_order(catalog_dir: Path, families_seen: list[str]) -> list[str]:
     meta = (
-        yaml.safe_load((catalog_dir / "catalog.yaml").read_text(encoding="utf-8")) or {}
+        load_catalog_yaml((catalog_dir / "catalog.yaml").read_text(encoding="utf-8"))
+        or {}
     )
     declared = [str(f) for f in meta.get("families", [])]
     ordered = [f for f in declared if f in families_seen]

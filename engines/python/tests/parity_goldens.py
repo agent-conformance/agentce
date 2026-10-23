@@ -340,7 +340,6 @@ def yaml_node_forms_golden() -> list[dict[str, Any]]:
                         path,
                         key="input.domain_binding_invalid",
                         what="the domain binding",
-                        unique_keys=True,
                     )
                 )
             except InputError as error:

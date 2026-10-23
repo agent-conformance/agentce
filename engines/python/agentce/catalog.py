@@ -32,7 +32,7 @@ from .errors import InputError, catalog_file_unloadable, catalog_unreadable
 from .graph import build_graph
 from .i18n_format import format_message
 from .psp import PropertyShape, Shape, parse_shapes_ttl
-from .safe_yaml import load_catalog_yaml
+from .safe_yaml import YamlProfileError, load_catalog_yaml
 from .source_class import SOURCE_CLASS_FROM, SOURCE_CLASS_RANK
 from .structural import evaluate_control, evaluate_shape
 
@@ -330,12 +330,16 @@ def _text(files: signing.CatalogFiles, rel: str) -> str:
 
 
 def _yaml_mapping(files: signing.CatalogFiles, rel: str) -> dict[str, Any]:
-    """``catalog.yaml`` or a control file as one YAML mapping, read as `load_untrusted_yaml` reads with
-    ``unique_keys`` (18.184i): a key written twice, YAML the engine refuses to load, or anything but one mapping (an
+    """``catalog.yaml`` or a control file as one YAML mapping, read as `load_untrusted_yaml` reads it, under the
+    SPEC 8.7 YAML profile (18.184i, 18.184u): a key written twice, YAML the engine refuses to load, or anything but one mapping (an
     empty file included) is refused naming the file, never read with its last value, as nothing, or skipped."""
     text = _text(files, rel)
     try:
         data = load_catalog_yaml(text)
+    except YamlProfileError as exc:
+        raise catalog_file_unloadable(
+            files.root, rel, exc.violation.message(), f"{exc.violation.hint}."
+        ) from exc
     except yaml.YAMLError as exc:
         raise catalog_file_unloadable(
             files.root, rel, f"is not YAML the engine can load: {exc}"

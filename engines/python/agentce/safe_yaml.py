@@ -43,6 +43,7 @@ from typing import Any
 import yaml
 
 from .errors import InputError
+from .yaml_profile import ProfileViolation, duplicate_key_line, profile_violation
 
 
 _MERGE_TAG = "tag:yaml.org,2002:merge"
@@ -100,7 +101,6 @@ class _PermissiveTimestampSafeLoader(yaml.SafeLoader):
             for child in node.value:
                 self._check_tree(child, visited)
         elif isinstance(node, yaml.MappingNode):
-            self._refuse_repeated_keys(node)
             for key_node, value_node in node.value:
                 if key_node.tag == _MERGE_TAG:
                     for source in _merge_sources(value_node):
@@ -108,45 +108,6 @@ class _PermissiveTimestampSafeLoader(yaml.SafeLoader):
                             self.construct_undefined(source)
                 self._check_tree(key_node, visited)
                 self._check_tree(value_node, visited)
-
-    def _refuse_repeated_keys(self, node: yaml.MappingNode) -> None:
-        """A hook for a mapping's keys; this loader keeps the last value of a repeated key, as ``SafeLoader`` does."""
-
-
-class _UniqueKeySafeLoader(_PermissiveTimestampSafeLoader):
-    """The loader above, refusing a mapping that writes one key twice, where ``SafeLoader`` keeps the last value. A
-    key a ``<<`` merge brings in may still be written again, as PyYAML's ``flatten_mapping`` allows; ``<<`` itself is a
-    key, so two merge keys in one mapping are refused too (the ports cannot all follow PyYAML's last-merge-wins). The
-    whole node tree is checked before anything is constructed, merge sources included (``flatten_mapping`` merges a
-    source without constructing it, and adds the merged keys to it), as Java's ``checkTree`` does."""
-
-    def _refuse_repeated_keys(self, node: yaml.MappingNode) -> None:
-        seen: set[Any] = set()
-        merged = False
-        for key_node, _ in node.value:
-            if key_node.tag == _MERGE_TAG:
-                if merged:
-                    raise yaml.constructor.ConstructorError(
-                        "while constructing a mapping",
-                        node.start_mark,
-                        "found the merge key '<<' twice",
-                        key_node.start_mark,
-                    )
-                merged = True
-                continue
-            key = self.construct_object(key_node)
-            try:
-                repeated = key in seen
-            except TypeError:
-                return  # an unhashable key: SafeLoader's own construct_mapping refuses it
-            if repeated:
-                raise yaml.constructor.ConstructorError(
-                    "while constructing a mapping",
-                    node.start_mark,
-                    f"found the key {key!r} twice",
-                    key_node.start_mark,
-                )
-            seen.add(key)
 
 
 def _construction_error(
@@ -310,25 +271,48 @@ def _pythonize_timestamp(raw: str) -> str:
     return out
 
 
+class YamlProfileError(Exception):
+    """A YAML file outside the SPEC 8.7 profile; the caller refuses it under the file role's ``input.*`` key."""
+
+    def __init__(self, violation: ProfileViolation) -> None:
+        super().__init__(violation.message())
+        self.violation = violation
+
+
+def _load(text: str) -> Any:
+    """``text`` checked against the YAML profile, composed, checked for repeated keys, then constructed."""
+    found = profile_violation(text)
+    if found is not None:
+        raise YamlProfileError(found)
+    loader = _PermissiveTimestampSafeLoader(text)
+    try:
+        node = loader.get_single_node()
+        line = duplicate_key_line(node)
+        if line is not None:
+            raise YamlProfileError(ProfileViolation("duplicate_key", line))
+        return loader.construct_document(node) if node is not None else None
+    finally:
+        loader.dispose()
+
+
 def load_catalog_yaml(text: str) -> Any:
-    """A catalog file's ``text`` read as :func:`load_untrusted_yaml` reads a file with ``unique_keys``; its
+    """A catalog file's ``text`` read as :func:`load_untrusted_yaml` reads it; its :class:`YamlProfileError`,
     ``yaml.YAMLError`` and ``RecursionError`` are the caller's to report."""
-    return yaml.load(text, Loader=_UniqueKeySafeLoader)
+    return _load(text)
 
 
-def load_untrusted_yaml(
-    path: Path, *, key: str, what: str, unique_keys: bool = False
-) -> Any:
-    """Load and return the YAML at ``path``, refusing hazards under the ``input.*`` ``key``; with ``unique_keys``,
-    a mapping that writes one key twice is refused too."""
+def load_untrusted_yaml(path: Path, *, key: str, what: str) -> Any:
+    """Load and return the YAML at ``path`` under the SPEC 8.7 profile, refusing hazards under the ``input.*``
+    ``key``."""
     try:
         text = path.read_text(encoding="utf-8")
-        return yaml.load(
-            text,
-            Loader=_UniqueKeySafeLoader
-            if unique_keys
-            else _PermissiveTimestampSafeLoader,
-        )
+        return _load(text)
+    except YamlProfileError as exc:
+        raise InputError(
+            key,
+            f"{what} at {str(path)!r} {exc.violation.message()}.",
+            f"{exc.violation.hint}.",
+        ) from exc
     except yaml.YAMLError as exc:
         raise InputError(
             key,
