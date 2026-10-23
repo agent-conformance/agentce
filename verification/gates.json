@@ -1337,8 +1337,8 @@
         {
           "description": "the outer, signed bundle_digest equality check at commands/__init__.py:769 is short-circuited off, so a tampered bundle whose per-file hashes were recomputed to match (passing load_bundle's own check) would be reported reproduced instead of refused -- exactly the gap three separate verifier rounds on item 18.8 found no test caught (mutation M8); disabling it fails the branch-coverage gate's own test_verify_report_bundle_digest_self_consistent_edit_is_still_tampered",
           "file": "engines/python/agentce/commands/__init__.py",
-          "search": "    if bundle_digest is None or bundle_digest != inputs.get(\"bundle_digest\"):",
-          "replace": "    if False:  # bundle_digest is None or bundle_digest != inputs.get(\"bundle_digest\")"
+          "search": "    if loaded_bundle.digest != inputs.get(\"bundle_digest\"):",
+          "replace": "    if False:  # loaded_bundle.digest != inputs.get(\"bundle_digest\")"
         },
         {
           "description": "an untested branch is added to _verify_report and hidden from coverage.py with `# pragma: no cover` (probe C in the 18.8.R1 verdict); coverage.py would not count it as missing, so only the gate's pragma scan turns it RED",

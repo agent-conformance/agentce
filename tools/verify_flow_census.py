@@ -2074,10 +2074,16 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
     "agentce.integrity._signed_digests: signing.parse_verify_input(read_confined(bundle_root, sig_ref, path))": (
         _SOURCE_SIG
     ),
-    "agentce.safe_json.load_json: json.loads(text)": ("bundle-streams",),
-    "agentce.schema.evidence_schema: json.loads(text)": _PACKAGED,
+    "agentce.safe_json._string: json.loads(f'\"\\\\{e}\"')": "disposition: decodes one escape "
+    "sequence the JSON profile scanner already checked; reads no input bytes",
+    "agentce.safe_json._value: json.loads(text)": (
+        "bundle-streams",
+        "catalog-sig-file",
+        "release-file",
+        "bundle-manifest",
+    ),
     "agentce.schema.evidence_schema: resources.files('agentce.data')"
-    ".joinpath('agentce-evidence.schema.json').read_text()": _PACKAGED,
+    ".joinpath('agentce-evidence.schema.json').read_bytes()": _PACKAGED,
     "agentce.signing._mode_matches: os.stat(path)": (
         "manifest-file",
         "signatures-file",
@@ -2109,11 +2115,6 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
         "report-trust-root",
         "signer-trust-root",
     ),
-    "agentce.signing.parse_untrusted_json: json.loads(raw.decode('utf-8'))": (
-        "catalog-sig-file",
-        "release-file",
-        "bundle-manifest",
-    ),
     "agentce.signing.parse_verify_input: parse_untrusted_json(raw)": (
         "catalog-sig-file",
         "catalog-statement",
@@ -2139,10 +2140,7 @@ INVENTORY_READS: dict[str, tuple[str, ...] | str] = {
         "catalog-statement",
         "release-statement",
     ),
-    "agentce.signing.vendored_trust: json.loads(vendored_trust_path().read_text('utf-8'))": (
-        _PACKAGED
-    ),
-    "agentce.signing.vendored_trust: vendored_trust_path().read_text('utf-8')": _PACKAGED,
+    "agentce.signing.vendored_trust: vendored_trust_path().read_bytes()": _PACKAGED,
     "agentce.signing.verify_catalog_directory: read_verify_input(sig_path)": (
         "catalog-sig-file",
     ),

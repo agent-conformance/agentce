@@ -399,7 +399,7 @@ def _read_input_json(raw: str | None, path: Path, *, key: str, what: str) -> Any
         ) from exc
 
 
-def _require_integer_fields(raw: str | None, data: Any) -> None:
+def _require_integer_fields(raw: str | None, data: Any, *, key: str) -> None:
     """Each assertion's ``rung`` and ``population`` counts, where present, are JSON integers (SPEC 8.7
     ``integer_field_float_form``): ``1.5``, ``1e20`` or ``true`` is refused, never truncated."""
     for i, item in enumerate(data if isinstance(data, list) else []):
@@ -414,7 +414,7 @@ def _require_integer_fields(raw: str | None, data: Any) -> None:
         for name, value in fields:
             if not is_json_integer(value):
                 raise InputError(
-                    "input.from_unreadable",
+                    f"input.{key}_unreadable",
                     f"the assertions file {raw!r} is outside the JSON profile: "
                     f"integer_field_float_form at [{i}].{name} (SPEC 8.7).",
                     "re-run the command that wrote it, or correct the JSON at that line.",
@@ -1017,12 +1017,8 @@ def _verify_report(
             f"bundle/evidence does not load cleanly: {exc.cause}",
             "the packaged evidence was altered after signing; regenerate and re-sign the report.",
         ) from exc
-    try:
-        bundle_digest = loaded_bundle.digest
-    except (CanonicalizationError, RecursionError):
-        # A manifest no digest can be computed for matches no recorded one.
-        bundle_digest = None
-    if bundle_digest is None or bundle_digest != inputs.get("bundle_digest"):
+    # load_bundle refuses a manifest that cannot be put in canonical form (SPEC 8.1), so it has a digest.
+    if loaded_bundle.digest != inputs.get("bundle_digest"):
         raise InputError(
             "verify.report_evidence_tampered",
             "bundle/evidence's digest does not match manifest.json's bundle_digest.",
@@ -2463,7 +2459,7 @@ def cmd_report(ns: argparse.Namespace) -> CommandResult:
     loaded = _read_input_json(
         source_raw, source, key="from", what="the assertions file"
     )
-    _require_integer_fields(source_raw, loaded)
+    _require_integer_fields(source_raw, loaded, key="from")
     assertions = [Assertion.from_json(a) for a in loaded]
     counts = aggregate(assertions)
     language = language or "en"
