@@ -9,6 +9,10 @@ fails if a gate in `gates.json` is not named in this file.
   cross-engine readiness, sign and report --validate agreement checks from source in its `report-file-parity` job.
   The gate holds that job's wiring: phase pushes trigger it, nothing can skip or excuse it, and it finishes within
   20 minutes.
+- `VG-CATALOG-SHAPE-SAFETY`, `VG-I18N-ERROR-CATALOGUE`, `VG-I18N-ONE-CATALOGUE`, `VG-TRUST-ROOT-PARSE-PARITY` and
+  `VG-VERIFY-REFUSAL-KEYS` (18.184v, changed): each installs the TypeScript engine's dependencies before it runs a
+  TypeScript test file. They had relied on an earlier gate in the same CI shard to install them, so adding a gate
+  that moved `VG-CATALOG-SHAPE-SAFETY` to another shard failed it with `tsx` not found.
 
 ## 0.117.0
 

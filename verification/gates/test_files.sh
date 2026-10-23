@@ -11,6 +11,8 @@
 # at least one.
 ts_tests() {
   local file out count
+  # A gate's place in a CI shard decides which gates ran before it, so it installs what it runs.
+  (cd "$root/engines/typescript" && pnpm install --frozen-lockfile >/dev/null) || return 1
   for file in "$@"; do
     if [ ! -f "$root/engines/typescript/$file" ]; then
       echo "typescript test file $file is missing" >&2

@@ -45,7 +45,9 @@ if ! (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen pytest -q 
 fi
 
 echo "catalog-shape-safety: typescript unit tests"
-if ! (cd "$root/engines/typescript" && node --import tsx --test src/psp.test.ts); then
+# Install here: a gate's place in a CI shard decides which gates ran before it.
+if ! (cd "$root/engines/typescript" && pnpm install --frozen-lockfile >/dev/null \
+  && node --import tsx --test src/psp.test.ts); then
   echo "catalog-shape-safety: typescript's loadCatalog did not refuse sh:sparql or sh:js" >&2
   status=1
 fi
