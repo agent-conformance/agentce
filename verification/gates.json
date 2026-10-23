@@ -1386,8 +1386,8 @@
         {
           "description": "TypeScript's catalogue loader goes back to returning {} on any error, so a corrupt catalogue reads as empty strings",
           "file": "engines/typescript/src/messages.ts",
-          "search": "  const data: unknown = JSON.parse(text);",
-          "replace": "  let data: unknown;\n  try {\n    data = JSON.parse(text);\n  } catch {\n    return {};\n  }"
+          "search": "  const data: unknown = readBundled(text);",
+          "replace": "  let data: unknown;\n  try {\n    data = readBundled(text);\n  } catch {\n    return {};\n  }"
         },
         {
           "description": "Java's catalogue loader goes back to an empty map for a non-object top level",
@@ -1508,13 +1508,13 @@
         {
           "description": "Python parses the trust root with plain json.loads again, so a 10000-deep file is a raw RecursionError and NaN loads",
           "file": "engines/python/agentce/signing.py",
-          "search": "        data = parse_untrusted_json(path.read_bytes())\n    except OSError as exc:\n",
+          "search": "        data = parse_untrusted_json(path.read_bytes(), bom=\"ignore\")\n    except OSError as exc:\n",
           "replace": "        data = json.loads(path.read_text(\"utf-8\"))\n    except (OSError, RecursionError) as exc:\n"
         },
         {
           "description": "TypeScript parses the trust root with JSON.parse over a lossy text decode again, so a deep object or an invalid UTF-8 byte loads and the assessment runs",
           "file": "engines/typescript/src/verify.ts",
-          "search": "    data = readUntrustedJsonFile(path);\n  } catch (exc) {\n    if (exc instanceof JsonTooDeep) {",
+          "search": "    data = readUntrustedJsonFile(path, \"ignore\");\n  } catch (exc) {\n    if (exc instanceof JsonTooDeep) {",
           "replace": "    data = JSON.parse(readFileSync(path, \"utf-8\"));\n  } catch (exc) {\n    if (exc instanceof JsonTooDeep) {"
         },
         {
@@ -2820,7 +2820,7 @@
         {
           "description": "Python's runtime_drift.jsonl line check goes back to json.loads, which raises a bare ValueError the JSONError handler does not catch",
           "file": "engines/python/agentce/report.py",
-          "search": "            if not isinstance(load_report_json(line), dict):\n",
+          "search": "            if not isinstance(load_report_json(line, i), dict):\n",
           "replace": "            if not isinstance(json.loads(line), dict):\n"
         },
         {
