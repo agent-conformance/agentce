@@ -52,4 +52,11 @@ its emitted `oscal-ar.json` against the real, vendored NIST OSCAL 1.1.2 schema (
 Python engine, `agentce.report.validate_oscal_ar_nist`, reachable via `agentce report --validate` and
 guarded in CI by the `three-engine.yml` `validate-schemas` job.
 
+`json-cases.json` is the JSON profile's case table (SPEC 8.7): one row per rule and edge, read by every
+engine's tests and by `tools/json_parity_check.py`. Reader rows give the input as `text` or, for bytes JSON
+text cannot hold, `hex`, with `mode` (`json` or `jsonl`), `bom` (`ignore` for an input, `refuse` for a file
+an engine wrote) and the expected `canonical` value or refused `line`. `number_rendering` rows give a
+lexeme and the bytes every engine prints for it; `compare_by_value` and `compare_across_types` rows give
+two JSON texts and whether they are equal.
+
 Nothing here opens a network connection or uses a learned component.
