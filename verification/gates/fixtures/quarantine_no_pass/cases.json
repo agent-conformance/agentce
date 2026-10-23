@@ -1319,6 +1319,111 @@
         ]
       }
     },
+    "ovs07-only-target-no-canonical-form": {
+      "fixture": "approval_outcome",
+      "subject": "spiffe://corp/agents/approval-outcome",
+      "control": "OVS-07",
+      "events": [
+        {
+          "specversion": "1.0",
+          "id": "d1",
+          "source": "urn:src:self_report",
+          "subject": "spiffe://corp/agents/approval-outcome",
+          "type": "org.agent-conformance.evidence.Decision.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "self_report",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "Decision",
+            "agent": {
+              "id": "spiffe://corp/agents/approval-outcome"
+            },
+            "decision_type": "dom:CreditDecision",
+            "acted_for": [
+              "urn:example:service:orchestrator",
+              "urn:example:person:owner-1"
+            ]
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "s1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/approval-outcome",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            },
+            "environment": "idp-login",
+            "principal": {
+              "id": "u2",
+              "kind": "human"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "s2",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/approval-outcome",
+          "type": "org.agent-conformance.evidence.SessionStart.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "SessionStart",
+            "agent": {
+              "id": "urn:example:service:identity-provider"
+            },
+            "environment": "idp-login",
+            "principal": {
+              "id": "u3",
+              "kind": "human"
+            }
+          }
+        },
+        {
+          "specversion": "1.0",
+          "id": "v1",
+          "source": "urn:src:independent_system",
+          "subject": "spiffe://corp/agents/approval-outcome",
+          "type": "org.agent-conformance.evidence.Override.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "independent_system",
+          "time": "2026-01-10T00:00:00Z",
+          "data": {
+            "@context": 1.5,
+            "@type": "Override",
+            "refs": {
+              "decision": "agentce:event/d1"
+            },
+            "actor": {
+              "id": "u2",
+              "kind": "human"
+            },
+            "session_ref": "agentce:event/s1",
+            "original": "approve",
+            "replacement": "reject"
+          }
+        }
+      ],
+      "expected": {
+        "outcome": "insufficient_evidence",
+        "failing": [],
+        "quarantined": 1,
+        "exit": 2,
+        "withheld": false,
+        "evidence": []
+      }
+    },
     "ovs07-only-interrupt-schema-invalid": {
       "fixture": "approval_outcome",
       "subject": "spiffe://corp/agents/approval-outcome",

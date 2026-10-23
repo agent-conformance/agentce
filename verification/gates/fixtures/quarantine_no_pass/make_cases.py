@@ -300,6 +300,22 @@ case(
     quarantined=1,
     evidence=["v1"],
 )
+# A record with no canonical form (SPEC 6.7; census odd-inputs line 110, 18.184r): its schema-open @context holds
+# 1.5. Ingest quarantines it schema_invalid at admission, so OVS-07 reads insufficient_evidence, never conformant on
+# the two approvals and never internal.unexpected from the integrity stage. With no canonical form it has no digest
+# to name, as the lone-surrogate case above.
+no_form_override = copy.deepcopy(override)
+no_form_override["data"]["@context"] = 1.5
+case(
+    "ovs07-only-target-no-canonical-form",
+    "approval_outcome",
+    OVS,
+    "OVS-07",
+    [dec(), *TWO, no_form_override],
+    IE,
+    quarantined=1,
+    evidence=[],
+)
 bad_interrupt = ev(
     OVS,
     "x1",
