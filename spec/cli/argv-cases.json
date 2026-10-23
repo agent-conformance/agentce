@@ -1,0 +1,1521 @@
+{
+  "$comment": "SPEC 8.5 command-line grammar case table (18.184w). Every engine's tests and tools/argv_parity_check.py read it. In argv, {report} is a READY quickstart report directory, {space} a directory whose path holds a space, with cat/ (a copy of spec/catalogs/base/eu-ai-act) and an empty gaps.md. engines (absent: all three) lists the engines a case runs in; the rest give cli.not_implemented. scan holds the parsed values an accept case must read. unchanged names a directory a refused run must leave byte-identical.",
+  "version": "1",
+  "cases": [
+    {
+      "id": "top-json-before-version",
+      "rule": "global_flag_before_command",
+      "argv": [
+        "--json",
+        "version"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "top-quiet-before-readiness",
+      "rule": "global_flag_before_command",
+      "argv": [
+        "--quiet",
+        "readiness",
+        "{report}"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "top-debug-json-before-version",
+      "rule": "global_flag_before_command",
+      "argv": [
+        "--debug",
+        "--json",
+        "version"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "top-version-short",
+      "rule": "version_alone",
+      "argv": [
+        "-V"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "top-version-long",
+      "rule": "version_alone",
+      "argv": [
+        "--version"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "top-version-with-command",
+      "rule": "version_alone",
+      "argv": [
+        "--version",
+        "readiness"
+      ],
+      "exit": 3,
+      "key": "input.unknown_command"
+    },
+    {
+      "id": "top-unknown-command",
+      "rule": "unknown_command",
+      "argv": [
+        "nope"
+      ],
+      "exit": 3,
+      "key": "input.unknown_command"
+    },
+    {
+      "id": "top-unknown-command-after-json",
+      "rule": "unknown_command",
+      "argv": [
+        "--json",
+        "nope"
+      ],
+      "exit": 3,
+      "key": "input.unknown_command"
+    },
+    {
+      "id": "top-abbreviated-command",
+      "rule": "unknown_command",
+      "argv": [
+        "read",
+        "{report}"
+      ],
+      "exit": 3,
+      "key": "input.unknown_command"
+    },
+    {
+      "id": "conformance-unknown-action",
+      "rule": "unknown_command",
+      "argv": [
+        "conformance",
+        "nope"
+      ],
+      "exit": 3,
+      "key": "input.conformance_action"
+    },
+    {
+      "id": "catalog-unknown-action",
+      "rule": "unknown_command",
+      "argv": [
+        "catalog",
+        "nope"
+      ],
+      "exit": 3,
+      "key": "input.catalog_action",
+      "engines": [
+        "python"
+      ]
+    },
+    {
+      "id": "top-short-cluster",
+      "rule": "short_cluster",
+      "argv": [
+        "-jq",
+        "version"
+      ],
+      "exit": 3,
+      "key": "input.unknown_command"
+    },
+    {
+      "id": "top-unknown-global",
+      "rule": "exact_spelling",
+      "argv": [
+        "--jsn",
+        "version"
+      ],
+      "exit": 3,
+      "key": "input.unknown_command"
+    },
+    {
+      "id": "top-repeated-global",
+      "rule": "repeated_option",
+      "argv": [
+        "--json",
+        "--json",
+        "version"
+      ],
+      "exit": 3,
+      "key": "input.unknown_command"
+    },
+    {
+      "id": "top-help-short",
+      "rule": "help_after_command",
+      "argv": [
+        "-h"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "top-help-long",
+      "rule": "help_after_command",
+      "argv": [
+        "--help"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "verify-help-short",
+      "rule": "help_after_command",
+      "argv": [
+        "verify",
+        "-h"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "verify-help-long",
+      "rule": "help_after_command",
+      "argv": [
+        "verify",
+        "--help"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "sign-help-short",
+      "rule": "help_after_command",
+      "argv": [
+        "sign",
+        "-h"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "sign-help-long",
+      "rule": "help_after_command",
+      "argv": [
+        "sign",
+        "--help"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "readiness-help-short",
+      "rule": "help_after_command",
+      "argv": [
+        "readiness",
+        "-h"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "readiness-help-long",
+      "rule": "help_after_command",
+      "argv": [
+        "readiness",
+        "--help"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "assess-help",
+      "rule": "help_after_command",
+      "argv": [
+        "assess",
+        "--help"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "report-help",
+      "rule": "help_after_command",
+      "argv": [
+        "report",
+        "--help"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "diff-help",
+      "rule": "help_after_command",
+      "argv": [
+        "diff",
+        "--help"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "quickstart-help",
+      "rule": "help_after_command",
+      "argv": [
+        "quickstart",
+        "--help"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "validate-help",
+      "rule": "help_after_command",
+      "argv": [
+        "validate",
+        "--help"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "version-help",
+      "rule": "help_after_command",
+      "argv": [
+        "version",
+        "--help"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "conformance-help",
+      "rule": "help_after_command",
+      "argv": [
+        "conformance",
+        "--help"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "conformance-run-help",
+      "rule": "help_after_command",
+      "argv": [
+        "conformance",
+        "run",
+        "-h"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "conformance-help-after-unknown-then-run",
+      "rule": "help_after_command",
+      "argv": [
+        "conformance",
+        "--he",
+        "run",
+        "-h"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "readiness-help-after-repeat",
+      "rule": "help_after_command",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--gaps",
+        "a",
+        "--gaps",
+        "b",
+        "--help"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "assess-help-after-unknown",
+      "rule": "help_after_command",
+      "argv": [
+        "assess",
+        "--nope",
+        "-h"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "readiness-help-after-extra",
+      "rule": "help_after_command",
+      "argv": [
+        "readiness",
+        "a",
+        "b",
+        "-h"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "collect-help",
+      "rule": "help_after_command",
+      "argv": [
+        "collect",
+        "-h"
+      ],
+      "exit": 0,
+      "key": null,
+      "engines": [
+        "python"
+      ]
+    },
+    {
+      "id": "ingest-help",
+      "rule": "help_after_command",
+      "argv": [
+        "ingest",
+        "-h"
+      ],
+      "exit": 0,
+      "key": null,
+      "engines": [
+        "python"
+      ]
+    },
+    {
+      "id": "doctor-help",
+      "rule": "help_after_command",
+      "argv": [
+        "doctor",
+        "-h"
+      ],
+      "exit": 0,
+      "key": null,
+      "engines": [
+        "python"
+      ]
+    },
+    {
+      "id": "init-help",
+      "rule": "help_after_command",
+      "argv": [
+        "init",
+        "-h"
+      ],
+      "exit": 0,
+      "key": null,
+      "engines": [
+        "python"
+      ]
+    },
+    {
+      "id": "catalog-lint-help",
+      "rule": "help_after_command",
+      "argv": [
+        "catalog",
+        "lint",
+        "--help"
+      ],
+      "exit": 0,
+      "key": null,
+      "engines": [
+        "python"
+      ]
+    },
+    {
+      "id": "config-show-help",
+      "rule": "help_after_command",
+      "argv": [
+        "config",
+        "show",
+        "-h"
+      ],
+      "exit": 0,
+      "key": null,
+      "engines": [
+        "python"
+      ]
+    },
+    {
+      "id": "readiness-wrong-case",
+      "rule": "exact_spelling",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--GAPS",
+        "x"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "readiness-version-after-command",
+      "rule": "exact_spelling",
+      "argv": [
+        "readiness",
+        "--version"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "verify-unknown",
+      "rule": "exact_spelling",
+      "argv": [
+        "verify",
+        "--bogus",
+        "x"
+      ],
+      "exit": 3,
+      "key": "input.verify_unrecognized_flag"
+    },
+    {
+      "id": "verify-space-in-token-no-equals",
+      "rule": "exact_spelling",
+      "argv": [
+        "verify",
+        "--catalog a b"
+      ],
+      "exit": 3,
+      "key": "input.verify_unrecognized_flag"
+    },
+    {
+      "id": "readiness-fullwidth-equals",
+      "rule": "exact_spelling",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--gaps＝x"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "catalog-lint-unknown",
+      "rule": "exact_spelling",
+      "argv": [
+        "catalog",
+        "lint",
+        "--nope"
+      ],
+      "exit": 3,
+      "key": "input.catalog_unrecognized_flag",
+      "engines": [
+        "python"
+      ]
+    },
+    {
+      "id": "assess-abbrev",
+      "rule": "abbreviation",
+      "argv": [
+        "assess",
+        "--pro",
+        "x"
+      ],
+      "exit": 3,
+      "key": "input.assess_unrecognized_flag"
+    },
+    {
+      "id": "readiness-abbrev",
+      "rule": "abbreviation",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--gap",
+        "x"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "verify-abbrev",
+      "rule": "abbreviation",
+      "argv": [
+        "verify",
+        "--cat",
+        "x"
+      ],
+      "exit": 3,
+      "key": "input.verify_unrecognized_flag"
+    },
+    {
+      "id": "version-abbrev-global",
+      "rule": "abbreviation",
+      "argv": [
+        "version",
+        "--js"
+      ],
+      "exit": 3,
+      "key": "input.version_unrecognized_flag"
+    },
+    {
+      "id": "report-abbrev",
+      "rule": "abbreviation",
+      "argv": [
+        "report",
+        "--form",
+        "md"
+      ],
+      "exit": 3,
+      "key": "input.report_unrecognized_flag"
+    },
+    {
+      "id": "conformance-run-abbrev",
+      "rule": "abbreviation",
+      "argv": [
+        "conformance",
+        "run",
+        "--eng",
+        "x"
+      ],
+      "exit": 3,
+      "key": "input.conformance_unrecognized_flag"
+    },
+    {
+      "id": "readiness-cluster",
+      "rule": "short_cluster",
+      "argv": [
+        "readiness",
+        "{report}",
+        "-jq"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "assess-cluster-help-joined",
+      "rule": "short_cluster",
+      "argv": [
+        "assess",
+        "-hx"
+      ],
+      "exit": 3,
+      "key": "input.assess_unrecognized_flag"
+    },
+    {
+      "id": "quickstart-cluster",
+      "rule": "short_cluster",
+      "argv": [
+        "quickstart",
+        "-hh"
+      ],
+      "exit": 3,
+      "key": "input.quickstart_unrecognized_flag"
+    },
+    {
+      "id": "ingest-cluster",
+      "rule": "short_cluster",
+      "argv": [
+        "ingest",
+        "-hx"
+      ],
+      "exit": 3,
+      "key": "input.ingest_unrecognized_flag",
+      "engines": [
+        "python"
+      ]
+    },
+    {
+      "id": "verify-equals-space",
+      "rule": "equals_value_with_spaces",
+      "argv": [
+        "verify",
+        "--catalog={space}/cat"
+      ],
+      "exit": 0,
+      "key": null
+    },
+    {
+      "id": "readiness-equals-space",
+      "rule": "equals_value_with_spaces",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--gaps={space}/gaps.md"
+      ],
+      "exit": 0,
+      "key": null,
+      "scan": {
+        "values": {
+          "--gaps": "{space}/gaps.md"
+        },
+        "positionals": [
+          "{report}"
+        ]
+      }
+    },
+    {
+      "id": "readiness-equals-empty",
+      "rule": "equals_value_with_spaces",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--gaps="
+      ],
+      "exit": 3,
+      "key": "input.gaps_not_a_file",
+      "scan": {
+        "values": {
+          "--gaps": ""
+        }
+      }
+    },
+    {
+      "id": "verify-equals-help-is-a-value",
+      "rule": "equals_value_with_spaces",
+      "argv": [
+        "verify",
+        "--catalog=--help"
+      ],
+      "exit": 3,
+      "key": "input.catalog_not_a_directory",
+      "scan": {
+        "values": {
+          "--catalog": "--help"
+        }
+      }
+    },
+    {
+      "id": "readiness-equals-negative",
+      "rule": "negative_number_after_equals",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--gaps=-1"
+      ],
+      "exit": 3,
+      "key": "input.gaps_not_a_file",
+      "scan": {
+        "values": {
+          "--gaps": "-1"
+        }
+      }
+    },
+    {
+      "id": "readiness-equals-dash-decimal",
+      "rule": "negative_number_after_equals",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--catalog-dir=-1.5"
+      ],
+      "exit": 3,
+      "key": "input.catalog_dir_not_a_directory",
+      "scan": {
+        "lists": {
+          "--catalog-dir": [
+            "-1.5"
+          ]
+        }
+      }
+    },
+    {
+      "id": "readiness-dashdash-then-dir",
+      "rule": "double_dash_ends_options",
+      "argv": [
+        "readiness",
+        "--",
+        "{report}"
+      ],
+      "exit": 0,
+      "key": null,
+      "scan": {
+        "positionals": [
+          "{report}"
+        ]
+      }
+    },
+    {
+      "id": "readiness-dashdash-help-is-positional",
+      "rule": "double_dash_ends_options",
+      "argv": [
+        "readiness",
+        "--",
+        "--help"
+      ],
+      "exit": 3,
+      "key": "input.report_dir_not_a_directory",
+      "scan": {
+        "positionals": [
+          "--help"
+        ]
+      }
+    },
+    {
+      "id": "readiness-dashdash-option-is-positional",
+      "rule": "double_dash_ends_options",
+      "argv": [
+        "readiness",
+        "--",
+        "--gaps"
+      ],
+      "exit": 3,
+      "key": "input.report_dir_not_a_directory",
+      "scan": {
+        "positionals": [
+          "--gaps"
+        ]
+      }
+    },
+    {
+      "id": "diff-dashdash-dash-number",
+      "rule": "double_dash_ends_options",
+      "argv": [
+        "diff",
+        "--",
+        "-1",
+        "-2"
+      ],
+      "exit": 3,
+      "key": "input.report_a_not_a_file",
+      "scan": {
+        "positionals": [
+          "-1",
+          "-2"
+        ]
+      }
+    },
+    {
+      "id": "readiness-dashdash-last",
+      "rule": "double_dash_alone",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "readiness-dashdash-only",
+      "rule": "double_dash_alone",
+      "argv": [
+        "readiness",
+        "--"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "quickstart-dashdash",
+      "rule": "double_dash_alone",
+      "argv": [
+        "quickstart",
+        "--"
+      ],
+      "exit": 3,
+      "key": "input.quickstart_unrecognized_flag"
+    },
+    {
+      "id": "verify-dashdash-no-positionals",
+      "rule": "double_dash_alone",
+      "argv": [
+        "verify",
+        "--",
+        "--catalog",
+        "x"
+      ],
+      "exit": 3,
+      "key": "input.verify_unrecognized_flag"
+    },
+    {
+      "id": "readiness-repeated-gaps",
+      "rule": "repeated_option",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--gaps",
+        "a",
+        "--gaps",
+        "b"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "readiness-repeated-gaps-equals-then-space",
+      "rule": "repeated_option",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--gaps=a",
+        "--gaps",
+        "b"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "readiness-repeated-gaps-same-value",
+      "rule": "repeated_option",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--gaps",
+        "a",
+        "--gaps=a"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "readiness-repeated-debug",
+      "rule": "repeated_option",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--debug",
+        "--debug"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "readiness-repeated-json-around-command",
+      "rule": "repeated_option",
+      "argv": [
+        "--json",
+        "readiness",
+        "{report}",
+        "--json"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "quickstart-repeated-out",
+      "rule": "repeated_option",
+      "argv": [
+        "quickstart",
+        "--out",
+        "a",
+        "--out",
+        "b"
+      ],
+      "exit": 3,
+      "key": "input.quickstart_unrecognized_flag"
+    },
+    {
+      "id": "verify-repeated-catalog",
+      "rule": "repeated_option",
+      "argv": [
+        "verify",
+        "--catalog",
+        "a",
+        "--catalog",
+        "b"
+      ],
+      "exit": 3,
+      "key": "input.verify_unrecognized_flag"
+    },
+    {
+      "id": "assess-repeated-emit",
+      "rule": "repeated_option",
+      "argv": [
+        "assess",
+        "--emit",
+        "a",
+        "--emit",
+        "b"
+      ],
+      "exit": 3,
+      "key": "input.assess_unrecognized_flag"
+    },
+    {
+      "id": "doctor-repeated-write-errors",
+      "rule": "repeated_option",
+      "argv": [
+        "doctor",
+        "--write-errors",
+        "e.md",
+        "--write-errors",
+        "b.md"
+      ],
+      "exit": 3,
+      "key": "input.doctor_unrecognized_flag",
+      "engines": [
+        "python"
+      ]
+    },
+    {
+      "id": "init-repeated-force",
+      "rule": "repeated_option",
+      "argv": [
+        "init",
+        "--force",
+        "--force"
+      ],
+      "exit": 3,
+      "key": "input.init_unrecognized_flag",
+      "engines": [
+        "python"
+      ]
+    },
+    {
+      "id": "verify-repeated-signer-trust-root",
+      "rule": "repeated_option",
+      "argv": [
+        "verify",
+        "--report",
+        "{report}",
+        "--signer-trust-root",
+        "a",
+        "--signer-trust-root",
+        "b"
+      ],
+      "exit": 3,
+      "key": "input.verify_unrecognized_flag",
+      "engines": [
+        "python"
+      ]
+    },
+    {
+      "id": "verify-repeated-expect-keyid",
+      "rule": "repeated_option",
+      "argv": [
+        "verify",
+        "--report",
+        "{report}",
+        "--expect-keyid",
+        "k1",
+        "--expect-keyid",
+        "k2"
+      ],
+      "exit": 3,
+      "key": "input.verify_unrecognized_flag",
+      "engines": [
+        "python"
+      ]
+    },
+    {
+      "id": "readiness-repeated-trust-root",
+      "rule": "repeated_option",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--trust-root",
+        "a",
+        "--trust-root",
+        "b"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "sign-repeated-key",
+      "rule": "repeated_option",
+      "argv": [
+        "sign",
+        "{report}",
+        "--as",
+        "claimant",
+        "--profile",
+        "kms",
+        "--key",
+        "a.pem",
+        "--key",
+        "b.pem"
+      ],
+      "exit": 3,
+      "key": "input.sign_unrecognized_flag",
+      "unchanged": "{report}"
+    },
+    {
+      "id": "sign-repeated-profile",
+      "rule": "repeated_option",
+      "argv": [
+        "sign",
+        "{report}",
+        "--as",
+        "claimant",
+        "--profile",
+        "kms",
+        "--profile",
+        "kms"
+      ],
+      "exit": 3,
+      "key": "input.sign_unrecognized_flag",
+      "unchanged": "{report}"
+    },
+    {
+      "id": "sign-repeated-as",
+      "rule": "repeated_option",
+      "argv": [
+        "sign",
+        "{report}",
+        "--as",
+        "claimant",
+        "--as",
+        "assessor",
+        "--profile",
+        "kms",
+        "--key",
+        "k.pem"
+      ],
+      "exit": 3,
+      "key": "input.sign_unrecognized_flag",
+      "unchanged": "{report}"
+    },
+    {
+      "id": "sign-repeated-as-dry-run",
+      "rule": "repeated_option",
+      "argv": [
+        "sign",
+        "{report}",
+        "--as",
+        "claimant",
+        "--as",
+        "assessor",
+        "--dry-run"
+      ],
+      "exit": 3,
+      "key": "input.sign_unrecognized_flag",
+      "unchanged": "{report}"
+    },
+    {
+      "id": "readiness-catalog-dir-keeps-order",
+      "rule": "repeatable_option_keeps_order",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--catalog-dir",
+        "a",
+        "--catalog-dir",
+        "b"
+      ],
+      "exit": 3,
+      "key": "input.catalog_dir_not_a_directory",
+      "scan": {
+        "lists": {
+          "--catalog-dir": [
+            "a",
+            "b"
+          ]
+        },
+        "positionals": [
+          "{report}"
+        ]
+      }
+    },
+    {
+      "id": "readiness-catalog-dir-keeps-order-mixed",
+      "rule": "repeatable_option_keeps_order",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--catalog-dir",
+        "b",
+        "--catalog-dir=a"
+      ],
+      "exit": 3,
+      "key": "input.catalog_dir_not_a_directory",
+      "scan": {
+        "lists": {
+          "--catalog-dir": [
+            "b",
+            "a"
+          ]
+        }
+      }
+    },
+    {
+      "id": "quickstart-out-at-end",
+      "rule": "needs_value",
+      "argv": [
+        "quickstart",
+        "--out"
+      ],
+      "exit": 3,
+      "key": "input.quickstart_unrecognized_flag"
+    },
+    {
+      "id": "readiness-gaps-at-end",
+      "rule": "needs_value",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--gaps"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "assess-out-at-end",
+      "rule": "needs_value",
+      "argv": [
+        "assess",
+        "--out"
+      ],
+      "exit": 3,
+      "key": "input.assess_flag_needs_value"
+    },
+    {
+      "id": "report-from-at-end",
+      "rule": "needs_value",
+      "argv": [
+        "report",
+        "--from"
+      ],
+      "exit": 3,
+      "key": "input.from_missing"
+    },
+    {
+      "id": "conformance-run-engine-at-end",
+      "rule": "needs_value",
+      "argv": [
+        "conformance",
+        "run",
+        "--engine"
+      ],
+      "exit": 3,
+      "key": "input.engine_missing"
+    },
+    {
+      "id": "doctor-write-errors-at-end",
+      "rule": "needs_value",
+      "argv": [
+        "doctor",
+        "--write-errors"
+      ],
+      "exit": 3,
+      "key": "input.doctor_unrecognized_flag",
+      "engines": [
+        "python"
+      ]
+    },
+    {
+      "id": "readiness-gaps-before-dashdash",
+      "rule": "needs_value_before_double_dash",
+      "argv": [
+        "readiness",
+        "--gaps",
+        "--",
+        "{report}"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "readiness-gaps-before-trailing-dashdash",
+      "rule": "needs_value_before_double_dash",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--gaps",
+        "--"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "verify-report-before-help",
+      "rule": "needs_value_before_option",
+      "argv": [
+        "verify",
+        "--report",
+        "--help"
+      ],
+      "exit": 3,
+      "key": "input.verify_unrecognized_flag"
+    },
+    {
+      "id": "verify-catalog-before-short-help",
+      "rule": "needs_value_before_option",
+      "argv": [
+        "verify",
+        "--catalog",
+        "-h"
+      ],
+      "exit": 3,
+      "key": "input.verify_unrecognized_flag"
+    },
+    {
+      "id": "sign-as-before-help",
+      "rule": "needs_value_before_option",
+      "argv": [
+        "sign",
+        "{report}",
+        "--as",
+        "--help"
+      ],
+      "exit": 3,
+      "key": "input.sign_unrecognized_flag"
+    },
+    {
+      "id": "readiness-gaps-before-help",
+      "rule": "needs_value_before_option",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--gaps",
+        "--help"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "readiness-gaps-before-negative",
+      "rule": "needs_value_before_option",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--gaps",
+        "-1"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "assess-out-before-dash-number",
+      "rule": "needs_value_before_option",
+      "argv": [
+        "assess",
+        "--out",
+        "-1",
+        "-hx"
+      ],
+      "exit": 3,
+      "key": "input.assess_flag_needs_value"
+    },
+    {
+      "id": "quickstart-out-before-lone-dash",
+      "rule": "needs_value_before_option",
+      "argv": [
+        "quickstart",
+        "--out",
+        "-",
+        "-hx"
+      ],
+      "exit": 3,
+      "key": "input.quickstart_unrecognized_flag"
+    },
+    {
+      "id": "readiness-gaps-before-option",
+      "rule": "needs_value_before_option",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--gaps",
+        "--trust-root",
+        "x"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "readiness-flag-with-value",
+      "rule": "value_on_flag",
+      "argv": [
+        "readiness",
+        "{report}",
+        "--allow-unverified-catalog=yes"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "sign-dry-run-with-value",
+      "rule": "value_on_flag",
+      "argv": [
+        "sign",
+        "{report}",
+        "--as",
+        "claimant",
+        "--dry-run=yes"
+      ],
+      "exit": 3,
+      "key": "input.sign_unrecognized_flag"
+    },
+    {
+      "id": "version-quiet-with-value",
+      "rule": "value_on_flag",
+      "argv": [
+        "version",
+        "--quiet=1"
+      ],
+      "exit": 3,
+      "key": "input.version_unrecognized_flag"
+    },
+    {
+      "id": "readiness-help-with-value",
+      "rule": "value_on_flag",
+      "argv": [
+        "readiness",
+        "-h=x"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "collect-dry-run-with-value",
+      "rule": "value_on_flag",
+      "argv": [
+        "collect",
+        "--dry-run=1"
+      ],
+      "exit": 3,
+      "key": "input.collect_unrecognized_flag",
+      "engines": [
+        "python"
+      ]
+    },
+    {
+      "id": "top-json-with-value",
+      "rule": "value_on_flag",
+      "argv": [
+        "--json=1",
+        "version"
+      ],
+      "exit": 3,
+      "key": "input.unknown_command"
+    },
+    {
+      "id": "readiness-extra",
+      "rule": "extra_positional",
+      "argv": [
+        "readiness",
+        "a",
+        "b"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "version-extra",
+      "rule": "extra_positional",
+      "argv": [
+        "version",
+        "extra"
+      ],
+      "exit": 3,
+      "key": "input.version_unrecognized_flag"
+    },
+    {
+      "id": "quickstart-extra",
+      "rule": "extra_positional",
+      "argv": [
+        "quickstart",
+        "extra"
+      ],
+      "exit": 3,
+      "key": "input.quickstart_unrecognized_flag"
+    },
+    {
+      "id": "sign-extra",
+      "rule": "extra_positional",
+      "argv": [
+        "sign",
+        "a",
+        "b"
+      ],
+      "exit": 3,
+      "key": "input.sign_unrecognized_flag"
+    },
+    {
+      "id": "diff-extra",
+      "rule": "extra_positional",
+      "argv": [
+        "diff",
+        "a",
+        "b",
+        "c"
+      ],
+      "exit": 3,
+      "key": "input.diff_extra_argument"
+    },
+    {
+      "id": "conformance-run-extra",
+      "rule": "extra_positional",
+      "argv": [
+        "conformance",
+        "run",
+        "x"
+      ],
+      "exit": 3,
+      "key": "input.conformance_unrecognized_flag"
+    },
+    {
+      "id": "config-show-extra",
+      "rule": "extra_positional",
+      "argv": [
+        "config",
+        "show",
+        "x"
+      ],
+      "exit": 3,
+      "key": "input.config_unrecognized_flag",
+      "engines": [
+        "python"
+      ]
+    },
+    {
+      "id": "validate-extra",
+      "rule": "extra_positional",
+      "argv": [
+        "validate",
+        "x"
+      ],
+      "exit": 3,
+      "key": "input.validate_unrecognized_flag"
+    },
+    {
+      "id": "readiness-dash-number",
+      "rule": "dash_token_not_option",
+      "argv": [
+        "readiness",
+        "-1"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "readiness-dash-letter",
+      "rule": "dash_token_not_option",
+      "argv": [
+        "readiness",
+        "{report}",
+        "-x"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "assess-dash-with-space",
+      "rule": "dash_token_not_option",
+      "argv": [
+        "assess",
+        "-a b"
+      ],
+      "exit": 3,
+      "key": "input.assess_unrecognized_flag"
+    },
+    {
+      "id": "readiness-lone-dash",
+      "rule": "dash_token_not_option",
+      "argv": [
+        "readiness",
+        "-"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    },
+    {
+      "id": "sign-lone-dash",
+      "rule": "dash_token_not_option",
+      "argv": [
+        "sign",
+        "-"
+      ],
+      "exit": 3,
+      "key": "input.sign_unrecognized_flag"
+    },
+    {
+      "id": "readiness-dash-decimal",
+      "rule": "dash_token_not_option",
+      "argv": [
+        "readiness",
+        "-1.5"
+      ],
+      "exit": 3,
+      "key": "input.readiness_unrecognized_flag"
+    }
+  ]
+}
