@@ -208,20 +208,13 @@ All three engines refuse it with exit `3` and one key per target: `input.catalog
 engine runs `--report`. The cause names the file or folder, relative to the target. An unreadable
 trust root keeps `input.trust_root_invalid`.
 
-The differences below remain. The first changes the exit code and the message key; the rest change
-only how the output reads.
+The differences below remain. They change only how the output reads, never the exit code or the
+message key.
 
-- **`--flag=value` when the value holds a space.** `verify "--catalog=/path/with a space"`, and the
-  same form of `--bundle` and `--release`, verifies in Python. TypeScript and Java refuse it with
-  `input.verify_unrecognized_flag` (exit `3`). Pass the path as its own argument,
-  `--catalog "/path/with a space"`, and all three engines read it.
 - **The path in the output.** Python prints the target path in normalized form, so `--catalog
   spec/catalogs/base/eu-ai-act/./` comes back as `"catalog": "spec/catalogs/base/eu-ai-act"`.
   TypeScript and Java print the path as you typed it. Compare the `verified` field and the digest,
   not the path string.
-- **`--help` and `-h`.** Python prints the usage text for `verify` and exits `0`. TypeScript and
-  Java refuse both with `input.verify_unrecognized_flag` (exit `3`), as they do for `sign` and
-  `readiness`. The `fix` line of that refusal names the flags `verify` accepts.
 - **Field names in a `--json` error.** Python names the fields of the `error` object `key`, `cause`,
   `fix` and `exit_code`. TypeScript and Java name them `message_key`, `detail` and `fix`. The
   message key, the text and the top-level `exit_code` are the same in all three.

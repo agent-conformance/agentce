@@ -1167,6 +1167,7 @@ def _site_explanation_pages() -> dict[Path, str]:
         "verification": DOCS / "verification.md",
         "errors": DOCS / "errors.md",
         "yaml-profile": DOCS / "yaml-profile.md",
+        "command-line": DOCS / "command-line.md",
     }
     # The only cross-links between these pages, rewritten to the site's absolute routes.
     rewrites = {
@@ -1174,6 +1175,8 @@ def _site_explanation_pages() -> dict[Path, str]:
         "(./threat-model.md)": "(/explanation/threat-model/)",
         "(errors.md)": "(/explanation/errors/)",
         "(../spec/rules/yaml-profile-cases.json)": "(https://github.com/agent-conformance/agentce/blob/main/spec/rules/yaml-profile-cases.json)",
+        "(../spec/cli/argv-grammar.json)": "(https://github.com/agent-conformance/agentce/blob/main/spec/cli/argv-grammar.json)",
+        "(../spec/cli/argv-cases.json)": "(https://github.com/agent-conformance/agentce/blob/main/spec/cli/argv-cases.json)",
     }
     pages: dict[Path, str] = {}
     titles: dict[str, str] = {}

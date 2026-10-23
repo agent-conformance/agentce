@@ -11,3 +11,4 @@ Understanding-oriented material published from `docs/` (SPEC §13.4).
 | [Verifying AgentCE artifacts](/explanation/verification/) |
 | [Message keys](/explanation/errors/) |
 | [YAML profile](/explanation/yaml-profile/) |
+| [Command line](/explanation/command-line/) |
