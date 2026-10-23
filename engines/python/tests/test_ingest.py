@@ -295,46 +295,66 @@ def _ingest_bytes(make_bundle: Callable[..., Any], body: bytes) -> Any:
     return ingest(load_bundle(root))
 
 
-def test_lines_end_at_lf_crlf_or_a_lone_cr(
+def test_lines_end_at_lf_or_crlf_only(
     make_bundle: Callable[..., Any], example_events: list[dict[str, Any]]
 ) -> None:
-    """The stream-line rule all three engines share (18.65): a lone CR ends a line as LF and CRLF
-    do, so two events joined by a CR are two events, not one invalid line."""
+    """The JSON Lines rule all three engines share (SPEC 8.7, 18.184x): LF ends a line and a CRLF's
+    CR is whitespace; a lone CR does not end a line, so two events joined by one are one line holding
+    two values, quarantined with the rule named."""
     import json
 
     first, second = (json.dumps(e).encode() for e in example_events)
-    for sep in (b"\n", b"\r\n", b"\r"):
+    for sep in (b"\n", b"\r\n"):
         result = _ingest_bytes(make_bundle, first + sep + second + sep)
         assert len(result.accepted) == 2, sep
         assert result.quarantined == [], sep
+    result = _ingest_bytes(make_bundle, first + b"\r" + second + b"\r")
+    assert result.accepted == []
+    assert [(q.reason, q.detail) for q in result.quarantined] == [
+        (
+            QuarantineReason.SCHEMA_INVALID,
+            "outside the JSON profile: jsonl_line_split at line 1 (SPEC 8.7)",
+        )
+    ]
 
 
 def test_a_line_that_is_not_utf8_is_quarantined_alone(
     make_bundle: Callable[..., Any], example_events: list[dict[str, Any]]
 ) -> None:
-    """Each line decodes on its own: an invalid UTF-8 line is one schema_invalid record, and the
-    file's other lines are still read (18.65; Python used to crash on the whole file)."""
+    """Each line decodes on its own: an invalid UTF-8 line is one schema_invalid record naming the
+    profile rule, and the file's other lines are still read (18.65, SPEC 8.7)."""
     import json
 
     first, second = (json.dumps(e).encode() for e in example_events)
     result = _ingest_bytes(make_bundle, first + b"\n\xff\xfe{}\n" + second + b"\n")
     assert len(result.accepted) == 2
     assert [(q.reason, q.detail) for q in result.quarantined] == [
-        (QuarantineReason.SCHEMA_INVALID, "invalid UTF-8")
+        (
+            QuarantineReason.SCHEMA_INVALID,
+            "outside the JSON profile: invalid_utf8 at line 2 (SPEC 8.7)",
+        )
     ]
 
 
-def test_a_leading_byte_order_mark_is_not_json_whitespace(
-    make_bundle: Callable[..., Any], example_event: dict[str, Any]
+def test_a_byte_order_mark_is_ignored_on_the_first_line_only(
+    make_bundle: Callable[..., Any], example_events: list[dict[str, Any]]
 ) -> None:
-    """Only JSON's own whitespace is trimmed, so a BOM-prefixed line is not JSON in any engine."""
+    """A records file is an input an adopter's tool may write, so one leading byte-order mark is
+    ignored (SPEC 8.7); on a later line it is not JSON whitespace, and that line is quarantined."""
     import json
 
-    result = _ingest_bytes(
-        make_bundle, b"\xef\xbb\xbf" + json.dumps(example_event).encode()
-    )
-    assert result.accepted == []
-    assert [q.reason for q in result.quarantined] == [QuarantineReason.SCHEMA_INVALID]
+    first, second = (json.dumps(e).encode() for e in example_events)
+    result = _ingest_bytes(make_bundle, b"\xef\xbb\xbf" + first + b"\n" + second)
+    assert len(result.accepted) == 2
+    assert result.quarantined == []
+    result = _ingest_bytes(make_bundle, first + b"\n\xef\xbb\xbf" + second)
+    assert len(result.accepted) == 1
+    assert [(q.reason, q.detail) for q in result.quarantined] == [
+        (
+            QuarantineReason.SCHEMA_INVALID,
+            "outside the JSON profile: bom at line 2 (SPEC 8.7)",
+        )
+    ]
 
 
 def test_nesting_past_the_limit_refuses_and_brackets_in_strings_do_not_count(

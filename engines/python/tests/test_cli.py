@@ -1256,13 +1256,18 @@ def test_sign_dry_run_without_a_claim_is_no_claim(
     assert env["error"]["key"] == "sign.no_claim"
 
 
+def _outside(rule: str) -> str:
+    # A claim.json outside the JSON profile names the rule (SPEC 8.7, 18.184x).
+    return f"claim.json is outside the JSON profile: {rule} at line 1 (SPEC 8.7)."
+
+
 @pytest.mark.parametrize(
     ("raw", "cause"),
     [
-        (b'{"a": "\xff"}', "claim.json is not valid JSON."),
-        (b'{"a": ', "claim.json is not valid JSON."),
-        (b"{} GARBAGE", "claim.json is not valid JSON."),
-        (b'{"a": "\\ud800"}', "claim.json is not valid JSON."),
+        (b'{"a": "\xff"}', _outside("invalid_utf8")),
+        (b'{"a": ', _outside("syntax")),
+        (b"{} GARBAGE", _outside("extra_value")),
+        (b'{"a": "\\ud800"}', _outside("lone_surrogate")),
         (b"[1, 2]", "claim.json is not an object."),
         (b'{"signatures": null}', "claim.json's signatures field is not a list."),
         (b'{"signatures": "x"}', "claim.json's signatures field is not a list."),

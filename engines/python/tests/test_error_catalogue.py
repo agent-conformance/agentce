@@ -16,6 +16,7 @@ from agentce import bundled, i18n_format, signing
 from agentce.commands import _digest_of
 from agentce.error_catalogue import MESSAGE_KEYS
 from agentce.errors import InputError
+from agentce.safe_json import JsonProfileError
 
 _PACKAGE = Path(__file__).resolve().parents[1] / "agentce"
 # A literal key passed as the first argument of an error constructor. Keys composed at run time
@@ -35,7 +36,7 @@ def test_every_literal_raised_key_is_in_the_catalogue() -> None:
 
 @pytest.mark.parametrize(
     ("body", "error"),
-    [("{not json", json.JSONDecodeError), ("[1, 2]", AttributeError)],
+    [("{not json", JsonProfileError), ("[1, 2]", AttributeError)],
 )
 def test_load_catalog_refuses_a_corrupt_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, body: str, error: type

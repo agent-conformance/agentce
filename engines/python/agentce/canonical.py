@@ -22,6 +22,8 @@ from __future__ import annotations
 import hashlib
 import unicodedata
 
+from .safe_json import render_number
+
 __all__ = ["CanonicalizationError", "canonical_string", "canonicalize", "sha256_hex"]
 
 
@@ -91,7 +93,7 @@ def _scalar(value: object) -> str:
             raise CanonicalizationError("integer_out_of_range", str(value))
         return str(value)
     if isinstance(value, float):
-        raise CanonicalizationError("non_integer_number", repr(value))
+        raise CanonicalizationError("non_integer_number", render_number(value))
     if isinstance(value, str):
         return _string(value)
     raise CanonicalizationError("unsupported_type", type(value).__name__)

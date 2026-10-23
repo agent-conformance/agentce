@@ -34,6 +34,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 _PACKAGE = Path(__file__).resolve().parents[1] / "agentce"
 BIG = "9" * 5000
 TOO_LONG = "integer literal exceeds 4300 digits"
+#: The JSON profile refusal for that literal on line 1 (SPEC 8.7).
+OUTSIDE = "outside the JSON profile: integer_digit_limit at line 1 (SPEC 8.7)"
 
 
 @pytest.fixture(params=[4300, 0, 640], ids=["default", "unlimited", "lowest"])
@@ -97,7 +99,7 @@ def test_ingest_quarantines_an_over_limit_line(
         QuarantineReason.SCHEMA_INVALID,
         QuarantineReason.SCHEMA_INVALID,
     ]
-    assert result.quarantined[0].detail == f"invalid JSON: {TOO_LONG}"
+    assert result.quarantined[0].detail == OUTSIDE.replace("line 1", "line 2")
     # 4300 digits parse: that line is refused for its shape, not as invalid JSON.
     assert not (result.quarantined[1].detail or "").startswith("invalid JSON")
 
@@ -160,12 +162,9 @@ def _report(directory: Path) -> Path:
 @pytest.mark.parametrize(
     ("artifact", "problem"),
     [
-        ("assertions.json", f"assertions.json: invalid JSON ({TOO_LONG})"),
-        ("manifest.json", f"manifest.json: invalid JSON ({TOO_LONG})"),
-        (
-            "runtime_drift.jsonl",
-            f"runtime_drift.jsonl: line 1 is not valid JSON ({TOO_LONG})",
-        ),
+        ("assertions.json", f"assertions.json: {OUTSIDE}"),
+        ("manifest.json", f"manifest.json: {OUTSIDE}"),
+        ("runtime_drift.jsonl", f"runtime_drift.jsonl: {OUTSIDE}"),
     ],
 )
 def test_validate_report_names_an_over_limit_artifact(
@@ -202,7 +201,7 @@ def test_an_over_limit_manifest_records_no_outputs(
     manifest = '{"outputs": {"runtime_drift.jsonl": "x"}, "n": %s}' % BIG
     (out / "manifest.json").write_text(manifest, encoding="utf-8")
     # Not "runtime_drift.jsonl: missing (recorded ...)": an unreadable manifest records nothing.
-    assert validate_report(out) == [f"manifest.json: invalid JSON ({TOO_LONG})"]
+    assert validate_report(out) == [f"manifest.json: {OUTSIDE}"]
 
 
 def _fake_run(stdout: str) -> Callable[..., subprocess.CompletedProcess[str]]:

@@ -101,49 +101,57 @@ def _unreadable(report: Path, name: str, shape: str, tmp_path: Path) -> Path | N
     return None
 
 
+def _cannot_read(name: str, rule: str | None, line: int = 1) -> str:
+    """The NOT READY reason for an unreadable report file; one outside the JSON profile names the
+    rule and line (SPEC 8.7, 18.184x)."""
+    if rule is None:
+        return f"cannot read report file {name}"
+    return f"cannot read report file {name}: outside the JSON profile: {rule} at line {line} (SPEC 8.7)"
+
+
 _MALFORMED = [
-    ("coverage.json", "null"),
-    ("coverage.json", "[]"),
-    ("coverage.json", '"x"'),
-    ("coverage.json", "3"),
-    ("coverage.json", ""),
-    ("coverage.json", "{"),
-    ("assertions.json", "null"),
-    ("assertions.json", "{}"),
-    ("assertions.json", ""),
-    ("assertions.json", "[3]"),
-    ("assertions.json", "[null]"),
-    ("integrity.jsonl", "not json\n"),
-    ("integrity.jsonl", "3\n"),
-    ("applicability.jsonl", "[]\n"),
-    ("applicability.jsonl", '{"drift": {"kind": "k", "ref": "r"}}\n'),
-    ("applicability.jsonl", '{"drift": "x"}\n'),
-    ("applicability.jsonl", '{"drift": null}\n'),
-    ("applicability.jsonl", '{"drift": [3]}\n'),
-    ("coverage.json", '{"subjects": {}, "x": NaN}'),
-    ("assertions.json", '[{"x": Infinity}]'),
-    ("integrity.jsonl", '{"x": -Infinity}\n'),
-    ("applicability.jsonl", '{"x": NaN}\n'),
+    ("coverage.json", "null", None),
+    ("coverage.json", "[]", None),
+    ("coverage.json", '"x"', None),
+    ("coverage.json", "3", None),
+    ("coverage.json", "", "syntax"),
+    ("coverage.json", "{", "syntax"),
+    ("assertions.json", "null", None),
+    ("assertions.json", "{}", None),
+    ("assertions.json", "", "syntax"),
+    ("assertions.json", "[3]", None),
+    ("assertions.json", "[null]", None),
+    ("integrity.jsonl", "not json\n", "syntax"),
+    ("integrity.jsonl", "3\n", None),
+    ("applicability.jsonl", "[]\n", None),
+    ("applicability.jsonl", '{"drift": {"kind": "k", "ref": "r"}}\n', None),
+    ("applicability.jsonl", '{"drift": "x"}\n', None),
+    ("applicability.jsonl", '{"drift": null}\n', None),
+    ("applicability.jsonl", '{"drift": [3]}\n', None),
+    ("coverage.json", '{"subjects": {}, "x": NaN}', "nan"),
+    ("assertions.json", '[{"x": Infinity}]', "infinity"),
+    ("integrity.jsonl", '{"x": -Infinity}\n', "infinity"),
+    ("applicability.jsonl", '{"x": NaN}\n', "nan"),
 ]
 
 
-@pytest.mark.parametrize(("name", "text"), _MALFORMED)
+@pytest.mark.parametrize(("name", "text", "rule"), _MALFORMED)
 def test_report_file_of_the_wrong_shape_is_not_ready(
-    tmp_path: Path, name: str, text: str
+    tmp_path: Path, name: str, text: str, rule: str | None
 ) -> None:
     # Not JSON of its shape reads NOT READY, never a crash and never READY (inbox row 393, 18.184h).
     report = _report(tmp_path)
     (report / name).write_text(text, encoding="utf-8")
     verdict = compute_readiness(report, severities=_SEVERITIES)
     assert verdict["verdict"] == NOT_READY
-    assert verdict["reasons"] == [f"cannot read report file {name}"]
+    assert verdict["reasons"] == [_cannot_read(name, rule)]
 
 
 def test_report_file_not_utf8_is_not_ready(tmp_path: Path) -> None:
     report = _report(tmp_path)
     (report / "coverage.json").write_bytes(b'{"subjects": {}}\xff')
     verdict = compute_readiness(report, severities=_SEVERITIES)
-    assert verdict["reasons"] == ["cannot read report file coverage.json"]
+    assert verdict["reasons"] == [_cannot_read("coverage.json", "invalid_utf8")]
 
 
 _JSONL_RECORD = {
@@ -177,6 +185,17 @@ _NOT_JSONL: dict[str, Callable[[bytes], bytes]] = {
     "nbsp_line": lambda r: _NBSP + b"\n" + r + b"\n",
     "not_utf8": lambda r: r[:-1] + b', "x": "\xff"}\n',
 }
+#: The JSON profile rule each line above breaks (SPEC 8.7): FF, NEL, LS, PS and a lone CR are not
+#: line ends, so the line runs on past them; VT and NBSP are not whitespace.
+_NOT_JSONL_RULE = {
+    **dict.fromkeys(
+        ("ff", "nel", "ls", "ps", "lone_cr", "lone_cr_no_lf"), "jsonl_line_split"
+    ),
+    **dict.fromkeys(("vt", "trail_nbsp"), "extra_value"),
+    **dict.fromkeys(("lead_nbsp", "nbsp_line"), "syntax"),
+    "lead_bom": "bom",
+    "not_utf8": "invalid_utf8",
+}
 _JSONL_OK: dict[str, Callable[[bytes], bytes]] = {
     "crlf": lambda r: r + b"\r\n",
     "space_tab": lambda r: b"\t " + r + b" \t\n",
@@ -188,16 +207,16 @@ _JSONL_OK: dict[str, Callable[[bytes], bytes]] = {
 
 
 @pytest.mark.parametrize("name", sorted(_JSONL_RECORD))
-@pytest.mark.parametrize("lines", _NOT_JSONL.values(), ids=_NOT_JSONL.keys())
+@pytest.mark.parametrize("case", sorted(_NOT_JSONL))
 def test_jsonl_line_outside_the_line_rule_is_not_ready(
-    tmp_path: Path, name: str, lines
+    tmp_path: Path, name: str, case: str
 ) -> None:
     """LF alone ends a line; any other separator or a no-break space or byte-order mark leaves a line
     not JSON (18.184n), in every engine alike."""
     report = _report(tmp_path)
-    (report / name).write_bytes(lines(_JSONL_RECORD[name]))
+    (report / name).write_bytes(_NOT_JSONL[case](_JSONL_RECORD[name]))
     verdict = compute_readiness(report, severities=_SEVERITIES)
-    assert verdict["reasons"] == [f"cannot read report file {name}"]
+    assert verdict["reasons"] == [_cannot_read(name, _NOT_JSONL_RULE[case])]
 
 
 @pytest.mark.parametrize("name", sorted(_JSONL_RECORD))

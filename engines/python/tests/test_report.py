@@ -1712,10 +1712,10 @@ def test_validate_report_reads_jsonl_by_the_line_rule(tmp_path: Path) -> None:
     problems = [
         p for p in validate_report(tmp_path) if p.startswith("runtime_drift.jsonl")
     ]
-    assert [p.split(" (")[0] for p in problems] == [
-        "runtime_drift.jsonl: line 3 is not valid JSON",
-        "runtime_drift.jsonl: line 4 is not valid JSON",
-    ], problems
+    assert problems == [
+        "runtime_drift.jsonl: outside the JSON profile: extra_value at line 3 (SPEC 8.7)",
+        "runtime_drift.jsonl: outside the JSON profile: jsonl_line_split at line 4 (SPEC 8.7)",
+    ]
 
 
 def test_validate_report_optional_artifacts_absent_is_fine(tmp_path: Path) -> None:

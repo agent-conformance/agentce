@@ -32,7 +32,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..safe_json import JsonProfileError, read_json
+from .json_profile import JsonProfileError, read_json
 
 #: The JSON-LD context every canonical payload carries (SPEC 6.2.2).
 BASE_CONTEXT = "https://agent-conformance.org/contexts/evidence/v1"

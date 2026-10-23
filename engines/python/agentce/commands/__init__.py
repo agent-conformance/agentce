@@ -3577,6 +3577,15 @@ def _read_sign_claim(claim_path: Path) -> dict[str, Any]:
         raise InputError(
             "sign.claim_malformed", "claim.json's signatures field is not a list.", fix
         )
+    try:
+        # The signature covers the canonical claim body, so a float is refused here (SPEC 8.7).
+        canonicalize({k: v for k, v in claim.items() if k != "signatures"})
+    except CanonicalizationError as exc:
+        raise InputError(
+            "sign.claim_malformed",
+            f"claim.json cannot be put in canonical form: {exc}.",
+            fix,
+        ) from exc
     return claim
 
 

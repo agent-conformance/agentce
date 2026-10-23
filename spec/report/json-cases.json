@@ -360,6 +360,18 @@
    ]
   },
   {
+   "id": "crlf-blank-line-skipped",
+   "rule": "jsonl_blank_line",
+   "mode": "jsonl",
+   "bom": "ignore",
+   "text": "{\"a\":1}\r\n\r\n \t\r\n{\"b\":2}\r\n",
+   "expect": "accept",
+   "records": [
+    1,
+    4
+   ]
+  },
+  {
    "id": "lone-cr-is-not-a-line-end",
    "rule": "jsonl_line_split",
    "mode": "jsonl",

@@ -487,6 +487,18 @@ def test_the_vendored_adapter_is_identical_to_the_adapter_source() -> None:
     )
 
 
+def test_the_adapter_reads_json_with_the_engine_reader() -> None:
+    # The adapter's json_profile.py is a copy of the engine's one JSON reader (SPEC 8.7, 18.184x).
+    engine_reader = Path(cli.__file__).resolve().parent / "safe_json.py"
+    assert (
+        _ADAPTER_SOURCE.with_name("json_profile.py").read_bytes()
+        == engine_reader.read_bytes()
+    ), (
+        "re-sync with `cp engines/python/agentce/safe_json.py "
+        "adapters/otel-genai/src/agentce_adapters/json_profile.py`"
+    )
+
+
 def _with_service_name(folder: Path, name: str) -> None:
     document = json.loads(
         (_FIXTURES / "otel-genai-chat" / "input.json").read_text(encoding="utf-8")
@@ -942,7 +954,7 @@ def test_nesting_is_judged_by_a_fixed_limit_on_the_raw_bytes(
     ]
 
 
-def test_a_document_that_does_not_parse_or_decode_gets_a_fixed_reason(
+def test_a_document_that_does_not_parse_or_decode_names_the_profile_rule(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     folder = _records(tmp_path / "records")
@@ -953,9 +965,9 @@ def test_a_document_that_does_not_parse_or_decode_gets_a_fixed_reason(
     assert code == 0
     unread = {u["path"]: u["reason"] for u in env["records"]["unrecognised"]}
     assert unread == {
-        "empty.json": "invalid_json: not valid JSON",
-        "junk.json": "invalid_json: not valid JSON",
-        "latin1.json": "invalid_encoding: not valid UTF-8",
+        "empty.json": "invalid_json: outside the JSON profile: syntax at line 1 (SPEC 8.7)",
+        "junk.json": "invalid_json: outside the JSON profile: syntax at line 1 (SPEC 8.7)",
+        "latin1.json": "invalid_encoding: outside the JSON profile: invalid_utf8 at line 1 (SPEC 8.7)",
     }
 
 
@@ -980,7 +992,7 @@ def test_a_lone_surrogate_names_the_file_instead_of_ending_the_run(
     assert env["records"]["unrecognised"] == [
         {
             "path": "lone.json",
-            "reason": "invalid_encoding: a string holds a lone surrogate, which UTF-8 cannot carry",
+            "reason": "invalid_json: outside the JSON profile: lone_surrogate at line 6 (SPEC 8.7)",
         }
     ]
 

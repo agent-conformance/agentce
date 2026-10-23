@@ -28,10 +28,11 @@ outcomes; ``check_support_matrix`` proves the matrix stays consistent with what 
 from __future__ import annotations
 
 import datetime
-import json
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
+
+from .json_profile import JsonProfileError, read_json
 
 #: The JSON-LD context every canonical payload carries (SPEC 6.2.2).
 BASE_CONTEXT = "https://agent-conformance.org/contexts/evidence/v1"
@@ -577,18 +578,19 @@ def adapt(
     """
     if source_class not in VALID_SOURCE_CLASSES:
         raise AdapterError("bad_source_class", source_class)
+    raw = (
+        payload.encode("utf-8", "surrogatepass")
+        if isinstance(payload, str)
+        else payload
+    )
     try:
-        document = json.loads(payload)
-    except json.JSONDecodeError as exc:
-        raise AdapterError("invalid_json", exc.msg) from exc
-    except UnicodeDecodeError as exc:
-        # Bytes that are not valid UTF-8 at all (hostile or corrupted input) are a decode failure,
-        # not a JSON syntax failure, but still refuse with a stable key rather than crash.
-        raise AdapterError("invalid_encoding", str(exc)) from exc
-    except ValueError as exc:
-        # json.loads raises a bare ValueError (not JSONDecodeError) for an integer literal longer than
-        # sys.int_max_str_digits (4300 digits): still malformed input, refused with the same key.
-        raise AdapterError("invalid_json", str(exc)) from exc
+        # The JSON profile (SPEC 8.7): a leading byte-order mark is ignored, NaN, a repeated key or a
+        # lone surrogate is refused, the same in every engine.
+        document = read_json(raw, bom="ignore")
+    except JsonProfileError as exc:
+        # Bytes that are not UTF-8 at all are a decode failure, not a JSON syntax failure.
+        reason = "invalid_encoding" if exc.rule == "invalid_utf8" else "invalid_json"
+        raise AdapterError(reason, str(exc)) from exc
     if not isinstance(document, dict):
         raise AdapterError("not_otlp", "top-level value is not a JSON object")
 

@@ -9,8 +9,10 @@ from typing import Any
 
 import pytest
 
+from agentce.canonical import CanonicalizationError, canonicalize
 from agentce.safe_json import (
     JsonProfileError,
+    is_json_integer,
     json_equal,
     read_json,
     read_jsonl,
@@ -102,14 +104,33 @@ def test_comparison(case: dict[str, Any]) -> None:
     assert json_equal(right, left) is case["equal"]
 
 
+@pytest.mark.parametrize(
+    "case",
+    [c for c in CASES if c["rule"] == "integer_field_float_form"],
+    ids=lambda c: c["id"],
+)
+def test_integer_field(case: dict[str, Any]) -> None:
+    value = read_json(case["text"].encode(), bom="refuse")
+    assert is_json_integer(value) is (case["expect"] == "accept")
+
+
+@pytest.mark.parametrize(
+    "case",
+    [c for c in CASES if c["rule"] == "non_integer_number"],
+    ids=lambda c: c["id"],
+)
+def test_non_integer_number(case: dict[str, Any]) -> None:
+    with pytest.raises(CanonicalizationError) as exc:
+        canonicalize(read_json(case["text"].encode(), bom="refuse"))
+    assert str(exc.value) == f"non_integer_number: {case['rendered']}"
+
+
 def test_every_rule_is_run() -> None:
     run = {c["rule"] for c in READER} | {
         "number_rendering",
         "compare_by_value",
         "compare_across_types",
-    }
-    later = {
         "integer_field_float_form",
         "non_integer_number",
-    }  # their callers' tests read these rows
-    assert {c["rule"] for c in CASES} <= run | later
+    }
+    assert {c["rule"] for c in CASES} == run

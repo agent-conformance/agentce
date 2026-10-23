@@ -226,6 +226,15 @@ def load_bundle(bundle_dir: Path) -> Bundle:
             "manifest.json is not an object.",
             "regenerate the bundle so its manifest.json is well-formed.",
         )
+    try:
+        # The bundle digest is the canonical manifest's (SPEC 8.1), so a float is refused here.
+        canonical.canonicalize(parsed)
+    except canonical.CanonicalizationError as exc:
+        raise InputError(
+            "input.bundle_manifest_invalid",
+            f"manifest.json cannot be put in canonical form: {exc}.",
+            "regenerate the bundle so its manifest.json is well-formed.",
+        ) from exc
     manifest: dict[str, Any] = parsed
 
     files = manifest.get("files")

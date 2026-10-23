@@ -53,7 +53,6 @@ def test_at_the_limit_reaches_the_shape_stage(tmp_path: Path) -> None:
         ("nan", b'{"keys":{},"x":NaN}'),
         ("lone-surrogate", b'{"keys":{},"x":"\\ud800"}'),
         ("invalid-utf8", b'{"keys":{},"x":"\xff"}'),
-        ("bom", b'\xef\xbb\xbf{"keys":{}}'),
         ("not-json", b"{not json"),
     ],
 )
@@ -66,8 +65,16 @@ def test_other_parse_refusals_name_the_file(
     assert "1000 levels" not in text
 
 
-def test_a_lone_surrogate_has_no_parser_suffix(tmp_path: Path) -> None:
+def test_a_lone_surrogate_names_the_profile_rule(tmp_path: Path) -> None:
     assert (
         _refusal(tmp_path, "s", b'{"keys":{},"x":"\\ud800"}')
-        == "<path> is not readable JSON"
+        == "<path> is not readable JSON: outside the JSON profile: lone_surrogate at line 1 (SPEC 8.7)"
     )
+
+
+def test_a_leading_byte_order_mark_is_ignored(tmp_path: Path) -> None:
+    # An adopter's tool may write the trust root with one (SPEC 8.7: an input's mark is ignored).
+    plain, marked = tmp_path / "plain.json", tmp_path / "bom.json"
+    plain.write_bytes(b'{"keys":{}}')
+    marked.write_bytes(b'\xef\xbb\xbf{"keys":{}}')
+    assert signing.load_trust_root(marked) == signing.load_trust_root(plain)

@@ -3824,7 +3824,7 @@ def _validate_jsonl(filename: str, text: str) -> list[str]:
             if not isinstance(load_report_json(line, i), dict):
                 problems.append(f"{filename}: line {i} is not a JSON object")
         except JSONError as exc:
-            problems.append(f"{filename}: line {i} is not valid JSON ({exc.msg})")
+            problems.append(f"{filename}: {exc.msg}")
     return problems
 
 
@@ -3931,7 +3931,7 @@ def validate_report(out_dir: Path) -> list[str]:
         try:
             instance = load_report_json(text)
         except JSONError as exc:
-            problems.append(f"{filename}: invalid JSON ({exc.msg})")
+            problems.append(f"{filename}: {exc.msg}")
             continue
         if filename == "assertions.json":
             has_assertions = isinstance(instance, list) and bool(instance)
@@ -3973,7 +3973,7 @@ def validate_report(out_dir: Path) -> list[str]:
             try:
                 load_report_json(text)
             except JSONError as exc:
-                problems.append(f"{filename}: invalid JSON ({exc.msg})")
+                problems.append(f"{filename}: {exc.msg}")
         elif (reason := data_file_problem(filename, text)) is not None:
             problems.append(f"{filename}: cannot be read: {reason}")
     for filename in _OPTIONAL_ARTIFACTS:
