@@ -4,10 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 
 /**
@@ -213,8 +215,91 @@ public final class Seams {
             }
         }
 
+        // json-cases is the JSON profile seam (SPEC 8.7, 18.184x) for tools/json_parity_check.py: every row
+        // of the shared case table through this engine's reader, printed as one result per row in table order,
+        // the shape Python's agentce.tools.json_cases and TypeScript's json-cases seam print.
+        if ("json-cases".equals(command)) {
+            if (args.length < 2) {
+                System.err.println("json-cases: a case file path is required");
+                return ExitCode.INPUT_ERROR.code;
+            }
+            ArrayNode out = Json.nodes().arrayNode();
+            for (JsonNode c : Json.readBundled(readAll(Paths.get(args[1]))).get("cases")) {
+                out.addArray().add(c.get("id").asText()).add(jsonCaseResult(c));
+            }
+            System.out.println(Json.compact(out));
+            return 0;
+        }
+
         System.err.println("seams: unknown seam '" + (command == null ? "" : command) + "'");
         return ExitCode.INPUT_ERROR.code;
+    }
+
+    private static byte[] readAll(Path path) {
+        try {
+            return Files.readAllBytes(path);
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+    }
+
+    private static JsonNode jsonValue(JsonNode c, String field) {
+        return Json.readJson(c.get(field).asText().getBytes(StandardCharsets.UTF_8), Json.Bom.REFUSE);
+    }
+
+    private static ObjectNode jsonRefusal(Json.JsonProfileError exc) {
+        ObjectNode node = Json.nodes().objectNode();
+        node.putArray("refuse").add(exc.rule()).add(exc.line());
+        return node;
+    }
+
+    private static ObjectNode jsonReaderResult(JsonNode c) {
+        byte[] raw = c.has("hex")
+                ? HexFormat.of().parseHex(c.get("hex").asText())
+                : c.get("text").asText().getBytes(StandardCharsets.UTF_8);
+        Json.Bom bom = c.has("bom") && c.get("bom").asText().equals("ignore") ? Json.Bom.IGNORE : Json.Bom.REFUSE;
+        ObjectNode node = Json.nodes().objectNode();
+        try {
+            if (c.get("mode").asText().equals("json")) {
+                node.put("canonical", Json.renderValue(Json.readJson(raw, bom)));
+                return node;
+            }
+            String decoded = Json.decodeProfile(raw, bom);
+            ArrayNode records = node.putArray("records");
+            for (Json.ByteLine line : Json.jsonlByteRecords(decoded.getBytes(StandardCharsets.UTF_8))) {
+                Json.readJsonlLine(new String(line.bytes(), StandardCharsets.UTF_8), line.number());
+                records.add(line.number());
+            }
+            return node;
+        } catch (Json.JsonProfileError exc) {
+            return jsonRefusal(exc);
+        }
+    }
+
+    private static ObjectNode jsonCaseResult(JsonNode c) {
+        if (c.has("mode")) {
+            return jsonReaderResult(c);
+        }
+        ObjectNode node = Json.nodes().objectNode();
+        switch (c.get("rule").asText()) {
+            case "number_rendering" -> node.put("rendered", Json.renderNumber(jsonValue(c, "input")));
+            case "compare_by_value", "compare_across_types" -> {
+                JsonNode left = jsonValue(c, "left");
+                JsonNode right = jsonValue(c, "right");
+                node.putArray("equal").add(Json.jsonEqual(left, right)).add(Json.jsonEqual(right, left));
+            }
+            case "integer_field_float_form" -> node.put("integer", Json.isJsonInteger(jsonValue(c, "text")));
+            case "non_integer_number" -> {
+                try {
+                    Canonical.canonicalString(jsonValue(c, "text"));
+                    node.putNull("refusal");
+                } catch (Canonical.CanonicalizationError exc) {
+                    node.put("refusal", exc.getMessage());
+                }
+            }
+            default -> node.put("unknown_rule", c.get("rule").asText());
+        }
+        return node;
     }
 
     /**

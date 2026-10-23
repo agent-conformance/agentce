@@ -7,7 +7,9 @@
 # names the fixture folder whose profile and domain it is assessed under, its subject and its control; a string event
 # is written as one raw line. The real Python, TypeScript and Java CLIs assess it, and the control must give the
 # expected outcome and failing events in every engine, with the expected quarantined record count and exit code, and an
-# insufficient_evidence case's evidence must name the quarantined events it lists.
+# insufficient_evidence case's evidence must name the quarantined events it lists, and a case with a quarantine_rule
+# must have a quarantine entry naming that SPEC 8.7 JSON profile rule. QUARANTINE_NO_PASS_ONLY=<prefix> runs only the
+# cases whose names start with it (VG-JSON-PROFILE runs the json-profile- cases).
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 label="quarantine-no-pass"
@@ -19,13 +21,17 @@ trap 'rm -rf "$work"' EXIT
 (cd "$root/engines/python" && PYTHONPATH="$root/verification/gates" env -u VIRTUAL_ENV uv run --frozen python - "$cases" "$work") <<'PY'
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 
 from fixture_integrity import add_coverage_counts, chain_streams
 
 cases = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))["cases"]
+only = os.environ.get("QUARANTINE_NO_PASS_ONLY", "")
 for name, case in cases.items():
+    if not name.startswith(only):
+        continue
     bundle = Path(sys.argv[2]) / name / "bundle"
     (bundle / "events").mkdir(parents=True)
     # Declared classes, so each record keeps the class its stream has (SPEC §6.4).
@@ -62,6 +68,9 @@ for name, case in cases.items():
     (bundle.parent / "withheld").write_text(f"{str(expected['withheld']).lower()}\n", encoding="utf-8")
     if "fail_on" in case:
         (bundle.parent / "fail_on").write_text(case["fail_on"], encoding="utf-8")
+    if "quarantine_rule" in expected:
+        # The SPEC 8.7 JSON profile rule the quarantine entry must name (18.184x C11).
+        (bundle.parent / "quarantine_rule").write_text(f"{expected['quarantine_rule']}\n", encoding="utf-8")
     if "evidence" in expected:
         # The quarantined events an insufficient_evidence outcome must name (18.119), comma-joined, sorted.
         named = ",".join(sorted(expected["evidence"]))
@@ -140,6 +149,11 @@ check_cases() {
     fi
     if [ "$withheld" = true ] && [ "$has_one" != true ]; then
       echo "$label: $engine $name lists the control under withheld_non_conformant but exit_codes lacks 1" >&2
+      touch "$work/.stop"
+      return 1
+    fi
+    if [ -f "$dir/quarantine_rule" ] && ! grep -q "outside the JSON profile: $(cat "$dir/quarantine_rule") at line" "$out/quarantine.jsonl"; then
+      echo "$label: $engine $name: no quarantine entry names the rule $(cat "$dir/quarantine_rule")" >&2
       touch "$work/.stop"
       return 1
     fi

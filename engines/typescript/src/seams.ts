@@ -11,7 +11,17 @@ import { CanonicalizationError, canonicalString } from "./canonical";
 import { InputError } from "./errors";
 import { ExitCode } from "./exitCodes";
 import { parseFailOn } from "./failOn";
-import { readBundled } from "./json";
+import {
+  JsonProfileError,
+  type NonCanonicalNumber,
+  isJsonInteger,
+  jsonEqual,
+  readBundled,
+  readJson,
+  readJsonl,
+  renderNumber,
+  renderValue,
+} from "./json";
 import { computeVectorFile } from "./numerics";
 import { OtelGenaiAdapterError, adapt as adaptOtelGenai } from "./otelGenai";
 import { catalogProvenanceDigest } from "./report";
@@ -167,8 +177,90 @@ export function main(argv: string[]): number {
     }
   }
 
+  // json-cases is the JSON profile seam (SPEC 8.7, 18.184x) for tools/json_parity_check.py: every row of
+  // the shared case table through this engine's reader, printed as one result per row in table order,
+  // the shape Python's `agentce.tools.json_cases` and Java's `json-cases` seam print.
+  if (command === "json-cases") {
+    const casefile = argv[1];
+    if (casefile === undefined) {
+      console.error("json-cases: a case file path is required");
+      return ExitCode.INPUT_ERROR;
+    }
+    const cases = (readBundled(readFileSync(casefile)) as { cases: JsonCase[] }).cases;
+    console.log(JSON.stringify(cases.map((c) => [c.id, jsonCaseResult(c)])));
+    return 0;
+  }
+
   console.error(`seams: unknown seam '${command ?? ""}'`);
   return ExitCode.INPUT_ERROR;
+}
+
+interface JsonCase {
+  id: string;
+  rule: string;
+  mode?: "json" | "jsonl";
+  bom?: "ignore" | "refuse";
+  text?: string;
+  hex?: string;
+  input?: string;
+  left?: string;
+  right?: string;
+}
+
+const jsonValue = (text: string): unknown => readJson(Buffer.from(text, "utf8"), "refuse");
+
+function jsonReaderResult(c: JsonCase): Record<string, unknown> {
+  const raw = c.hex !== undefined ? Buffer.from(c.hex, "hex") : Buffer.from(c.text ?? "", "utf8");
+  const bom = c.bom ?? "refuse";
+  try {
+    if (c.mode === "json") {
+      return { canonical: renderValue(readJson(raw, bom)) };
+    }
+    const lines = readJsonl(raw, bom);
+    const bad = lines.find(([, v]) => v instanceof JsonProfileError);
+    if (bad !== undefined) {
+      const exc = bad[1] as JsonProfileError;
+      return { refuse: [exc.rule, exc.line] };
+    }
+    return { records: lines.map(([n]) => n) };
+  } catch (exc) {
+    if (exc instanceof JsonProfileError) {
+      return { refuse: [exc.rule, exc.line] };
+    }
+    throw exc;
+  }
+}
+
+function jsonCaseResult(c: JsonCase): Record<string, unknown> {
+  if (c.mode !== undefined) {
+    return jsonReaderResult(c);
+  }
+  switch (c.rule) {
+    case "number_rendering":
+      return {
+        rendered: renderNumber(jsonValue(c.input as string) as number | NonCanonicalNumber),
+      };
+    case "compare_by_value":
+    case "compare_across_types": {
+      const left = jsonValue(c.left as string);
+      const right = jsonValue(c.right as string);
+      return { equal: [jsonEqual(left, right), jsonEqual(right, left)] };
+    }
+    case "integer_field_float_form":
+      return { integer: isJsonInteger(jsonValue(c.text as string)) };
+    case "non_integer_number":
+      try {
+        canonicalString(jsonValue(c.text as string));
+      } catch (exc) {
+        if (exc instanceof CanonicalizationError) {
+          return { refusal: exc.message };
+        }
+        throw exc;
+      }
+      return { refusal: null };
+    default:
+      return { unknown_rule: c.rule };
+  }
 }
 
 if (require.main === module) {

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.120.0",
+  "suite_version": "0.121.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -1966,6 +1966,55 @@
           "file": "spec/rules/yaml-profile-cases.json",
           "search": "\"id\": \"anchor-1\",\n      \"rule\": \"anchor\",\n      \"expect\": \"refuse\",",
           "replace": "\"id\": \"anchor-1\",\n      \"rule\": \"anchor\",\n      \"expect\": \"accept\","
+        }
+      ]
+    },
+    {
+      "id": "VG-JSON-PROFILE",
+      "title": "every engine reads JSON under the SPEC 8.7 profile: each row of the shared case table spec/report/json-cases.json gives the table's result through every engine's reader, number rendering and comparison, seven real-CLI rows give the profile's exit code, key and text in all three engines, and a records line outside the profile never makes a non-conformant control read better (18.184x)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/json_profile.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 900,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "tools/json_parity_check.py --self-test catches its seeded faults; every case-table row's result from the Python, TypeScript and Java json-cases seams equals the table's; the seven --cli rows give the expected exit code, key and text in all three engines; and the json-profile- cases of VG-QUARANTINE-NO-PASS read insufficient_evidence with a quarantine entry naming the rule",
+        "fail": "the table loses a rule's row or a required rendering or comparison, an engine reads, refuses, renders or compares a row other than the table says, a CLI row's exit code, key or text differs from the profile's, or a records line outside the profile lets ROB-02 read better than non-conformant"
+      },
+      "fix_hint": "run verification/gates/json_profile.sh and read the first FAIL line; each engine's reader is engines/python/agentce/safe_json.py, engines/typescript/src/json.ts and engines/java/src/main/java/org/agentce/Json.java, the seams are agentce.tools.json_cases, src/seams.ts and org.agentce.Seams, and the cases are spec/report/json-cases.json",
+      "faults": [
+        {
+          "description": "TypeScript's number rendering drops the .0 of an integral float",
+          "file": "engines/typescript/src/json.ts",
+          "search": "  return `${sign}${intPart}.${fracPart === \"\" ? \"0\" : fracPart}`;",
+          "replace": "  return fracPart === \"\" ? `${sign}${intPart}` : `${sign}${intPart}.${fracPart}`;"
+        },
+        {
+          "description": "Java's reader accepts a repeated key",
+          "file": "engines/java/src/main/java/org/agentce/Json.java",
+          "search": "if (!top.orElseThrow().add(key.toString())) {",
+          "replace": "if (!top.orElseThrow().add(key.toString()) && false) {"
+        },
+        {
+          "description": "Python's reader refuses a byte-order mark in an input read with bom ignore",
+          "file": "engines/python/agentce/safe_json.py",
+          "search": "    if raw.startswith(BOM):\n        if bom == \"refuse\":",
+          "replace": "    if raw.startswith(BOM):\n        if bom in (\"refuse\", \"ignore\"):"
+        },
+        {
+          "description": "TypeScript reads sign's claim.json without number kinds, so 5.0 becomes 5",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "    claim = parseUntrustedJson(readFileSync(claimPath));",
+          "replace": "    claim = JSON.parse(readFileSync(claimPath, \"utf8\"));"
         }
       ]
     },

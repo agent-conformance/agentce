@@ -3,6 +3,22 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.121.0
+
+- `VG-JSON-PROFILE` (18.184x, added): every engine reads JSON under the SPEC 8.7 profile. The gate runs
+  `tools/json_parity_check.py`, which holds `spec/report/json-cases.json` to its shape (a row for every rule, the
+  `1e+20`, `5.0` and `-0.0` renderings, `1` vs `true` unequal and `1` vs `1.0` equal) and feeds every row to each
+  engine's `json-cases` seam, comparing each result with the table's; then seven real-CLI rows (a manifest with a
+  byte-order mark, a repeated `files` key, a coverage count of `1e20`, `diff` on NaN, `report --from` with a `rung`
+  of `1.5`, a `state_version` of `true`, `sign` on a claim holding `5.0`); then the `json-profile-` cases of
+  `VG-QUARANTINE-NO-PASS`. Four seeded faults.
+- `VG-QUARANTINE-NO-PASS` (18.184x, changed): three cases put the write that makes ROB-02 non-conformant outside
+  the JSON profile (a repeated key whose last value reads trusted, a NaN, a lone surrogate); each must read
+  insufficient_evidence with a quarantine entry naming the rule. `QUARANTINE_NO_PASS_ONLY=<prefix>` runs a subset.
+- `VG-TRUST-ROOT-PARSE-PARITY`, `VG-JSON-INTEGER-LIMIT` and `VG-RECORDS-FOLDER-PARITY` (18.184x, changed): a
+  trust root with one leading byte-order mark is read, and refusals carry the profile wording
+  `outside the JSON profile: <rule> at line <n> (SPEC 8.7)`, with a records line's rule at its file line.
+
 ## 0.120.0
 
 - `VG-ARGV-GRAMMAR` (18.184w, added): every engine reads its command line under the SPEC 8.5 grammar. The gate

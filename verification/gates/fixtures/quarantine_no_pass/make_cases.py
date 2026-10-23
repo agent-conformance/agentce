@@ -9,6 +9,7 @@ late record that changes nothing, an unreadable record of another subject) leave
 names the fixture folder whose profile and domain it is assessed under."""
 
 import copy
+import json
 import sys
 from pathlib import Path
 
@@ -17,7 +18,6 @@ from approval_events import CTX, NC, TWO, C, appr, cnd02, dec, ran, write  # noq
 from approval_events import SUBJECT as OVS  # noqa: E402
 
 IE = "insufficient_evidence"
-
 
 
 def case(
@@ -33,11 +33,13 @@ def case(
     evidence=None,
     withheld=False,
     fail_on=None,
+    rule=None,
 ):
     """``evidence`` is the quarantined event ids an insufficient_evidence case names (an unreadable line names none).
     ``withheld`` says the --json output lists the case control under withheld_non_conformant: its withheld records
     read non-conformant with the held ones, so assess exits as for a non-conformant outcome (18.149). ``fail_on`` is a
-    --fail-on expression the case is assessed with."""
+    --fail-on expression the case is assessed with. ``rule`` is the SPEC 8.7 JSON profile rule the quarantine entry must
+    name."""
     if exit is None:
         # The approval fixture's profile holds other high-severity controls these bundles leave unmet (exit 2).
         exit = 2 if fixture == "approval_outcome" else 0
@@ -58,6 +60,8 @@ def case(
         C[name]["expected"]["evidence"] = list(evidence)
     if fail_on is not None:
         C[name]["fail_on"] = fail_on
+    if rule is not None:
+        C[name]["expected"]["quarantine_rule"] = rule
 
 
 def ev(subject, i, t, at, cls, **data):
@@ -84,14 +88,35 @@ def rob(i, t, sec, cls="enforcement_point", **data):
 
 
 def write_(i, sec, record, trust, verdict):
-    return rob(i, "MemoryWrite", sec, store="kb", record_ref=record, trust=trust, guard_verdict=verdict)
+    return rob(
+        i,
+        "MemoryWrite",
+        sec,
+        store="kb",
+        record_ref=record,
+        trust=trust,
+        guard_verdict=verdict,
+    )
 
 
 W1 = write_("w1", 1, "mem:r1", "trusted", "allow")
 W2 = write_("w2", 2, "mem:r1", "untrusted", "block")
-READ = rob("m1", "MemoryRead", 3, store="kb", record_refs=["mem:r1"], refs={"consumer": "agentce:event/d1"})
+READ = rob(
+    "m1",
+    "MemoryRead",
+    3,
+    store="kb",
+    record_refs=["mem:r1"],
+    refs={"consumer": "agentce:event/d1"},
+)
 DECIDE = rob(
-    "d1", "Decision", 4, cls="self_report", decision_type="dom:CreditDecision", agent={"id": ROB}, inputs=["mem:r1"]
+    "d1",
+    "Decision",
+    4,
+    cls="self_report",
+    decision_type="dom:CreditDecision",
+    agent={"id": ROB},
+    inputs=["mem:r1"],
 )
 # Delivered on time the write makes ROB-02 non-conformant (exit 1), so delivered late it exits 1 too (18.149).
 LATE_WRITE = [W1, READ, W2, DECIDE]
@@ -173,6 +198,36 @@ case(
     ["d1"],
     exit=1,
 )
+# The write that makes ROB-02 non-conformant, outside the JSON profile (SPEC 8.7, 18.184x C11): a repeated key whose
+# last value would read trusted, a NaN and a lone surrogate. Each line is quarantined naming the rule, and the control
+# never reads better than on time: insufficient_evidence, never conformant.
+W2_LINE = json.dumps(W2, sort_keys=True)
+for rule, line in (
+    (
+        "duplicate_key",
+        W2_LINE.replace(
+            '"trust": "untrusted"', '"trust": "untrusted", "trust": "trusted"'
+        ),
+    ),
+    ("nan", W2_LINE.replace('"store": "kb"', '"note": NaN, "store": "kb"')),
+    (
+        "lone_surrogate",
+        W2_LINE.replace('"store": "kb"', '"note": "\\ud800", "store": "kb"'),
+    ),
+):
+    assert line != W2_LINE
+    case(
+        f"json-profile-in-order-write-{rule.replace('_', '-')}",
+        "rob02_untrusted",
+        ROB,
+        "ROB-02",
+        [W1, line, READ, DECIDE],
+        IE,
+        quarantined=1,
+        exit=2,
+        evidence=[],
+        rule=rule,
+    )
 # The guard's read supplies ROB-02's minimum evidence, so without it the held records read insufficient_evidence, not
 # conformant: delivered after a later write of the guard's stream it is still judged with them, reads non-conformant
 # and exits 1 as on time (18.149).
@@ -272,7 +327,14 @@ CND = "spiffe://corp/agents/cnd05-fixture"
 
 
 def instruction():
-    return ev(CND, "i1", "Instruction", "2026-01-02T00:00:01Z", "enforcement_point", source_class="tool_output")
+    return ev(
+        CND,
+        "i1",
+        "Instruction",
+        "2026-01-02T00:00:01Z",
+        "enforcement_point",
+        source_class="tool_output",
+    )
 
 
 def call(refs):
@@ -339,13 +401,29 @@ LATE_ACTION = [
     at(appr("approve", i="a2", d="d2"), "02:00:00"),
     at(appr("approve"), "02:00:00"),
 ]
-case("cnd02-approve-after-action-quarantined-time-order", "approval_outcome", OVS, "CND-02", LATE_ACTION, IE, quarantined=2, evidence=["t0", "t0-gate"], withheld=True)
+case(
+    "cnd02-approve-after-action-quarantined-time-order",
+    "approval_outcome",
+    OVS,
+    "CND-02",
+    LATE_ACTION,
+    IE,
+    quarantined=2,
+    evidence=["t0", "t0-gate"],
+    withheld=True,
+)
 case(
     "cnd02-reject-spelled-Reject",
     "approval_outcome",
     OVS,
     "CND-02",
-    [dec(), *TWO, at(appr("approve"), "01:00:00"), at(appr("Reject", i="a2"), "02:00:00"), at(ran(), "03:00:00")],
+    [
+        dec(),
+        *TWO,
+        at(appr("approve"), "01:00:00"),
+        at(appr("Reject", i="a2"), "02:00:00"),
+        at(ran(), "03:00:00"),
+    ],
     IE,
     quarantined=1,
     evidence=["a2"],
@@ -355,7 +433,13 @@ case(
     "approval_outcome",
     OVS,
     "CND-02",
-    [dec(), *TWO, at(appr("approve"), "01:00:00"), at(appr("reject"), "02:00:00"), at(ran(), "03:00:00")],
+    [
+        dec(),
+        *TWO,
+        at(appr("approve"), "01:00:00"),
+        at(appr("reject"), "02:00:00"),
+        at(ran(), "03:00:00"),
+    ],
     IE,
     quarantined=1,
     evidence=["a1"],
@@ -404,7 +488,15 @@ case(
 )
 heartbeat = at(ran("d1", "h1"), "03:00:00")
 heartbeat["type"] = "org.agent-conformance.evidence.Heartbeat.v1"
-case("cnd02-unknown-type-is-benign", "approval_outcome", OVS, "CND-02", [*GATED, heartbeat], "conformant", quarantined=1)
+case(
+    "cnd02-unknown-type-is-benign",
+    "approval_outcome",
+    OVS,
+    "CND-02",
+    [*GATED, heartbeat],
+    "conformant",
+    quarantined=1,
+)
 other = at(appr("Reject", i="a9"), "04:00:00")
 other["subject"] = "spiffe://corp/agents/someone-else"
 case(

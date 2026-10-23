@@ -195,7 +195,7 @@
    "line": 1
   },
   {
-   "id": "negative",
+   "id": "negative-infinity",
    "rule": "infinity",
    "mode": "json",
    "bom": "ignore",
@@ -267,7 +267,7 @@
    "line": 1
   },
   {
-   "id": "negative",
+   "id": "negative-leading-zero",
    "rule": "leading_zero",
    "mode": "json",
    "bom": "ignore",
