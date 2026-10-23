@@ -2,7 +2,7 @@
 # Build gate helper for VG-FAST-TIER-REPORT-FILE-PARITY (18.184v): three-engine.yml, a fast-tier workflow that runs on
 # every phase push, runs the cross-engine readiness, sign and report --validate agreement checks from source, each
 # --self-test then the real run, in one unconditional job of 20 minutes or less. Without it a phase push that made one
-# engine disagree went green on the fast tier (quickstart.yml runs the same checks on main, pull requests and dispatch).
+# engine disagree went green on the fast tier (quickstart.yml then ran the same checks on main, pull requests and dispatch only).
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$root"

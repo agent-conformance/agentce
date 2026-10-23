@@ -14,6 +14,11 @@ fails if a gate in `gates.json` is not named in this file.
   `VG-FAIL-ON-PARITY` (18.184w, changed): an option given twice is refused in every engine, where these gates had
   expected the last one to win. `VG-CLI-UTILITY`'s diff fault now drops the `=` form of `--format`, since a
   repeated `--format` no longer reaches the command.
+- `VG-VERIFY-CENSUS-SHARD-COVERAGE` (18.184w, changed): `quickstart.yml` joins the fast tier, so the expected
+  triggers are push to main and to `phase/**`, pull request and manual dispatch, and the workflow's root
+  `concurrency:` must be the fast tier's cancel-in-progress block. The paths-ignore seeded fault searches for the new
+  `branches: [main, "phase/**"]` line. The census puts `--json` before a `--` in a mutation's argv, since after `--`
+  every token is a positional.
 
 ## 0.119.0
 

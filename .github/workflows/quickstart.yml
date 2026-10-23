@@ -2,7 +2,7 @@
 # each engine runs end to end within five minutes — the Python engine assesses the vendored quickstart
 # project; the TypeScript and Java engines, which implement `conformance run`, run the conformance suite
 # and must write one assertions.json per project — and the engine container image builds and runs the quickstart with no network. Runs on every
-# push to main and on every pull request, and can be dispatched by hand; every
+# push to main and to a phase/** branch (it is a fast-tier workflow) and on every pull request, and can be dispatched by hand; every
 # action is pinned by commit SHA (AGENTS.md quality gates). No image is pushed. The
 # installed-artifacts-offline job builds the wheel, sdist, npm tarball and runnable jar from the current
 # sources, installs each outside the checkout and runs it from an empty directory with the network cut.
@@ -10,9 +10,13 @@ name: quickstart
 
 on:
   push:
-    branches: [main]
+    branches: [main, "phase/**"]
   pull_request:
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

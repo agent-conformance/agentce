@@ -62,7 +62,7 @@ results are added as the suite grows, and every change to a gate is recorded in 
 ## CI tiers
 
 Every push to a `phase/**` branch runs the fast tier: the quick tier in `verification-quick.yml`, with the other fast
-workflows. The seeded-fault demos and the required `quick` check run in `verification.yml`, the full tier, on push to
+workflows, `quickstart.yml` among them (the fresh-machine runs, the installed artifacts and the verify census). The seeded-fault demos and the required `quick` check run in `verification.yml`, the full tier, on push to
 `main`, on every pull request, and on manual dispatch.
 
 ## Demo shard durations

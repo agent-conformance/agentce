@@ -95,9 +95,15 @@ SELF_TEST_RUNS = (
 ALLOWED_OUTSIDE_CENSUS = {SCENARIOS_RUN, SELF_TEST_RUNS[1], LIST_LINE}
 # The workflow's whole `on:`, compared exactly: any filter or dropped trigger is rejected by construction.
 EXPECTED_TRIGGERS: dict[str, Any] = {
-    "push": {"branches": ["main"]},
+    "push": {"branches": ["main", "phase/**"]},
     "pull_request": None,
     "workflow_dispatch": None,
+}
+# The fast tier's one concurrency block (as in three-engine.yml): a newer push to the same ref
+# cancels the older run. Any other value, a job-level one included, is rejected.
+EXPECTED_CONCURRENCY: dict[str, Any] = {
+    "group": "${{ github.workflow }}-${{ github.ref }}",
+    "cancel-in-progress": True,
 }
 REFUSAL_TIMEOUT_S = 60
 
@@ -143,6 +149,16 @@ def trigger_problems(doc: Any) -> list[str]:
         f"the workflow's on: is {triggers!r}, not exactly {EXPECTED_TRIGGERS!r}; a paths, "
         "paths-ignore or branch filter, or a dropped trigger, stops the census running on some "
         "changes (update EXPECTED_TRIGGERS here if a trigger change is deliberate)"
+    ]
+
+
+def concurrency_problems(doc: Any) -> list[str]:
+    """The workflow's root `concurrency:` must be exactly `EXPECTED_CONCURRENCY`."""
+    found = doc.get("concurrency") if isinstance(doc, dict) else None
+    if found == EXPECTED_CONCURRENCY:
+        return []
+    return [
+        f"the workflow's concurrency: is {found!r}, not exactly {EXPECTED_CONCURRENCY!r}"
     ]
 
 
@@ -386,8 +402,14 @@ def check_workflow(
         return [f"{workflow_path}: unreadable: {exc}"]
     raw_jobs = doc.get("jobs") if isinstance(doc, dict) else None
     jobs: dict[str, Any] = raw_jobs if isinstance(raw_jobs, dict) else {}
+    root_keys = (
+        {k: v for k, v in doc.items() if k != "concurrency"}
+        if isinstance(doc, dict)
+        else doc
+    )
     problems = (
-        workflow_level_problems(doc)
+        workflow_level_problems(root_keys)
+        + concurrency_problems(doc)
         + trigger_problems(doc)
         + census_list_job_problems(jobs.get(LIST_JOB))
         + census_job_problems(jobs.get(CENSUS_JOB))
@@ -694,6 +716,11 @@ def self_test() -> int:
             False,
         ),
         (
+            "phase pushes dropped",
+            {True: {**EXPECTED_TRIGGERS, "push": {"branches": ["main"]}}},
+            False,
+        ),
+        (
             "paths on pull_request",
             {True: {**EXPECTED_TRIGGERS, "pull_request": {"paths": ["engines/**"]}}},
             False,
@@ -740,8 +767,19 @@ def self_test() -> int:
         ),
         ("crashed (exit 2)", (2, f"MISMATCH: {own} {wrong}"), False),
     ]
+    concurrency_cases: list[tuple[str, Any, bool]] = [
+        ("the fast tier's block", {"concurrency": EXPECTED_CONCURRENCY}, True),
+        ("no block", {}, False),
+        (
+            "no cancel",
+            {"concurrency": {**EXPECTED_CONCURRENCY, "cancel-in-progress": False}},
+            False,
+        ),
+        ("one group for every ref", {"concurrency": "quickstart"}, False),
+    ]
     judged: list[tuple[list[tuple[str, Any, bool]], Any]] = [
         (list_job_cases, census_list_job_problems),
+        (concurrency_cases, concurrency_problems),
         (trigger_cases, trigger_problems),
         (reference_cases, lambda reference: reference_problems(reference, full)),
         (refusal_cases, lambda args: refusal_problems(args[0], args[1], own, wrong)),

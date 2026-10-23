@@ -127,7 +127,7 @@ jobs:
         run: uv run --frozen pytest -q -p no:cacheprovider tests/test_numerics.py
 
   # The cross-engine agreement checks for readiness, sign and report --validate, from source, on every phase push
-  # (18.184v): quickstart.yml runs the same checks on main, pull requests and dispatch only, so a phase push that made
+  # (18.184v): quickstart.yml then ran the same checks on main, pull requests and dispatch only, so a phase push that made
   # one engine disagree went green on the fast tier. VG-FAST-TIER-REPORT-FILE-PARITY holds this job's wiring.
   report-file-parity:
     name: readiness, sign and report --validate agree across engines
