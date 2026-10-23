@@ -33,6 +33,11 @@ export function pspTermsPath(): string {
   return join(dataRoot(), "psp-terms.json");
 }
 
+/** The vendored SPEC 8.5 command-line grammar (the original is `spec/cli/argv-grammar.json`). */
+export function argvGrammarPath(): string {
+  return join(dataRoot(), "cli", "argv-grammar.json");
+}
+
 /** The vendored ICU MessageFormat catalogue (the language-neutral original lives in `spec/i18n/`). */
 export function i18nDir(): string {
   return join(dataRoot(), "i18n");

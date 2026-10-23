@@ -1,113 +1,13 @@
 /**
- * report on the shared argv scanner (18.110): the two grammar additions report needs (an option's
- * `choices`, refused at once with its own error, and an option's own needs-value key), and the public
- * conformance statement against Python's `render_public_statement` over the same assertions. The
- * expected statements are Python's output, pasted verbatim. `ReportCliTest.java` pins the same.
+ * The public conformance statement against Python's `render_public_statement` over the same
+ * assertions (18.110). The expected statements are Python's output, pasted verbatim.
+ * `ReportCliTest.java` pins the same. report's `choices` and needs-value keys are pinned in
+ * `argv.test.ts`.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { type Grammar, scanArgv } from "./argv";
 import { type Assertion, assertionFromJson } from "./assertions";
-import { InputError } from "./errors";
 import { appliedDeviationIds, renderPublicStatement } from "./report";
-
-const G: Grammar = {
-  options: [
-    { names: ["-h", "--help"], kind: "help" },
-    { names: ["--json"], kind: "flag" },
-    { names: ["--from"], kind: "value", needsValueKey: "input.from_missing" },
-    {
-      names: ["--format"],
-      kind: "value",
-      choices: {
-        values: ["md", "public"],
-        error: (value) => new InputError("input.t_format", `bad format '${value}'.`, "FMT-FIX"),
-      },
-    },
-    { names: ["--out"], kind: "value" },
-  ],
-  maxPositionals: 0,
-  unrecognizedKey: "input.t_unrecognized_flag",
-  needsValueKey: "input.t_default_needs_value",
-  needsValueCause: "plain",
-  flagFix: "FLAG-FIX",
-  extraArgFix: "EXTRA-FIX",
-};
-
-function refusal(argv: string[]): { key: string; cause: string; fix: string } {
-  try {
-    scanArgv(argv, G);
-  } catch (exc) {
-    assert.ok(exc instanceof InputError);
-    return { key: exc.key, cause: exc.cause, fix: exc.fix };
-  }
-  assert.fail(`no refusal for ${JSON.stringify(argv)}`);
-}
-
-const badFormat = (value: string) => ({
-  key: "input.t_format",
-  cause: `bad format '${value}'.`,
-  fix: "FMT-FIX",
-});
-
-test("a choice outside the list is refused at once with its own error, in either spelling", () => {
-  assert.deepEqual(refusal(["--format", "nope"]), badFormat("nope"));
-  assert.deepEqual(refusal(["--format=nope"]), badFormat("nope"));
-  assert.deepEqual(refusal(["--format="]), badFormat(""));
-  assert.deepEqual(refusal(["--format", ""]), badFormat(""));
-});
-
-test("a bad choice is refused before a later unknown flag, extra argument or missing value", () => {
-  assert.deepEqual(refusal(["--format", "nope", "--no-such-flag"]), badFormat("nope"));
-  assert.deepEqual(refusal(["--format", "nope", "extra"]), badFormat("nope"));
-  assert.deepEqual(refusal(["--format", "nope", "--from"]), badFormat("nope"));
-  // An earlier missing value is still refused first: argv order.
-  assert.equal(refusal(["--from", "--format", "nope"]).key, "input.from_missing");
-});
-
-test("a good choice is read, the last one wins, and a later bad one is refused", () => {
-  assert.equal(scanArgv(["--format", "md", "--format=public"], G).values["--format"], "public");
-  assert.deepEqual(refusal(["--format", "public", "--format", "nope"]), badFormat("nope"));
-});
-
-test("an option's own needs-value key, else the grammar's default, with Python's plain cause", () => {
-  assert.deepEqual(refusal(["--from"]), {
-    key: "input.from_missing",
-    cause: "flag '--from' needs a value.",
-    fix: "pass --from <value>.",
-  });
-  assert.deepEqual(refusal(["--out", "--json"]), {
-    key: "input.t_default_needs_value",
-    cause: "flag '--out' needs a value.",
-    fix: "pass --out <value>.",
-  });
-  assert.equal(refusal(["--format"]).key, "input.t_default_needs_value");
-});
-
-test("a grammar without needsValueCause keeps argparse's own sentence (assess)", () => {
-  const argparseCause: Grammar = { ...G, needsValueCause: undefined };
-  try {
-    scanArgv(["--from"], argparseCause);
-    assert.fail("no refusal");
-  } catch (exc) {
-    assert.ok(exc instanceof InputError);
-    assert.equal(exc.key, "input.from_missing");
-    assert.equal(exc.cause, "argument --from: expected one argument");
-  }
-});
-
-test("to a command with no positionals, `--` is itself the unrecognized flag, as argparse leaves it", () => {
-  const dashes = {
-    key: "input.t_unrecognized_flag",
-    cause: "unrecognized flag '--'.",
-    fix: "FLAG-FIX",
-  };
-  assert.deepEqual(refusal(["--from", "a", "--"]), dashes);
-  assert.deepEqual(refusal(["--from", "a", "--", "-h"]), dashes);
-  assert.deepEqual(refusal(["--", "--from", "a"]), dashes);
-  // An unknown flag before it is still the first refused.
-  assert.equal(refusal(["--nope", "--"]).cause, "unrecognized flag '--nope'.");
-});
 
 function mk(control: string, subject: string, outcome: string, deviation?: string): Assertion {
   return assertionFromJson({

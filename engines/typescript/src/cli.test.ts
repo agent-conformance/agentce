@@ -610,7 +610,8 @@ test("assess refuses --manual, --probes, packaging, an unknown language and a ba
       "input.report_language_unknown",
       "--report-language 'xx' has no report catalogue.",
     ],
-    [["--out"], "input.assess_flag_needs_value", "argument --out: expected one argument"],
+    [["--state"], "input.assess_flag_needs_value", "flag '--state' needs a value."],
+    [["--out", "o2"], "input.assess_unrecognized_flag", "flag '--out' was given more than once."],
   ];
   for (const [extra, key, cause] of cases) {
     withOut("assess-refused", (out) => {
@@ -682,20 +683,33 @@ test("assess --report-language de writes the German report and records the langu
   });
 });
 
-test("assess takes the last of a repeated value option and reads --<option>=<v> for every one (18.109)", () => {
-  withOut("assess-last-wins", (out) => {
+test("assess reads --<option>=<v> for every value option and refuses a repeated one (SPEC 8.5)", () => {
+  withOut("assess-equals", (out) => {
+    const { exitCode, envelope } = runEnvelope([
+      "assess",
+      "--json",
+      `--bundle=${join(quickstartDir(), "evidence")}`,
+      `--profile=${join(quickstartDir(), "applicability.yaml")}`,
+      `--out=${join(out, "b")}`,
+    ]);
+    assert.notEqual(exitCode, 3, JSON.stringify(envelope.error));
+    assert.deepEqual(readdirSync(out), ["b"]);
+  });
+  withOut("assess-repeated", (out) => {
     const { exitCode, envelope } = runEnvelope([
       "assess",
       "--json",
       "--bundle=nope",
       `--bundle=${join(quickstartDir(), "evidence")}`,
-      `--profile=${join(quickstartDir(), "applicability.yaml")}`,
       `--out=${join(out, "a")}`,
-      "--out",
-      join(out, "b"),
     ]);
-    assert.notEqual(exitCode, 3, JSON.stringify(envelope.error));
-    assert.deepEqual(readdirSync(out), ["b"]);
+    assert.equal(exitCode, 3);
+    assert.deepEqual(envelope.error, {
+      message_key: "input.assess_unrecognized_flag",
+      detail: "flag '--bundle' was given more than once.",
+      fix: "give --bundle once.",
+    });
+    assert.deepEqual(readdirSync(out), []);
   });
 });
 
@@ -716,21 +730,27 @@ test("assess --deviations before another option is refused, never read as the pa
   });
 });
 
-test("assess repeated --deviations: the last register wins, in either order", () => {
-  withOut("assess-deviations-last", (out) => {
+test("assess repeated --deviations is refused, in either order, before anything is written", () => {
+  withOut("assess-deviations-repeated", (out) => {
     const empty = join(out, "empty.yaml");
     writeFileSync(empty, "deviation_register_version: 1\ndeviations: []\n");
-    const emptyDigest = digestBytes(readFileSync(empty));
-    for (const [first, last, digest, auv01] of [
-      [AUDITOR_REGISTER, empty, emptyDigest, "non-conformant"],
-      [empty, AUDITOR_REGISTER, AUDITOR_REGISTER_DIGEST, "partial"],
+    for (const [first, last] of [
+      [AUDITOR_REGISTER, empty],
+      [empty, AUDITOR_REGISTER],
     ] as const) {
       const report = join(out, "report");
-      rmSync(report, { recursive: true, force: true });
-      runEnvelope([...auditorAssessArgs(report), "--deviations", first, "--deviations", last]);
-      const facts = deviationFacts(report);
-      assert.equal(facts.digest, digest);
-      assert.equal(facts.outcomes["AUV-01"]?.[0], auv01);
+      const { exitCode, envelope } = runEnvelope([
+        ...auditorAssessArgs(report),
+        "--deviations",
+        first,
+        `--deviations=${last}`,
+      ]);
+      assert.equal(exitCode, 3);
+      assert.equal(
+        (envelope.error as Record<string, string>).detail,
+        "flag '--deviations' was given more than once.",
+      );
+      assert.ok(!existsSync(report));
     }
   });
 });
@@ -807,7 +827,7 @@ test("assess --fail-on gates the exit code", () => {
   });
 });
 
-test("assess --fail-on=<expr> and the last --fail-on wins", () => {
+test("assess --fail-on=<expr>, and a repeated --fail-on is refused", () => {
   withOut("assess-fail-on-last", (out) => {
     let run = failOnRun([...auditorAssessArgs(out), '--fail-on=severity=="critical"'], out);
     assert.equal(run.exitCode, 3);
@@ -816,27 +836,29 @@ test("assess --fail-on=<expr> and the last --fail-on wins", () => {
       [...auditorAssessArgs(out), "--fail-on", 'control=="AUV-01"', "--fail-on", 'control=="none"'],
       out,
     );
-    assert.equal(run.exitCode, 0);
-    assert.deepEqual(run.failOn, { expression: 'control=="none"', matched: 0 });
-    run = failOnRun(
-      [...auditorAssessArgs(out), "--fail-on", 'control=="none"', '--fail-on=control=="AUV-01"'],
-      out,
-    );
+    assert.equal(run.exitCode, 3);
+    assert.equal(run.error?.detail, "flag '--fail-on' was given more than once.");
+    assert.equal(run.written, false);
+    run = failOnRun([...auditorAssessArgs(out), '--fail-on=control=="AUV-01"'], out);
     assert.equal(run.exitCode, 1);
     assert.deepEqual(run.failOn, { expression: 'control=="AUV-01"', matched: 1 });
     // An empty value is a value, refused by the parser, not by the argv scan.
     run = failOnRun([...auditorAssessArgs(out), "--fail-on="], out);
     assert.equal(run.error?.message_key, "input.fail_on_invalid_expression");
-    // Values that start with '-' which argparse still reads as values (M4, M7, M8, M9).
+    // A value that starts with '-' is read only after `=` (SPEC 8.5); as the next token it is no
+    // value.
+    for (const argv of [["--fail-on=-x"], ["--fail-on=-1"], ["--fail-on=-a b"]]) {
+      run = failOnRun([...auditorAssessArgs(out), ...argv], out);
+      assert.equal(run.error?.message_key, "input.fail_on_invalid_expression", argv.join(" "));
+      assert.match(run.error?.detail ?? "", /unexpected character '-' at position 0$/);
+    }
     for (const argv of [
-      ["--fail-on=-x"],
       ["--fail-on", "-1"],
       ["--fail-on", "-a b"],
       ["--fail-on", "-\u0661"],
     ]) {
       run = failOnRun([...auditorAssessArgs(out), ...argv], out);
-      assert.equal(run.error?.message_key, "input.fail_on_invalid_expression", argv.join(" "));
-      assert.match(run.error?.detail ?? "", /unexpected character '-' at position 0$/);
+      assert.equal(run.error?.message_key, "input.assess_flag_needs_value", argv.join(" "));
     }
   });
 });
@@ -853,7 +875,7 @@ test("assess --fail-on with no value is refused", () => {
       assert.equal(run.exitCode, 3);
       assert.deepEqual(run.error, {
         message_key: "input.assess_flag_needs_value",
-        detail: "argument --fail-on: expected one argument",
+        detail: "flag '--fail-on' needs a value.",
         fix: "pass --fail-on <expression>.",
       });
       assert.equal(run.written, false);
@@ -867,11 +889,11 @@ test("assess value flags name the first missing value", () => {
       [...auditorAssessArgs(out), "--fail-on", "--deviations", AUDITOR_REGISTER],
       out,
     );
-    assert.equal(run.error?.detail, "argument --fail-on: expected one argument");
+    assert.equal(run.error?.detail, "flag '--fail-on' needs a value.");
     run = failOnRun([...auditorAssessArgs(out), "--deviations", "--fail-on", 'control=="x"'], out);
     assert.deepEqual(run.error, {
       message_key: "input.assess_flag_needs_value",
-      detail: "argument --deviations: expected one argument",
+      detail: "flag '--deviations' needs a value.",
       fix: "pass --deviations <file>.",
     });
     assert.equal(run.written, false);
@@ -2284,10 +2306,11 @@ test("verify: a usage error is the keyed envelope Python and Java give, and an a
     [["--catalog", "x", "extra"], "unrecognized argument 'extra'."],
     [["--", "--catalog", "x"], "unrecognized flag '--'."],
     [["--catalog", "x", "--signer-trust-root"], "flag '--signer-trust-root' needs a value."],
-    [["--json=1", "--catalog", "x"], "flag '--json' takes no value."],
+    [["--debug=1", "--catalog", "x"], "flag '--debug' takes no value."],
+    [["--catalog", "x", "--json"], "flag '--json' was given more than once."],
   ];
   for (const [argv, detail] of cases) {
-    const { exitCode, envelope } = runJson(["verify", ...argv]);
+    const { exitCode, envelope } = runEnvelope(["--json", "verify", ...argv]);
     const error = envelope.error as { message_key: string; detail: string };
     assert.equal(exitCode, 3, argv.join(" "));
     assert.deepEqual([error.message_key, error.detail], ["input.verify_unrecognized_flag", detail]);
@@ -2571,15 +2594,15 @@ test("scanTopLevel reads the tokens before the command as Python's _scan_top_lev
   assert.deepEqual(scanTopLevel(["--version"]), { kind: "version" });
   assert.deepEqual(scanTopLevel(["--json", "--debug", "version", "--quiet"]), {
     kind: "run",
+    pre: ["--json", "--debug"],
     command: "version",
     rest: ["--quiet"],
-    globals: new Set(["--json", "--debug"]),
   });
-  assert.deepEqual(scanTopLevel(["--", "version"]), {
+  assert.deepEqual(scanTopLevel(["--json", "--", "nope", "--"]), {
     kind: "run",
-    command: "version",
-    rest: [],
-    globals: new Set(),
+    pre: ["--json"],
+    command: "nope",
+    rest: ["--"],
   });
   const refusals: [string[], string][] = [
     [["-V", "extra"], "'-V' takes no other arguments."],
@@ -2589,8 +2612,7 @@ test("scanTopLevel reads the tokens before the command as Python's _scan_top_lev
     [["--no-such-flag", "version"], "unrecognized flag '--no-such-flag'."],
     [["--"], "no command given after '--'."],
     [["--json"], "no command given."],
-    [["nope"], "unrecognized command 'nope'."],
-    [["digest-tree", "x"], "unrecognized command 'digest-tree'."],
+    [["--no-such-flag", "--", "-x"], "unrecognized command '-x'."],
   ];
   for (const [argv, cause] of refusals) {
     assert.throws(
@@ -2599,6 +2621,27 @@ test("scanTopLevel reads the tokens before the command as Python's _scan_top_lev
         exc instanceof InputError && exc.key === "input.unknown_command" && exc.cause === cause,
       argv.join(" "),
     );
+  }
+  // a global flag before the command reaches it: --json gives the envelope
+  const before = runEnvelope(["--json", "version"]);
+  assert.deepEqual([before.exitCode, before.envelope.command], [0, "version"]);
+  // the command word, and a repeated global flag, are checked once the scan has found the command
+  for (const [argv, cause] of [
+    [["--json", "nope"], "unrecognized command 'nope'."],
+    [["--json", "digest-tree", "x"], "unrecognized command 'digest-tree'."],
+    [["--json", "--json", "nope"], "flag '--json' was given more than once."],
+  ] as const) {
+    const { exitCode, envelope } = runEnvelope([...argv]);
+    assert.equal(exitCode, 3);
+    assert.deepEqual(envelope.error, {
+      message_key: "input.unknown_command",
+      detail: cause,
+      fix:
+        cause[0] === "f"
+          ? "give --json once."
+          : "run `agentce --help` for the commands agentce takes.",
+    });
+    assert.equal(envelope.command, "agentce");
   }
 });
 
@@ -2685,7 +2728,7 @@ test("validate, diff, version and conformance refuse what Python refuses, with i
       [["validate", "--bundle", bundle, "--out"], "input.validate_unrecognized_flag"],
       [["validate", "--bundle="], "input.bundle_not_a_directory"],
       [["validate", "--bundle", ""], "input.bundle_not_a_directory"],
-      [["validate", "--bundle", bundle, "--bundle", "nope"], "input.bundle_not_a_directory"],
+      [["validate", "--bundle", bundle, "--bundle", "nope"], "input.validate_unrecognized_flag"],
       [["validate", "--bundle", bundle, "--out="], "input.out_dir_unwritable"],
       [["validate", "--bundle", bundle, "--out", ""], "input.out_dir_unwritable"],
       [["diff", "--no-such-flag"], "input.diff_unrecognized_flag"],
@@ -2713,7 +2756,7 @@ test("validate, diff, version and conformance refuse what Python refuses, with i
       [["version", "--", "x"], "input.version_unrecognized_flag"],
       [["conformance"], "input.conformance_action"],
       [["conformance", "nope"], "input.conformance_action"],
-      [["conformance", "--he", "nope"], "input.conformance_action"],
+      [["conformance", "--he", "nope"], "input.conformance_unrecognized_flag"],
       [["conformance", "--", "run"], "input.conformance_action"],
       [["conformance", "--he"], "input.conformance_unrecognized_flag"],
       [["conformance", "-hx", "run"], "input.conformance_unrecognized_flag"],
@@ -2722,11 +2765,12 @@ test("validate, diff, version and conformance refuse what Python refuses, with i
       [["conformance", "run", "-hx"], "input.conformance_unrecognized_flag"],
       [["conformance", "run"], "input.engine_missing"],
       [["conformance", "run", "--engine"], "input.engine_missing"],
-      [["conformance", "run", "--he", "--engine"], "input.engine_missing"],
+      [["conformance", "run", "--he", "--engine"], "input.conformance_unrecognized_flag"],
+      [["conformance", "run", "--engine", "--he"], "input.engine_missing"],
       [["conformance", "run", "--corpus", "/nonexistent"], "input.engine_missing"],
       [["conformance", "run", "--engine", engine, "--corpus"], "input.corpus_missing"],
       [["conformance", "run", "--engine=", "--corpus", corpus], "input.engine_not_a_directory"],
-      [[...run, "--engine=nope"], "input.engine_not_a_directory"],
+      [[...run, "--engine=nope"], "input.conformance_unrecognized_flag"],
       [["conformance", "run", "--engine", engine, "--corpus="], "input.corpus_not_a_directory"],
       [[...run, "--no-such-flag"], "input.conformance_unrecognized_flag"],
       [[...run, "extra"], "input.conformance_unrecognized_flag"],
@@ -2746,7 +2790,7 @@ test("validate, diff, version and conformance refuse what Python refuses, with i
   }
 });
 
-test("validate, diff and conformance read = forms, the last repeat and intermixed diff positionals (18.111)", () => {
+test("validate, diff and conformance read = forms and intermixed diff positionals, and refuse a repeat (18.111)", () => {
   const dir = mkdtempSync(join(tmpdir(), "agentce-cli-utility-read-"));
   try {
     const bundle = join(quickstartDir(), "evidence");
@@ -2754,7 +2798,7 @@ test("validate, diff and conformance read = forms, the last repeat and intermixe
     const validated = refusalKey(["validate", `--bundle=${bundle}`, `--out=${out}`]);
     assert.deepEqual(validated, { exitCode: 1, key: undefined });
     assert.ok(existsSync(join(out, "quarantine.jsonl")));
-    assert.equal(refusalKey(["validate", "--bundle", "nope", "--bundle", bundle]).exitCode, 1);
+    assert.equal(refusalKey(["validate", "--bundle", "nope", "--bundle", bundle]).exitCode, 3);
 
     const a = diffFixture(dir, "a.json", [{ control: "C-1", subject: "s", outcome: "conformant" }]);
     const b = diffFixture(dir, "b.json", [
@@ -2764,7 +2808,6 @@ test("validate, diff and conformance read = forms, the last repeat and intermixe
       ["diff", a, "--format", "md", b],
       ["diff", "--format", "md", a, b],
       ["diff", a, b, "--format=md"],
-      ["diff", a, b, "--format", "json", "--format", "md"],
       ["diff", "--", a, b],
     ]) {
       const { exitCode, lines } = runText(argv);

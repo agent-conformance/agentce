@@ -2,7 +2,8 @@
  * The `agentce` command-line interface (SPEC §8.5): the same verbs, `--json` envelope, and exit-code
  * scheme as the Python reference. `assess`, `validate`, `report`, and `quickstart` are implemented on
  * the existing ECS/report path (the same modules `conformance run` already exercises); a verb not yet
- * implemented returns a stable `input_error` envelope rather than a guess.
+ * implemented returns a stable `input_error` envelope rather than a guess. Every command line is read
+ * by one scanner (`argv.ts`) under the vendored SPEC 8.5 grammar table, as Python's `_parse` reads it.
  */
 
 import {
@@ -21,7 +22,14 @@ import { basename, relative, resolve as resolvePath, sep } from "node:path";
 import { load } from "js-yaml";
 import { summarizeActivity } from "./activity";
 import { resolve as resolveApplicability } from "./applicability";
-import { type Grammar, NEGATIVE_NUMBER, scanArgv } from "./argv";
+import {
+  type Command as ArgvCommand,
+  HELP,
+  type Scan,
+  command as argvCommand,
+  isCommand,
+  scan as scanArgv,
+} from "./argv";
 import { type Assertion, aggregate, assertionFromJson, assertionToJson } from "./assertions";
 import {
   WITHHELD_KEY,
@@ -134,9 +142,7 @@ const REPORT_FORMATS = ["md", "html", "oscal", "sarif", "public", "pack"] as con
 const REPORT_ROLES = ["provider", "deployer"] as const;
 
 function emit(result: CommandResult, json: boolean): void {
-  if (result.usage !== undefined) {
-    process.stdout.write(result.usage);
-  } else if (json) {
+  if (json) {
     // json.dumps(envelope, sort_keys=True, indent=2, ensure_ascii=True), matching the Python reference
     console.log(jsonStringifyAscii(sortKeysDeep(result.envelope()), 2));
   } else {
@@ -151,102 +157,6 @@ function emit(result: CommandResult, json: boolean): void {
  * equivalent. */
 function emptyToUndefined(value: string | undefined): string | undefined {
   return value === undefined || value === "" ? undefined : value;
-}
-
-const VERIFY_TARGETS = ["bundle", "catalog", "release", "report"] as const;
-type VerifyTarget = (typeof VERIFY_TARGETS)[number];
-
-interface VerifyArgs {
-  targets: Record<VerifyTarget, string[]>;
-  signerTrustRoot: string | undefined;
-  expectKeyid: string | undefined;
-}
-
-function verifyUnrecognized(detail: string, fix: string): InputError {
-  return new InputError("input.verify_unrecognized_flag", detail, fix);
-}
-
-/** `agentce verify`'s argv, read the way Python's `verify` subparser (argparse, `allow_abbrev=False`)
- * reads it, so a command line gets one answer from all three engines (18.65 round 3): the four
- * target flags take one value each and are collected so `verifyTarget` can refuse a repeat;
- * `--signer-trust-root`/`--expect-keyid` take one value (the last one wins); `--json`/`--debug`/
- * `--quiet` take none; a value is the next token or the `=`-joined rest. A flag missing its value or
- * given one it takes none of refuses at once, as argparse does mid-parse; any other token (an
- * unknown or abbreviated flag, `--`, a positional) refuses after the scan, naming the first one, as
- * argparse reports what it left unparsed. */
-function parseVerifyArgv(argv: string[]): VerifyArgs {
-  const parsed: VerifyArgs = {
-    targets: { bundle: [], catalog: [], release: [], report: [] },
-    signerTrustRoot: undefined,
-    expectKeyid: undefined,
-  };
-  let unknown: string | undefined;
-  for (let i = 1; i < argv.length; i++) {
-    const token = argv[i] as string;
-    const eq = looksLikeOption(token) ? token.indexOf("=") : -1;
-    const name = eq >= 0 ? token.slice(0, eq) : token;
-    if (!looksLikeOption(token) || token === "--") {
-      unknown ??= token;
-      continue;
-    }
-    if (GLOBAL_BOOLEAN_FLAGS.has(name)) {
-      if (eq >= 0) {
-        throw verifyUnrecognized(`flag '${name}' takes no value.`, `drop the value: ${name}.`);
-      }
-      continue;
-    }
-    const flag = name.slice(2);
-    const isTarget = (VERIFY_TARGETS as readonly string[]).includes(flag);
-    if (!isTarget && flag !== "signer-trust-root" && flag !== "expect-keyid") {
-      unknown ??= token;
-      continue;
-    }
-    let value: string;
-    if (eq >= 0) {
-      value = token.slice(eq + 1);
-    } else {
-      const next = argv[i + 1];
-      if (next === undefined || looksLikeOption(next)) {
-        throw verifyUnrecognized(`flag '${name}' needs a value.`, `pass ${name} <value>.`);
-      }
-      value = next;
-      i++;
-    }
-    if (isTarget) {
-      parsed.targets[flag as VerifyTarget].push(value);
-    } else if (flag === "signer-trust-root") {
-      parsed.signerTrustRoot = value;
-    } else {
-      parsed.expectKeyid = value;
-    }
-  }
-  if (unknown !== undefined) {
-    throw unknown.startsWith("-") && unknown !== "-"
-      ? verifyUnrecognized(
-          `unrecognized flag '${unknown}'.`,
-          "pass --bundle, --catalog, --release, or --report (with --signer-trust-root or " +
-            "--expect-keyid for --report), or drop the flag.",
-        )
-      : verifyUnrecognized(
-          `unrecognized argument '${unknown}'.`,
-          "pass the target with its flag, e.g. `agentce verify --bundle <dir>`.",
-        );
-  }
-  return parsed;
-}
-
-/** One target flag's value: refuses a repeated `--name` (Python's `_verify_target_flag` too,
- * verifier round 2, 18.65) and normalizes an empty value to `undefined` (F4, 18.65). */
-function verifyTarget(args: VerifyArgs, name: VerifyTarget): string | undefined {
-  const values = args.targets[name];
-  if (values.length > 1) {
-    throw new InputError(
-      "input.verify_target",
-      `--${name} was given more than once.`,
-      `pass --${name} <path> once.`,
-    );
-  }
-  return emptyToUndefined(values[0]);
 }
 
 /** The digest assess records for an input it already read and parsed (deviation register, profile,
@@ -365,9 +275,6 @@ function requireEnterable(path: string, key: string, what: string): void {
     );
   }
 }
-
-/** The global flags every command accepts, none of which takes a value. */
-const GLOBAL_BOOLEAN_FLAGS = new Set(["--json", "--debug", "--quiet"]);
 
 /**
  * A path safe to write into a shared artifact (SPEC §8.4: `invocation` records paths, never a person
@@ -646,50 +553,6 @@ function nothingEvaluated(
   );
 }
 
-/** The global flags every grammar declares, as Python's `common` parent parser adds them. */
-const COMMON_OPTIONS: Grammar["options"] = [
-  { names: ["-h", "--help"], kind: "help" },
-  { names: ["--json"], kind: "flag" },
-  { names: ["--debug"], kind: "flag" },
-  { names: ["--quiet"], kind: "flag" },
-];
-
-/** Python's `_flag_fix`: the fix for an unknown flag, naming the command's help. */
-const flagFix = (command: string): string =>
-  `run \`agentce ${command} --help\` for the flags ${command} takes, or drop the flag.`;
-
-/** A grammar of one of the small commands (validate, diff, version, conformance and its run), as
- * Java's `Cli.utilityGrammar` builds it: -h/--help, the three global flags, then `valueOptions`; an
- * unknown flag and a missing value both take the command's unrecognized-flag key (unless
- * `needsValueKeys` names the option's own) with Python's plain needs-value cause. */
-function utilityGrammar(
-  command: string,
-  valueOptions: readonly string[],
-  maxPositionals: number,
-  fixes: { flagFix: string; extraArgFix: string },
-  needsValueKeys: Readonly<Record<string, string>> = {},
-  action?: Grammar["action"],
-): Grammar {
-  const key = `input.${command}_unrecognized_flag`;
-  return {
-    options: [
-      ...COMMON_OPTIONS,
-      ...valueOptions.map((name) => {
-        const needsValueKey = needsValueKeys[name];
-        return needsValueKey === undefined
-          ? { names: [name], kind: "value" as const }
-          : { names: [name], kind: "value" as const, needsValueKey };
-      }),
-    ],
-    maxPositionals,
-    ...(action === undefined ? {} : { action }),
-    unrecognizedKey: key,
-    needsValueKey: key,
-    needsValueCause: "plain",
-    ...fixes,
-  };
-}
-
 /** Python's `agentce conformance --help` (COLUMNS=80), word for word. */
 const CONFORMANCE_USAGE = `usage: agentce conformance [-h] [--json] [--debug] [--quiet] <action> ...
 
@@ -735,35 +598,6 @@ function conformanceActionError(): InputError {
   );
 }
 
-/** Both conformance levels word their refusals alike, as Python's one `_ArgvErrors` table does. */
-const CONFORMANCE_FIXES = {
-  flagFix: flagFix("conformance run"),
-  extraArgFix:
-    "pass the inputs with their flags: `agentce conformance run --engine <dir> --corpus <dir>`.",
-};
-
-/** conformance's grammar (Python's conformance parser and its `run` subparser): one table, read by
- * `scanArgv`. */
-const CONFORMANCE_GRAMMAR: Grammar = utilityGrammar(
-  "conformance",
-  [],
-  0,
-  CONFORMANCE_FIXES,
-  {},
-  {
-    grammars: {
-      run: utilityGrammar(
-        "conformance",
-        ["--engine", "--corpus", "--out", "--adapters"],
-        0,
-        CONFORMANCE_FIXES,
-        { "--engine": "input.engine_missing", "--corpus": "input.corpus_missing" },
-      ),
-    },
-    error: conformanceActionError,
-  },
-);
-
 /** Python's `commands._refuse_empty`, the one empty-value rule for a path option the command reads
  * with a default or writes to: an empty value names no path, so it is refused under the role's key
  * before anything is read or written, never read as the working directory, the default, or no value.
@@ -797,13 +631,8 @@ function refuseEmptyOut(out: string | undefined): void {
 
 /** `agentce conformance run`, read from its grammar's scan alone. An empty --engine, --corpus or
  * --adapters names no directory (Node's stat of `""` fails, as Python's `_require_dir` refuses ''). */
-function cmdConformance(argv: string[]): CommandResult {
-  const args = scanArgv(argv.slice(1), CONFORMANCE_GRAMMAR);
+function cmdConformance(args: Scan): CommandResult {
   const result = new CommandResult("conformance");
-  if (args.help) {
-    result.usage = args.action === "run" ? CONFORMANCE_RUN_USAGE : CONFORMANCE_USAGE;
-    return result;
-  }
   if (args.action === undefined) {
     throw conformanceActionError(); // the scanner refuses any action but run itself
   }
@@ -881,26 +710,8 @@ global options:
   --quiet          log warnings and errors only
 `;
 
-/** validate's grammar (Python's validate subparser, global flags included): one table, read by
- * `scanArgv`. */
-const VALIDATE_GRAMMAR: Grammar = utilityGrammar(
-  "validate",
-  ["--bundle", "--out"],
-  0,
-  {
-    flagFix: flagFix("validate"),
-    extraArgFix: "pass the bundle with its flag: `agentce validate --bundle <dir>`.",
-  },
-  { "--bundle": "input.bundle_missing" },
-);
-
-function cmdValidate(argv: string[]): CommandResult {
-  const args = scanArgv(argv.slice(1), VALIDATE_GRAMMAR);
+function cmdValidate(args: Scan): CommandResult {
   const result = new CommandResult("validate");
-  if (args.help) {
-    result.usage = VALIDATE_USAGE;
-    return result;
-  }
   const bundleDir = requireDir(args.values["--bundle"], "bundle", "the evidence bundle");
   const out = args.values["--out"];
   refuseEmptyOut(out);
@@ -1496,44 +1307,8 @@ global options:
   --quiet               log warnings and errors only
 `;
 
-/** assess's grammar (Python's assess subparser, global flags included): one table, read by `scanArgv`. */
-const ASSESS_GRAMMAR: Grammar = {
-  options: [
-    { names: ["-h", "--help"], kind: "help" },
-    { names: ["--json"], kind: "flag" },
-    { names: ["--debug"], kind: "flag" },
-    { names: ["--quiet"], kind: "flag" },
-    { names: ["--bundle"], kind: "value" },
-    { names: ["--catalog"], kind: "value" },
-    { names: ["--profile"], kind: "value" },
-    { names: ["--deviations"], kind: "value", valueHint: "<file>" },
-    { names: ["--domain"], kind: "value" },
-    { names: ["--catalog-dir"], kind: "append" },
-    { names: ["--trust-root"], kind: "value" },
-    { names: ["--allow-unverified-catalog"], kind: "flag" },
-    { names: ["--package-for-sharing"], kind: "flag" },
-    { names: ["--out"], kind: "value" },
-    { names: ["--state"], kind: "value" },
-    { names: ["--report-language"], kind: "value" },
-    { names: ["--emit"], kind: "value", valueHint: "<formats>" },
-    { names: ["--for"], kind: "value", valueHint: "<preset>" },
-    { names: ["--fail-on"], kind: "value", valueHint: "<expression>" },
-  ],
-  maxPositionals: 1,
-  unrecognizedKey: "input.assess_unrecognized_flag",
-  needsValueKey: "input.assess_flag_needs_value",
-  flagFix: "run `agentce assess --help` for the flags assess takes, or drop the flag.",
-  extraArgFix: "pass at most one records folder: `agentce assess <folder>`.",
-};
-
 /** `agentce assess`, read from its grammar's scan alone. */
-function cmdAssess(argv: string[]): CommandResult {
-  const args = scanArgv(argv.slice(1), ASSESS_GRAMMAR);
-  if (args.help) {
-    const result = new CommandResult("assess");
-    result.usage = ASSESS_USAGE;
-    return result;
-  }
+function cmdAssess(args: Scan): CommandResult {
   const v = args.values;
   refuseEmptyOut(v["--out"]);
   refuseEmpty(
@@ -1577,78 +1352,11 @@ global options:
   --quiet     log warnings and errors only
 `;
 
-function quickstartUnrecognized(cause: string, fix: string): InputError {
-  return new InputError("input.quickstart_unrecognized_flag", cause, fix);
-}
-
-/** `agentce quickstart`'s argv, read the way Python's quickstart subparser (argparse,
- * `allow_abbrev=False`) reads it, left to right: `--out` takes one value (separate or `=`-joined, the
- * last one wins), `--json`/`--debug`/`--quiet` take none, `-h`/`--help` stop the scan and ask for the
- * usage. A value-less `--out` or a value on a flag that takes none is refused at once; any other token
- * (an unknown or abbreviated flag, a positional, a bare `--` and all after it) is refused after the scan,
- * so `-h` after an unknown flag is still help, as in argparse. Every refusal is
- * `input.quickstart_unrecognized_flag`. */
-function parseQuickstartArgv(argv: string[]): { help: boolean; out: string | undefined } {
-  const flagFix =
-    "run `agentce quickstart --help` for the flags quickstart takes, or drop the flag.";
-  let out: string | undefined;
-  let unknown: string | undefined;
-  for (let i = 1; i < argv.length; i++) {
-    const token = argv[i] as string;
-    if (token === "--") {
-      unknown ??= token;
-      break;
-    }
-    if (!looksLikeOption(token)) {
-      unknown ??= token;
-      continue;
-    }
-    const eq = token.indexOf("=");
-    const name = eq >= 0 ? token.slice(0, eq) : token;
-    const help = name === "-h" || name === "--help";
-    if (name === "--out") {
-      if (eq >= 0) {
-        out = token.slice(eq + 1);
-      } else {
-        const next = argv[i + 1];
-        if (next === undefined || looksLikeOption(next)) {
-          throw quickstartUnrecognized("flag '--out' needs a value.", "pass --out <dir>.");
-        }
-        out = next;
-        i++;
-      }
-    } else if (help || GLOBAL_BOOLEAN_FLAGS.has(name)) {
-      if (eq >= 0) {
-        throw quickstartUnrecognized(`flag '${name}' takes no value.`, `drop the value: ${name}.`);
-      }
-      if (help) {
-        return { help, out: undefined };
-      }
-    } else {
-      unknown ??= token;
-    }
-  }
-  if (unknown !== undefined) {
-    throw unknown.startsWith("-") && unknown !== "-"
-      ? quickstartUnrecognized(`unrecognized flag '${unknown}'.`, flagFix)
-      : quickstartUnrecognized(
-          `unrecognized argument '${unknown}'.`,
-          "quickstart takes no other argument: `agentce quickstart --out <dir>`.",
-        );
-  }
-  return { help: false, out };
-}
-
 /** Assess the bundled quickstart project end to end — one command, offline (SPEC §13.4 AX-1). */
-function cmdQuickstart(argv: string[]): CommandResult {
+function cmdQuickstart(args: Scan): CommandResult {
   const result = new CommandResult("quickstart");
-  const args = parseQuickstartArgv(argv);
-  if (args.help) {
-    result.usage = QUICKSTART_USAGE;
-    return result;
-  }
-  refuseEmptyOut(args.out);
-  const out = args.out ?? DEFAULT_OUT_DIR;
+  refuseEmptyOut(args.values["--out"]);
+  const out = args.values["--out"] ?? DEFAULT_OUT_DIR;
   const quickstart = quickstartDir();
   if (!statSync(quickstart, { throwIfNoEntry: false })?.isDirectory()) {
     throw new InputError(
@@ -1736,46 +1444,14 @@ function reportLanguageError(flag: string, language: string): InputError {
   );
 }
 
-/** report's grammar (Python's report subparser, global flags included): one table, read by `scanArgv`. */
-const REPORT_GRAMMAR: Grammar = {
-  options: [
-    { names: ["-h", "--help"], kind: "help" },
-    { names: ["--json"], kind: "flag" },
-    { names: ["--debug"], kind: "flag" },
-    { names: ["--quiet"], kind: "flag" },
-    { names: ["--from"], kind: "value", needsValueKey: "input.from_missing" },
-    {
-      names: ["--format"],
-      kind: "value",
-      choices: { values: REPORT_FORMATS, error: reportFormatError },
-    },
-    {
-      names: ["--role"],
-      kind: "value",
-      choices: { values: REPORT_ROLES, error: reportRoleError },
-    },
-    { names: ["--catalog"], kind: "value" },
-    { names: ["--language"], kind: "value" },
-    { names: ["--out"], kind: "value" },
-    { names: ["--validate"], kind: "value", needsValueKey: "input.validate_missing" },
-  ],
-  maxPositionals: 0,
-  unrecognizedKey: "input.report_unrecognized_flag",
-  needsValueKey: "input.report_unrecognized_flag",
-  needsValueCause: "plain",
-  flagFix: "run `agentce report --help` for the flags report takes, or drop the flag.",
-  extraArgFix:
-    "pass the input with its flag: `agentce report --from <file>` or `--validate <dir>`.",
-};
-
 /** The key `report --validate` answers with when a report folder fails validation. */
 const REPORT_INVALID = "report.validation_failed";
 
 /** The rendering options `report --validate` never reads, in the order the refusal names the first:
  * every value option of the grammar but --validate itself. */
-const REPORT_RENDER_FLAGS = REPORT_GRAMMAR.options
-  .filter((spec) => spec.kind === "value" && spec.names[0] !== "--validate")
-  .map((spec) => spec.names[0] as string);
+const REPORT_RENDER_FLAGS = [...new Set(argvCommand("report").level.options.values())]
+  .filter((opt) => opt.kind === "value" && opt.name !== "--validate")
+  .map((opt) => opt.name);
 
 /** Each rendering option a format may not read: the formats that read it and the fix's first step. */
 const REPORT_FORMAT_ONLY: readonly (readonly [string, readonly string[], string])[] = [
@@ -1793,13 +1469,8 @@ const isBlank = (text: string): boolean =>
  * validate every artifact in a report directory at parity with the Python reference (item 18.27).
  * Read from its grammar's scan alone; every option is either read or refused with a key, in
  * Python's `cmd_report` order (18.110). */
-function cmdReport(argv: string[]): CommandResult {
-  const args = scanArgv(argv.slice(1), REPORT_GRAMMAR);
+function cmdReport(args: Scan): CommandResult {
   const result = new CommandResult("report");
-  if (args.help) {
-    result.usage = REPORT_USAGE;
-    return result;
-  }
   const v = args.values;
   const validate = v["--validate"];
   if (validate !== undefined) {
@@ -1937,23 +1608,10 @@ global options:
   --quiet          log warnings and errors only
 `;
 
-/** diff's grammar (Python's diff subparser, global flags included): one table, read by `scanArgv`.
- * Positionals are unbounded (Python's hidden `extra`), so `cmdDiff` counts them itself, and --format
- * has no choices: `cmdDiff` checks it after the two files, as Python's `cmd_diff` does. */
-const DIFF_GRAMMAR: Grammar = utilityGrammar("diff", ["--format"], Number.POSITIVE_INFINITY, {
-  flagFix: "pass --format text|json|md, or drop the flag.",
-  extraArgFix: "pass two assertions files: `agentce diff <a> <b>`.",
-});
-
 /** `agentce diff` (SPEC §9.3, item 18.6): a real, deterministic assertion-set diff, matching the
  * Python reference's `cmd_diff` byte for byte (see `diff.ts`). Read from its grammar's scan alone. */
-function cmdDiff(argv: string[], json: boolean): CommandResult {
-  const args = scanArgv(argv.slice(1), DIFF_GRAMMAR);
+function cmdDiff(args: Scan, json: boolean): CommandResult {
   const result = new CommandResult("diff");
-  if (args.help) {
-    result.usage = DIFF_USAGE;
-    return result;
-  }
   const positional = args.positionals;
   if (positional.length > 2) {
     throw new InputError(
@@ -2064,107 +1722,57 @@ function readinessSeverities(
   return { severities, limitations };
 }
 
-interface ReadinessArgs {
-  reportDir: string | undefined;
-  gaps: string | undefined;
-  deviations: string | undefined;
-  catalogDirs: string[];
-  trustRoot: string | undefined;
-  allowUnverified: boolean;
-}
+/** Python's `agentce readiness --help` (COLUMNS=80), word for word. */
+const READINESS_USAGE = `usage: agentce readiness [-h] [--json] [--debug] [--quiet] [--gaps GAPS]
+                         [--deviations DEVIATIONS] [--catalog-dir CATALOG_DIR]
+                         [--trust-root TRUST_ROOT]
+                         [--allow-unverified-catalog]
+                         [report_dir]
 
-/** A token argparse classifies as an option rather than a value: it starts with `-`, is not a bare
- * `-`, does not look like a negative number and holds no space (`argparse._parse_optional`). The
- * negative-number pattern is argparse's own str regex, so `\d` is any Unicode decimal digit (`-١` is a
- * number) and `$` also matches before one trailing newline. */
-function looksLikeOption(token: string): boolean {
-  return (
-    token.startsWith("-") && token !== "-" && !NEGATIVE_NUMBER.test(token) && !token.includes(" ")
-  );
-}
+positional arguments:
+  report_dir            the report directory
 
-function readinessUnrecognized(detail: string, fix: string): InputError {
-  return new InputError("input.readiness_unrecognized_flag", detail, fix);
-}
+options:
+  -h, --help            show this help message and exit
+  --gaps GAPS           a gaps file listing accepted high-severity evidence
+                        gaps
+  --deviations DEVIATIONS
+                        a deviation register to validate
+  --catalog-dir CATALOG_DIR
+                        a catalog directory whose control severities the
+                        verdict reads (repeatable); verified as assess
+                        verifies it
+  --trust-root TRUST_ROOT
+                        trust root every --catalog-dir signature is verified
+                        against (default: AGENTCE_TRUST_ROOT, else the
+                        vendored development root)
+  --allow-unverified-catalog
+                        read a --catalog-dir catalog whose signature is absent
+                        or does not verify, recording the override as a
+                        limitation in the verdict (SPEC 8.7). Requires
+                        --catalog-dir.
 
-/** `agentce readiness`'s argv, read the way Python's `readiness` subparser (argparse,
- * `allow_abbrev=False`) reads it: `--gaps`/`--deviations` take one value (separate or `=`-joined, the
- * last one wins), `--catalog-dir` appends, `--json`/`--debug`/`--quiet` take none, `--` ends the
- * options, and there is at most one positional. Anything argparse would refuse (an unknown or
- * abbreviated flag, a value flag with no value, a second positional) throws
- * `input.readiness_unrecognized_flag` rather than being skipped, so a mistyped flag can never give a
- * verdict computed without it. An empty `--gaps`/`--deviations` value is ignored, as Python's
- * `if gaps_path:` does. */
-function parseReadinessArgv(argv: string[]): ReadinessArgs {
-  const flagFix =
-    "pass --gaps, --deviations, --catalog-dir, --trust-root or --allow-unverified-catalog, or drop the flag.";
-  const parsed: ReadinessArgs = {
-    reportDir: undefined,
-    gaps: undefined,
-    deviations: undefined,
-    catalogDirs: [],
-    trustRoot: undefined,
-    allowUnverified: false,
-  };
-  let optionsEnded = false;
-  for (let i = 1; i < argv.length; i++) {
-    const token = argv[i] as string;
-    if (!optionsEnded && token === "--") {
-      optionsEnded = true;
-      continue;
-    }
-    if (!optionsEnded && looksLikeOption(token)) {
-      const eq = token.indexOf("=");
-      const name = eq >= 0 ? token.slice(0, eq) : token;
-      if (GLOBAL_BOOLEAN_FLAGS.has(name) || name === "--allow-unverified-catalog") {
-        if (eq >= 0) {
-          throw readinessUnrecognized(`flag '${name}' takes no value.`, `drop the value: ${name}.`);
-        }
-        parsed.allowUnverified ||= name === "--allow-unverified-catalog";
-        continue;
-      }
-      if (!["--gaps", "--deviations", "--catalog-dir", "--trust-root"].includes(name)) {
-        throw readinessUnrecognized(`unrecognized flag '${token}'.`, flagFix);
-      }
-      let value: string;
-      if (eq >= 0) {
-        value = token.slice(eq + 1);
-      } else {
-        const next = argv[i + 1];
-        if (next === undefined || looksLikeOption(next)) {
-          throw readinessUnrecognized(`flag '${name}' needs a value.`, `pass ${name} <path>.`);
-        }
-        value = next;
-        i++;
-      }
-      if (name === "--catalog-dir") {
-        parsed.catalogDirs.push(value);
-      } else if (name === "--trust-root") {
-        parsed.trustRoot = value;
-      } else {
-        parsed[name === "--gaps" ? "gaps" : "deviations"] = value;
-      }
-      continue;
-    }
-    if (parsed.reportDir !== undefined) {
-      throw readinessUnrecognized(
-        `unrecognized argument '${token}'.`,
-        "pass exactly one report directory: `agentce readiness <report-dir>`.",
-      );
-    }
-    parsed.reportDir = token;
-  }
-  return parsed;
-}
+global options:
+  --json                emit machine-readable JSON on stdout
+  --debug               verbose logs on stderr and a stack trace on unexpected
+                        errors
+  --quiet               log warnings and errors only
+`;
 
 /** `agentce readiness` (SPEC §13.3.4 stage 4, item 18.25): the report-readiness verdict, matching the
  * Python reference's `cmd_readiness` byte for byte (see `readiness.ts`). Exit 0 for READY and READY
  * WITH LIMITATIONS, 1 for NOT READY -- the verdict logic lives in the engine, never in a skill. */
-function cmdReadiness(argv: string[]): CommandResult {
+function cmdReadiness(scan: Scan): CommandResult {
   const result = new CommandResult("readiness");
-  const args = parseReadinessArgv(argv);
+  const args = {
+    gaps: scan.values["--gaps"],
+    deviations: scan.values["--deviations"],
+    catalogDirs: scan.lists["--catalog-dir"] ?? [],
+    trustRoot: scan.values["--trust-root"],
+    allowUnverified: scan.flags.has("--allow-unverified-catalog"),
+  };
   const reportDir = requireDir(
-    args.reportDir,
+    scan.positionals[0],
     "report_dir",
     "the report directory",
     "pass the report directory: `agentce readiness <report-dir>`.",
@@ -2228,96 +1836,6 @@ function cmdReadiness(argv: string[]): CommandResult {
 
 const SIGN_ROLES = ["claimant", "assessor"] as const;
 const SIGN_PROFILES = ["sigstore-public", "sigstore-private", "kms"] as const;
-
-interface SignArgs {
-  reportDir: string | undefined;
-  asRole: string | undefined;
-  profile: string | undefined;
-  key: string | undefined;
-  dryRun: boolean;
-  writeTrustRoot: boolean;
-}
-
-function signUnrecognized(detail: string, fix: string): InputError {
-  return new InputError("input.sign_unrecognized_flag", detail, fix);
-}
-
-/** `agentce sign`'s argv, read the way Python's `sign` subparser (argparse, `allow_abbrev=False`)
- * reads it: `--as`/`--profile`/`--key` take one value (separate or `=`-joined, the last one wins),
- * `--dry-run`/`--write-trust-root` take none, `--` ends the options, and there is at most one
- * positional -- the same shape `parseReadinessArgv` established for `readiness` in 18.25. Anything
- * argparse would refuse throws `input.sign_unrecognized_flag` rather than being silently skipped. */
-function parseSignArgv(argv: string[]): SignArgs {
-  const flagFix =
-    "pass --as, --profile, --key, --dry-run, or --write-trust-root, or drop the flag.";
-  const parsed: SignArgs = {
-    reportDir: undefined,
-    asRole: undefined,
-    profile: undefined,
-    key: undefined,
-    dryRun: false,
-    writeTrustRoot: false,
-  };
-  let optionsEnded = false;
-  for (let i = 1; i < argv.length; i++) {
-    const token = argv[i] as string;
-    if (!optionsEnded && token === "--") {
-      optionsEnded = true;
-      continue;
-    }
-    if (!optionsEnded && looksLikeOption(token)) {
-      const eq = token.indexOf("=");
-      const name = eq >= 0 ? token.slice(0, eq) : token;
-      if (GLOBAL_BOOLEAN_FLAGS.has(name)) {
-        if (eq >= 0) {
-          throw signUnrecognized(`flag '${name}' takes no value.`, `drop the value: ${name}.`);
-        }
-        continue;
-      }
-      if (name === "--dry-run" || name === "--write-trust-root") {
-        if (eq >= 0) {
-          throw signUnrecognized(`flag '${name}' takes no value.`, `drop the value: ${name}.`);
-        }
-        if (name === "--dry-run") {
-          parsed.dryRun = true;
-        } else {
-          parsed.writeTrustRoot = true;
-        }
-        continue;
-      }
-      if (name !== "--as" && name !== "--profile" && name !== "--key") {
-        throw signUnrecognized(`unrecognized flag '${token}'.`, flagFix);
-      }
-      let value: string;
-      if (eq >= 0) {
-        value = token.slice(eq + 1);
-      } else {
-        const next = argv[i + 1];
-        if (next === undefined || looksLikeOption(next)) {
-          throw signUnrecognized(`flag '${name}' needs a value.`, `pass ${name} <value>.`);
-        }
-        value = next;
-        i++;
-      }
-      if (name === "--as") {
-        parsed.asRole = value;
-      } else if (name === "--profile") {
-        parsed.profile = value;
-      } else {
-        parsed.key = value;
-      }
-      continue;
-    }
-    if (parsed.reportDir !== undefined) {
-      throw signUnrecognized(
-        `unrecognized argument '${token}'.`,
-        "pass exactly one report directory: `agentce sign <report-dir> --as claimant|assessor`.",
-      );
-    }
-    parsed.reportDir = token;
-  }
-  return parsed;
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -2437,15 +1955,52 @@ function readSignClaim(claimPath: string): Record<string, unknown> {
   return claim;
 }
 
+/** Python's `agentce sign --help` (COLUMNS=80), word for word. */
+const SIGN_USAGE = `usage: agentce sign [-h] [--json] [--debug] [--quiet]
+                    [--as {claimant,assessor}]
+                    [--profile {sigstore-public,sigstore-private,kms}]
+                    [--key KEY] [--dry-run] [--write-trust-root]
+                    [report_dir]
+
+positional arguments:
+  report_dir            the report directory
+
+options:
+  -h, --help            show this help message and exit
+  --as {claimant,assessor}
+                        the signing role
+  --profile {sigstore-public,sigstore-private,kms}
+                        the signing profile
+  --key KEY             operator Ed25519 private key (PEM) for the kms profile
+  --dry-run             plan only; sign nothing
+  --write-trust-root    write trust-root.json (the signer's public key) into
+                        the report directory, so a recipient can \`agentce
+                        verify --report\` this bundle without any other key
+                        exchange. Requires --profile kms (the only profile
+                        with an exportable key).
+
+global options:
+  --json                emit machine-readable JSON on stdout
+  --debug               verbose logs on stderr and a stack trace on unexpected
+                        errors
+  --quiet               log warnings and errors only
+`;
+
 /** `agentce sign` (SPEC §8.7, §9.1, item 18.26): the Ed25519/DSSE/in-toto signing flow, `kms` profile,
  * matching the Python reference's `cmd_sign` byte for byte (see `sign.ts`). Refuses to sign unless the
  * report's readiness verdict is not `NOT READY` (`agentce readiness`'s own gate, computed the same
  * way). */
-function cmdSign(argv: string[]): CommandResult {
+function cmdSign(scan: Scan): CommandResult {
   const result = new CommandResult("sign");
-  const args = parseSignArgv(argv);
+  const args = {
+    asRole: scan.values["--as"],
+    profile: scan.values["--profile"],
+    key: scan.values["--key"],
+    dryRun: scan.flags.has("--dry-run"),
+    writeTrustRoot: scan.flags.has("--write-trust-root"),
+  };
   const reportDir = requireDir(
-    args.reportDir,
+    scan.positionals[0],
     "report_dir",
     "the report directory",
     "pass the report directory: `agentce sign <report-dir> --as claimant|assessor`.",
@@ -2575,19 +2130,65 @@ function cmdSign(argv: string[]): CommandResult {
   return result;
 }
 
+/** Python's `agentce verify --help` (COLUMNS=80), word for word. */
+const VERIFY_USAGE = `usage: agentce verify [-h] [--json] [--debug] [--quiet] [--bundle BUNDLE]
+                      [--catalog CATALOG] [--release RELEASE]
+                      [--report REPORT]
+                      [--signer-trust-root SIGNER_TRUST_ROOT]
+                      [--expect-keyid EXPECT_KEYID]
+
+Integrity or signature verification. \`--report <dir>\` re-runs a shareable
+report bundle (\`assess --package-for-sharing\`) offline through nine stages, in
+order, each with its own message key: (1) the claim exists and is signed
+(verify.report_no_claim, verify.report_claim_malformed,
+verify.report_unsigned); (2) the trust root resolves
+(verify.report_no_trust_root, input.trust_root_invalid,
+verify.report_keyid_mismatch); (3) a claimant signature verifies
+(verify.report_signature_invalid); (4) the signed subjects match what's on
+disk (verify.report_subject_missing, verify.report_manifest_tampered,
+verify.report_claim_tampered); (5) the engine build matches
+(verify.report_engine_mismatch); (6) every manifest-tracked output's digest
+matches (verify.report_output_tampered); (7) the packaged evidence, profile,
+domain binding, and catalogs match (verify.report_evidence_tampered); (8) an
+offline re-run reproduces every canonical output byte for byte
+(verify.report_reproduction_mismatch); (9) success (\`reproduced: true\`).
+
+options:
+  -h, --help            show this help message and exit
+  --bundle BUNDLE       verify an evidence bundle's integrity
+  --catalog CATALOG     verify a catalog's signatures
+  --release RELEASE     verify a release artifact's signatures
+  --report REPORT       re-run a shareable report bundle (assess --package-
+                        for-sharing) offline and check it reproduces byte for
+                        byte, refusing any tampering
+  --signer-trust-root SIGNER_TRUST_ROOT
+                        verify --report's signature against this trust root
+                        file, instead of an embedded trust-root.json inside
+                        the report directory
+  --expect-keyid EXPECT_KEYID
+                        verify --report: refuse unless the claim signature's
+                        keyid matches this value
+
+global options:
+  --json                emit machine-readable JSON on stdout
+  --debug               verbose logs on stderr and a stack trace on unexpected
+                        errors
+  --quiet               log warnings and errors only
+`;
+
 /** `agentce verify --bundle/--catalog/--release/--report`: offline DSSE/certificate verification
  * (SPEC §8.7, §9.1). Ports `cmd_verify`'s own input validation verbatim (`commands/__init__.py:254-
  * 282`); `--report` (the 9-stage offline reproduction) is out of scope for this port (18.26's own
  * disposition) and falls to {@link notImplemented} once validation passes. */
-function cmdVerify(argv: string[]): CommandResult {
+function cmdVerify(args: Scan): CommandResult {
   const result = new CommandResult("verify");
   // An empty value (`--catalog ""`) is treated as not provided (F4, 18.65): otherwise it would fall
-  // through to `requireDir`, which refuses it under a different key than the other two engines.
-  const args = parseVerifyArgv(argv);
-  const bundle = verifyTarget(args, "bundle");
-  const catalog = verifyTarget(args, "catalog");
-  const release = verifyTarget(args, "release");
-  const report = verifyTarget(args, "report");
+  // through to `requireDir`, which refuses it under a different key than the other two engines. A
+  // repeated target never reaches here: the command-line grammar refuses it (SPEC 8.5).
+  const bundle = emptyToUndefined(args.values["--bundle"]);
+  const catalog = emptyToUndefined(args.values["--catalog"]);
+  const release = emptyToUndefined(args.values["--release"]);
+  const report = emptyToUndefined(args.values["--report"]);
   const chosenCount = [bundle, catalog, release, report].filter((v) => v !== undefined).length;
   if (chosenCount !== 1) {
     throw new InputError(
@@ -2596,7 +2197,8 @@ function cmdVerify(argv: string[]): CommandResult {
       "pass exactly one target, e.g. `agentce verify --bundle <dir>`.",
     );
   }
-  const { signerTrustRoot, expectKeyid } = args;
+  const signerTrustRoot = args.values["--signer-trust-root"];
+  const expectKeyid = args.values["--expect-keyid"];
   if (report === undefined && (signerTrustRoot !== undefined || expectKeyid !== undefined)) {
     throw new InputError(
       "input.verify_target",
@@ -2693,23 +2295,12 @@ global options:
   --quiet     log warnings and errors only
 `;
 
-/** version's grammar (Python's version subparser): the global flags, no positionals. */
-const VERSION_GRAMMAR: Grammar = utilityGrammar("version", [], 0, {
-  flagFix: flagFix("version"),
-  extraArgFix: "version takes no argument: `agentce version`.",
-});
-
 /** `agentce version` (SPEC §8.5): the same structured envelope every other command returns, with a
  * real installed-artifact `no_ml` self-report (mirrors Python's `cmd_version`). Distinct from the
  * bare `--version`/`-V` flag, which stays a plain one-line shortcut (handled before this is ever
  * reached, `main` below). */
-function cmdVersion(argv: string[]): CommandResult {
-  const args = scanArgv(argv.slice(1), VERSION_GRAMMAR);
+function cmdVersion(): CommandResult {
   const result = new CommandResult("version");
-  if (args.help) {
-    result.usage = VERSION_USAGE;
-    return result;
-  }
   const scan = installedNoMl();
   result.data.engine = ENGINE_NAME;
   result.data.engine_version = engineVersion();
@@ -2772,30 +2363,28 @@ global options:
   --quiet        log warnings and errors only
 `;
 
-/** The commands Python's parser takes; the ones this engine has not built answer cli.not_implemented. */
-const COMMANDS = new Set([
-  "validate",
-  "verify",
-  "assess",
-  "report",
-  "collect",
-  "ingest",
-  "catalog",
-  "conformance",
-  "diff",
-  "sign",
-  "readiness",
-  "doctor",
-  "quickstart",
-  "init",
-  "config",
-  "version",
-]);
+/** Each command's usage (`-h`/`--help`), and each action's under `<command> <action>`. */
+const USAGES: Readonly<Record<string, string>> = {
+  validate: VALIDATE_USAGE,
+  verify: VERIFY_USAGE,
+  assess: ASSESS_USAGE,
+  report: REPORT_USAGE,
+  conformance: CONFORMANCE_USAGE,
+  "conformance run": CONFORMANCE_RUN_USAGE,
+  diff: DIFF_USAGE,
+  sign: SIGN_USAGE,
+  readiness: READINESS_USAGE,
+  quickstart: QUICKSTART_USAGE,
+  version: VERSION_USAGE,
+};
 
 const TOP_FIX =
   "name a command: `agentce <command>`; run `agentce --help` for the commands agentce takes.";
 const TOP_FLAG_FIX = "run `agentce --help` for the commands and global flags agentce takes.";
+const TOP_COMMAND_FIX = "run `agentce --help` for the commands agentce takes.";
+const GLOBAL_FLAGS: readonly string[] = ["--json", "--debug", "--quiet"];
 
+/** A top-level refusal: the command is `agentce`, every key input.unknown_command. */
 function topRefusal(cause: string, fix = TOP_FIX): InputError {
   return new InputError("input.unknown_command", cause, fix);
 }
@@ -2803,42 +2392,43 @@ function topRefusal(cause: string, fix = TOP_FIX): InputError {
 type TopLevel =
   | { kind: "help" }
   | { kind: "version" }
-  | { kind: "run"; command: string; rest: string[]; globals: Set<string> };
+  | { kind: "run"; pre: string[]; command: string; rest: string[] };
 
 /** The tokens before the command, read as Python's `_scan_top_level` reads them (18.108): a short
- * cluster or a value on a flag that takes none is refused at once; -h/--help win when reached;
- * -V/--version answer only a line of their own; --json/--debug/--quiet are recorded; any other flag is
- * refused once the scan ends; `--` makes the next token the command. Every refusal is
- * input.unknown_command. */
-export function scanTopLevel(argv: string[]): TopLevel {
-  const globals = new Set<string>();
+ * cluster, a value on a flag that takes none, an unknown flag before the command, -V/--version with
+ * anything else on the line, a `--` with nothing (or a dash token) after it, or global flags with no
+ * command are refused; -h/--help win when reached. `pre` holds the global flags before the command, in
+ * order; a `--` before the command is dropped. Every refusal is input.unknown_command. */
+export function scanTopLevel(argv: readonly string[]): TopLevel {
+  let line = [...argv];
   let unknown: string | undefined;
-  for (let i = 0; i < argv.length; i++) {
-    const token = argv[i] as string;
-    if (token === "--" || !token.startsWith("-") || token === "-") {
-      const at = token === "--" ? i + 1 : i;
-      if (at === argv.length) {
+  let hasCommand = false;
+  for (let i = 0; i < line.length; i++) {
+    const token = line[i] as string;
+    if (token === "--") {
+      const next = line[i + 1];
+      if (next === undefined) {
         throw topRefusal("no command given after '--'.");
       }
-      if (unknown !== undefined) {
-        break;
+      if (next.startsWith("-")) {
+        // No command starts with a dash.
+        throw topRefusal(`unrecognized command '${next}'.`, TOP_COMMAND_FIX);
       }
-      const command = argv[at] as string;
-      if (!COMMANDS.has(command)) {
-        throw topRefusal(
-          `unrecognized command '${command}'.`,
-          "run `agentce --help` for the commands agentce takes.",
-        );
-      }
-      return { kind: "run", command, rest: argv.slice(at + 1), globals };
+      hasCommand = true;
+      line = [...line.slice(0, i), ...line.slice(i + 1)];
+      break;
+    }
+    if (!token.startsWith("-") || token === "-") {
+      hasCommand = true;
+      break;
     }
     const name = token.split("=", 1)[0] as string;
     if (!token.startsWith("--") && token.length > 2) {
       throw topRefusal(`unrecognized flag '${token}'.`, TOP_FLAG_FIX);
     }
-    const help = name === "-h" || name === "--help";
+    const help = HELP.includes(name);
     const version = name === "-V" || name === "--version";
-    const known = help || version || GLOBAL_BOOLEAN_FLAGS.has(name);
+    const known = help || version || GLOBAL_FLAGS.includes(name);
     if (known && token.includes("=")) {
       throw topRefusal(`flag '${name}' takes no value.`, `drop the value: ${name}.`);
     }
@@ -2846,7 +2436,7 @@ export function scanTopLevel(argv: string[]): TopLevel {
       return { kind: "help" };
     }
     if (version) {
-      if (argv.length !== 1) {
+      if (line.length !== 1) {
         throw topRefusal(
           `'${name}' takes no other arguments.`,
           "run `agentce --version` alone, or `agentce version --json` for the JSON envelope.",
@@ -2854,75 +2444,180 @@ export function scanTopLevel(argv: string[]): TopLevel {
       }
       return { kind: "version" };
     }
-    if (known) {
-      globals.add(name);
-    } else {
+    if (!known) {
       unknown ??= token;
     }
   }
   if (unknown !== undefined) {
     throw topRefusal(`unrecognized flag '${unknown}'.`, TOP_FLAG_FIX);
   }
-  if (argv.length > 0) {
-    throw topRefusal("no command given.");
+  if (!hasCommand) {
+    if (line.length > 0) {
+      throw topRefusal("no command given.");
+    }
+    return { kind: "help" };
   }
-  return { kind: "help" };
+  const at = line.findIndex((token) => !token.startsWith("-") || token === "-");
+  return {
+    kind: "run",
+    pre: line.slice(0, at),
+    command: line[at] as string,
+    rest: line.slice(at + 1),
+  };
+}
+
+/** A refusal is the JSON envelope when `--json` comes before any `--` (SPEC 8.5). */
+function wantsJson(argv: readonly string[]): boolean {
+  const at = argv.indexOf("--");
+  return (at < 0 ? argv : argv.slice(0, at)).includes("--json");
+}
+
+/** A value outside an option's `choices`, by command and option: the command's own keyed error. */
+const CHOICE_ERRORS: Readonly<
+  Record<string, Readonly<Record<string, (value: string) => InputError>>>
+> = {
+  report: { "--format": reportFormatError, "--role": reportRoleError },
+};
+
+/** The error for an action a command does not have. */
+const ACTION_ERRORS: Readonly<Record<string, () => InputError>> = {
+  conformance: conformanceActionError,
+};
+
+/** A value outside an option's `choices`: the command's own error, else (Python's `_parse` fallback)
+ * argparse's invalid-choice sentence under the command's unrecognized-flag key. */
+function choiceError(cmd: ArgvCommand): (option: string, value: string) => InputError {
+  return (option, value) => {
+    const own = CHOICE_ERRORS[cmd.name]?.[option];
+    if (own !== undefined) {
+      return own(value);
+    }
+    const allowed = (cmd.level.options.get(option)?.choices ?? []).map(pyRepr).join(", ");
+    return new InputError(
+      cmd.unrecognizedKey,
+      `argument ${option}: invalid choice: ${pyRepr(value)} (choose from ${allowed}).`,
+      cmd.flagFix,
+    );
+  };
+}
+
+/** What a line asks for, read under the SPEC 8.5 grammar: a usage or version text to print, a command
+ * this engine has not built, or a command with its scan and the global flags given. */
+type Parsed =
+  | { kind: "print"; text: string }
+  | { kind: "version" }
+  | { kind: "not_implemented"; command: string }
+  | { kind: "run"; command: string; scan: Scan; globals: Set<string> };
+
+function parse(rawArgv: readonly string[]): Parsed {
+  const top = scanTopLevel(rawArgv);
+  if (top.kind === "help") {
+    return { kind: "print", text: TOP_USAGE };
+  }
+  if (top.kind === "version") {
+    return { kind: "version" };
+  }
+  const { pre, command: name } = top;
+  pre.forEach((flag, i) => {
+    if (pre.indexOf(flag) < i) {
+      throw topRefusal(`flag '${flag}' was given more than once.`, `give ${flag} once.`);
+    }
+  });
+  if (!isCommand(name)) {
+    throw topRefusal(`unrecognized command '${name}'.`, TOP_COMMAND_FIX);
+  }
+  const cmd = argvCommand(name);
+  if (!cmd.implementedIn.includes("typescript")) {
+    return { kind: "not_implemented", command: name };
+  }
+  let scan: Scan;
+  try {
+    const actionError = ACTION_ERRORS[name];
+    scan = scanArgv(cmd, top.rest, {
+      seen: pre,
+      choiceError: choiceError(cmd),
+      ...(actionError === undefined ? {} : { actionError }),
+    });
+  } catch (exc) {
+    throw exc instanceof InputError ? new CommandRefusal(name, exc) : exc;
+  }
+  if (scan.help) {
+    const usage = USAGES[scan.action === undefined ? name : `${name} ${scan.action}`] as string;
+    return { kind: "print", text: usage };
+  }
+  return { kind: "run", command: name, scan, globals: new Set([...pre, ...scan.flags]) };
+}
+
+/** A refusal of a command's own line, carrying the command for the envelope's `command`. */
+class CommandRefusal extends InputError {
+  readonly command: string;
+
+  constructor(command: string, err: InputError) {
+    super(err.key, err.cause, err.fix);
+    this.command = command;
+  }
+}
+
+function run(command: string, scan: Scan, json: boolean): CommandResult {
+  switch (command) {
+    case "conformance":
+      return cmdConformance(scan);
+    case "validate":
+      return cmdValidate(scan);
+    case "assess":
+      return cmdAssess(scan);
+    case "report":
+      return cmdReport(scan);
+    case "diff":
+      return cmdDiff(scan, json);
+    case "readiness":
+      return cmdReadiness(scan);
+    case "sign":
+      return cmdSign(scan);
+    case "verify":
+      return cmdVerify(scan);
+    case "quickstart":
+      return cmdQuickstart(scan);
+    default:
+      return cmdVersion();
+  }
 }
 
 export function main(rawArgv: string[]): number {
-  let top: TopLevel;
+  let parsed: Parsed;
   try {
-    top = scanTopLevel(rawArgv);
+    parsed = parse(rawArgv);
   } catch (exc) {
     if (!(exc instanceof InputError)) {
       throw exc;
     }
-    const refused = errorResult("agentce", exc);
-    emit(refused, rawArgv.includes("--json"));
+    const refused = errorResult(exc instanceof CommandRefusal ? exc.command : "agentce", exc);
+    emit(refused, wantsJson(rawArgv));
     return refused.exitCode;
   }
-  if (top.kind === "help") {
-    process.stdout.write(TOP_USAGE);
+  if (parsed.kind === "print") {
+    process.stdout.write(parsed.text);
     return 0;
   }
-  if (top.kind === "version") {
+  if (parsed.kind === "version") {
     console.log(`agentce ${engineVersion()}`);
     return 0;
   }
-  const command = top.command;
-  const argv = [command, ...top.rest];
-
-  const json = top.globals.has("--json") || argv.includes("--json");
-  const debug = top.globals.has("--debug") || argv.includes("--debug");
+  if (parsed.kind === "not_implemented") {
+    const result = notImplemented(parsed.command);
+    emit(result, wantsJson(rawArgv));
+    return result.exitCode;
+  }
+  const { command, scan, globals } = parsed;
+  const json = globals.has("--json");
+  const debug = globals.has("--debug");
   if (debug) {
     logDebug(command, "command.start");
   }
   let result: CommandResult;
   let failed = false;
   try {
-    if (command === "conformance") {
-      result = cmdConformance(argv);
-    } else if (command === "validate") {
-      result = cmdValidate(argv);
-    } else if (command === "assess") {
-      result = cmdAssess(argv);
-    } else if (command === "report") {
-      result = cmdReport(argv);
-    } else if (command === "diff") {
-      result = cmdDiff(argv, json);
-    } else if (command === "readiness") {
-      result = cmdReadiness(argv);
-    } else if (command === "sign") {
-      result = cmdSign(argv);
-    } else if (command === "verify") {
-      result = cmdVerify(argv);
-    } else if (command === "quickstart") {
-      result = cmdQuickstart(argv);
-    } else if (command === "version") {
-      result = cmdVersion(argv);
-    } else {
-      result = notImplemented(command);
-    }
+    result = run(command, scan, json);
   } catch (exc) {
     failed = true;
     if (exc instanceof AgentceError) {
@@ -2950,7 +2645,7 @@ export function main(rawArgv: string[]): number {
     }
   }
   emit(result, json);
-  if (debug && !failed && result.usage === undefined) {
+  if (debug && !failed) {
     logDebug(command, "command.end", { exit_code: result.exitCode });
   }
   return result.exitCode;

@@ -753,7 +753,7 @@ test("18.167: a recorded data file that went missing, and one that does not pars
 test("18.167: a failed validation names its key, each problem and a fix", () => {
   const out = mkdtempSync(join(tmpdir(), "agentce-report-validate-"));
   try {
-    const { exitCode, envelope } = runJson(["report", "--validate", out, "--json"]);
+    const { exitCode, envelope } = runJson(["report", "--validate", out]);
     assert.equal(exitCode, 3);
     assert.equal(envelope.message_key, "report.validation_failed");
     assert.equal(envelope.valid, false);
