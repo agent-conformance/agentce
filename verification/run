@@ -139,7 +139,10 @@ def lint_registry(registry: dict[str, Any], root: Path) -> list[str]:
 
 
 def lint_argv_cases(root: Path) -> list[str]:
-    """SPEC 8.5: every rule the command-line grammar names keeps at least one case in the shared table."""
+    """SPEC 8.5: every rule the command-line grammar names keeps at least one case in the shared table.
+    A root with no grammar (the self-tests' scratch roots) has no rules to cover."""
+    if not (root / ARGV_GRAMMAR).exists():
+        return []
     try:
         rules = json.loads((root / ARGV_GRAMMAR).read_text(encoding="utf-8"))["rules"]
         cases = json.loads((root / ARGV_CASES).read_text(encoding="utf-8"))["cases"]
