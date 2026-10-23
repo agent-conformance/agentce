@@ -139,7 +139,7 @@ export class StateDir {
       );
     }
     const data = parsed;
-    const version: unknown = data.state_version ?? 0;
+    const version: unknown = "state_version" in data ? data.state_version : 0;
     // The JSON integer 1 and nothing else (SPEC 8.7): 1.0, "1" and true are not state_version 1.
     if (!isJsonInteger(version) || version !== STATE_VERSION) {
       throw new InputError(

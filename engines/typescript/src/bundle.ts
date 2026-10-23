@@ -19,7 +19,7 @@ import {
   statSync,
 } from "node:fs";
 import { isAbsolute, posix, relative, sep } from "node:path";
-import { sha256Hex } from "./canonical";
+import { CanonicalizationError, canonicalString, sha256Hex } from "./canonical";
 import { InputError, isPermissionError, readPermissionError, unreadableError } from "./errors";
 import { notValid } from "./json";
 import { underByIdentity } from "./report";
@@ -291,6 +291,19 @@ export function loadBundle(bundleDir: string): Bundle {
     throw new InputError(
       "input.bundle_manifest_invalid",
       "manifest.json is not an object.",
+      "regenerate the bundle so its manifest.json is well-formed.",
+    );
+  }
+  try {
+    // The bundle digest is the canonical manifest's (SPEC 8.1), so a float is refused here.
+    canonicalString(parsed);
+  } catch (exc) {
+    if (!(exc instanceof CanonicalizationError)) {
+      throw exc;
+    }
+    throw new InputError(
+      "input.bundle_manifest_invalid",
+      `manifest.json cannot be put in canonical form: ${exc.message}.`,
       "regenerate the bundle so its manifest.json is well-formed.",
     );
   }

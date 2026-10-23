@@ -7,7 +7,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { loadBundle } from "./bundle";
-import { CanonicalizationError } from "./canonical";
 import { InputError } from "./errors";
 import { ingest } from "./ingest";
 import { GENESIS_PREV, IntegrityStatus, recomputeHash, verifyBundle } from "./integrity";
@@ -119,11 +118,11 @@ test("validateEvent rejects an unknown payload type", () => {
   assert.ok(errors.length > 0);
 });
 
-test("a manifest number the canonical form refuses is refused on digest, not folded to a whole number, and never blocks loading", () => {
-  for (const [token, reason] of [
-    ["2.0", "non_integer_number"],
-    ["1e2", "non_integer_number"],
-    ["10000000000000001", "integer_out_of_range"],
+test("a manifest number the canonical form refuses is refused at load with input.bundle_manifest_invalid, as Python and Java refuse it", () => {
+  for (const [token, detail] of [
+    ["2.0", "non_integer_number: 2.0"],
+    ["1e2", "non_integer_number: 100.0"],
+    ["10000000000000001", "integer_out_of_range: 10000000000000001"],
   ] as const) {
     const dir = mkdtempSync(join(tmpdir(), "agentce-manifest-"));
     mkdirSync(join(dir, "events"));
@@ -133,13 +132,13 @@ test("a manifest number the canonical form refuses is refused on digest, not fol
       `"bundle_format": "1.0", "note": ${token}`,
     );
     writeFileSync(join(dir, "manifest.json"), manifest);
-    // `digest` is lazy (18.65): loading, and ingest, never touch it, matching the Python
-    // reference's `@property`. It still throws the same way once something reads it.
-    const bundle = loadBundle(dir);
-    assert.equal(ingest(bundle).accepted.length, 1, token);
+    // The bundle digest is the canonical manifest's (SPEC 8.1), so loading refuses it (bundle.py).
     assert.throws(
-      () => bundle.digest,
-      (err: unknown) => err instanceof CanonicalizationError && err.reason === reason,
+      () => loadBundle(dir),
+      (err: unknown) =>
+        err instanceof InputError &&
+        err.key === "input.bundle_manifest_invalid" &&
+        err.cause === `manifest.json cannot be put in canonical form: ${detail}.`,
       token,
     );
   }

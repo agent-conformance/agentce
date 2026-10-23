@@ -41,6 +41,7 @@ import {
 import { computeBlindSpots } from "./blindSpots";
 import { confineToRoot, loadBundle } from "./bundle";
 import { DEFAULT_LENS, catalogsDir as bundledCatalogsDir, quickstartDir } from "./bundled";
+import { CanonicalizationError, canonicalString } from "./canonical";
 import { type Catalog, loadCatalog } from "./catalog";
 import { runEcs } from "./conformance";
 import { computeCoverage } from "./coverage";
@@ -2018,6 +2019,19 @@ function readSignClaim(claimPath: string): Record<string, unknown> {
     throw new InputError(
       "sign.claim_malformed",
       "claim.json's signatures field is not a list.",
+      fix,
+    );
+  }
+  try {
+    // The signature covers the canonical claim body, so a float is refused here (SPEC 8.7).
+    canonicalString(Object.fromEntries(Object.entries(claim).filter(([k]) => k !== "signatures")));
+  } catch (exc) {
+    if (!(exc instanceof CanonicalizationError)) {
+      throw exc;
+    }
+    throw new InputError(
+      "sign.claim_malformed",
+      `claim.json cannot be put in canonical form: ${exc.message}.`,
       fix,
     );
   }
