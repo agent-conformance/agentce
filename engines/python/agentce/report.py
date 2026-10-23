@@ -60,7 +60,8 @@ from .buyer_view import (
 from .catalog import Catalog, ControlSpec, catalog_provenance_digest
 from .outputs import write_file
 from .profile import Profile, Subject
-from .safe_json import JSONError, jsonl_lines, load_json
+from .readiness import data_file_problem
+from .safe_json import JSONError, jsonl_lines, load_json, load_report_json
 from .project import (
     blind_spots_by_subject,
     compute_project_view,
@@ -3815,11 +3816,13 @@ def _validate_xml_wellformed(filename: str, data: bytes) -> list[str]:
 
 
 def _validate_jsonl(filename: str, text: str) -> list[str]:
-    """Every non-blank line of ``text`` (:func:`jsonl_lines`) parses as JSON on its own."""
+    """Every non-blank line of ``text`` (:func:`jsonl_lines`) is one JSON object on its own, read by
+    the report-file rule (:func:`load_report_json`)."""
     problems = []
     for i, line in jsonl_lines(text):
         try:
-            load_json(line)
+            if not isinstance(load_report_json(line), dict):
+                problems.append(f"{filename}: line {i} is not a JSON object")
         except JSONError as exc:
             problems.append(f"{filename}: line {i} is not valid JSON ({exc.msg})")
     return problems
@@ -3926,7 +3929,7 @@ def validate_report(out_dir: Path) -> list[str]:
         if text is None:
             continue  # mandatory absence was already reported above; optional absence is not a problem
         try:
-            instance = load_json(text)
+            instance = load_report_json(text)
         except JSONError as exc:
             problems.append(f"{filename}: invalid JSON ({exc.msg})")
             continue
@@ -3966,13 +3969,13 @@ def validate_report(out_dir: Path) -> list[str]:
                     " records any writes claim.json)"
                 )
             continue
-        if filename.endswith(".jsonl"):
-            problems += _validate_jsonl(filename, text)
-            continue
-        try:
-            load_json(text)
-        except JSONError as exc:
-            problems.append(f"{filename}: invalid JSON ({exc.msg})")
+        if filename == "claim.json":
+            try:
+                load_report_json(text)
+            except JSONError as exc:
+                problems.append(f"{filename}: invalid JSON ({exc.msg})")
+        elif (reason := data_file_problem(filename, text)) is not None:
+            problems.append(f"{filename}: cannot be read: {reason}")
     for filename in _OPTIONAL_ARTIFACTS:
         xml = filename.endswith(".xml")
         content = _read_or_report(

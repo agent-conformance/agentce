@@ -1228,7 +1228,7 @@ def test_sign_ok(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
 
 
 def _stage4_files(report: Path) -> Path:
-    """The four files readiness reads, empty, so a hand-built report folder gets past readiness
+    """The five files readiness reads, empty, so a hand-built report folder gets past readiness
     (an absent one is NOT READY since 18.166) and the test reaches the claim."""
     report.mkdir(exist_ok=True)
     for name, text in (
@@ -1236,6 +1236,7 @@ def _stage4_files(report: Path) -> Path:
         ("coverage.json", "{}"),
         ("applicability.jsonl", ""),
         ("assertions.json", "[]"),
+        ("quarantine.jsonl", ""),
     ):
         (report / name).write_text(text, encoding="utf-8")
     return report

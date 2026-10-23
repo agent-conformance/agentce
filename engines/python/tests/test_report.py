@@ -2269,7 +2269,7 @@ def test_validate_report_catches_a_recorded_data_file_that_went_missing(
     (report / "integrity.jsonl").write_text("{}\nnot json\n", encoding="utf-8")
     (report / "coverage.json").write_text("{", encoding="utf-8")
     problems = validate_report(report)
-    assert [p.split(" (")[0] for p in problems] == [
-        "integrity.jsonl: line 2 is not valid JSON",
-        "coverage.json: invalid JSON",
+    assert [p.split(": cannot be read: ")[0] for p in problems] == [
+        "integrity.jsonl",
+        "coverage.json",
     ], problems

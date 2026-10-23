@@ -52,6 +52,7 @@ def _report(
     (out / "applicability.jsonl").write_text(
         "".join(json.dumps(s) + "\n" for s in (applicability or [])), encoding="utf-8"
     )
+    (out / "quarantine.jsonl").write_text("", encoding="utf-8")
     return out
 
 
@@ -72,6 +73,7 @@ _REPORT_FILES = (
     "integrity.jsonl",
     "applicability.jsonl",
     "assertions.json",
+    "quarantine.jsonl",
 )
 _not_root = pytest.mark.skipif(
     os.geteuid() == 0, reason="root reads a mode-000 file and enters a mode-600 folder"
@@ -145,8 +147,9 @@ def test_report_file_not_utf8_is_not_ready(tmp_path: Path) -> None:
 
 
 _JSONL_RECORD = {
-    "integrity.jsonl": b'{"stream": "s", "status": "ok"}',
+    "integrity.jsonl": b'{"stream": "s", "status": "verified"}',
     "applicability.jsonl": b'{"drift": []}',
+    "quarantine.jsonl": b'{"record": "r"}',
 }
 _NBSP, _BOM = "\u00a0".encode(), "\ufeff".encode()
 

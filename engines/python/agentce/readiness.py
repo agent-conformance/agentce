@@ -106,7 +106,11 @@ def _integrity(text: str) -> list[dict[str, Any]]:
     """integrity.jsonl: one object per line, each with a ``status`` from integrity-result.schema.json's
     enum. A record without one, or with another value, is unreadable, never read as no break."""
     records = _jsonl(text)
-    if any(record.get("status") not in _INTEGRITY_STATUSES for record in records):
+    if any(
+        not isinstance(status := record.get("status"), str)
+        or status not in _INTEGRITY_STATUSES
+        for record in records
+    ):
         raise _Unreadable("an integrity status is missing or not one the schema allows")
     return records
 
@@ -176,6 +180,25 @@ def _assertions(text: str) -> list[dict[str, Any]]:
         if assertion.get("deviation") is not None:
             _strings(assertion, "deviation")
     return assertions
+
+
+#: The reader readiness applies to each report data file; ``report --validate`` reads them with these
+#: same readers, so a file one command refuses the other refuses too (18.184q).
+_DATA_FILE_READERS: dict[str, Callable[[str], Any]] = {
+    "integrity.jsonl": _integrity,
+    "coverage.json": _coverage,
+    "applicability.jsonl": _applicability,
+    "quarantine.jsonl": _jsonl,
+}
+
+
+def data_file_problem(name: str, text: str) -> str | None:
+    """Why readiness cannot read the report data file ``name`` holding ``text``, or ``None`` when it can."""
+    try:
+        _DATA_FILE_READERS[name](text)
+    except _Unreadable as exc:
+        return str(exc)
+    return None
 
 
 def _schema(name: str) -> dict[str, Any]:
@@ -316,7 +339,7 @@ def compute_readiness(
                 reasons.append(f"coverage shortfall for {subject} {event_type}")
 
     # Read for its presence and shape only: deleting it must not read READY (SPEC §13.3.4, 18.184q).
-    report_file("quarantine.jsonl", _jsonl)
+    report_file("quarantine.jsonl", _DATA_FILE_READERS["quarantine.jsonl"])
 
     for statement in report_file("applicability.jsonl", _applicability) or []:
         for drift in statement.get("drift", []):
