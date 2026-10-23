@@ -1325,7 +1325,7 @@ public final class Readiness {
 
     private static JsonNode parseJson(String text) {
         try {
-            return Json.parse(text);
+            return Json.parseReport(text);
         } catch (IllegalArgumentException e) {
             throw new Unreadable(e.getMessage());
         }
@@ -1358,9 +1358,21 @@ public final class Readiness {
         return objects(Json.jsonlLines(text).stream().map(line -> parseJson(line.text())).toList());
     }
 
-    /** integrity.jsonl: one object per line, whose {@code status} (when present) is a string. */
+    /** Every status integrity-result.schema.json allows; a record with no status or another one is unreadable. */
+    private static final Set<String> INTEGRITY_STATUSES = Set.of(
+            "failed", "gap", "reordered", "verified", "verified_weak", "unsigned", "time_suspect");
+
+    /** integrity.jsonl: one object per line, each with a {@code status} from integrity-result.schema.json's
+     * enum. A record without one, or with another value, is unreadable, never read as no break. */
     private static List<JsonNode> parseIntegrity(String text) {
-        return parseJsonl(text).stream().map(record -> strings(record, "status")).toList();
+        List<JsonNode> records = parseJsonl(text);
+        for (JsonNode record : records) {
+            JsonNode status = record.path("status");
+            if (!status.isTextual() || !INTEGRITY_STATUSES.contains(status.textValue())) {
+                throw new Unreadable("an integrity status is missing or not one the schema allows");
+            }
+        }
+        return records;
     }
 
     private static JsonNode parseJsonObject(String text) {
@@ -1444,6 +1456,25 @@ public final class Readiness {
         return statements;
     }
 
+    /** The reader readiness applies to each report data file; {@code report --validate} reads them with
+     * these same readers, so a file one command refuses the other refuses too (18.184q). */
+    private static final Map<String, Function<String, ?>> DATA_FILE_READERS = Map.of(
+            "integrity.jsonl", Readiness::parseIntegrity,
+            "coverage.json", Readiness::parseCoverage,
+            "applicability.jsonl", Readiness::parseApplicability,
+            "quarantine.jsonl", Readiness::parseJsonl);
+
+    /** Why readiness cannot read the report data file {@code name} holding {@code text}, or {@code null}
+     * when it can. Mirrors {@code readiness.data_file_problem}. */
+    static String dataFileProblem(String name, String text) {
+        try {
+            DATA_FILE_READERS.get(name).apply(text);
+        } catch (Unreadable e) {
+            return e.getMessage();
+        }
+        return null;
+    }
+
     /** Returns the readiness verdict for a finished report directory (SPEC §13.3.4 stage 4), ported
      * from {@code compute_readiness} ({@code readiness.py:104-197}) exactly. {@code severities} maps
      * control id to severity (from the catalogs the report used); {@code gaps} is the set of control
@@ -1503,6 +1534,9 @@ public final class Readiness {
                 }
             }
         }
+
+        // Read for its presence and shape only: deleting it must not read READY (SPEC §13.3.4, 18.184q).
+        reportFile(reportDir, "quarantine.jsonl", DATA_FILE_READERS.get("quarantine.jsonl"), null, reasons);
 
         for (JsonNode statement :
                 Readiness.<List<JsonNode>>reportFile(

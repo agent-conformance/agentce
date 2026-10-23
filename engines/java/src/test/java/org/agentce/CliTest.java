@@ -1124,6 +1124,7 @@ class CliTest {
         Files.writeString(reportDir.resolve("integrity.jsonl"), integrityJsonl);
         Files.writeString(reportDir.resolve("coverage.json"), "{\"subjects\":{}}");
         Files.writeString(reportDir.resolve("applicability.jsonl"), "");
+        Files.writeString(reportDir.resolve("quarantine.jsonl"), "");
         return reportDir;
     }
 

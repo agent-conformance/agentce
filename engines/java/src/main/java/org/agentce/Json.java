@@ -115,7 +115,14 @@ public final class Json {
      * assumes a parse either throws or returns a node (18.29 verifier round 1, F1).
      */
     public static JsonNode parse(String text) {
+        return parse(text, false);
+    }
+
+    private static JsonNode parse(String text, boolean uniqueKeys) {
         try (JsonParser parser = new IntegerDigitLimit(MAPPER.getFactory().createParser(text))) {
+            if (uniqueKeys) {
+                parser.enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
+            }
             JsonNode node = MAPPER.readTree(parser);
             if (node == null) {
                 throw new IllegalArgumentException("invalid JSON: no content");
@@ -129,6 +136,56 @@ public final class Json {
         } catch (IOException e) {
             throw new IllegalArgumentException("cannot parse JSON: " + e.getMessage(), e);
         }
+    }
+
+    /** The deepest container nesting a strict reader accepts (Jackson's own default limit); all three
+     * engines enforce it with the same byte pre-scan, so they refuse at the same depth. Mirrors {@code
+     * safe_json.MAX_JSON_DEPTH}. */
+    static final int MAX_JSON_DEPTH = 1000;
+
+    /** Whether {@code raw} opens more than {@link #MAX_JSON_DEPTH} containers at once, counting
+     * {@code [} and {@code {} up and {@code ]} and {@code }} down outside strings (a backslash in a
+     * string skips the next byte). Run before parsing, so depth is found first whatever else is wrong
+     * with the bytes. Mirrors {@code safe_json.too_deep}. */
+    static boolean tooDeep(byte[] raw) {
+        int depth = 0;
+        boolean inString = false;
+        for (int i = 0; i < raw.length; i++) {
+            byte b = raw[i];
+            if (inString) {
+                if (b == '\\') {
+                    i++;
+                } else if (b == '"') {
+                    inString = false;
+                }
+            } else if (b == '"') {
+                inString = true;
+            } else if (b == '[' || b == '{') {
+                if (++depth > MAX_JSON_DEPTH) {
+                    return true;
+                }
+            } else if (b == ']' || b == '}') {
+                depth--;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Parse one report file (or one JSON Lines line of one) by the rule every engine's readiness, sign
+     * and {@code report --validate} share (SPEC §13.3.4 stage 4): containers nested at most {@link
+     * #MAX_JSON_DEPTH} deep, no {@code NaN}/{@code Infinity}/{@code -Infinity} (Jackson's default),
+     * integer literals of at most {@link #MAX_INT_STR_DIGITS} digits, and no key repeated within one
+     * object (Jackson compares decoded names, so {@code "st\\u0061tus"} repeats {@code "status"}).
+     * Mirrors {@code safe_json.load_report_json} and {@code json.ts}'s {@code parseReportJson}; anything
+     * else throws {@link IllegalArgumentException}.
+     */
+    public static JsonNode parseReport(String text) {
+        if (tooDeep(text.getBytes(StandardCharsets.UTF_8))) {
+            throw new IllegalArgumentException(
+                    "invalid JSON: containers nested more than " + MAX_JSON_DEPTH + " deep");
+        }
+        return parse(text, true);
     }
 
     /** Parse a JSON file (UTF-8). */

@@ -572,8 +572,9 @@ class ReportValidateTest {
                 ReportValidate.validateReport(out));
         Files.writeString(out.resolve("integrity.jsonl"), "{}\nnot json\n");
         Files.writeString(out.resolve("coverage.json"), "{");
-        List<String> problems = ReportValidate.validateReport(out).stream().map(p -> p.split(" \\(")[0]).toList();
-        assertEquals(List.of("integrity.jsonl: line 2 is not valid JSON", "coverage.json: invalid JSON"), problems);
+        List<String> problems =
+                ReportValidate.validateReport(out).stream().map(p -> p.split(": cannot be read: ")[0]).toList();
+        assertEquals(List.of("integrity.jsonl", "coverage.json"), problems);
     }
 
     @Test
@@ -581,5 +582,30 @@ class ReportValidateTest {
         JsonNode envelope = runJson("report", "--validate", out.toString());
         assertEquals("report.validation_failed", envelope.get("message_key").asText());
         assertEquals(false, envelope.get("valid").asBoolean());
+    }
+
+    /** report --validate refuses a data file readiness cannot read, and only such a file (18.184q); the
+     * same table drives test_report.py and reportValidate.test.ts. */
+    @Test
+    void dataFilesAreReadByTheReportFileRule(@TempDir Path out) throws IOException {
+        freshFullReport(out);
+        for (ReportFileRuleCases.Case ruleCase : ReportFileRuleCases.all()) {
+            if (ruleCase.validate() == null) {
+                continue;
+            }
+            Path file = out.resolve(ruleCase.file());
+            boolean existed = Files.exists(file);
+            byte[] original = existed ? Files.readAllBytes(file) : null;
+            Files.writeString(file, ruleCase.content());
+            List<String> named = ReportValidate.validateReport(out).stream()
+                    .filter(p -> p.startsWith(ruleCase.file() + ":"))
+                    .toList();
+            assertEquals("refused".equals(ruleCase.validate()), !named.isEmpty(), ruleCase.id() + ": " + named);
+            if (existed) {
+                Files.write(file, original);
+            } else {
+                Files.delete(file);
+            }
+        }
     }
 }

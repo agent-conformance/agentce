@@ -72,6 +72,7 @@ class ReadinessTest {
             applicabilityLines.append(s).append("\n");
         }
         Files.writeString(dir.resolve("applicability.jsonl"), applicabilityLines.toString());
+        Files.writeString(dir.resolve("quarantine.jsonl"), "");
     }
 
     private static Path reportWithAssertions(Path dir, ArrayNode assertions) throws IOException {
@@ -122,13 +123,14 @@ class ReadinessTest {
     }
 
     private static final Map<String, String> JSONL_RECORD = Map.of(
-            "integrity.jsonl", "{\"stream\": \"s\", \"status\": \"ok\"}",
-            "applicability.jsonl", "{\"drift\": []}");
+            "integrity.jsonl", "{\"stream\": \"s\", \"status\": \"verified\"}",
+            "applicability.jsonl", "{\"drift\": []}",
+            "quarantine.jsonl", "{\"record\": \"r\"}");
 
     /** LF alone ends a line; any other separator, or a no-break space or byte-order mark, leaves a
      * line not JSON (18.184n), as in Python and TypeScript. */
     @ParameterizedTest
-    @ValueSource(strings = {"integrity.jsonl", "applicability.jsonl"})
+    @ValueSource(strings = {"integrity.jsonl", "applicability.jsonl", "quarantine.jsonl"})
     void jsonlLineOutsideTheLineRuleIsNotReady(String name, @TempDir Path tmp) throws IOException {
         String r = JSONL_RECORD.get(name);
         Map<String, String> cases = new LinkedHashMap<>();
@@ -157,7 +159,7 @@ class ReadinessTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"integrity.jsonl", "applicability.jsonl"})
+    @ValueSource(strings = {"integrity.jsonl", "applicability.jsonl", "quarantine.jsonl"})
     void jsonlLineInsideTheLineRuleStaysReady(String name, @TempDir Path tmp) throws IOException {
         String r = JSONL_RECORD.get(name);
         List<String> cases = List.of(
@@ -195,7 +197,8 @@ class ReadinessTest {
     /** An entry that is there but cannot be read blocks; it never reads as absent, which would let a
      * recorded gap stop blocking (18.165, the same answer Python gives). */
     @ParameterizedTest
-    @ValueSource(strings = {"coverage.json", "integrity.jsonl", "applicability.jsonl", "assertions.json"})
+    @ValueSource(strings = {
+            "coverage.json", "integrity.jsonl", "applicability.jsonl", "assertions.json", "quarantine.jsonl"})
     void unreadableReportFileIsNotReady(String name, @TempDir Path tmp) throws IOException {
         Assumptions.assumeFalse("root".equals(System.getProperty("user.name")), "running as root");
         for (String shape : SHAPES) {
@@ -215,7 +218,8 @@ class ReadinessTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"coverage.json", "integrity.jsonl", "applicability.jsonl", "assertions.json"})
+    @ValueSource(strings = {
+            "coverage.json", "integrity.jsonl", "applicability.jsonl", "assertions.json", "quarantine.jsonl"})
     void absentReportFileIsNotReadyAndNamed(String name, @TempDir Path dir) throws IOException {
         writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
         Files.delete(dir.resolve(name));
@@ -260,7 +264,8 @@ class ReadinessTest {
                             "cannot read report file applicability.jsonl",
                             "cannot read report file assertions.json",
                             "cannot read report file coverage.json",
-                            "cannot read report file integrity.jsonl"),
+                            "cannot read report file integrity.jsonl",
+                            "cannot read report file quarantine.jsonl"),
                     v.reasons());
         } finally {
             Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwx------"));
@@ -983,5 +988,22 @@ class ReadinessTest {
         Files.writeString(dir.resolve("assertions.json"),
                 "[{\"control\": \"DOC-01\", \"outcome\": \"conformant\", \"deviation\": null}]");
         assertEquals(Readiness.READY, Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).verdict());
+    }
+
+    /** One report-file rule in every engine (18.184q): the same table drives test_readiness.py and
+     * readiness.test.ts. */
+    @Test
+    void reportFileRule(@TempDir Path tmp) throws IOException {
+        for (ReportFileRuleCases.Case ruleCase : ReportFileRuleCases.all()) {
+            Path dir = Files.createDirectories(tmp.resolve(ruleCase.id()));
+            writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
+            if (ruleCase.content() == null) {
+                Files.delete(dir.resolve(ruleCase.file()));
+            } else {
+                Files.writeString(dir.resolve(ruleCase.file()), ruleCase.content());
+            }
+            assertEquals(ruleCase.readiness(),
+                    Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).reasons(), ruleCase.id());
+        }
     }
 }

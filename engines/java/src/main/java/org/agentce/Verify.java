@@ -516,10 +516,8 @@ public final class Verify {
         throw refusal("verify.no_signature_verified", lastError);
     }
 
-    /** The deepest container nesting {@link #parseUntrustedJson} accepts (mirrors {@code
-     * signing.MAX_JSON_DEPTH}, which is Jackson's own default limit); all three engines enforce it with
-     * the same byte pre-scan. */
-    static final int MAX_JSON_DEPTH = 1000;
+    /** The deepest container nesting {@link #parseUntrustedJson} accepts ({@link Json#MAX_JSON_DEPTH}). */
+    static final int MAX_JSON_DEPTH = Json.MAX_JSON_DEPTH;
 
     /** A document nested past {@link #MAX_JSON_DEPTH}; its message stays "not readable JSON" for
      * callers that do not tell depth apart. Mirrors {@code signing.JsonTooDeep}. */
@@ -529,34 +527,6 @@ public final class Verify {
         JsonTooDeep() {
             super("not readable JSON");
         }
-    }
-
-    /** Whether {@code raw} opens more than {@link #MAX_JSON_DEPTH} containers at once, counting
-     * {@code [} and {@code {} up and {@code ]} and {@code }} down outside strings (a backslash in a
-     * string skips the next byte). Run before parsing, so depth is found first whatever else is wrong
-     * with the bytes. Mirrors {@code signing._too_deep}. */
-    private static boolean tooDeep(byte[] raw) {
-        int depth = 0;
-        boolean inString = false;
-        for (int i = 0; i < raw.length; i++) {
-            byte b = raw[i];
-            if (inString) {
-                if (b == '\\') {
-                    i++;
-                } else if (b == '"') {
-                    inString = false;
-                }
-            } else if (b == '"') {
-                inString = true;
-            } else if (b == '[' || b == '{') {
-                if (++depth > MAX_JSON_DEPTH) {
-                    return true;
-                }
-            } else if (b == ']' || b == '}') {
-                depth--;
-            }
-        }
-        return false;
     }
 
     /** {@link #parseUntrustedJson} for one input verify reads, refused with that input's own key:
@@ -595,7 +565,7 @@ public final class Verify {
      * text; its message is never shown. A document too deep throws {@link JsonTooDeep}, whatever else
      * is wrong with it. */
     static JsonNode parseUntrustedJson(byte[] raw) {
-        if (tooDeep(raw)) {
+        if (Json.tooDeep(raw)) {
             throw new JsonTooDeep();
         }
         JsonNode value;

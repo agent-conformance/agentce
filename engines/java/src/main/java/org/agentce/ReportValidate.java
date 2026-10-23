@@ -371,11 +371,15 @@ public final class ReportValidate {
         }
     }
 
+    /** Every non-blank line of {@code text} ({@link Json#jsonlLines}) is one JSON object on its own, read
+     * by the report-file rule ({@link Json#parseReport}). Mirrors {@code report._validate_jsonl}. */
     private static List<String> validateJsonl(String text, String filename) {
         List<String> problems = new ArrayList<>();
         for (Json.Line line : Json.jsonlLines(text)) {
             try {
-                Json.parse(line.text());
+                if (!Json.parseReport(line.text()).isObject()) {
+                    problems.add(filename + ": line " + line.number() + " is not a JSON object");
+                }
             } catch (IllegalArgumentException e) {
                 problems.add(filename + ": line " + line.number() + " is not valid JSON (" + originalMessage(e) + ")");
             }
@@ -491,7 +495,7 @@ public final class ReportValidate {
             }
             JsonNode instance;
             try {
-                instance = Json.parse(text);
+                instance = Json.parseReport(text);
             } catch (IllegalArgumentException e) {
                 problems.add(filename + ": invalid JSON (" + originalMessage(e) + ")");
                 continue;
@@ -528,14 +532,17 @@ public final class ReportValidate {
                 }
                 continue;
             }
-            if (filename.endsWith(".jsonl")) {
-                problems.addAll(validateJsonl(text, filename));
+            if (filename.equals("claim.json")) {
+                try {
+                    Json.parseReport(text);
+                } catch (IllegalArgumentException e) {
+                    problems.add(filename + ": invalid JSON (" + originalMessage(e) + ")");
+                }
                 continue;
             }
-            try {
-                Json.parse(text);
-            } catch (IllegalArgumentException e) {
-                problems.add(filename + ": invalid JSON (" + originalMessage(e) + ")");
+            String reason = Readiness.dataFileProblem(filename, text);
+            if (reason != null) {
+                problems.add(filename + ": cannot be read: " + reason);
             }
         }
         for (String filename : OPTIONAL_ARTIFACTS) {
