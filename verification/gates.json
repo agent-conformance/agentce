@@ -2821,8 +2821,8 @@
         {
           "description": "TypeScript: the unreadable classification removed from loadBundle's member hash read, so an unreadable stream file crashes as internal.unexpected",
           "file": "engines/typescript/src/bundle.ts",
-          "search": "      data = readConfined(bundleDir, rel, member);\n    } catch (err) {\n      if (isPermissionError(err)) {\n        throw bundleUnreadable(bundleDir, rel);\n      }\n      throw err;\n",
-          "replace": "      data = readConfined(bundleDir, rel, member);\n    } catch (err) {\n      throw err;\n"
+          "search": "        data = readConfined(bundleDir, rel, member, limit);\n      } catch (err) {\n        if (isPermissionError(err)) {\n          throw bundleUnreadable(bundleDir, rel);\n        }\n        throw err;\n",
+          "replace": "        data = readConfined(bundleDir, rel, member, limit);\n      } catch (err) {\n        throw err;\n"
         },
         {
           "description": "Java: verifyCertificate always refuses, so a validly certificate-signed release does not verify",
