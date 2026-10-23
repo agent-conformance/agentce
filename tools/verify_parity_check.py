@@ -796,9 +796,12 @@ def _run_mutation(
     path = mutation.build(root)
     target = mutation.arg(path) if mutation.arg is not None else str(path)
     argv = target if isinstance(target, list) else [flag, target]
+    # After `--` every token is a positional (SPEC 8.5), so --json goes before it.
+    cut = argv.index("--") if "--" in argv else len(argv)
+    argv = [*argv[:cut], "--json", *argv[cut:]]
     runs = {}
     for engine in verify_flow_census.ENGINES_BY_FLOW[mutation.flow]:
-        out, code = ENGINE_VERIFY[engine]([*argv, "--json"])
+        out, code = ENGINE_VERIFY[engine](argv)
         runs[engine] = (out.replace(str(root), "<dir>"), code)
     return runs
 
