@@ -159,6 +159,21 @@ export function digestOf(event: Record<string, unknown>): string | null {
   }
 }
 
+/** The quarantine detail for a record the canonical form cannot hold (SPEC 6.7), such as a number in a schema-open
+ * field that is not a safe integer; `null` when it has one. Such a record is never admitted, so no later stage
+ * (integrity, digest, conduct rules) meets it, as Python's `_no_canonical_form` (18.184r). */
+function noCanonicalForm(event: Record<string, unknown>): string | null {
+  try {
+    canonicalString(event);
+  } catch (exc) {
+    if (exc instanceof CanonicalizationError) {
+      return `the record has no canonical form: ${exc.message} (SPEC 6.7)`;
+    }
+    throw exc;
+  }
+  return null;
+}
+
 function readable(record: QuarantineRecord, event: Record<string, unknown>): Withheld {
   return { record, event, subject: optStr(event, "subject") ?? null, digest: digestOf(event) };
 }
@@ -316,6 +331,22 @@ export function ingest(bundle: Bundle, maxEventBytes = DEFAULT_MAX_EVENT_BYTES):
               source: optStr(event, "source"),
               type: optStr(event, "type"),
               detail: errors[0],
+            },
+            event,
+          ),
+        );
+        continue;
+      }
+      const noForm = noCanonicalForm(event);
+      if (noForm !== null) {
+        records.push(
+          unreadable(
+            {
+              reason: QuarantineReason.SCHEMA_INVALID,
+              eventId: optStr(event, "id"),
+              source: optStr(event, "source"),
+              type: optStr(event, "type"),
+              detail: noForm,
             },
             event,
           ),

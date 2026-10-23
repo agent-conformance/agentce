@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .bundle import Bundle
-from .canonical import CanonicalizationError, sha256_hex
+from .canonical import CanonicalizationError, canonical_string, sha256_hex
 from .errors import InputError
 from .graph import UnreadableWrite, _text
 from .quarantine import QuarantineReason, QuarantineRecord
@@ -196,6 +196,21 @@ def ingest(
                     )
                 )
                 continue
+            no_form = _no_canonical_form(event)
+            if no_form is not None:
+                records.append(
+                    _unreadable(
+                        QuarantineRecord(
+                            QuarantineReason.SCHEMA_INVALID,
+                            event_id=_opt(event, "id"),
+                            source=_opt(event, "source"),
+                            type=_opt(event, "type"),
+                            detail=no_form,
+                        ),
+                        event,
+                    )
+                )
+                continue
 
             type_value = str(event["type"])
             name = _event_type_name(type_value)
@@ -344,6 +359,17 @@ def ingest(
         or held.get(str(raw_event["id"])) != digest
     )
     return result
+
+
+def _no_canonical_form(event: dict[str, Any]) -> str | None:
+    """The quarantine detail for a record the canonical form cannot hold (SPEC 6.7), such as a number in a
+    schema-open field that is not a safe integer; ``None`` when it has one. Such a record is never admitted, so
+    no later stage (integrity, digest, conduct rules) meets it (18.184r)."""
+    try:
+        canonical_string(event)
+    except CanonicalizationError as exc:
+        return f"the record has no canonical form: {exc} (SPEC 6.7)"
+    return None
 
 
 def record_digest(event: dict[str, Any]) -> str | None:

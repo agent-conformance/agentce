@@ -93,6 +93,20 @@ public final class Ingest {
         }
     }
 
+    /**
+     * The quarantine detail for a record the canonical form cannot hold (SPEC 6.7), such as a number in a schema-open
+     * field that is not a safe integer; null when it has one. Such a record is never admitted, so no later stage
+     * (integrity, digest, conduct rules) meets it, as Python's {@code _no_canonical_form} (18.184r).
+     */
+    static String noCanonicalForm(JsonNode event) {
+        try {
+            Canonical.canonicalString(event);
+        } catch (Canonical.CanonicalizationError e) {
+            return "the record has no canonical form: " + e.getMessage() + " (SPEC 6.7)";
+        }
+        return null;
+    }
+
     /** Matches only an unpaired surrogate (a valid pair is one code point to the regex engine). */
     private static final Pattern LONE_SURROGATE = Pattern.compile("[\\x{D800}-\\x{DFFF}]");
 
@@ -228,6 +242,15 @@ public final class Ingest {
                             .source(opt(event, "source"))
                             .type(opt(event, "type"))
                             .detail(errors.get(0)), event));
+                    continue;
+                }
+                String noForm = noCanonicalForm(event);
+                if (noForm != null) {
+                    records.add(unreadable(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
+                            .eventId(opt(event, "id"))
+                            .source(opt(event, "source"))
+                            .type(opt(event, "type"))
+                            .detail(noForm), event));
                     continue;
                 }
 

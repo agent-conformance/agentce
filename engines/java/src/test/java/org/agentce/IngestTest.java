@@ -328,4 +328,54 @@ class IngestTest {
                         java.util.Arrays.asList("w7", new Ingest.UnreadableWrite(null, "kb"))),
                 withheld);
     }
+
+    /**
+     * A record with no canonical form (SPEC 6.7) is quarantined schema_invalid at admission, never admitted for a
+     * later stage to crash on (census odd-inputs line 110, 18.184r); the event carries an integrity chain, so the
+     * integrity stage would have met it. The detail is byte-identical in all three engines.
+     */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource(
+            delimiter = '|',
+            value = {
+                "1.5|non_integer_number: 1.5",
+                "{\"a\": 1.5}|non_integer_number: 1.5",
+                "[\"x\", 1.5]|non_integer_number: 1.5",
+                "9007199254740993|integer_out_of_range: 9007199254740993"
+            })
+    void recordWithNoCanonicalFormIsQuarantinedSchemaInvalid(String context, String refusal, @TempDir Path tempDir)
+            throws IOException {
+        Ingest.Result result = Ingest.ingest(rawBundle(tempDir, context));
+        assertEquals(0, result.accepted.size());
+        assertEquals(1, result.quarantined.size());
+        Quarantine.Record record = result.quarantined.get(0);
+        assertEquals(Quarantine.Reason.SCHEMA_INVALID, record.reason);
+        assertEquals("e1", record.eventId);
+        assertEquals(SOURCE, record.source);
+        assertEquals("org.agent-conformance.evidence.SessionStart.v1", record.type);
+        assertEquals("the record has no canonical form: " + refusal + " (SPEC 6.7)", record.detail);
+    }
+
+    @Test
+    void recordWhoseContextIsASafeIntegerIsAdmitted(@TempDir Path tempDir) throws IOException {
+        Ingest.Result result = Ingest.ingest(rawBundle(tempDir, "2"));
+        assertEquals(1, result.accepted.size());
+        assertEquals(0, result.quarantined.size());
+    }
+
+    /** A bundle of one event whose data {@code @context} is the raw JSON {@code context}. */
+    private static Bundle rawBundle(Path tempDir, String context) throws IOException {
+        Path root = tempDir.resolve("bundle");
+        Files.createDirectories(root.resolve("events"));
+        String line = Json.compact(Fixtures.buildIngestEvent(SOURCE, "enforcement_point"))
+                .replace("\"@context\":\"https://agent-conformance.org/contexts/evidence/v1\"", "\"@context\":" + context);
+        byte[] content = (line + "\n").getBytes(StandardCharsets.UTF_8);
+        Files.write(root.resolve("events/log.jsonl"), content);
+        Files.writeString(
+                root.resolve("manifest.json"),
+                "{\"files\":[{\"path\":\"events/log.jsonl\",\"sha256\":\"sha256:" + Canonical.sha256Hex(content)
+                        + "\"}],\"sources\":[{\"id\":" + Json.quote(SOURCE) + ",\"class\":\"enforcement_point\"}]}",
+                StandardCharsets.UTF_8);
+        return Bundle.load(root);
+    }
 }

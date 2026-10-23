@@ -546,3 +546,47 @@ def test_an_unknown_version_of_memory_write_is_withheld_as_unreadable(
         ("w6", UnreadableWrite(None, "kb")),
         ("w7", UnreadableWrite(None, "kb")),
     ]
+
+
+# A record with no canonical form (SPEC 6.7) is quarantined schema_invalid at admission, never admitted for a later
+# stage to crash on (census odd-inputs line 110, 18.184r). The detail is byte-identical in all three engines.
+_NO_CANONICAL_FORM = [
+    ("1.5", "non_integer_number: 1.5"),
+    ('{"a": 1.5}', "non_integer_number: 1.5"),
+    ('["x", 1.5]', "non_integer_number: 1.5"),
+    ("9007199254740993", "integer_out_of_range: 9007199254740993"),
+]
+
+
+def _with_context(event: dict[str, Any], context: str) -> str:
+    import json
+
+    return json.dumps(
+        {**event, "data": {**event["data"], "@context": "__CTX__"}}
+    ).replace('"__CTX__"', context)
+
+
+def test_a_record_with_no_canonical_form_is_quarantined_schema_invalid(
+    make_bundle: Callable[..., Any], example_event: dict[str, Any]
+) -> None:
+    for context, refusal in _NO_CANONICAL_FORM:
+        result = ingest(
+            load_bundle(make_bundle([_with_context(example_event, context)]))
+        )
+        assert result.accepted == [], context
+        [record] = result.quarantined
+        assert record.reason == QuarantineReason.SCHEMA_INVALID
+        assert record.event_id == example_event["id"]
+        assert record.source == example_event["source"]
+        assert record.type == example_event["type"]
+        assert (
+            record.detail == f"the record has no canonical form: {refusal} (SPEC 6.7)"
+        )
+
+
+def test_a_record_whose_context_is_a_safe_integer_is_admitted(
+    make_bundle: Callable[..., Any], example_event: dict[str, Any]
+) -> None:
+    result = ingest(load_bundle(make_bundle([_with_context(example_event, "2")])))
+    assert len(result.accepted) == 1
+    assert result.quarantined == []

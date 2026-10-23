@@ -444,3 +444,55 @@ test("an unknown version of MemoryWrite is withheld as unreadable (18.202)", () 
     ],
   );
 });
+
+/** A bundle of one raw JSON Lines line, for numbers `JSON.stringify` cannot write (9007199254740993). */
+function writeRawBundle(line: string): string {
+  const dir = mkdtempSync(join(tmpdir(), "agentce-ingest-"));
+  mkdirSync(join(dir, "events"));
+  const lines = `${line}\n`;
+  writeFileSync(join(dir, "events", "stream.jsonl"), lines);
+  const hash = createHash("sha256").update(lines).digest("hex");
+  writeFileSync(
+    join(dir, "manifest.json"),
+    JSON.stringify({
+      bundle_format: "1.0",
+      files: [{ path: "events/stream.jsonl", sha256: `sha256:${hash}` }],
+    }),
+  );
+  return dir;
+}
+
+function withContext(context: string): string {
+  const event = enforcementPointEvent();
+  const data = { ...(event.data as Record<string, unknown>), "@context": "__CTX__" };
+  return JSON.stringify({ ...event, data }).replace('"__CTX__"', context);
+}
+
+// A record with no canonical form (SPEC 6.7) is quarantined schema_invalid at admission, never admitted for a later
+// stage to crash on (census odd-inputs line 110, 18.184r). The detail is byte-identical in all three engines.
+for (const [context, refusal] of [
+  ["1.5", "non_integer_number: 1.5"],
+  ['{"a": 1.5}', "non_integer_number: 1.5"],
+  ['["x", 1.5]', "non_integer_number: 1.5"],
+  ["9007199254740993", "integer_out_of_range: 9007199254740993"],
+]) {
+  test(`a record whose @context is ${context} has no canonical form and is quarantined schema_invalid`, () => {
+    const result = ingest(loadBundle(writeRawBundle(withContext(context))));
+    assert.equal(result.accepted.length, 0);
+    assert.deepEqual(result.quarantined, [
+      {
+        reason: "schema_invalid",
+        eventId: "evt-undeclared-source",
+        source: "urn:agentce:source:gw:eu-1",
+        type: "org.agent-conformance.evidence.ToolCall.v1",
+        detail: `the record has no canonical form: ${refusal} (SPEC 6.7)`,
+      },
+    ]);
+  });
+}
+
+test("a record whose @context is a safe integer is admitted", () => {
+  const result = ingest(loadBundle(writeRawBundle(withContext("2"))));
+  assert.equal(result.accepted.length, 1);
+  assert.equal(result.quarantined.length, 0);
+});
