@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.121.0",
+  "suite_version": "0.122.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",

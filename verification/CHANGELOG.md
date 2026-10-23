@@ -3,6 +3,16 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.122.0
+
+- `VG-QUARANTINE-NO-PASS` (18.184r, changed): an OVS-07 target whose `@context` is `1.5` has no canonical form
+  (SPEC 6.7); every engine quarantines it `schema_invalid` at admission, so the control reads insufficient_evidence,
+  never conformant and never `internal.unexpected` from the integrity stage. One more seeded fault (Python admits it).
+- `VG-COVERAGE-UNKNOWN` (18.184r, changed): a coverage denominator manifest whose root is not a JSON object (`[1, 2]`)
+  is refused `input.coverage_denominator_manifest_invalid` with exit 3 in all three engines, where it was read as
+  declaring no counts. One more seeded fault (TypeScript reads the root as no counts).
+- `VG-VERIFY` (18.184r, changed): its TypeScript seeded fault searches the bounded member read `loadBundle` now does.
+
 ## 0.121.0
 
 - `VG-JSON-PROFILE` (18.184x, added): every engine reads JSON under the SPEC 8.7 profile. The gate runs
