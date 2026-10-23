@@ -565,7 +565,6 @@ def test_report_readiness_reads_trust_root_as_the_engine_does(
     for argv in (
         [f"--trust-root={missing}"],
         ["--trust-root", ""],
-        ["--trust-root", "/dev/null", "--trust-root", missing],
     ):
         assert (
             report_readiness.body(["--report", str(report), *argv, "--json"])
@@ -575,7 +574,14 @@ def test_report_readiness_reads_trust_root_as_the_engine_does(
             "input.trust_root_not_a_file"
             in json.loads(capsys.readouterr().out)["message"]
         )
-    for argv in (["--trust-root"], ["--allow-unverified-catalog=1"], ["--catalog-dir"]):
+    for argv in (
+        ["--trust-root"],
+        ["--allow-unverified-catalog=1"],
+        ["--catalog-dir"],
+        ["--trust-root", "/dev/null", "--trust-root", missing],
+        ["--gaps", "a", "--gaps", "b"],
+        ["--gap", "a"],
+    ):
         assert (
             report_readiness.body(["--report", str(report), *argv, "--json"])
             == INPUT_ERROR

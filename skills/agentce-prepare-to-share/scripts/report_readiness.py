@@ -11,8 +11,8 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from dataclasses import replace
 from pathlib import Path
-from typing import NoReturn
 
 from _common import (
     FINDINGS,
@@ -22,6 +22,7 @@ from _common import (
     run_guarded,
 )
 
+from agentce import argv as argv_grammar
 from agentce import readiness
 from agentce.commands import (
     _effective_trust_root,
@@ -35,27 +36,36 @@ class _ArgError(Exception):
     """A malformed command line: refused, never read as a missing option."""
 
 
-class _Parser(argparse.ArgumentParser):
-    def error(self, message: str) -> NoReturn:
-        raise _ArgError(message)
+def _grammar() -> argv_grammar.Command:
+    """`agentce readiness`'s grammar (SPEC §8.5), with ``--report`` in place of its report-dir
+    positional."""
+    cmd = argv_grammar.command("readiness")
+    report = argv_grammar.Option(names=("--report",), kind="value", repeatable=False)
+    level = replace(
+        cmd.level, options={**cmd.level.options, "--report": report}, max_positionals=0
+    )
+    return replace(cmd, level=level)
 
 
 def _parse(argv: list[str]) -> argparse.Namespace:
-    """The options as `agentce readiness` reads them: `--flag=value` is the same as `--flag value`, a
-    repeated single-value option keeps its last value, and a flag without its value is refused."""
-    p = _Parser(prog="report_readiness", add_help=False, allow_abbrev=False)
-    p.add_argument("--report")
-    p.add_argument("--gaps")
-    p.add_argument("--deviations")
-    p.add_argument("--catalog-dir", dest="catalog_dir", action="append")
-    p.add_argument("--trust-root", dest="trust_root")
-    p.add_argument(
-        "--allow-unverified-catalog",
-        dest="allow_unverified_catalog",
-        action="store_true",
+    """The options as `agentce readiness` reads them, through the engine's own scanner (SPEC §8.5):
+    `--flag=value` is the same as `--flag value`, an option given twice, an abbreviation and a flag
+    without its value are refused."""
+    try:
+        scan = argv_grammar.scan(_grammar(), argv)
+    except argv_grammar.ArgvRefusal as exc:
+        raise _ArgError(str(exc)) from None
+    if scan.help:
+        raise _ArgError("pass --report <report-dir>")
+    return argparse.Namespace(
+        report=scan.values.get("--report"),
+        gaps=scan.values.get("--gaps"),
+        deviations=scan.values.get("--deviations"),
+        catalog_dir=scan.lists.get("--catalog-dir"),
+        trust_root=scan.values.get("--trust-root"),
+        allow_unverified_catalog="--allow-unverified-catalog" in scan.flags,
+        json="--json" in scan.flags,
     )
-    p.add_argument("--json", action="store_true")
-    return p.parse_args(argv)
 
 
 def body(argv: list[str]) -> int:
