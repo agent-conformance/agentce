@@ -10,6 +10,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -354,5 +355,38 @@ test("confineToRoot judges a link spelled with the bundle in another case by fol
     assert.equal(confineToRoot(bundle, "inside.jsonl"), join(bundle, "inside.jsonl"));
     assert.equal(confineToRoot(bundle, "sibling.jsonl"), null);
     assert.equal(confineToRoot(bundle, "parent.jsonl"), null);
+  });
+});
+
+test("manifest.json unreadable at the read is input.bundle_unreadable, never not valid JSON", () => {
+  // Census odd-inputs line 90 (18.184r): readable at the pre-check, refused at the read; one key per cause.
+  withTempDir((dir) => {
+    const root = join(dir, "b");
+    mkdirSync(join(root, "events"), { recursive: true });
+    writeFileSync(join(root, "events", "a.jsonl"), '{"id":"e1"}\n', "utf-8");
+    writeManifest(root, [{ path: "events/a.jsonl", sha256: sha256File('{"id":"e1"}\n') }]);
+    bundleReadHooks.afterConfine = (rel, member) => {
+      if (rel === "manifest.json") {
+        chmodSync(member, 0o000);
+      }
+    };
+    let message = "";
+    try {
+      assert.equal(
+        inputErrorKey(() => {
+          try {
+            loadBundle(root);
+          } catch (exc) {
+            message = String((exc as Error).message);
+            throw exc;
+          }
+        }),
+        "input.bundle_unreadable",
+      );
+      assert.match(message, /cannot be read: manifest\.json\./);
+    } finally {
+      bundleReadHooks.afterConfine = undefined;
+      chmodSync(join(root, "manifest.json"), 0o644);
+    }
   });
 });

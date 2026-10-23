@@ -280,6 +280,9 @@ export function loadBundle(bundleDir: string): Bundle {
     if (err instanceof InputError) {
       throw err;
     }
+    if (isPermissionError(err)) {
+      throw bundleUnreadable(bundleDir, "manifest.json");
+    }
     // The profile rule and line, the same in the three engines; never the parser's own text (F3, 18.65).
     throw new InputError(
       "input.bundle_manifest_invalid",

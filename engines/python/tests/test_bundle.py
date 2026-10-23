@@ -301,3 +301,27 @@ def test_coverage_denominator_rewritten_after_load_counts_the_checked_bytes(
         "urn:agentce:subject:test"
     ]["event_types"]["ToolCall"]
     assert tool["expected"] == 1
+
+
+def test_manifest_unreadable_at_the_read_is_unreadable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, example_event: dict[str, Any]
+) -> None:
+    """Census odd-inputs line 90 (18.184r): readable at the pre-check, refused at the read: one key per cause."""
+    from agentce import bundle
+
+    root = write_bundle(tmp_path / "b", [json.dumps(example_event)])
+    original = bundle.read_confined
+
+    def unreadable_at_read(base: Path, rel: str, member: Path, *more: Any) -> bytes:
+        if rel == "manifest.json":
+            member.chmod(0)
+        return original(base, rel, member, *more)
+
+    monkeypatch.setattr(bundle, "read_confined", unreadable_at_read)
+    try:
+        with pytest.raises(InputError) as caught:
+            load_bundle(root)
+    finally:
+        (root / "manifest.json").chmod(0o644)
+    assert caught.value.key == "input.bundle_unreadable"
+    assert "cannot be read: manifest.json." in str(caught.value)

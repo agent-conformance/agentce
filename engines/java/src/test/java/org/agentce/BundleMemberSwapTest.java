@@ -127,4 +127,22 @@ class BundleMemberSwapTest {
         assertEquals(1, Coverage.computeCoverage(List.of(), profile, loaded.members)
                 .get("subjects").get("subj-A").get("event_types").get("ToolCall").get("expected").asInt());
     }
+
+    @Test
+    void manifestUnreadableAtTheReadIsUnreadableNotInvalid(@TempDir Path dir) throws IOException {
+        // Census odd-inputs line 90 (18.184r): readable at the pre-check, refused at the read; one key per cause.
+        Path root = bundle(dir);
+        Bundle.afterConfine = (rel, member) -> {
+            if (rel.equals("manifest.json")) {
+                assertTrue(member.toFile().setReadable(false, false));
+            }
+        };
+        try {
+            InputError error = assertThrows(InputError.class, () -> Bundle.load(root));
+            assertEquals("input.bundle_unreadable", error.key);
+            assertTrue(error.getMessage().contains("cannot be read: manifest.json."), error.getMessage());
+        } finally {
+            root.resolve("manifest.json").toFile().setReadable(true, false);
+        }
+    }
 }

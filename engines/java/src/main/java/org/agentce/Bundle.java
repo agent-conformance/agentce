@@ -352,6 +352,8 @@ public final class Bundle {
                     readConfined(bundleDir, "manifest.json", manifestPath), Json.Bom.IGNORE);
         } catch (InputError exc) {
             throw exc;
+        } catch (AccessDeniedException exc) {
+            throw bundleUnreadable(bundleDir, "manifest.json");
         } catch (IOException | RuntimeException exc) {
             // The profile rule and line, the same in the three engines; never the parser's own text (F3, 18.65).
             throw new InputError(
