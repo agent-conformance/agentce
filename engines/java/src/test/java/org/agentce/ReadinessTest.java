@@ -802,37 +802,40 @@ class ReadinessTest {
         assertEquals("2021-01-01T10:00:00+0500", entries.get(0).path("expiry").asText());
     }
 
-    @Test
-    void yaml11BooleansResolveUnquotedStayStringsQuoted(@TempDir Path dir) throws IOException {
-        Path path = writeYaml(
-                dir,
-                "deviations:\n  - control: OVS-03\n    rationale: no\n  - control: OVS-04\n    rationale: \"no\"\n");
-        List<JsonNode> entries = Readiness.loadDeviationRegister(path);
-        assertFalse(entries.get(0).path("rationale").asBoolean(true));
-        assertTrue(entries.get(0).path("rationale").isBoolean());
-        assertEquals("no", entries.get(1).path("rationale").asText());
+    /** The register at {@code path} refused as outside the SPEC 8.7 YAML profile (18.184u). */
+    private static void assertRegisterOutsideProfile(Path path, String rule, int line) {
+        InputError e = assertThrows(InputError.class, () -> Readiness.loadDeviationRegister(path));
+        assertEquals("input.deviation_invalid", e.key);
+        assertTrue(e.reason.endsWith(" is outside the YAML profile: " + rule + " at line " + line + " (SPEC 8.7)."),
+                e.reason);
+        assertEquals(YamlProfile.HINTS.get(rule) + ".", e.fix);
     }
 
     @Test
-    void aMergeKeyIsHonouredAnExplicitKeyOverridesTheMergedOne(@TempDir Path dir) throws IOException {
-        // Verifier round 2, F3: SnakeYAML's compose() never resolves `<<`, unlike PyYAML's
-        // SafeLoader (flatten_mapping); Readiness.java's own loader must do it at the node level.
-        Path path = writeYaml(
+    void yaml11BooleansAreOutsideTheYamlProfileQuotedStayStrings(@TempDir Path dir) throws IOException {
+        assertRegisterOutsideProfile(writeYaml(
                 dir,
-                "deviations:\n  - <<: &base\n      rationale: shared\n      owner: alice\n    control: OVS-03\n    owner: carol\n");
-        List<JsonNode> entries = Readiness.loadDeviationRegister(path);
-        assertEquals("shared", entries.get(0).path("rationale").asText());
-        assertEquals("carol", entries.get(0).path("owner").asText());
-        assertEquals("OVS-03", entries.get(0).path("control").asText());
+                "deviations:\n  - control: OVS-03\n    rationale: no\n  - control: OVS-04\n    rationale: \"no\"\n"),
+                "yaml11_bool", 3);
+        Path quoted = writeYaml(dir, "deviations:\n  - control: OVS-04\n    rationale: \"no\"\n");
+        assertEquals("no", Readiness.loadDeviationRegister(quoted).get(0).path("rationale").asText());
     }
 
     @Test
-    void aDuplicateMappingKeyKeepsTheLastValueMatchingPyyaml(@TempDir Path dir) throws IOException {
-        // Verifier round 2, F4: this was already correct in Java (LinkedHashMap.put keeps document
-        // position but overwrites the value) -- pins it as a cross-engine vector alongside TS's fix.
-        Path path = writeYaml(dir, "deviations:\n  - control: OVS-03\n    owner: alice\n    owner: carol\n");
-        List<JsonNode> entries = Readiness.loadDeviationRegister(path);
-        assertEquals("carol", entries.get(0).path("owner").asText());
+    void aMergeKeyIsOutsideTheYamlProfile(@TempDir Path dir) throws IOException {
+        // Was: SnakeYAML's compose() never resolves `<<`, so Readiness merged at the node level (verifier round 2, F3).
+        assertRegisterOutsideProfile(writeYaml(
+                dir,
+                "deviations:\n  - <<: &base\n      rationale: shared\n      owner: alice\n    control: OVS-03\n    owner: carol\n"),
+                "merge_key", 2);
+    }
+
+    @Test
+    void aDuplicateMappingKeyIsOutsideTheYamlProfile(@TempDir Path dir) throws IOException {
+        // Was: the last value kept, as PyYAML keeps it (verifier round 2, F4).
+        assertRegisterOutsideProfile(
+                writeYaml(dir, "deviations:\n  - control: OVS-03\n    owner: alice\n    owner: carol\n"),
+                "duplicate_key", 4);
     }
 
     @Test

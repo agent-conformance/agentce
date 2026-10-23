@@ -18,7 +18,6 @@ import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -623,7 +622,12 @@ public final class Readiness {
             Map<String, Object> out = new LinkedHashMap<>();
             done.put(node, out);
             for (NodeTuple tuple : flattenMapping(map)) {
-                out.put(String.valueOf(composeValue(scalarKey(tuple), done)), composeValue(tuple.getValueNode(), done));
+                Node keyNode = scalarKey(tuple);
+                // flatten_mapping retags a plain `=` key (the value tag) as str, so it is its own text as a key.
+                Object key = pyyamlTag(keyNode).equals(PYYAML_VALUE_TAG)
+                        ? ((ScalarNode) keyNode).getValue()
+                        : composeValue(keyNode, done);
+                out.put(String.valueOf(key), composeValue(tuple.getValueNode(), done));
             }
             return out;
         }
@@ -880,9 +884,9 @@ public final class Readiness {
 
     /** The YAML at {@code path} as Python's {@code load_untrusted_yaml} reads it (PyYAML's {@code SafeLoader} typing,
      * the compose path above), refusing a file that is not UTF-8, nests too deeply, or carries YAML it cannot load
-     * under {@code key}. With {@code uniqueKeys}, a mapping that writes one key twice is refused too (a key a
-     * {@code <<} merge brings in may be written again); without it the last value wins, as {@code SafeLoader} keeps it. */
-    static Object loadPyyaml(Path path, String key, String what, boolean uniqueKeys) {
+     * under {@code key}. The text is checked against the SPEC 8.7 YAML profile first ({@link YamlProfile}), and a
+     * file outside it, a repeated key included, is refused under {@code key} naming the rule and line (18.184u). */
+    static Object loadPyyaml(Path path, String key, String what) {
         // Python passes the loader a Path, so its errors name ./r.yaml as r.yaml.
         String where = what + " at " + pyRepr(Diff.normalizePosixPath(path.toString()));
         String text;
@@ -896,7 +900,9 @@ public final class Readiness {
             throw new UncheckedIOException(e);
         }
         try {
-            return composePyyaml(text, uniqueKeys);
+            return composePyyaml(text);
+        } catch (YamlProfile.ProfileException e) {
+            throw new InputError(key, where + " " + e.violation().message() + ".", e.violation().hint() + ".");
         } catch (StackOverflowError | RuntimeException e) {
             if (nestedTooDeeply(e)) {
                 // SnakeYAML caps nesting (and composeValue recurses per level), as PyYAML's composer
@@ -916,7 +922,9 @@ public final class Readiness {
 
     /** {@code text} read as {@link #loadPyyaml} reads a file, its errors left to the caller: a {@link
      * StackOverflowError} or a {@link RuntimeException} ({@link #nestedTooDeeply} tells the depth cap apart). */
-    static Object composePyyaml(String text, boolean uniqueKeys) {
+    static Object composePyyaml(String text) {
+        // The SPEC 8.7 profile first (18.184u): a file outside it is a YamlProfile.ProfileException.
+        YamlProfile.check(text);
         String scannerProblem = PyyamlScanner.problem(text);
         if (scannerProblem != null) {
             // SnakeYAML reads tabs and flow forms PyYAML's scanner refuses (18.184p).
@@ -930,13 +938,15 @@ public final class Readiness {
         if (root == null) {
             return null;
         }
-        checkTree(root, uniqueKeys, Collections.newSetFromMap(new IdentityHashMap<>()));
+        YamlProfile.checkDuplicateKeys(root);
+        checkTree(root, Collections.newSetFromMap(new IdentityHashMap<>()));
         return composeValue(root);
     }
 
-    /** {@code text} read as a catalog file: {@link #composePyyaml} with unique keys (18.184o). */
+    /** {@code text} read as a catalog file: {@link #composePyyaml}, as Python's {@code load_catalog_yaml} reads it
+     * (18.184o, 18.184u). */
     static Object composeCatalogPyyaml(String text) {
-        return composePyyaml(text, true);
+        return composePyyaml(text);
     }
 
     /** Whether {@code e}, thrown by {@link #composePyyaml}, is SnakeYAML's nesting cap or the recursion it
@@ -946,34 +956,22 @@ public final class Readiness {
     }
 
     /** Refuses a merge source (or merge-list item) anywhere under {@code node} whose tag is not one of {@link #SAFE_TAGS}
-     * other than the merge tag, as Python's untrusted loaders refuse it in every file (18.184p); with {@code uniqueKeys},
-     * also a mapping that writes one key twice. Each node is walked once ({@code visited}), so an alias is not. */
-    private static void checkTree(Node node, boolean uniqueKeys, Set<Node> visited) {
+     * other than the merge tag, as Python's untrusted loaders refuse it in every file (18.184p). Repeated keys are the
+     * profile's ({@link YamlProfile#checkDuplicateKeys}, 18.184u). Each node is walked once ({@code visited}). */
+    private static void checkTree(Node node, Set<Node> visited) {
         if (!visited.add(node)) {
             return;
         }
         if (node instanceof SequenceNode seq) {
             for (Node child : seq.getValue()) {
-                checkTree(child, uniqueKeys, visited);
+                checkTree(child, visited);
             }
         } else if (node instanceof MappingNode map) {
-            Set<Object> seen = new HashSet<>();
-            boolean merged = false;
             for (NodeTuple tuple : map.getValue()) {
                 if (Tag.MERGE.equals(pyyamlTag(tuple.getKeyNode()))) {
-                    // `<<` is a key too: which of two merges wins is never read (18.184k D1).
-                    if (merged && uniqueKeys) {
-                        throw new IllegalArgumentException("found the merge key '<<' twice");
-                    }
-                    merged = true;
                     rejectMergeSourceTags(tuple.getValueNode());
-                } else if (uniqueKeys) {
-                    Object k = composeValue(scalarKey(tuple));
-                    if (!seen.add(pythonKey(k))) {
-                        throw new IllegalArgumentException("found the key " + k + " twice");
-                    }
                 }
-                checkTree(tuple.getValueNode(), uniqueKeys, visited);
+                checkTree(tuple.getValueNode(), visited);
             }
         }
     }
@@ -1040,7 +1038,7 @@ public final class Readiness {
      * timestamp is normalized via {@link #normalizeDeviationDates} before use. */
     public static List<JsonNode> loadDeviationRegister(Path path) {
         String where = "the deviation register at " + pyRepr(Diff.normalizePosixPath(path.toString()));
-        Object parsed = loadPyyaml(path, "input.deviation_invalid", "the deviation register", false);
+        Object parsed = loadPyyaml(path, "input.deviation_invalid", "the deviation register");
         Object data = pyTruthyRaw(parsed) ? parsed : new LinkedHashMap<String, Object>();
         if (!(data instanceof Map<?, ?> dataMap)) {
             throw new InputError(

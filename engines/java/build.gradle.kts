@@ -74,6 +74,8 @@ tasks.withType<JavaCompile>().configureEach {
 
 tasks.test {
     useJUnitPlatform()
+    // The shared YAML profile table's 10,000-deep block mapping is a 100 MB file read through every role (18.184u).
+    maxHeapSize = "1g"
     testLogging {
         events("failed")
         exceptionFormat = TestExceptionFormat.FULL

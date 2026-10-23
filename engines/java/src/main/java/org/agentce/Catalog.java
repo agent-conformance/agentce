@@ -436,16 +436,17 @@ public final class Catalog {
         }
     }
 
-    /** {@code catalog.yaml} or a control file as one YAML mapping (18.184i): checked as Python's unique-key
-     * {@code SafeLoader} reads it ({@link Readiness#composeCatalogPyyaml}), so a key written twice, YAML the engine
-     * refuses to load, or anything but one mapping (an empty file included) is refused naming the file, never
-     * read with its last value, as nothing, or skipped. The values are read from that same tree, so a merge key
-     * ({@code <<}) applies as in PyYAML (18.184o). */
+    /** {@code catalog.yaml} or a control file as one YAML mapping (18.184i), read as Python's {@code load_catalog_yaml}
+     * reads it ({@link Readiness#composeCatalogPyyaml}): a file outside the SPEC 8.7 YAML profile (a key written twice
+     * included, 18.184u), YAML the engine refuses to load, or anything but one mapping (an empty file included) is
+     * refused naming the file, never read with its last value, as nothing, or skipped. */
     private static JsonNode readMapping(CatalogFiles files, String rel) {
         String text = text(files, rel);
         JsonNode data;
         try {
             data = Readiness.toJsonNode(Readiness.composeCatalogPyyaml(text));
+        } catch (YamlProfile.ProfileException e) {
+            throw fileUnloadable(files.root(), rel, e.violation().message(), e.violation().hint() + ".");
         } catch (StackOverflowError | RuntimeException e) {
             throw fileUnloadable(
                     files.root(),
@@ -463,11 +464,17 @@ public final class Catalog {
     /** input.catalog_unreadable for a catalog file that was read but cannot be loaded (Python's
      * {@code catalog_file_unloadable}, 18.184i). {@code problem} completes "<rel> ...". */
     private static InputError fileUnloadable(Path dir, String rel, String problem) {
+        return fileUnloadable(dir, rel, problem,
+                "fix " + rel + " so it is UTF-8 text holding one YAML mapping with each key written once, or ask the "
+                        + "catalog's publisher for a corrected copy, then re-run.");
+    }
+
+    /** {@link #fileUnloadable} with its own {@code fix} (a YAML profile violation's hint, 18.184u). */
+    private static InputError fileUnloadable(Path dir, String rel, String problem, String fix) {
         return new InputError(
                 "input.catalog_unreadable",
                 "the catalog directory " + dir + " holds a file that cannot be loaded: " + rel + " " + problem + ".",
-                "fix " + rel + " so it is UTF-8 text holding one YAML mapping with each key written once, or ask the "
-                        + "catalog's publisher for a corrected copy, then re-run.");
+                fix);
     }
 
     /** The covered {@code controls/<name>.yaml} files, one level deep as the listing always was, sorted. */

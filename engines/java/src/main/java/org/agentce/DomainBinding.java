@@ -145,7 +145,7 @@ public final class DomainBinding {
 
     public static DomainBinding load(Path path) {
         JsonNode data = Readiness.toJsonNode(
-                Readiness.loadPyyaml(path, "input.domain_binding_invalid", "the domain binding", true));
+                Readiness.loadPyyaml(path, "input.domain_binding_invalid", "the domain binding"));
         if (data == null || !data.isObject()) {
             return empty();
         }

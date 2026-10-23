@@ -19,7 +19,8 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/** 18.184i: every catalog YAML file is one mapping read as Python's unique-key loader reads it; anything else is
+/** 18.184i: every catalog YAML file is one mapping read as Python's catalog loader reads it (under the SPEC 8.7 YAML
+ * profile since 18.184u); anything else is
  * refused as input.catalog_unreadable naming the file (Python's tests/test_catalog_yaml_files.py, the same cases). */
 class CatalogYamlFileTest {
 
@@ -59,13 +60,18 @@ class CatalogYamlFileTest {
         String rel = CONTROL;
         String problem = "is not YAML the engine can load";
         switch (kind) {
-            case "dupcontrol" -> edit(
-                    dir,
-                    CONTROL,
-                    "  min_source_class: self_report\n",
-                    "  min_source_class: independent_system\n  min_source_class: self_report\n");
+            case "dupcontrol" -> {
+                // 18.184u: refused by the SPEC 8.7 YAML profile, naming the rule and line.
+                problem = "is outside the YAML profile: duplicate_key at line 13 (SPEC 8.7)";
+                edit(
+                        dir,
+                        CONTROL,
+                        "  min_source_class: self_report\n",
+                        "  min_source_class: independent_system\n  min_source_class: self_report\n");
+            }
             case "dupmeta" -> {
                 rel = "catalog.yaml";
+                problem = "is outside the YAML profile: duplicate_key at line 7 (SPEC 8.7)";
                 edit(dir, rel, "version: \"2026.09\"\n", "version: \"2026.09\"\nversion: \"9\"\n");
             }
             case "emptymeta" -> {
@@ -97,28 +103,47 @@ class CatalogYamlFileTest {
             }
             case "syntax" -> Files.writeString(dir.resolve(rel), "id: [DAT-01\n");
             case "deep" -> {
-                problem = "is nested too deeply to read safely";
+problem = "is outside the YAML profile: depth_over_100 at line 1 (SPEC 8.7)";
                 Files.writeString(dir.resolve(rel), "x: " + "[".repeat(5000) + "]".repeat(5000) + "\n");
             }
-            case "pythontag" -> Files.writeString(dir.resolve(rel), "id: !!python/object:object {}\n");
+            case "pythontag" -> {
+                problem = "is outside the YAML profile: tag at line 1 (SPEC 8.7)";
+                Files.writeString(dir.resolve(rel), "id: !!python/object:object {}\n");
+            }
             // 18.184o: a tag PyYAML's SafeLoader constructs but no engine reads in a catalog.
-            case "binary" -> edit(dir, rel, "id: DAT-01\n", "id: DAT-01\nextra: !!binary aGVsbG8=\n");
-            case "set" -> edit(dir, rel, "id: DAT-01\n", "id: DAT-01\nextra: !!set {a: null}\n");
-            case "omap" -> edit(dir, rel, "id: DAT-01\n", "id: DAT-01\nextra: !!omap [{a: 1}]\n");
-            case "pairs" -> edit(dir, rel, "id: DAT-01\n", "id: DAT-01\nextra: !!pairs [{a: 1}]\n");
+            case "binary" -> {
+                problem = "is outside the YAML profile: tag at line 2 (SPEC 8.7)";
+                edit(dir, rel, "id: DAT-01\n", "id: DAT-01\nextra: !!binary aGVsbG8=\n");
+            }
+            case "set" -> {
+                problem = "is outside the YAML profile: tag at line 2 (SPEC 8.7)";
+                edit(dir, rel, "id: DAT-01\n", "id: DAT-01\nextra: !!set {a: null}\n");
+            }
+            case "omap" -> {
+                problem = "is outside the YAML profile: tag at line 2 (SPEC 8.7)";
+                edit(dir, rel, "id: DAT-01\n", "id: DAT-01\nextra: !!omap [{a: 1}]\n");
+            }
+            case "pairs" -> {
+                problem = "is outside the YAML profile: tag at line 2 (SPEC 8.7)";
+                edit(dir, rel, "id: DAT-01\n", "id: DAT-01\nextra: !!pairs [{a: 1}]\n");
+            }
             case "metabinary" -> {
                 rel = "catalog.yaml";
+                problem = "is outside the YAML profile: tag at line 6 (SPEC 8.7)";
                 edit(dir, rel, "id: eu-ai-act\n", "id: eu-ai-act\nextra: !!binary aGVsbG8=\n");
             }
-            default -> append(dir, rel, "---\nid: DAT-99\n".getBytes(StandardCharsets.UTF_8));
+            default -> {
+                problem = "is outside the YAML profile: second_document at line 31 (SPEC 8.7)";
+                append(dir, rel, "---\nid: DAT-99\n".getBytes(StandardCharsets.UTF_8));
+            }
         }
         InputError e = assertThrows(InputError.class, () -> Catalog.load(dir));
         assertEquals("input.catalog_unreadable", e.key);
         assertTrue(e.reason.contains("holds a file that cannot be loaded: " + rel + " " + problem), e.reason);
     }
 
-    /** 18.184o: a merge source is never composed, so its tag is checked on its own, and a key it writes twice is
-     * refused (Python's "control merge source" cases). */
+    /** 18.184o: a merge source the engine cannot load is refused; since 18.184u the {@code <<} key itself is outside
+     * the SPEC 8.7 YAML profile, so every such file is refused at it (Python's "control merge source" cases). */
     @ParameterizedTest
     @ValueSource(
             strings = {
@@ -136,76 +161,78 @@ class CatalogYamlFileTest {
         edit(dir, CONTROL, "id: DAT-01\n", "id: DAT-01\nextra:\n  <<: " + merge + "\n");
         InputError e = assertThrows(InputError.class, () -> Catalog.load(dir));
         assertEquals("input.catalog_unreadable", e.key);
-        assertTrue(e.reason.contains("holds a file that cannot be loaded: " + CONTROL + " is not YAML the engine can load"),
-                e.reason);
+        assertTrue(e.reason.endsWith("holds a file that cannot be loaded: " + CONTROL
+                + " is outside the YAML profile: merge_key at line 3 (SPEC 8.7)."), e.reason);
+        assertEquals(YamlProfile.HINTS.get("merge_key") + ".", e.fix);
     }
 
     private static final String FLOOR = "  min_source_class: self_report\n";
 
-    /** 18.184o: a merge key in a control is read as PyYAML merges it (Python's
-     * test_a_merge_key_in_a_control_is_read_as_pyyaml_merges, the same cases): an explicit key beats a merged one
-     * wherever it is written, and the first source of a merge list wins. */
+    /** 18.184o's merge cases (Python's test_a_merge_key_in_a_control_is_read_as_pyyaml_merges): since 18.184u a merge
+     * key, and the anchor it reads, are outside the SPEC 8.7 YAML profile, so each control is refused at the first. */
     static Stream<Arguments> merges() {
         return Stream.of(
-                Arguments.of("", "  <<: {min_source_class: independent_system}\n", "independent_system"),
+                Arguments.of("", "  <<: {min_source_class: independent_system}\n", "merge_key at line 12"),
                 Arguments.of(
-                        "x-b: &b {min_source_class: independent_system}\n", "  <<: *b\n", "independent_system"),
+                        "x-b: &b {min_source_class: independent_system}\n", "  <<: *b\n", "anchor at line 1"),
                 Arguments.of(
                         "",
                         "  <<: [{min_source_class: independent_system}, {min_source_class: self_report}]\n",
-                        "independent_system"),
+                        "merge_key at line 12"),
                 Arguments.of(
                         "",
                         "  <<: [{min_source_class: self_report}, {min_source_class: independent_system}]\n",
-                        "self_report"),
+                        "merge_key at line 12"),
                 Arguments.of(
                         "x-a: &a {min_source_class: self_report}\n"
                                 + "x-b: &b {<<: *a, min_source_class: independent_system}\n",
                         "  <<: *b\n",
-                        "independent_system"),
-                Arguments.of("", "  <<: {min_source_class: independent_system}\n" + FLOOR, "self_report"),
+                        "anchor at line 1"),
+                Arguments.of("", "  <<: {min_source_class: independent_system}\n" + FLOOR, "merge_key at line 12"),
                 Arguments.of(
                         "",
                         "  min_source_class: independent_system\n  <<: {min_source_class: self_report}\n",
-                        "independent_system"));
+                        "merge_key at line 13"));
     }
 
     @ParameterizedTest
     @MethodSource("merges")
-    void aMergeKeyInAControlIsReadAsPyyamlMergesIt(String head, String floor, String expected, @TempDir Path tmp)
+    void aMergeKeyInAControlIsOutsideTheYamlProfile(String head, String floor, String found, @TempDir Path tmp)
             throws IOException {
         Path dir = copy(tmp);
         Path control = dir.resolve(CONTROL);
         String text = Files.readString(control);
         assertTrue(text.contains(FLOOR));
         Files.writeString(control, head + text.replace(FLOOR, floor));
-        Catalog.ControlSpec spec = Catalog.load(dir).controls.stream()
-                .filter(c -> c.id.equals("DAT-01"))
-                .findFirst()
-                .orElseThrow();
-        assertEquals(expected, spec.minSourceClass);
+        InputError e = assertThrows(InputError.class, () -> Catalog.load(dir));
+        assertEquals("input.catalog_unreadable", e.key);
+        assertTrue(e.reason.endsWith(CONTROL + " is outside the YAML profile: " + found + " (SPEC 8.7)."), e.reason);
     }
 
     @Test
     void aMergedValueThatIsNotASourceClassIsRefused(@TempDir Path tmp) throws IOException {
+        // 18.184u: refused at the merge key, before its value is read.
         Path dir = copy(tmp);
         edit(dir, CONTROL, FLOOR, "  <<: {min_source_class: trusted}\n");
         InputError e = assertThrows(InputError.class, () -> Catalog.load(dir));
-        assertEquals("catalog.control.min_source_class_unknown", e.key);
+        assertEquals("input.catalog_unreadable", e.key);
+        assertTrue(e.reason.endsWith(" is outside the YAML profile: merge_key at line 12 (SPEC 8.7)."), e.reason);
     }
 
     @Test
-    void aMergeKeyInCatalogYamlIsRead(@TempDir Path tmp) throws IOException {
+    void aMergeKeyInCatalogYamlIsOutsideTheYamlProfile(@TempDir Path tmp) throws IOException {
         Path dir = copy(tmp);
         edit(dir, "catalog.yaml", "version: \"2026.09\"\n", "<<: {version: \"2026.09\"}\n");
-        assertEquals("2026.09", Catalog.load(dir).version);
+        InputError e = assertThrows(InputError.class, () -> Catalog.load(dir));
+        assertTrue(e.reason.endsWith("catalog.yaml is outside the YAML profile: merge_key at line 6 (SPEC 8.7)."), e.reason);
     }
 
     @Test
-    void explicitCoreTagsStayReadable(@TempDir Path tmp) throws IOException {
+    void explicitCoreTagsAreOutsideTheYamlProfile(@TempDir Path tmp) throws IOException {
         Path dir = copy(tmp);
         edit(dir, CONTROL, "id: DAT-01\n", "id: !!str DAT-01\nsince: !!timestamp 2026-01-02\n");
-        assertTrue(Catalog.load(dir).controls.stream().anyMatch(c -> c.id.equals("DAT-01")));
+        InputError e = assertThrows(InputError.class, () -> Catalog.load(dir));
+        assertTrue(e.reason.endsWith(CONTROL + " is outside the YAML profile: tag at line 1 (SPEC 8.7)."), e.reason);
     }
 
     /** The blast-radius fact for Java (18.184i): every catalog the repository ships, and every bundled copy, still

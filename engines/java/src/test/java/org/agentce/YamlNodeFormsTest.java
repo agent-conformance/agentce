@@ -23,7 +23,7 @@ import org.junit.jupiter.api.io.TempDir;
  * The domain binding's YAML node forms read as PyYAML's SafeLoader reads them (SPEC §7.4; 18.184k). {@code
  * yaml-node-forms-golden.json} is written by {@code generate_goldens.py} from the Python reference: each case's YAML
  * (tags x scalar styles x values, key kinds, merges, nesting inside task_scopes and budgets) and Python's reading of
- * it through {@code load_untrusted_yaml(..., unique_keys=True)}, by type, or the key it is refused under. {@link
+ * it through {@code load_untrusted_yaml}, by type, or the key it is refused under. {@link
  * Readiness#loadPyyaml} must give the same reading for every case.
  */
 class YamlNodeFormsTest {
@@ -77,7 +77,7 @@ class YamlNodeFormsTest {
             JsonNode got;
             try {
                 got = reading(Readiness.toJsonNode(
-                        Readiness.loadPyyaml(path, "input.domain_binding_invalid", "the domain binding", true)));
+                        Readiness.loadPyyaml(path, "input.domain_binding_invalid", "the domain binding")));
             } catch (InputError e) {
                 got = F.objectNode().put("refused", e.key);
             } catch (RuntimeException e) {

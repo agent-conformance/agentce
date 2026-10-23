@@ -3,6 +3,7 @@ package org.agentce;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -26,7 +27,7 @@ class UntrustedYamlFormsTest {
                 "a: [a?, b]\n", "a: [a ?, b]\n", "a: {a?: 1}\n", "a: [a ?]\n", "a: [a?b]\n", "a: [lookup ?,\n \"yes\"]\n",
                 "a: b\t\n", "a: 'b'\t\n", "a: [b]\t\n", "a\t: b\n", "a:\tb\n", "-\ta\n", "a: |\t\n  x\n",
                 "a: [b,\tc]\n", "a: b\t# c\n", "a: {: 1}\n", "a: [: 1]\n", "a: {a: 1, : 2}\n")) {
-            assertThrows(IllegalArgumentException.class, () -> Readiness.composePyyaml(text, false), text);
+            assertThrows(IllegalArgumentException.class, () -> Readiness.composePyyaml(text), text);
         }
         for (String text : List.of(
                 "a: a?\n", "a: [\"a?\", b]\n", "a: [? a]\n", "a: \"b\tc\"\n", "a: b # c\td\n", "a: |\n  x\ty\n",
@@ -36,9 +37,12 @@ class UntrustedYamlFormsTest {
     }
 
     @Test
-    void aProfileReadsItsCatalogsThroughAMergeKey(@TempDir Path tmp) throws IOException {
+    void aProfileWithAMergeKeyIsOutsideTheYamlProfile(@TempDir Path tmp) throws IOException {
+        // Anchors, aliases and << are refused before the YAML is read (SPEC 8.7, 18.184u).
         Path p = write(tmp, "p.yaml", "b: &b {catalogs: [eu-ai-act]}\n<<: *b\n");
-        assertEquals(List.of("eu-ai-act"), Profile.load(p).catalogs);
+        InputError e = assertThrows(InputError.class, () -> Profile.load(p));
+        assertEquals("input.profile_invalid", e.key);
+        assertTrue(e.reason.endsWith(" is outside the YAML profile: anchor at line 1 (SPEC 8.7)."), e.reason);
     }
 
     @Test
@@ -58,9 +62,11 @@ class UntrustedYamlFormsTest {
 
     @Test
     void onlyAUnicode15DigitReadsAsADigit() {
-        assertEquals(java.math.BigInteger.TEN, ((java.util.Map<?, ?>) Readiness.composePyyaml("a: !!int \"١٠\"\n", false)).get("a"));
+        // A tag is outside the YAML profile (SPEC 8.7, 18.184u), so no tagged digit is read at all.
+        assertEquals(new YamlProfile.Violation("tag", 1), assertThrows(YamlProfile.ProfileException.class,
+                () -> Readiness.composePyyaml("a: !!int \"١٠\"\n")).violation());
         for (String text : List.of("a: !!int \"𐵁𐵀\"\n", "a: !!float \"𐵁.5\"\n", "a: !!int \"𖵱\"\n")) {
-            assertThrows(IllegalArgumentException.class, () -> Readiness.composePyyaml(text, false), text);
+            assertThrows(IllegalArgumentException.class, () -> Readiness.composePyyaml(text), text);
         }
     }
 
@@ -73,7 +79,7 @@ class UntrustedYamlFormsTest {
     }
 
     @Test
-    void nestedAliasesUnderAnIgnoredKeyAreReadInOnePass(@TempDir Path tmp) throws IOException {
+    void nestedAliasesUnderAnIgnoredKeyAreRefusedAtTheFirstAnchor(@TempDir Path tmp) throws IOException {
         StringBuilder text = new StringBuilder("x:\n  a0: &a0 [v]\n");
         for (int i = 1; i <= 25; i++) {
             String p = "*a" + (i - 1);
@@ -81,7 +87,9 @@ class UntrustedYamlFormsTest {
                     .append(String.join(", ", java.util.Collections.nCopies(9, p))).append("]\n");
         }
         text.append("catalogs: [eu-ai-act]\n");
-        assertEquals(List.of("eu-ai-act"), Profile.load(write(tmp, "p.yaml", text.toString())).catalogs);
+        InputError e = assertThrows(InputError.class, () -> Profile.load(write(tmp, "p.yaml", text.toString())));
+        assertEquals("input.profile_invalid", e.key);
+        assertTrue(e.reason.endsWith(" is outside the YAML profile: anchor at line 2 (SPEC 8.7)."), e.reason);
     }
 
     @Test
@@ -92,23 +100,24 @@ class UntrustedYamlFormsTest {
                     .append(", r: *a").append(i - 1).append("}\n");
         }
         for (String rest : List.of("catalogs: [eu-ai-act]\n", "deviations: []\n", "task_scopes: []\n")) {
-            for (boolean uniqueKeys : List.of(false, true)) {
-                assertTimeoutPreemptively(java.time.Duration.ofSeconds(10),
-                        () -> Readiness.composePyyaml(chain + rest, uniqueKeys), rest);
-            }
+            assertTimeoutPreemptively(java.time.Duration.ofSeconds(10),
+                    () -> assertThrows(YamlProfile.ProfileException.class, () -> Readiness.composePyyaml(chain + rest)),
+                    rest);
         }
     }
 
     @Test
-    void aRepeatedKeyIsDecidedByPythonsKeyEquality() {
+    void aKeyThatDoesNotReadAsTextIsOutsideTheYamlProfile() {
+        // PyYAML's key equality no longer decides a repeat: a non-string key is refused first (SPEC 8.7, 18.184u),
+        // and a repeat is the same written key text twice (duplicate_key).
         for (String text : List.of("{1: a, 1.0: b}", "{1: a, true: b}", "{0: a, false: b}", "{0x1: a, 1: b}",
                 "{null: a, ~: b}", "{.nan: a, .nan: b}", "{2026-01-01: a, 2026-01-01: b}",
-                "{2026-01-01T00:00:00Z: a, 2026-01-01T01:00:00+01:00: b}")) {
-            assertThrows(IllegalArgumentException.class, () -> Readiness.composePyyaml(text + "\n", true), text);
+                "{2026-01-01T00:00:00Z: a, 2026-01-01T01:00:00+01:00: b}", "{\"1\": a, 1: b}", "{null: a, \"null\": b}",
+                "{2026-01-01: a, 2026-01-02: b}", "{2026-01-01: a, \"2026-01-01\": b}", "{1.5: a, 15e-1: b}")) {
+            assertEquals("non_string_key", assertThrows(YamlProfile.ProfileException.class,
+                    () -> Readiness.composePyyaml(text + "\n"), text).violation().rule(), text);
         }
-        for (String text : List.of("{\"1\": a, 1: b}", "{null: a, \"null\": b}", "{2026-01-01: a, 2026-01-02: b}",
-                "{2026-01-01: a, \"2026-01-01\": b}", "{1.5: a, 15e-1: b}")) {
-            Readiness.composePyyaml(text + "\n", true);
-        }
+        assertEquals(new YamlProfile.Violation("duplicate_key", 1), assertThrows(YamlProfile.ProfileException.class,
+                () -> Readiness.composePyyaml("{\"a\": 1, a: 2}\n")).violation());
     }
 }

@@ -135,7 +135,7 @@ public final class Profile {
      * {@code input.profile_invalid}. */
     public static Profile load(Path path) {
         JsonNode data = Readiness.toJsonNode(
-                Readiness.loadPyyaml(path, "input.profile_invalid", "the applicability profile", false));
+                Readiness.loadPyyaml(path, "input.profile_invalid", "the applicability profile"));
         if (data == null || !data.isObject()) {
             return new Profile();
         }

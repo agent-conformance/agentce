@@ -107,6 +107,18 @@ class DomainBindingTest {
         return loadText("task_scopes:\n  - {task_type: a, " + scope + "}\n").taskScopes.get("a").get(0);
     }
 
+    /** {@code text} refused as outside the SPEC 8.7 YAML profile at {@code rule} (18.184u). */
+    private void assertOutsideProfile(String text, String rule) {
+        InputError e = assertThrows(InputError.class, () -> loadText(text), text);
+        assertEquals("input.domain_binding_invalid", e.key, text);
+        assertTrue(e.reason.contains(" is outside the YAML profile: " + rule + " at line "), e.reason);
+        assertEquals(YamlProfile.HINTS.get(rule) + ".", e.fix, text);
+    }
+
+    private void assertScopeOutsideProfile(String scope, String rule) {
+        assertOutsideProfile("task_scopes:\n  - {task_type: a, " + scope + "}\n", rule);
+    }
+
     @Test
     void nonFiniteBudgetLimitIsUnreadableInEveryDimension() throws IOException {
         for (String dimension : List.of("spend", "compute_seconds", "tokens")) {
@@ -122,8 +134,12 @@ class DomainBindingTest {
     @Test
     void budgetLimitSpellingsReadAsPyyamlTypesThem() throws IOException {
         Object[][] cases = {
-            {"10", 10.0}, {"1_0", 10.0}, {"010", 8.0}, {"0x10", 16.0}, {"1e1", null}, {"\"1e1\"", null}, {"2.5", 2.5},
+            {"10", 10.0}, {"0x10", 16.0}, {"\"1e1\"", null}, {"2.5", 2.5},
         };
+        // 18.184u: the spellings PyYAML alone types are outside the SPEC 8.7 YAML profile.
+        assertScopeOutsideProfile("budgets: {spend: 1_0}", "underscore_number");
+        assertScopeOutsideProfile("budgets: {spend: 010}", "octal");
+        assertScopeOutsideProfile("budgets: {spend: 1e1}", "exponent_no_dot");
         for (Object[] c : cases) {
             assertEquals(
                     List.of(new DomainBinding.Budget("spend", (Double) c[1])),
@@ -134,7 +150,7 @@ class DomainBindingTest {
 
     @Test
     void allowedToolsYaml11BooleansNameNoTool() throws IOException {
-        assertEquals(Set.of(), scopeFromYaml("allowed_tools: [yes, on, off]").allowedTools());
+        assertScopeOutsideProfile("allowed_tools: [yes, on, off]", "yaml11_bool");
         assertEquals(Set.of("yes"), scopeFromYaml("allowed_tools: [\"yes\"]").allowedTools());
     }
 
@@ -151,10 +167,10 @@ class DomainBindingTest {
     }
 
     @Test
-    void keyAMergeBringsInMayBeWrittenAgain() throws IOException {
-        DomainBinding binding = loadText(
-                "base: &b {task_type: a, allowed_tools: [x]}\ntask_scopes:\n  - {<<: *b, allowed_tools: [y]}\n");
-        assertEquals(Set.of("y"), binding.taskScopes.get("a").get(0).allowedTools());
+    void aMergeAndItsAnchorAreOutsideTheYamlProfile() {
+        assertOutsideProfile(
+                "base: &b {task_type: a, allowed_tools: [x]}\ntask_scopes:\n  - {<<: *b, allowed_tools: [y]}\n", "anchor");
+        assertOutsideProfile("task_scopes:\n  - {<<: {task_type: a}, allowed_tools: [y]}\n", "merge_key");
     }
 
     @Test
@@ -190,41 +206,21 @@ class DomainBindingTest {
     }
 
     @Test
-    void explicitTagsConstructAsSafeLoaderDoes() throws IOException {
-        assertEquals(
-                Set.of("7", "x", "yes"),
-                scopeFromYaml("allowed_tools: [!!bool \"yes\", !!bool \"true\", !!bool 'on', !!int \"7\", !!float \"1.5\","
-                                + " !!str 7, !!str yes, x]")
-                        .allowedTools());
-        assertEquals(
-                List.of(
-                        new DomainBinding.Budget("tokens", null),
-                        new DomainBinding.Budget("compute_seconds", 5.0),
-                        new DomainBinding.Budget("spend", 10.0)),
-                scopeFromYaml("budgets: {tokens: !!str 1000, spend: !!int \"10\", compute_seconds: !!float \"5\"}").budgets());
-        assertEquals(
-                List.of(new DomainBinding.Budget("tokens", 10.0), new DomainBinding.Budget("spend", null)),
-                scopeFromYaml("budgets: {tokens: !!int \"1_0\", spend: !!float \".inf\"}").budgets());
-    }
-
-    @Test
-    void taggedTextReadsAsPythonsIntAndFloatDo() throws IOException {
-        assertEquals(
-                List.of(
-                        new DomainBinding.Budget("tokens", 8.0),
-                        new DomainBinding.Budget("compute_seconds", 0.5),
-                        new DomainBinding.Budget("spend", null)),
-                scopeFromYaml("budgets: {tokens: !!int \"0o10\", compute_seconds: !!float \"+.5\", spend: !!float \"inf\"}")
-                        .budgets());
-        assertEquals(
-                List.of(new DomainBinding.Budget("tokens", 5.0)),
-                scopeFromYaml("budgets: {tokens: !!int \" 5\"}").budgets());
+    void explicitTagsAreOutsideTheYamlProfile() {
+        for (String scope : List.of(
+                "allowed_tools: [!!bool \"yes\", !!str 7, x]",
+                "budgets: {tokens: !!str 1000, spend: !!int \"10\", compute_seconds: !!float \"5\"}",
+                "budgets: {tokens: !!int \"1_0\", spend: !!float \".inf\"}",
+                "budgets: {tokens: !!int \"0o10\", compute_seconds: !!float \"+.5\", spend: !!float \"inf\"}",
+                "budgets: {tokens: !!int \" 5\"}")) {
+            assertScopeOutsideProfile(scope, "tag");
+        }
     }
 
     @Test
     void aDateNoCalendarHoldsIsText() throws IOException {
         assertEquals(Set.of("2021-02-29"), scopeFromYaml("allowed_tools: [2021-02-29, 2020-02-29]").allowedTools());
-        assertEquals(List.of(), scopeFromYaml("budgets: {2020-01-01: 1, 2020-01-02: 2}").budgets());
+        assertScopeOutsideProfile("budgets: {2020-01-01: 1, 2020-01-02: 2}", "non_string_key");
     }
 
     @Test
