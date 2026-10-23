@@ -42,6 +42,9 @@ public final class Integrity {
     private static final String UNSIGNED = "unsigned";
     private static final String TIME_SUSPECT = "time_suspect";
     private static final String FAILED = "failed";
+    /** Every status integrity-result.schema.json allows. */
+    static final Set<String> STATUSES =
+            Set.of(VERIFIED, VERIFIED_WEAK, GAP, REORDERED, UNSIGNED, TIME_SUSPECT, FAILED);
 
     public static final class Result {
         public final String stream;

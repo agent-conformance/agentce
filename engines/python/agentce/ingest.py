@@ -30,7 +30,7 @@ from .graph import UnreadableWrite, _text
 from .quarantine import QuarantineReason, QuarantineRecord
 from .safe_json import JSONError, load_json
 from .schema import event_types, validate_event
-from .signing import MAX_JSON_DEPTH
+from .safe_json import MAX_JSON_DEPTH
 from .source_class import SOURCE_CLASS_RANK
 from .structural import compare_instants
 

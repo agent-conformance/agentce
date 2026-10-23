@@ -18,10 +18,10 @@ from collections.abc import Mapping
 from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Any
 
-from . import signing
 from .domain import MAX_COUNT
 from .errors import InputError
 from .profile import CoverageDenominator, Profile, Subject
+from .safe_json import too_deep
 
 STATUS_COVERED = "covered"
 STATUS_BELOW = "below_threshold"
@@ -86,7 +86,7 @@ def _declared_counts(
             return {}
         # The bytes load_bundle checked and hashed, never a second read of the name (18.184f). Counted on the
         # bytes, not left to json's recursion limit, which differs by Python.
-        if signing._too_deep(raw):
+        if too_deep(raw):
             raise InputError(
                 "input.coverage_denominator_manifest_invalid",
                 f"the coverage denominator manifest '{denominator.manifest}' is nested too deeply "

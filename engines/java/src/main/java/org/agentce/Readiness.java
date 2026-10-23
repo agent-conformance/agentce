@@ -1359,8 +1359,7 @@ public final class Readiness {
     }
 
     /** Every status integrity-result.schema.json allows; a record with no status or another one is unreadable. */
-    private static final Set<String> INTEGRITY_STATUSES = Set.of(
-            "failed", "gap", "reordered", "verified", "verified_weak", "unsigned", "time_suspect");
+    private static final Set<String> INTEGRITY_STATUSES = Integrity.STATUSES;
 
     /** integrity.jsonl: one object per line, each with a {@code status} from integrity-result.schema.json's
      * enum. A record without one, or with another value, is unreadable, never read as no break. */

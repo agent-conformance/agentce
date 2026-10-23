@@ -206,8 +206,8 @@ public final class Ingest {
                     continue;
                 }
                 // The bracket count bounds the nesting, so most lines skip the character scan.
-                if (bracketCount(line) > Verify.MAX_JSON_DEPTH
-                        && maxNesting(line) > Verify.MAX_JSON_DEPTH) {
+                if (bracketCount(line) > Json.MAX_JSON_DEPTH
+                        && maxNesting(line) > Json.MAX_JSON_DEPTH) {
                     throw new InputError(
                             "input.event_structure_too_deep",
                             "an evidence event line is nested too deeply to parse safely.",

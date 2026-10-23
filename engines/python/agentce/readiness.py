@@ -22,6 +22,7 @@ from typing import Any, TypeVar
 import jsonschema
 
 from .coverage import STATUS_UNKNOWN
+from .integrity import IntegrityStatus
 from .safe_json import JSONError, jsonl_lines, load_report_json
 from .signing import is_regular_file
 
@@ -34,12 +35,7 @@ NOT_READY = "NOT READY"
 #: Integrity statuses that block a report from being signed (SPEC §13.3.4).
 _BAD_INTEGRITY = frozenset({"failed", "gap", "reordered"})
 #: Every status integrity-result.schema.json allows; a record with no status or another one is unreadable.
-_INTEGRITY_STATUSES = _BAD_INTEGRITY | {
-    "verified",
-    "verified_weak",
-    "unsigned",
-    "time_suspect",
-}
+_INTEGRITY_STATUSES = frozenset(s.value for s in IntegrityStatus)
 #: The integrity and coverage family whose findings can never be accepted as a deviation (§13.3.4).
 _INT_FAMILY = "INT"
 #: Default maximum deviation lifetime in days (SPEC §13.3.4; a catalog may set its own).

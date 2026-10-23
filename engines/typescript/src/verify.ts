@@ -170,10 +170,6 @@ function* trustEntries(
   }
 }
 
-/** The deepest container nesting {@link parseUntrustedJson} accepts (`json.ts`, mirrors
- * `safe_json.MAX_JSON_DEPTH`). */
-export { MAX_JSON_DEPTH };
-
 /** The generic text of the untrusted parser's own refusals; it names no parser error. */
 const NOT_READABLE_JSON = "not readable JSON";
 

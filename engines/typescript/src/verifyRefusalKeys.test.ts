@@ -10,10 +10,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { messageKeys } from "./errorCatalogue";
+import { MAX_JSON_DEPTH } from "./json";
 import { keyidFor } from "./sign";
 import {
   CATALOG_SIGNATURE_NAME,
-  MAX_JSON_DEPTH,
   TrustRoot,
   VerifyRefusal,
   parseUntrustedJson,

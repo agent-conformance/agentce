@@ -22,13 +22,12 @@ import type { Bundle } from "./bundle";
 import { CanonicalizationError, canonicalString } from "./canonical";
 import { InputError } from "./errors";
 import { text } from "./graph";
-import { parseJson } from "./json";
+import { MAX_JSON_DEPTH, parseJson } from "./json";
 import { QuarantineReason, type QuarantineRecord } from "./quarantine";
 import { eventTypes, validateEvent } from "./schema";
 import { SOURCE_CLASS_RANK } from "./sourceClass";
 import { compareInstants } from "./structural";
 import { byteCompare, decodeUtf8Strict } from "./util";
-import { MAX_JSON_DEPTH } from "./verify";
 
 const DEFAULT_MAX_EVENT_BYTES = 1_048_576;
 const TYPE_RE = /^org\.agent-conformance\.evidence\.([A-Za-z0-9]+)\.v1$/;
