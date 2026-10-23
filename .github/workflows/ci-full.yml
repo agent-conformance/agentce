@@ -1,0 +1,96 @@
+# The full tier of `ci`: the jobs that are not needed to know a commit is sound, so they stay off the
+# per-push fast tier. It runs on push to main, on every pull request, every four hours against
+# `phase/18`, and by hand. The fast tier is ci.yml. Every action is pinned by commit SHA.
+name: ci-full
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "23 */4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-install-matrix:
+    # Proves the one documented command works off the maintainer's own architecture. cryptography
+    # publishes prebuilt wheels for Linux and Apple-silicon macOS on the 50.x line, and no release
+    # since 49.0.0 ships an Intel-macOS wheel, so darwin/x86_64 is pinned to the 48.x-line universal2
+    # wheel instead (ADR-0024): a real prebuilt binary, not a source build. Each leg installs the
+    # engine from the frozen lockfile, checks `agentce doctor` reports the wheel provenance the docs
+    # state for that platform, and runs the quickstart to a report.
+    name: python-install-matrix (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            wheel: prebuilt
+          - os: macos-latest
+            wheel: prebuilt
+          - os: macos-15-intel
+            wheel: prebuilt
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'phase/18' || github.sha }}
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Sync the engine (frozen lockfile)
+        working-directory: engines/python
+        run: uv sync --frozen
+      - name: Doctor reports the toolchain the docs describe
+        env:
+          EXPECTED_WHEEL: ${{ matrix.wheel }}
+        run: |
+          set -euo pipefail
+          uv run --project engines/python --frozen agentce doctor --project corpus/quickstart --json > "$RUNNER_TEMP/doctor.json"
+          python3 - "$RUNNER_TEMP/doctor.json" <<'PY'
+          import json, os, sys
+          doc = json.load(open(sys.argv[1]))
+          env = doc["environment"]
+          got = env["cryptography"]["wheel_source"]
+          print(f"python {env['python']['version']} on {env['platform']['system']} {env['platform']['machine']}; "
+                f"cryptography {env['cryptography']['version']} ({got}), {env['cryptography']['openssl']}")
+          assert doc["healthy"], doc["problems"]
+          assert got == os.environ["EXPECTED_WHEEL"], f"expected a {os.environ['EXPECTED_WHEEL']} cryptography, got {got}"
+          PY
+      - name: Quickstart to a report
+        run: |
+          set -euo pipefail
+          uv run --project engines/python --frozen agentce quickstart --out "$RUNNER_TEMP/report"
+          test -s "$RUNNER_TEMP/report/assertions.json"
+
+  contributor-lane:
+    # A newcomer's first three trust signals: CONTRIBUTING.md's documented commands genuinely test
+    # the code (observed by running them and requiring them to catch a seeded broken test and a
+    # seeded lint violation in the reference engine, never by parsing the shell), a real Code of
+    # Conduct with no fabricated enforcement contact, and real GitHub issue/pull-request templates.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'phase/18' || github.sha }}
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Sync the reference engine (engines/python)
+        working-directory: engines/python
+        run: uv sync --frozen
+      - name: contributing_doctest_check self-test
+        run: uv run --project tools --frozen python tools/contributing_doctest_check.py --self-test
+      - name: CONTRIBUTING.md's documented commands genuinely run pytest and ruff
+        run: uv run --project tools --frozen python tools/contributing_doctest_check.py
+      - name: code_of_conduct_check self-test
+        run: uv run --project tools --frozen python tools/code_of_conduct_check.py --self-test
+      - name: Code of Conduct and contribution templates are real
+        run: uv run --project tools --frozen python tools/code_of_conduct_check.py

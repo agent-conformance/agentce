@@ -162,7 +162,7 @@ claims:
     pages:
       - website/src/content/docs/docs/getting-started.md
     check:
-      workflow: .github/workflows/ci.yml
+      workflow: .github/workflows/ci-full.yml
       job: python-install-matrix
       description: >-
         On every pull request, installs the engine from the frozen lockfile on ubuntu-latest,

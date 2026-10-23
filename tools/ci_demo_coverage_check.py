@@ -63,6 +63,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "verification.yml"
+FAST_WORKFLOW = "verification-quick.yml"
 DEMO_JOB = "demo-fault"
 QUICK_JOB = "quick"
 QUICK_TIER_JOB = "quick-tier"
@@ -474,6 +475,25 @@ def fault_selection_problems(scratch: Path) -> list[str]:
     return problems
 
 
+def fast_tier_problems(path: Path) -> list[str]:
+    """The fast tier runs the quick tier on every phase push, so its quick-tier job must be wired
+    exactly as verification.yml's is (the partition is checked once, below, for both)."""
+    if not path.is_file():
+        return [f"{path}: missing"]
+    try:
+        doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        return [f"{path}: not valid YAML: {exc}"]
+    raw_jobs = doc.get("jobs") if isinstance(doc, dict) else None
+    jobs: dict[str, Any] = raw_jobs if isinstance(raw_jobs, dict) else {}
+    return [
+        f"{path.name}: {problem}"
+        for problem in wiring_problems(
+            jobs.get(QUICK_TIER_JOB), QUICK_TIER_JOB, CANONICAL_QUICK_TIER_RUN
+        )
+    ]
+
+
 def check_workflow(
     workflow_path: Path = WORKFLOW_PATH, root: Path = REPO_ROOT
 ) -> list[str]:
@@ -494,6 +514,7 @@ def check_workflow(
         + quick_wiring_problems(jobs.get(QUICK_JOB))
         + build_problems(jobs.get("build"))
     )
+    problems += fast_tier_problems(workflow_path.with_name(FAST_WORKFLOW))
     gates = [line for line in _stdout_lines(root, "verification/run", "--list") if line]
     if not gates:
         return problems + ["`verification/run --list` printed no gates"]

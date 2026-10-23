@@ -1,0 +1,38 @@
+# The full tier of `tests`: the whole Python engine suite on every Python requires-python admits. It
+# runs on push to main, on every pull request, every four hours against `phase/18`, and by hand. The
+# fast tier is tests.yml. Every action is pinned by commit SHA.
+name: tests-full
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "23 */4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-versions:
+    # VG-PYTHON-VERSIONS (18.114): the whole Python engine suite on every Python requires-python admits,
+    # one version per job, each in an isolated environment. 3.12.10 is the first 3.12 patch whose argparse
+    # drops a leading `--` as 3.13 does.
+    name: python-versions (${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.14", "3.13", "3.12.10", "3.12.3"]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'phase/18' || github.sha }}
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: The Python engine's tests on Python ${{ matrix.python }}
+        run: bash verification/gates/python_versions.sh ${{ matrix.python }}

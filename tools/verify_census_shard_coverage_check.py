@@ -95,8 +95,9 @@ SELF_TEST_RUNS = (
 ALLOWED_OUTSIDE_CENSUS = {SCENARIOS_RUN, SELF_TEST_RUNS[1], LIST_LINE}
 # The workflow's whole `on:`, compared exactly: any filter or dropped trigger is rejected by construction.
 EXPECTED_TRIGGERS: dict[str, Any] = {
-    "push": {"branches": ["main", "phase/**"]},
+    "push": {"branches": ["main"]},
     "pull_request": None,
+    "schedule": [{"cron": "23 */4 * * *"}],
     "workflow_dispatch": None,
 }
 REFUSAL_TIMEOUT_S = 60

@@ -52,6 +52,12 @@
           "replace": "python3 verification/shard.py --quick \"${{ matrix.lane }}\" \"${{ strategy.job-total }}\""
         },
         {
+          "description": "the fast tier's quick-tier step is rewired to key off the matrix's own lane value instead of strategy.job-index, so every phase push runs a partition that stops covering the quick tier the moment the lane list changes",
+          "file": ".github/workflows/verification-quick.yml",
+          "search": "python3 verification/shard.py --quick \"${{ strategy.job-index }}\" \"${{ strategy.job-total }}\"",
+          "replace": "python3 verification/shard.py --quick \"${{ matrix.lane }}\" \"${{ strategy.job-total }}\""
+        },
+        {
           "description": "build runs the whole quick tier again, as it did before 18.131, so one job can time out the required check",
           "file": ".github/workflows/verification.yml",
           "search": "        run: python3 verification/probe.py\n",
@@ -2416,8 +2422,8 @@
         {
           "description": "a paths-ignore on the push trigger stops quickstart, and with it the census, running on pushes that touch only the ignored paths",
           "file": ".github/workflows/quickstart.yml",
-          "search": "    branches: [main, \"phase/**\"]\n",
-          "replace": "    branches: [main, \"phase/**\"]\n    paths-ignore: [\"docs/**\"]\n"
+          "search": "    branches: [main]\n",
+          "replace": "    branches: [main]\n    paths-ignore: [\"docs/**\"]\n"
         },
         {
           "description": "the full census comes back in the artifacts job spelled python -m verify_parity_check, which a match on the script's .py name would miss",

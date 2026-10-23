@@ -1,0 +1,31 @@
+# The fast tier of the verification suite: the quick tier alone, sharded the way verification.yml shards
+# it, on every push to main or a phase branch and every pull request. The seeded-fault demos and the
+# `quick` required check stay in verification.yml (the full tier). Every action is pinned by commit SHA.
+name: verification-quick
+
+on:
+  push:
+    branches: [main, "phase/**"]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quick-tier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      # `lane` only fans out 12 parallel jobs; the partition uses strategy.job-index/job-total.
+      matrix:
+        lane: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ./.github/actions/setup-verification-env
+      - name: This shard's quick-tier gates
+        run: python3 verification/shard.py --quick "${{ strategy.job-index }}" "${{ strategy.job-total }}"
