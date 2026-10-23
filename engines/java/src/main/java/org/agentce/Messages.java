@@ -63,7 +63,7 @@ public final class Messages {
             return Map.of();
         }
         Map<String, String> out = new LinkedHashMap<>();
-        JsonNode node = Json.parse(text);
+        JsonNode node = Json.readBundled(text.getBytes(StandardCharsets.UTF_8));
         if (node == null || !node.isObject()) {
             throw new IllegalArgumentException(path + " does not hold a message catalogue object");
         }

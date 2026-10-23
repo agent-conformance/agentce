@@ -96,21 +96,16 @@ public final class Json {
     /** One non-blank JSON Lines line: its 1-based number and its text, as {@link #jsonlLines} returns it. */
     public record Line(int number, String text) {}
 
-    /**
-     * The JSON Lines of {@code text}, blank lines left out: LF alone ends a line, and a line holding only
-     * space, tab or CR is blank. Every other line is returned as it stands for a strict JSON parser, which
-     * accepts only JSON's whitespace around a value (so a CRLF pair reads as LF) and refuses a VT, FF, NEL,
-     * U+2028, no-break space or byte-order mark outside a string, and two values joined by a lone CR.
-     * Python's {@code safe_json.jsonl_lines} and {@code json.ts}'s {@code jsonlLines} apply the same rule.
-     * Report files are the engines' own JSON Lines output; evidence input keeps {@code Ingest}'s wider
-     * {@code splitLines} (18.65), where a lone CR also ends a line.
-     */
+    /** The non-blank JSON Lines of {@code text}: LF alone ends a line, a CRLF's CR is dropped, a line
+     * holding only spaces and tabs is blank. Mirrors Python's {@code safe_json.jsonl_lines} and {@code
+     * json.ts}'s {@code jsonlRecords}. */
     public static List<Line> jsonlLines(String text) {
         String[] lines = text.split("\n", -1);
         List<Line> out = new ArrayList<>();
         for (int i = 0; i < lines.length; i++) {
-            if (!lines[i].chars().allMatch(c -> c == ' ' || c == '\t' || c == '\r')) {
-                out.add(new Line(i + 1, lines[i]));
+            String line = lines[i].endsWith("\r") ? lines[i].substring(0, lines[i].length() - 1) : lines[i];
+            if (!line.chars().allMatch(c -> c == ' ' || c == '\t')) {
+                out.add(new Line(i + 1, line));
             }
         }
         return out;
@@ -129,14 +124,7 @@ public final class Json {
      * assumes a parse either throws or returns a node (18.29 verifier round 1, F1).
      */
     public static JsonNode parse(String text) {
-        return parse(text, false);
-    }
-
-    private static JsonNode parse(String text, boolean uniqueKeys) {
         try (JsonParser parser = new IntegerDigitLimit(MAPPER.getFactory().createParser(text))) {
-            if (uniqueKeys) {
-                parser.enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
-            }
             JsonNode node = MAPPER.readTree(parser);
             if (node == null) {
                 throw new IllegalArgumentException("invalid JSON: no content");
@@ -185,21 +173,18 @@ public final class Json {
         return false;
     }
 
-    /**
-     * Parse one report file (or one JSON Lines line of one) by the rule every engine's readiness, sign
-     * and {@code report --validate} share (SPEC §13.3.4 stage 4): containers nested at most {@link
-     * #MAX_JSON_DEPTH} deep, no {@code NaN}/{@code Infinity}/{@code -Infinity} (Jackson's default),
-     * integer literals of at most {@link #MAX_INT_STR_DIGITS} digits, and no key repeated within one
-     * object (Jackson compares decoded names, so {@code "st\\u0061tus"} repeats {@code "status"}).
-     * Mirrors {@code safe_json.load_report_json} and {@code json.ts}'s {@code parseReportJson}; anything
-     * else throws {@link IllegalArgumentException}.
-     */
+    /** Parse one report file (or, with {@code line}, that JSON Lines line of one) under the JSON profile
+     * (SPEC 8.7, §13.3.4 stage 4): every engine's readiness, sign and {@code report --validate} read
+     * report files by this rule. Outside it throws {@link JsonProfileError}. Mirrors {@code
+     * safe_json.load_report_json} and {@code json.ts}'s {@code parseReportJson}. */
+    public static JsonNode parseReport(String text, Integer line) {
+        checkProfile(text, line);
+        return parse(text);
+    }
+
+    /** {@link #parseReport(String, Integer)} on a whole file. */
     public static JsonNode parseReport(String text) {
-        if (tooDeep(text.getBytes(StandardCharsets.UTF_8))) {
-            throw new IllegalArgumentException(
-                    "invalid JSON: containers nested more than " + MAX_JSON_DEPTH + " deep");
-        }
-        return parse(text, true);
+        return parseReport(text, null);
     }
 
     /** Parse a JSON file (UTF-8). */
@@ -776,11 +761,12 @@ public final class Json {
         return value != null && value.isIntegralNumber();
     }
 
-    /** The refusal sentence for {@code noun}: the profile rule when {@code exc} names one, else
-     * {@code <noun> is not valid JSON.} Mirrors Python's {@code safe_json.not_valid}. */
-    public static String notValid(String noun, Exception exc) {
-        return exc instanceof JsonProfileError
-                ? noun + " is " + exc.getMessage() + "."
+    /** The refusal sentence for {@code noun}: the profile rule when {@code exc} (or its cause) names one,
+     * else {@code <noun> is not valid JSON.} Mirrors Python's {@code safe_json.not_valid}. */
+    public static String notValid(String noun, Throwable exc) {
+        Throwable cause = exc instanceof JsonProfileError ? exc : exc.getCause();
+        return cause instanceof JsonProfileError
+                ? noun + " is " + cause.getMessage() + "."
                 : noun + " is not valid JSON.";
     }
 
@@ -796,6 +782,13 @@ public final class Json {
     }
 
     static String renderFloat(double v) {
+        if (Double.isNaN(v)) {
+            return "nan";
+        }
+        if (Double.isInfinite(v)) {
+            // Python's repr of a literal past the double range (1e400 reads as inf).
+            return v > 0 ? "inf" : "-inf";
+        }
         if (v == 0.0 && 1.0 / v < 0) {
             return "-0.0";
         }

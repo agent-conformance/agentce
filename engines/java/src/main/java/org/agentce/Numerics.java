@@ -46,6 +46,10 @@ public final class Numerics {
 
     /** Compute a case file from disk. */
     public static ObjectNode computeVectorFile(Path file) {
-        return computeVectorFile(Json.parseFile(file));
+        try {
+            return computeVectorFile(Json.readBundled(java.nio.file.Files.readAllBytes(file)));
+        } catch (java.io.IOException e) {
+            throw new IllegalArgumentException("cannot read JSON " + file + ": " + e.getMessage(), e);
+        }
     }
 }

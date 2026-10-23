@@ -10,7 +10,6 @@ import com.networknt.schema.ValidationMessage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -42,7 +41,7 @@ public final class Schema {
                 if (in == null) {
                     throw new IllegalStateException("vendored evidence schema not on classpath");
                 }
-                local = Json.parse(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+                local = Json.readBundled(in.readAllBytes());
                 schema = local;
             } catch (IOException e) {
                 throw new IllegalStateException("cannot read vendored evidence schema", e);

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.math.BigInteger;
-import java.nio.charset.CharacterCodingException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -142,12 +141,12 @@ public final class Coverage {
                         + " records, 0 or more.");
     }
 
-    /** The manifest's JSON, read as every engine reads it: strict UTF-8 and standard JSON only (18.184j). */
+    /** The manifest's JSON, read under the JSON profile (SPEC 8.7) as every engine reads it. */
     private static JsonNode loadManifest(String name, byte[] raw) {
         try {
-            return Json.parse(Verify.decodeStrict(raw).toString());
-        } catch (CharacterCodingException | RuntimeException e) {
-            throw invalidManifest(name, "is not JSON (" + e.getMessage() + ")");
+            return Json.readJson(raw, Json.Bom.IGNORE);
+        } catch (Json.JsonProfileError e) {
+            throw invalidManifest(name, "is " + e.getMessage());
         }
     }
 
@@ -170,7 +169,7 @@ public final class Coverage {
                     && count.longValue() >= 0
                     && count.longValue() <= DomainBinding.MAX_COUNT;
             if (!whole) {
-                throw invalidManifest(name, "counts '" + e.getKey() + "' as " + count
+                throw invalidManifest(name, "counts '" + e.getKey() + "' as " + Json.renderValue(count)
                         + ", not a whole number from 0 to " + DomainBinding.MAX_COUNT);
             }
             out.put(e.getKey(), count.longValue());

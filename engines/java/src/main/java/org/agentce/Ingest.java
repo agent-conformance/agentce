@@ -6,7 +6,6 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -187,19 +186,17 @@ public final class Ingest {
         for (Path path : bundle.eventFiles) {
             // The bytes Bundle.load checked and hashed, never a second read of the name (18.184f).
             byte[] content = bundle.contents.get(path);
-            for (byte[] rawLine : splitLines(content)) {
+            for (Json.ByteLine record : Json.jsonlByteRecords(Json.stripBom(content))) {
+                int number = record.number();
                 String raw;
                 try {
-                    raw = Verify.decodeStrict(rawLine).toString();
+                    raw = Verify.decodeStrict(record.bytes()).toString();
                 } catch (CharacterCodingException e) {
                     records.add(unreadable(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
-                            .detail("invalid UTF-8"), null));
+                            .detail(new Json.JsonProfileError("invalid_utf8", number).getMessage()), null));
                     continue;
                 }
                 String line = trimJsonWhitespace(raw);
-                if (line.isEmpty()) {
-                    continue;
-                }
                 if (line.getBytes(StandardCharsets.UTF_8).length > maxEventBytes) {
                     records.add(unreadable(new Quarantine.Record(Quarantine.Reason.OVERSIZE)
                             .detail("event exceeds " + maxEventBytes + " bytes"), null));
@@ -208,18 +205,14 @@ public final class Ingest {
                 // The bracket count bounds the nesting, so most lines skip the character scan.
                 if (bracketCount(line) > Json.MAX_JSON_DEPTH
                         && maxNesting(line) > Json.MAX_JSON_DEPTH) {
-                    throw new InputError(
-                            "input.event_structure_too_deep",
-                            "an evidence event line is nested too deeply to parse safely.",
-                            "flatten the event's structure; reference deeply nested content by an "
-                                    + "opaque locator instead (SPEC R12).");
+                    throw tooDeep(number);
                 }
                 JsonNode event;
                 try {
-                    event = Json.parse(line);
-                } catch (RuntimeException exc) {
+                    event = Json.readJsonlLine(line, number);
+                } catch (Json.JsonProfileError exc) {
                     records.add(unreadable(new Quarantine.Record(Quarantine.Reason.SCHEMA_INVALID)
-                            .detail("invalid JSON"), null));
+                            .detail(exc.getMessage()), null));
                     continue;
                 }
                 if (event == null || !event.isObject()) {
@@ -365,27 +358,13 @@ public final class Ingest {
         return result;
     }
 
-    /**
-     * One line rule the three engines share (18.65, Python's {@code bytes.splitlines}): a line ends at
-     * \n, \r\n or a lone \r. Split on bytes, before decoding, so each line is decoded (and refused) on
-     * its own; \r and \n never occur inside a multi-byte UTF-8 sequence.
-     */
-    static List<byte[]> splitLines(byte[] raw) {
-        List<byte[]> lines = new ArrayList<>();
-        int start = 0;
-        for (int i = 0; i < raw.length; i++) {
-            if (raw[i] == '\n' || raw[i] == '\r') {
-                lines.add(Arrays.copyOfRange(raw, start, i));
-                if (raw[i] == '\r' && i + 1 < raw.length && raw[i + 1] == '\n') {
-                    i++;
-                }
-                start = i + 1;
-            }
-        }
-        if (start < raw.length) {
-            lines.add(Arrays.copyOfRange(raw, start, raw.length));
-        }
-        return lines;
+    private static InputError tooDeep(int line) {
+        return new InputError(
+                "input.event_structure_too_deep",
+                "an evidence event line is nested too deeply to parse safely: "
+                        + new Json.JsonProfileError("depth_over_limit", line).getMessage() + ".",
+                "flatten the event's structure; reference deeply nested content by an "
+                        + "opaque locator instead (SPEC R12).");
     }
 
     /**

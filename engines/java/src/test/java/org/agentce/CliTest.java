@@ -1054,23 +1054,15 @@ class CliTest {
     }
 
     @Test
-    void diffAMalformedInputFileGivesAKeyedInternalUnexpectedResultNeverACrash(@TempDir Path dir) {
+    void diffAnInputFileOutsideTheJsonProfileIsReportAUnreadableNamingTheRule(@TempDir Path dir) {
         Path a = diffFixture(dir, "a.json", "not json");
         Path b = diffFixture(dir, "b.json", "[]");
         JsonNode env = runJson("diff", a.toString(), b.toString());
         assertEquals(3, env.get("exit_code").asInt());
-        assertEquals("internal.unexpected", env.get("error").get("message_key").asText());
-        assertEquals(
-                "re-run with --debug to see the stack trace, then file an issue for an AgentCE maintainer to investigate.",
-                env.get("error").get("fix").asText());
-    }
-
-    @Test
-    void diffDebugOnAMalformedInputFileRethrowsInsteadOfReturningAKeyedEnvelope(@TempDir Path dir) {
-        Path a = diffFixture(dir, "a.json", "not json");
-        Path b = diffFixture(dir, "b.json", "[]");
-        org.junit.jupiter.api.Assertions.assertThrows(
-                RuntimeException.class, () -> Cli.run(new String[] {"diff", a.toString(), b.toString(), "--debug"}));
+        assertEquals("input.report_a_unreadable", env.get("error").get("message_key").asText());
+        assertTrue(env.get("error").get("detail").asText()
+                .endsWith(" is outside the JSON profile: syntax at line 1 (SPEC 8.7)."),
+                env.get("error").get("detail").asText());
     }
 
     @Test
@@ -1309,13 +1301,15 @@ class CliTest {
 
     @Test
     void signMalformedClaimGivesClaimMalformedBeforeTheKeyOrADryRun(@TempDir Path dir) throws Exception {
-        String notJson = "claim.json is not valid JSON.";
+        // A claim.json outside the JSON profile names the rule (SPEC 8.7, 18.184x).
+        java.util.function.Function<String, String> outside =
+                rule -> "claim.json is outside the JSON profile: " + rule + " at line 1 (SPEC 8.7).";
         String notList = "claim.json's signatures field is not a list.";
         Object[][] cases = {
-            {new byte[] {'{', '"', 'a', '"', ':', '"', (byte) 0xff, '"', '}'}, notJson},
-            {"{\"a\": ".getBytes(StandardCharsets.UTF_8), notJson},
-            {"{} GARBAGE".getBytes(StandardCharsets.UTF_8), notJson},
-            {"{\"a\": \"\\ud800\"}".getBytes(StandardCharsets.UTF_8), notJson},
+            {new byte[] {'{', '"', 'a', '"', ':', '"', (byte) 0xff, '"', '}'}, outside.apply("invalid_utf8")},
+            {"{\"a\": ".getBytes(StandardCharsets.UTF_8), outside.apply("syntax")},
+            {"{} GARBAGE".getBytes(StandardCharsets.UTF_8), outside.apply("extra_value")},
+            {"{\"a\": \"\\ud800\"}".getBytes(StandardCharsets.UTF_8), outside.apply("lone_surrogate")},
             {"[1, 2]".getBytes(StandardCharsets.UTF_8), "claim.json is not an object."},
             {"{\"signatures\": null}".getBytes(StandardCharsets.UTF_8), notList},
             {"{\"signatures\": \"x\"}".getBytes(StandardCharsets.UTF_8), notList},

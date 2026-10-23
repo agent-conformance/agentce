@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -58,33 +57,51 @@ public final class StateDir {
         return times.isEmpty() ? "1970-01-01T00:00:00Z" : times.get(times.size() - 1);
     }
 
+    private static final String UNREADABLE_FIX =
+            "restore state.json from the run that wrote it, or move the state directory aside and re-run "
+                    + "with --state pointing at a fresh, empty directory.";
+
     public static StateDir load(Path path) {
         StateDir state = new StateDir(path);
         Path file = path.resolve(STATE_FILE);
         if (!Files.isRegularFile(file)) {
             return state;
         }
-        String text;
+        byte[] raw;
         try {
-            text = Files.readString(file, StandardCharsets.UTF_8);
+            raw = Files.readAllBytes(file);
         } catch (IOException e) {
             throw new InputError("input.state_dir_unwritable", e.getClass().getSimpleName() + ": " + e.getMessage(), FIX);
         }
-        JsonNode data = Json.parse(text);
-        int version = data.has("state_version") && data.get("state_version").isNumber()
-                ? data.get("state_version").asInt()
-                : 0;
-        if (version != STATE_VERSION) {
+        JsonNode data;
+        try {
+            data = Json.readJson(raw, Json.Bom.IGNORE);
+        } catch (Json.JsonProfileError e) {
+            throw new InputError(
+                    "input.state_unreadable",
+                    "the state file " + Readiness.pyRepr(file.toString()) + " is " + e.getMessage() + ".",
+                    UNREADABLE_FIX);
+        }
+        if (!data.isObject()) {
+            throw new InputError(
+                    "input.state_unreadable",
+                    "the state file " + Readiness.pyRepr(file.toString()) + " does not hold a JSON object.",
+                    UNREADABLE_FIX);
+        }
+        JsonNode versionNode = data.has("state_version") ? data.get("state_version") : Json.nodes().numberNode(0);
+        // The JSON integer 1 and nothing else (SPEC 8.7): 1.0, "1" and true are not state_version 1.
+        if (!Json.isJsonInteger(versionNode)
+                || !versionNode.bigIntegerValue().equals(java.math.BigInteger.valueOf(STATE_VERSION))) {
             throw new InputError(
                     "input.state_version_incompatible",
-                    "the state directory at " + path + " is state_version " + version
+                    "the state directory at " + path + " is state_version " + Json.renderValue(versionNode)
                             + ", but this engine writes state_version " + STATE_VERSION + ".",
                     "there is no migration command: move or delete the state directory and re-run "
                             + "with --state pointing at a fresh, empty directory (this discards the prior "
                             + "bundle/outcome history recorded there, so late-arriving evidence and drift are "
                             + "tracked only from that point forward).");
         }
-        state.version = version;
+        state.version = STATE_VERSION;
         JsonNode digests = data.get("bundle_digests");
         if (digests != null && digests.isArray()) {
             for (JsonNode d : digests) {

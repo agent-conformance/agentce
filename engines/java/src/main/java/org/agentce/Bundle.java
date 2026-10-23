@@ -348,22 +348,30 @@ public final class Bundle {
         }
         JsonNode manifest;
         try {
-            manifest = Verify.parseUntrustedJson(readConfined(bundleDir, "manifest.json", manifestPath));
+            manifest = Verify.parseUntrustedJson(
+                    readConfined(bundleDir, "manifest.json", manifestPath), Json.Bom.IGNORE);
         } catch (InputError exc) {
             throw exc;
         } catch (IOException | RuntimeException exc) {
-            // A fixed message, not the parser's own text: Jackson's exception text would make this
-            // refusal's cause diverge from the other two engines for the same malformed input, for no
-            // reason a reader could use (F3, 18.65).
+            // The profile rule and line, the same in the three engines; never the parser's own text (F3, 18.65).
             throw new InputError(
                     "input.bundle_manifest_invalid",
-                    "manifest.json is not valid JSON.",
+                    Json.notValid("manifest.json", exc),
                     "regenerate the bundle so its manifest.json is well-formed.");
         }
         if (manifest == null || !manifest.isObject()) {
             throw new InputError(
                     "input.bundle_manifest_invalid",
                     "manifest.json is not an object.",
+                    "regenerate the bundle so its manifest.json is well-formed.");
+        }
+        try {
+            // The bundle digest is the canonical manifest's (SPEC 8.1), so a float is refused here.
+            Canonical.canonicalString(manifest);
+        } catch (Canonical.CanonicalizationError exc) {
+            throw new InputError(
+                    "input.bundle_manifest_invalid",
+                    "manifest.json cannot be put in canonical form: " + exc.getMessage() + ".",
                     "regenerate the bundle so its manifest.json is well-formed.");
         }
 

@@ -2,6 +2,7 @@ package org.agentce;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -72,7 +73,6 @@ class TrustRootParseTest {
                 "nan", ascii("{\"keys\":{},\"x\":NaN}"),
                 "lone-surrogate", ascii("{\"keys\":{},\"x\":\"\\ud800\"}"),
                 "invalid-utf8", concat(ascii("{\"keys\":{},\"x\":\""), new byte[] {(byte) 0xff}, ascii("\"}")),
-                "bom", concat(new byte[] {(byte) 0xef, (byte) 0xbb, (byte) 0xbf}, ascii("{\"keys\":{}}")),
                 "not-json", ascii("{not json"));
         for (Map.Entry<String, byte[]> c : cases.entrySet()) {
             String text = refusal(c.getKey(), c.getValue());
@@ -83,7 +83,17 @@ class TrustRootParseTest {
     }
 
     @Test
-    void aLoneSurrogateHasNoParserSuffix() throws IOException {
-        assertEquals("<path> is not readable JSON", refusal("s", ascii("{\"keys\":{},\"x\":\"\\ud800\"}")));
+    void aLoneSurrogateNamesTheProfileRule() throws IOException {
+        assertEquals(
+                "<path> is not readable JSON: outside the JSON profile: lone_surrogate at line 1 (SPEC 8.7)",
+                refusal("s", ascii("{\"keys\":{},\"x\":\"\\ud800\"}")));
+    }
+
+    @Test
+    void aLeadingByteOrderMarkIsIgnored() throws IOException {
+        // An adopter's tool may write the trust root with one (SPEC 8.7: an input's mark is ignored).
+        Path marked = work.resolve("bom.json");
+        Files.write(marked, concat(new byte[] {(byte) 0xef, (byte) 0xbb, (byte) 0xbf}, ascii("{\"keys\":{}}")));
+        assertNotNull(Verify.loadTrustRoot(marked));
     }
 }

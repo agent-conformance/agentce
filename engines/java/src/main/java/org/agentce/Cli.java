@@ -1743,7 +1743,8 @@ global options:
                         "pass the labels comma-separated with none empty, e.g. --catalog eu-ai-act,nist-ai-rmf.");
             }
         }
-        JsonNode parsedFile = Json.parseFile(Paths.get(source));
+        JsonNode parsedFile = readInputJson(source, "from", "the assertions file");
+        requireIntegerFields(source, parsedFile);
         List<Assertions.Assertion> assertions = new ArrayList<>();
         if (parsedFile != null && parsedFile.isArray()) {
             for (JsonNode node : parsedFile) {
@@ -1855,8 +1856,8 @@ global options:
         }
         result.data.put("report_a", Diff.normalizePosixPath(reportA));
         result.data.put("report_b", Diff.normalizePosixPath(reportB));
-        JsonNode aNode = Json.parseFile(Paths.get(reportA));
-        JsonNode bNode = Json.parseFile(Paths.get(reportB));
+        JsonNode aNode = readInputJson(reportA, "report_a", "the first assertion set");
+        JsonNode bNode = readInputJson(reportB, "report_b", "the second assertion set");
         List<Diff.Change> changes = Diff.diffAssertionSets((ArrayNode) aNode, (ArrayNode) bNode);
         Map<String, List<Diff.Change>> grouped = Diff.whatChanged(changes);
         result.data.put("changed", changes.size());
@@ -2186,6 +2187,59 @@ global options:
                 "produce the report again: `agentce assess … --out <report-dir>`.");
     }
 
+    /** An engine-written JSON file the command already accepted, read under the JSON profile (SPEC 8.7, a
+     * byte-order mark refused); outside it is {@code input.<key>_unreadable} naming the rule. Mirrors
+     * Python's {@code _read_input_json}. */
+    static JsonNode readInputJson(String path, String key, String what) {
+        byte[] raw;
+        try {
+            raw = Files.readAllBytes(Paths.get(path));
+        } catch (IOException e) {
+            throw new IllegalArgumentException("cannot read JSON " + path + ": " + e.getMessage(), e);
+        }
+        try {
+            return Json.readJson(raw, Json.Bom.REFUSE);
+        } catch (Json.JsonProfileError e) {
+            throw new InputError(
+                    "input." + key + "_unreadable",
+                    what + " " + Readiness.pyRepr(path) + " is " + e.getMessage() + ".",
+                    "re-run the command that wrote it, or correct the JSON at that line.");
+        }
+    }
+
+    /** Each assertion's {@code rung} and {@code population} counts, where present, are JSON integers (SPEC
+     * 8.7 {@code integer_field_float_form}): {@code 1.5}, {@code 1e20} or {@code true} is refused, never
+     * truncated. Mirrors Python's {@code _require_integer_fields}. */
+    static void requireIntegerFields(String path, JsonNode data) {
+        if (data == null || !data.isArray()) {
+            return;
+        }
+        for (int i = 0; i < data.size(); i++) {
+            JsonNode item = data.get(i);
+            if (!item.isObject()) {
+                continue;
+            }
+            Map<String, JsonNode> fields = new LinkedHashMap<>();
+            fields.put("rung", item.has("rung") ? item.get("rung") : Json.nodes().numberNode(0));
+            JsonNode population = item.get("population");
+            if (population != null && population.isObject()) {
+                for (String name : List.of("applicable", "failed")) {
+                    fields.put("population." + name,
+                            population.has(name) ? population.get(name) : Json.nodes().numberNode(0));
+                }
+            }
+            for (Map.Entry<String, JsonNode> field : fields.entrySet()) {
+                if (!Json.isJsonInteger(field.getValue())) {
+                    throw new InputError(
+                            "input.from_unreadable",
+                            "the assertions file " + Readiness.pyRepr(path) + " is outside the JSON profile: "
+                                    + "integer_field_float_form at [" + i + "]." + field.getKey() + " (SPEC 8.7).",
+                            "re-run the command that wrote it, or correct the JSON at that line.");
+                }
+            }
+        }
+    }
+
     /** claim.json as {@code sign} appends to it, as Python's {@code _read_sign_claim}: an object whose
      * {@code signatures}, when present, is a list. Read through verify's own strict reader, with
      * verify's wording. */
@@ -2195,13 +2249,22 @@ global options:
         try {
             claim = Verify.readUntrustedJsonFile(claimPath);
         } catch (IllegalArgumentException e) {
-            throw new InputError("sign.claim_malformed", "claim.json is not valid JSON.", fix);
+            throw new InputError("sign.claim_malformed", Json.notValid("claim.json", e), fix);
         }
         if (!claim.isObject()) {
             throw new InputError("sign.claim_malformed", "claim.json is not an object.", fix);
         }
         if (claim.has("signatures") && !claim.get("signatures").isArray()) {
             throw new InputError("sign.claim_malformed", "claim.json's signatures field is not a list.", fix);
+        }
+        ObjectNode body = ((ObjectNode) claim).deepCopy();
+        body.remove("signatures");
+        try {
+            // The signature covers the canonical claim body, so a float is refused here (SPEC 8.7).
+            Canonical.canonicalString(body);
+        } catch (Canonical.CanonicalizationError e) {
+            throw new InputError(
+                    "sign.claim_malformed", "claim.json cannot be put in canonical form: " + e.getMessage() + ".", fix);
         }
         return (ObjectNode) claim;
     }

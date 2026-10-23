@@ -3,7 +3,6 @@ package org.agentce;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -277,7 +276,7 @@ public final class Psp {
             if (in == null) {
                 throw new IllegalStateException("vendored psp-terms.json not on classpath");
             }
-            return Json.parse(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+            return Json.readBundled(in.readAllBytes());
         } catch (IOException e) {
             throw new IllegalStateException("cannot read psp-terms.json: " + e.getMessage(), e);
         }

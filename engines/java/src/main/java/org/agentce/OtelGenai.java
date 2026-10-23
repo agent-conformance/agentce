@@ -5,12 +5,10 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.math.BigInteger;
-import java.nio.charset.CharacterCodingException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -727,22 +725,13 @@ public final class OtelGenai {
             throw new OtelGenaiAdapterError("bad_source_class", resolvedSourceClass);
         }
 
-        byte[] bytes = payload;
-        if (bytes.length >= 3 && (bytes[0] & 0xFF) == 0xEF && (bytes[1] & 0xFF) == 0xBB && (bytes[2] & 0xFF) == 0xBF) {
-            // UTF-8 BOM, matching Python's `utf-8-sig` auto-detection.
-            bytes = Arrays.copyOfRange(bytes, 3, bytes.length);
-        }
-        String text;
-        try {
-            text = Verify.decodeStrict(bytes).toString();
-        } catch (CharacterCodingException e) {
-            throw new OtelGenaiAdapterError("invalid_encoding", "payload is not valid UTF-8");
-        }
         JsonNode document;
         try {
-            document = Json.parse(text);
-        } catch (IllegalArgumentException e) {
-            throw new OtelGenaiAdapterError("invalid_json", e.getMessage());
+            document = Json.readJson(payload, Json.Bom.IGNORE);
+        } catch (Json.JsonProfileError e) {
+            // Bytes that are not UTF-8 at all are a decode failure, not a JSON syntax failure.
+            throw new OtelGenaiAdapterError(
+                    "invalid_utf8".equals(e.rule()) ? "invalid_encoding" : "invalid_json", e.getMessage());
         }
         if (!document.isObject()) {
             throw new OtelGenaiAdapterError("not_otlp", "top-level value is not a JSON object");

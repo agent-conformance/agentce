@@ -95,7 +95,7 @@ public final class Seams {
                 System.err.println("security-view: a fixture file path is required");
                 return ExitCode.INPUT_ERROR.code;
             }
-            JsonNode data = Json.parseFile(Paths.get(args[1]));
+            JsonNode data = readFixture(Paths.get(args[1]));
             ObjectNode activity = (ObjectNode) data.get("activity");
             List<Assertions.Assertion> assertions = new ArrayList<>();
             for (JsonNode a : data.get("assertions")) {
@@ -113,7 +113,7 @@ public final class Seams {
                 System.err.println("auditor-view: a fixture file path is required");
                 return ExitCode.INPUT_ERROR.code;
             }
-            JsonNode data = Json.parseFile(Paths.get(args[1]));
+            JsonNode data = readFixture(Paths.get(args[1]));
             List<Assertions.Assertion> assertions = new ArrayList<>();
             for (JsonNode a : data.get("assertions")) {
                 assertions.add(Assertions.fromJson(a));
@@ -137,7 +137,7 @@ public final class Seams {
                 System.err.println("fail-on-check: a fixture file path is required");
                 return ExitCode.INPUT_ERROR.code;
             }
-            JsonNode data = Json.parseFile(Paths.get(args[1]));
+            JsonNode data = readFixture(Paths.get(args[1]));
             List<Assertions.Assertion> assertions = new ArrayList<>();
             for (JsonNode a : data.get("assertions")) {
                 assertions.add(Assertions.fromJson(a));
@@ -181,7 +181,7 @@ public final class Seams {
             JsonNode adaptArgs;
             try {
                 inputBytes = Files.readAllBytes(dir.resolve("input.json"));
-                adaptArgs = Json.parseFile(dir.resolve("adapt.json"));
+                adaptArgs = Json.readBundled(Files.readAllBytes(dir.resolve("adapt.json")));
             } catch (IOException | RuntimeException e) {
                 System.err.println("otel-genai-fixture: " + e.getMessage());
                 return ExitCode.INPUT_ERROR.code;
@@ -238,4 +238,12 @@ public final class Seams {
         return Json.compact(node);
     }
 
+    /** A seam's fixture file, read as bundled data (the TypeScript seams' readBundled). */
+    private static JsonNode readFixture(Path file) {
+        try {
+            return Json.readBundled(Files.readAllBytes(file));
+        } catch (IOException e) {
+            throw new IllegalArgumentException("cannot read JSON " + file + ": " + e.getMessage(), e);
+        }
+    }
 }

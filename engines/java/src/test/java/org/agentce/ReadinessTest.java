@@ -127,34 +127,43 @@ class ReadinessTest {
             "applicability.jsonl", "{\"drift\": []}",
             "quarantine.jsonl", "{\"record\": \"r\"}");
 
+    /** The NOT READY reason for an unreadable report file; one outside the JSON profile names the rule and
+     * line (SPEC 8.7, 18.184x), as Python's {@code _cannot_read}. */
+    private static String cannotRead(String name, String rule) {
+        return rule == null
+                ? "cannot read report file " + name
+                : "cannot read report file " + name + ": outside the JSON profile: " + rule + " at line 1 (SPEC 8.7)";
+    }
+
     /** LF alone ends a line; any other separator, or a no-break space or byte-order mark, leaves a
-     * line not JSON (18.184n), as in Python and TypeScript. */
+     * line outside the JSON profile (18.184n), naming the rule as in Python and TypeScript (18.184x). */
     @ParameterizedTest
     @ValueSource(strings = {"integrity.jsonl", "applicability.jsonl", "quarantine.jsonl"})
     void jsonlLineOutsideTheLineRuleIsNotReady(String name, @TempDir Path tmp) throws IOException {
         String r = JSONL_RECORD.get(name);
-        Map<String, String> cases = new LinkedHashMap<>();
-        for (String sep : List.of("\u000b", "\u000c", "\u0085", " ", " ", "\r")) {
-            cases.put("joined " + (int) sep.charAt(0), r + sep + r + "\n");
+        Map<String, String[]> cases = new LinkedHashMap<>();
+        cases.put("joined VT", new String[] {r + "\u000b" + r + "\n", "extra_value"});
+        for (String sep : List.of("\u000c", "\u0085", "\u2028", "\u2029", "\r")) {
+            cases.put("joined " + (int) sep.charAt(0), new String[] {r + sep + r + "\n", "jsonl_line_split"});
         }
-        cases.put("lone CR, no LF", r + "\r" + r);
-        cases.put("leading NBSP", " " + r + "\n");
-        cases.put("leading BOM", "﻿" + r + "\n");
-        cases.put("trailing NBSP", r + " \n");
-        cases.put("NBSP-only line", " \n" + r + "\n");
+        cases.put("lone CR, no LF", new String[] {r + "\r" + r, "jsonl_line_split"});
+        cases.put("leading NBSP", new String[] {"\u00a0" + r + "\n", "syntax"});
+        cases.put("leading BOM", new String[] {"\ufeff" + r + "\n", "bom"});
+        cases.put("trailing NBSP", new String[] {r + "\u00a0\n", "extra_value"});
+        cases.put("NBSP-only line", new String[] {"\u00a0\n" + r + "\n", "syntax"});
         int i = 0;
-        for (Map.Entry<String, String> c : cases.entrySet()) {
+        for (Map.Entry<String, String[]> c : cases.entrySet()) {
             Path dir = Files.createDirectories(tmp.resolve("c" + i++));
             writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
-            Files.writeString(dir.resolve(name), c.getValue());
-            assertEquals(List.of("cannot read report file " + name),
+            Files.writeString(dir.resolve(name), c.getValue()[0]);
+            assertEquals(List.of(cannotRead(name, c.getValue()[1])),
                     Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).reasons(), c.getKey());
         }
         Path dir = Files.createDirectories(tmp.resolve("not-utf8"));
         writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
         Files.writeString(dir.resolve(name), r.substring(0, r.length() - 1) + ", \"x\": \"");
         Files.write(dir.resolve(name), new byte[] {(byte) 0xff, '"', '}', '\n'}, java.nio.file.StandardOpenOption.APPEND);
-        assertEquals(List.of("cannot read report file " + name),
+        assertEquals(List.of(cannotRead(name, "invalid_utf8")),
                 Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).reasons(), "not UTF-8");
     }
 
@@ -941,7 +950,10 @@ class ReadinessTest {
         Files.writeString(dir.resolve(parts[0]), parts[1].replace("\\n", "\n"));
         Readiness.Verdict verdict = Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of());
         assertEquals(Readiness.NOT_READY, verdict.verdict());
-        assertEquals(List.of("cannot read report file " + parts[0]), verdict.reasons());
+        // Text that is not JSON at all is outside the JSON profile, which the reason names (18.184x).
+        String body = parts[1].replace("\\n", "\n");
+        boolean notJson = body.isEmpty() || body.equals("{") || body.equals("not json\n");
+        assertEquals(List.of(cannotRead(parts[0], notJson ? "syntax" : null)), verdict.reasons());
     }
 
     @Test
@@ -951,7 +963,7 @@ class ReadinessTest {
         byte[] bytes = java.util.Arrays.copyOf(text, text.length + 1);
         bytes[text.length] = (byte) 0xff;
         Files.write(dir.resolve("coverage.json"), bytes);
-        assertEquals(List.of("cannot read report file coverage.json"),
+        assertEquals(List.of(cannotRead("coverage.json", "invalid_utf8")),
                 Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).reasons());
     }
 

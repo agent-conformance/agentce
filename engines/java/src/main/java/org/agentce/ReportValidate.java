@@ -12,7 +12,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.CharacterCodingException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
@@ -105,7 +104,7 @@ public final class ReportValidate {
                 if (in == null) {
                     throw new IllegalStateException("vendored report schema not on classpath: " + resource);
                 }
-                return Json.parse(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+                return Json.readBundled(in.readAllBytes());
             } catch (IOException e) {
                 throw new IllegalStateException("cannot read vendored report schema " + resource, e);
             }
@@ -340,7 +339,7 @@ public final class ReportValidate {
             if (text == null) {
                 return Map.of();
             }
-            manifest = Json.parse(text);
+            manifest = Json.parseReport(text);
         } catch (CannotRead | IllegalArgumentException e) {
             return Map.of(); // a manifest that cannot be read records nothing here; the schema check reports it
         }
@@ -376,20 +375,18 @@ public final class ReportValidate {
     private static List<String> validateJsonl(String text, String filename) {
         List<String> problems = new ArrayList<>();
         for (Json.Line line : Json.jsonlLines(text)) {
+            JsonNode value;
             try {
-                if (!Json.parseReport(line.text()).isObject()) {
-                    problems.add(filename + ": line " + line.number() + " is not a JSON object");
-                }
+                value = Json.parseReport(line.text(), line.number());
             } catch (IllegalArgumentException e) {
-                problems.add(filename + ": line " + line.number() + " is not valid JSON (" + originalMessage(e) + ")");
+                problems.add(filename + ": " + e.getMessage());
+                continue;
+            }
+            if (!value.isObject()) {
+                problems.add(filename + ": line " + line.number() + " is not a JSON object");
             }
         }
         return problems;
-    }
-
-    private static String originalMessage(IllegalArgumentException e) {
-        String message = e.getMessage();
-        return message != null && message.startsWith("invalid JSON: ") ? message.substring("invalid JSON: ".length()) : message;
     }
 
     /** A minimal RFC 4180 field splitter: exactly what {@code report.csv}'s own writer produces (no
@@ -497,7 +494,7 @@ public final class ReportValidate {
             try {
                 instance = Json.parseReport(text);
             } catch (IllegalArgumentException e) {
-                problems.add(filename + ": invalid JSON (" + originalMessage(e) + ")");
+                problems.add(filename + ": " + e.getMessage());
                 continue;
             }
             if (filename.equals("assertions.json")) {
@@ -536,7 +533,7 @@ public final class ReportValidate {
                 try {
                     Json.parseReport(text);
                 } catch (IllegalArgumentException e) {
-                    problems.add(filename + ": invalid JSON (" + originalMessage(e) + ")");
+                    problems.add(filename + ": " + e.getMessage());
                 }
                 continue;
             }

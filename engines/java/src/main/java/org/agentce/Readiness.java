@@ -10,7 +10,6 @@ import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.CharacterCodingException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
@@ -1236,6 +1235,10 @@ public final class Readiness {
             if (text != null) {
                 return parse.apply(text);
             }
+        } catch (Json.JsonProfileError e) {
+            // The profile rule and line when the file is outside the JSON profile (SPEC 8.7).
+            reasons.add("cannot read report file " + name + ": " + e.getMessage());
+            return empty;
         } catch (IOException | Unreadable e) {
             reasons.add("cannot read report file " + name);
             return empty;
@@ -1249,7 +1252,8 @@ public final class Readiness {
      * (a folder, a dangling link, a link into a folder that can be listed but not entered, a file
      * without read permission) throws {@link IOException}: readiness reports it as a blocking reason
      * rather than reading it as absent, which would let a coverage gap or an integrity break stop
-     * blocking. Text that is not UTF-8 is unreadable the same way (as Python's strict decode makes it). */
+     * blocking. Bytes that are not UTF-8, or a byte-order mark, put the file outside the JSON profile
+     * (SPEC 8.7). */
     private static String readReportFile(Path path) throws IOException {
         try {
             Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
@@ -1259,7 +1263,7 @@ public final class Readiness {
         if (!Files.isRegularFile(path)) {
             throw new IOException(path + " is not a regular file");
         }
-        return Files.readString(path, StandardCharsets.UTF_8);
+        return Json.decodeProfile(Files.readAllBytes(path), Json.Bom.REFUSE);
     }
 
     /** A report file whose content is not JSON of the shape readiness reads. */
@@ -1272,8 +1276,14 @@ public final class Readiness {
     }
 
     private static JsonNode parseJson(String text) {
+        return parseJson(text, null);
+    }
+
+    private static JsonNode parseJson(String text, Integer line) {
         try {
-            return Json.parseReport(text);
+            return Json.parseReport(text, line);
+        } catch (Json.JsonProfileError e) {
+            throw e;
         } catch (IllegalArgumentException e) {
             throw new Unreadable(e.getMessage());
         }
@@ -1303,7 +1313,7 @@ public final class Readiness {
     }
 
     private static List<JsonNode> parseJsonl(String text) {
-        return objects(Json.jsonlLines(text).stream().map(line -> parseJson(line.text())).toList());
+        return objects(Json.jsonlLines(text).stream().map(line -> parseJson(line.text(), line.number())).toList());
     }
 
     /** Every status integrity-result.schema.json allows; a record with no status or another one is unreadable. */
@@ -1416,7 +1426,7 @@ public final class Readiness {
     static String dataFileProblem(String name, String text) {
         try {
             DATA_FILE_READERS.get(name).apply(text);
-        } catch (Unreadable e) {
+        } catch (Unreadable | Json.JsonProfileError e) {
             return e.getMessage();
         }
         return null;

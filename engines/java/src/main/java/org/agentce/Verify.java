@@ -413,7 +413,7 @@ public final class Verify {
     public static TrustRoot loadTrustRoot(Path path) {
         JsonNode data;
         try {
-            data = readUntrustedJsonFile(path);
+            data = readUntrustedJsonFile(path, Json.Bom.IGNORE);
         } catch (JsonTooDeep e) {
             String tooDeep = refusal("verify.json_too_deep", "what", "it", "limit", String.valueOf(MAX_JSON_DEPTH))
                     .getMessage();
@@ -441,7 +441,7 @@ public final class Verify {
             if (in == null) {
                 throw new IllegalStateException("vendored trust root not on classpath");
             }
-            return TrustRoot.fromDict(Json.parse(new String(in.readAllBytes(), StandardCharsets.UTF_8)));
+            return TrustRoot.fromDict(Json.readBundled(in.readAllBytes()));
         } catch (IOException e) {
             throw new IllegalStateException("cannot read vendored trust root", e);
         }
@@ -559,59 +559,36 @@ public final class Verify {
 
 
     /** Mirrors {@code signing.parse_untrusted_json}: parse JSON {@code verify} reads from an untrusted
-     * file or signed payload, or throw {@link IllegalArgumentException}. Strict UTF-8 with no
-     * byte-order mark, standard JSON only, containers nested at most {@link #MAX_JSON_DEPTH} deep, and
-     * every string and key well-formed Unicode. Callers turn the exception into their own fixed reason
-     * text; its message is never shown. A document too deep throws {@link JsonTooDeep}, whatever else
-     * is wrong with it. */
-    static JsonNode parseUntrustedJson(byte[] raw) {
+     * file or signed payload under the JSON profile (SPEC 8.7, {@link Json#readJson}), or throw {@link
+     * IllegalArgumentException} whose cause is the {@link Json.JsonProfileError} naming the rule. {@code
+     * bom} is {@code REFUSE} for a file an engine wrote (claim.json, envelopes) and {@code IGNORE} for one
+     * an adopter's tool may have written (a bundle manifest, a trust root). A document too deep throws
+     * {@link JsonTooDeep}, whatever else is wrong with it. */
+    static JsonNode parseUntrustedJson(byte[] raw, Json.Bom bom) {
         if (Json.tooDeep(raw)) {
             throw new JsonTooDeep();
         }
-        JsonNode value;
         try {
-            value = Json.parse(decodeStrict(raw).toString());
-        } catch (CharacterCodingException | RuntimeException e) {
+            return Json.readJson(raw, bom);
+        } catch (Json.JsonProfileError e) {
             throw new IllegalArgumentException("not readable JSON", e);
         }
-        if (value == null || value.isMissingNode()) {
-            throw new IllegalArgumentException("not readable JSON");
-        }
-        java.util.ArrayDeque<JsonNode> stack = new java.util.ArrayDeque<>();
-        stack.push(value);
-        while (!stack.isEmpty()) {
-            JsonNode node = stack.pop();
-            if (node.isTextual()) {
-                requireWellFormed(node.textValue());
-            } else if (node.isContainerNode()) {
-                if (node.isObject()) {
-                    node.fieldNames().forEachRemaining(Verify::requireWellFormed);
-                }
-                for (JsonNode child : node) {
-                    stack.push(child);
-                }
-            }
-        }
-        return value;
     }
 
-    static JsonNode readUntrustedJsonFile(Path path) {
+    static JsonNode parseUntrustedJson(byte[] raw) {
+        return parseUntrustedJson(raw, Json.Bom.REFUSE);
+    }
+
+    static JsonNode readUntrustedJsonFile(Path path, Json.Bom bom) {
         try {
-            return parseUntrustedJson(Files.readAllBytes(path));
+            return parseUntrustedJson(Files.readAllBytes(path), bom);
         } catch (IOException e) {
             throw new IllegalArgumentException("not readable JSON", e);
         }
     }
 
-    private static void requireWellFormed(String text) {
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (Character.isHighSurrogate(c) && i + 1 < text.length() && Character.isLowSurrogate(text.charAt(i + 1))) {
-                i++;
-            } else if (Character.isSurrogate(c)) {
-                throw new IllegalArgumentException("not readable JSON");
-            }
-        }
+    static JsonNode readUntrustedJsonFile(Path path) {
+        return readUntrustedJsonFile(path, Json.Bom.REFUSE);
     }
 
     /** Mirrors {@code signing.describe_untrusted}: how a refusal names a value read from an untrusted

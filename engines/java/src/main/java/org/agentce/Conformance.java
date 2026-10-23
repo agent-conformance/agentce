@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
@@ -57,11 +56,9 @@ public final class Conformance {
      * objects. One it cannot read, or of another shape, is refused {@code input.corpus_unreadable},
      * never a crash, as Python's {@code run_ecs}. */
     private static JsonNode readManifest(Path manifestPath, Path corpusDir) {
-        String text;
+        byte[] raw;
         try {
-            text = Files.readString(manifestPath, StandardCharsets.UTF_8);
-        } catch (CharacterCodingException e) {
-            text = null;
+            raw = Files.readAllBytes(manifestPath);
         } catch (IOException e) {
             String why = e instanceof AccessDeniedException ? "Permission denied" : e.getMessage();
             throw new InputError(
@@ -69,13 +66,14 @@ public final class Conformance {
                     manifestPath + " in the corpus folder " + corpusDir + " could not be read (" + why + ").",
                     "make the corpus folder readable and enterable, then re-run.");
         }
-        JsonNode manifest = null;
-        if (text != null) {
-            try {
-                manifest = Json.parse(text);
-            } catch (IllegalArgumentException e) {
-                manifest = null;
-            }
+        JsonNode manifest;
+        try {
+            manifest = Json.readJson(raw, Json.Bom.IGNORE);
+        } catch (Json.JsonProfileError e) {
+            throw new InputError(
+                    "input.corpus_unreadable",
+                    manifestPath + " in the corpus folder " + corpusDir + " is " + e.getMessage() + ".",
+                    "regenerate the corpus manifest, then re-run.");
         }
         boolean shaped = manifest != null && manifest.isObject();
         if (shaped && manifest.has("projects")) {

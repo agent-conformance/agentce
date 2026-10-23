@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -60,7 +59,7 @@ public final class BlindSpots {
                 if (in == null) {
                     throw new IllegalStateException("vendored event_producers.json not on classpath");
                 }
-                JsonNode root = Json.parse(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+                JsonNode root = Json.readBundled(in.readAllBytes());
                 Map<String, Map<String, String>> parsed = new LinkedHashMap<>();
                 root.fields().forEachRemaining(entry -> {
                     Map<String, String> byAdapter = new LinkedHashMap<>();

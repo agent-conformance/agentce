@@ -3,7 +3,6 @@ package org.agentce;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -104,7 +103,7 @@ public final class Argv {
                 if (in == null) {
                     throw new IllegalStateException("missing classpath resource " + path);
                 }
-                loaded = Json.parse(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+                loaded = Json.readBundled(in.readAllBytes());
             } catch (IOException e) {
                 throw new IllegalStateException("cannot read classpath resource " + path + ": " + e.getMessage(), e);
             }

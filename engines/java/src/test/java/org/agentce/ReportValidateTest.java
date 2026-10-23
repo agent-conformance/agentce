@@ -104,7 +104,7 @@ class ReportValidateTest {
         freshFullReport(out);
         Files.writeString(out.resolve("manifest.json"), "not json{");
         List<String> problems = ReportValidate.validateReport(out);
-        assertTrue(problems.stream().anyMatch(p -> p.startsWith("manifest.json: invalid JSON")), problems.toString());
+        assertTrue(problems.stream().anyMatch(p -> p.equals("manifest.json: outside the JSON profile: syntax at line 1 (SPEC 8.7)")), problems.toString());
     }
 
     @Test
@@ -267,7 +267,7 @@ class ReportValidateTest {
         Files.writeString(driftPath, "{\"subject\": \"x\"}\nnot json at all\n");
         List<String> problems = ReportValidate.validateReport(out);
         assertTrue(
-                problems.stream().anyMatch(p -> p.startsWith("runtime_drift.jsonl: line 2 is not valid JSON")),
+                problems.stream().anyMatch(p -> p.equals("runtime_drift.jsonl: outside the JSON profile: syntax at line 2 (SPEC 8.7)")),
                 problems.toString());
     }
 
@@ -284,10 +284,11 @@ class ReportValidateTest {
         assertEquals(List.of(), ReportValidate.validateReport(out));
         Files.writeString(driftPath, "{\"subject\": \"x\"}\n\n{\"a\": 1}\u000b{\"b\": 2}\n ");
         assertEquals(
-                List.of("runtime_drift.jsonl: line 3 is not valid JSON", "runtime_drift.jsonl: line 4 is not valid JSON"),
+                List.of(
+                        "runtime_drift.jsonl: outside the JSON profile: extra_value at line 3 (SPEC 8.7)",
+                        "runtime_drift.jsonl: outside the JSON profile: jsonl_line_split at line 4 (SPEC 8.7)"),
                 ReportValidate.validateReport(out).stream()
                         .filter(p -> p.startsWith("runtime_drift.jsonl"))
-                        .map(p -> p.split(" \\(")[0])
                         .toList());
     }
 

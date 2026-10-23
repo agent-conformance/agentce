@@ -46,7 +46,7 @@ public final class Diff {
         if (!value.isTextual()) {
             throw new InputError(
                     "input.diff_field_not_string",
-                    "assertion field '" + field + "' must be a string, not " + Json.pretty(value) + ".",
+                    "assertion field '" + field + "' must be a string, not " + Json.renderValue(value) + ".",
                     "emit control/subject/outcome as JSON strings.");
         }
         return value.textValue();
