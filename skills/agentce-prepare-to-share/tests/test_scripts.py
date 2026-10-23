@@ -48,6 +48,7 @@ def _report(
     )
     (out / "coverage.json").write_text(json.dumps({"subjects": {}}), encoding="utf-8")
     (out / "applicability.jsonl").write_text("", encoding="utf-8")
+    (out / "quarantine.jsonl").write_text("", encoding="utf-8")
     return out
 
 

@@ -87,6 +87,7 @@ def _report_dir(
         json.dumps({"subjects": {}}), encoding="utf-8"
     )
     (report / "applicability.jsonl").write_text("", encoding="utf-8")
+    (report / "quarantine.jsonl").write_text("", encoding="utf-8")
     return report
 
 
@@ -307,8 +308,14 @@ def _float_vectors(directory: Path) -> list[tuple[str, list[str]]]:
     ]
 
 
-#: The stage-4 files readiness reads; each is deleted in turn from an otherwise clean report (18.166).
-REPORT_FILES = ("integrity.jsonl", "coverage.json", "applicability.jsonl", "assertions.json")
+#: The stage-4 files readiness reads; each is deleted in turn from an otherwise clean report (18.166, 18.184q).
+REPORT_FILES = (
+    "integrity.jsonl",
+    "coverage.json",
+    "applicability.jsonl",
+    "assertions.json",
+    "quarantine.jsonl",
+)
 
 
 def _absent_vectors(directory: Path) -> list[tuple[str, list[str]]]:
