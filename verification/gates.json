@@ -4180,6 +4180,12 @@
           "file": "engines/java/src/main/java/org/agentce/Coverage.java",
           "search": "        if (!denominator.covers.isEmpty()) {\n            counts.keySet().retainAll(denominator.covers);\n",
           "replace": "        if (denominator.covers == null) {\n            counts.keySet().retainAll(denominator.covers);\n"
+        },
+        {
+          "description": "TypeScript reads a denominator manifest whose root is not an object as declaring no counts, so a garbled declared count falls through to the source's own events (18.184r)",
+          "file": "engines/typescript/src/coverage.ts",
+          "search": "    if (!isRecord(data) || data instanceof NonCanonicalNumber) {\n      throw invalidManifest(name, \"is not a JSON object\");\n    }\n",
+          "replace": "    if (!isRecord(data) || data instanceof NonCanonicalNumber) {\n      return {};\n    }\n"
         }
       ],
       "fix_hint": "Run verification/gates/coverage_unknown.sh; it names the engine, the case, what it gave and what was expected. The rule is the coverage post-pass in each engine's assess (assess.py _coverage_unknown, _uncovered and COVERAGE_FAMILIES; coverageUnknown and uncovered in assess.ts and Assess.java) over compute_coverage's per-subject coverage_status; what counts as an independent denominator, and which events leave the observed count, are coverage.py _independent and the yardstick set in compute_coverage (a denominator's own records of each type it covers and counts) and their ports in coverage.ts and Coverage.java."
