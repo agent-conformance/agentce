@@ -130,7 +130,7 @@ public final class Canonical {
                 }
                 out.append(integer.toString());
             } else {
-                throw new CanonicalizationError("non_integer_number", value.asText());
+                throw new CanonicalizationError("non_integer_number", Json.renderNumber(value));
             }
         } else if (value.isTextual()) {
             serialiseString(value.textValue(), out);

@@ -72,6 +72,20 @@ public final class Json {
             }
             return token;
         }
+
+        /** A float token reads as a {@code BigDecimal}, which has no negative zero, so {@code -0.0} would read
+         * as {@code 0.0}. Jackson builds a double node for a token it reports as NaN; reporting a negative
+         * zero that way keeps its sign (SPEC 8.7 renders it {@code -0.0}, as Python's {@code repr} does). */
+        @Override
+        public boolean isNaN() throws IOException {
+            if (delegate.currentToken() == JsonToken.VALUE_NUMBER_FLOAT) {
+                String text = delegate.getText();
+                if (text.startsWith("-") && text.substring(1).split("[eE]", 2)[0].matches("[0.]+")) {
+                    return true;
+                }
+            }
+            return delegate.isNaN();
+        }
     }
 
     /** The node factory for building output trees. */
@@ -790,8 +804,17 @@ public final class Json {
         }
         String sign = v < 0 ? "-" : "";
         double abs = Math.abs(v);
-        // Double.toString gives the shortest round-trip digits (JDK 19+); reformat them.
-        java.math.BigDecimal shortest = new java.math.BigDecimal(Double.toString(abs)).stripTrailingZeros();
+        // The fewest significant digits, correctly rounded from the exact binary value, that read back to
+        // the same double (Python's repr; Double.toString gives 4.9E-324 where repr gives 5e-324).
+        java.math.BigDecimal exactAbs = new java.math.BigDecimal(abs);
+        java.math.BigDecimal shortest = exactAbs;
+        for (int p = 1; p <= 17; p++) {
+            shortest = exactAbs.round(new java.math.MathContext(p, java.math.RoundingMode.HALF_EVEN));
+            if (shortest.doubleValue() == abs) {
+                break;
+            }
+        }
+        shortest = shortest.stripTrailingZeros();
         String digits = shortest.unscaledValue().toString();
         int e = digits.length() - shortest.scale() - 1;
         if (abs >= 1e16 || abs < 1e-4) {
