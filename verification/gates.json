@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.118.0",
+  "suite_version": "0.119.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -1906,6 +1906,66 @@
           "file": ".github/workflows/three-engine.yml",
           "search": "    name: readiness, sign and report --validate agree across engines\n",
           "replace": "    name: readiness, sign and report --validate agree across engines\n    needs: [compare]\n"
+        }
+      ]
+    },
+    {
+      "id": "VG-YAML-PROFILE",
+      "title": "every engine reads YAML under the SPEC 8.7 profile: the shared case table keeps a refuse case for each rule, and each engine's case-table test refuses every out-of-profile case with the file role's key, rule and line and reads every in-profile case (18.184u)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/yaml_profile.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "java"
+      ],
+      "timeout_s": 600,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "spec/rules/yaml-profile-cases.json has a refuse case for every rule it names a hint for, and tests/test_yaml_profile.py (Python), src/yamlProfile.test.ts (TypeScript) and org.agentce.YamlProfileTest (Java) pass over every case in the table",
+        "fail": "a rule loses its last refuse case, or an engine reads an out-of-profile case, refuses an in-profile one, or names a different rule or line"
+      },
+      "fix_hint": "run verification/gates/yaml_profile.sh and read the first failing engine test; each engine's profile check is engines/python/agentce/yaml_profile.py, engines/typescript/src/yamlProfile.ts and engines/java/src/main/java/org/agentce/YamlProfile.java, and the cases are spec/rules/yaml-profile-cases.json",
+      "faults": [
+        {
+          "description": "Python skips the anchor rule: it steps over the anchor and its name",
+          "file": "engines/python/agentce/yaml_profile.py",
+          "search": "            if ch == \"&\":\n                raise self.fail(\"anchor\")\n",
+          "replace": "            if ch == \"&\":\n                i = line.find(\" \", i) if \" \" in line[i:] else len(line)\n                continue\n"
+        },
+        {
+          "description": "TypeScript skips the yaml11_bool rule",
+          "file": "engines/typescript/src/yamlProfile.ts",
+          "search": "  [\"yaml11_bool\", YAML11_BOOL],\n",
+          "replace": ""
+        },
+        {
+          "description": "Java's depth bound becomes 101",
+          "file": "engines/java/src/main/java/org/agentce/YamlProfile.java",
+          "search": "static final int MAX_DEPTH = 100;",
+          "replace": "static final int MAX_DEPTH = 101;"
+        },
+        {
+          "description": "TypeScript's tab rule ignores a tab in a comment inside a flow collection",
+          "file": "engines/typescript/src/yamlProfile.ts",
+          "search": "    if (line.indexOf(\"\\t\", i) !== -1) {",
+          "replace": "    if (this.flow.length === 0 && line.indexOf(\"\\t\", i) !== -1) {"
+        },
+        {
+          "description": "Java's flow_line_not_indented rule reads a flow line at its key's indent",
+          "file": "engines/java/src/main/java/org/agentce/YamlProfile.java",
+          "search": "if (!flow.isEmpty() && col <= flowIndent) {",
+          "replace": "if (!flow.isEmpty() && col < flowIndent) {"
+        },
+        {
+          "description": "a refuse case in the table is flipped to an accept case",
+          "file": "spec/rules/yaml-profile-cases.json",
+          "search": "\"id\": \"anchor-1\",\n      \"rule\": \"anchor\",\n      \"expect\": \"refuse\",",
+          "replace": "\"id\": \"anchor-1\",\n      \"rule\": \"anchor\",\n      \"expect\": \"accept\","
         }
       ]
     },

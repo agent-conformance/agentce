@@ -948,6 +948,13 @@
       "rule": "no_false_positive",
       "expect": "accept",
       "yaml": "a: true\nb: null\nc: ~\n"
+    },
+    {
+      "id": "tab-132",
+      "rule": "tab",
+      "expect": "refuse",
+      "line": 1,
+      "yaml": "k: [a, # c\td\n  b]\n"
     }
   ]
 }

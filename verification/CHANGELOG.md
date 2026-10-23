@@ -3,6 +3,15 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.119.0
+
+- `VG-YAML-PROFILE` (18.184u, added): every engine reads YAML under the SPEC 8.7 profile. The gate checks that the
+  shared case table `spec/rules/yaml-profile-cases.json` keeps a refuse case for each rule, then runs each engine's
+  case-table test, which reads every case through that engine's real loading path: an out-of-profile case is refused
+  with the file role's key and a message naming the rule and line, and an in-profile case reads.
+- `VG-RECORDS-PROFILE-ROUND-TRIP` and `VG-COVERAGE-UNKNOWN` (18.184u, changed): the profiles each gate builds are
+  written without anchors, so the files stay inside the SPEC 8.7 profile the engines now read them under.
+
 ## 0.118.0
 
 - `VG-FAST-TIER-REPORT-FILE-PARITY` (18.184v, added): `three-engine.yml`, which runs on every phase push, runs the
