@@ -17,8 +17,8 @@ const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
 export class OtelGenaiAdapterError extends Error {
   readonly reason: string;
 
-  constructor(reason: string, detail = "") {
-    super(detail ? `${reason}: ${detail}` : reason);
+  constructor(reason: string, detail = "", options?: { cause?: unknown }) {
+    super(detail ? `${reason}: ${detail}` : reason, options);
     this.reason = reason;
     this.name = "OtelGenaiAdapterError";
   }
@@ -763,6 +763,7 @@ export function adapt(payload: Uint8Array, opts: AdaptOptions): AdaptResult {
     throw new OtelGenaiAdapterError(
       exc.rule === "invalid_utf8" ? "invalid_encoding" : "invalid_json",
       exc.message,
+      { cause: exc },
     );
   }
   if (!isPlainObject(document)) {

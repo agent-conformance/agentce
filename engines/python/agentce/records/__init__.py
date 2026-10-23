@@ -32,7 +32,7 @@ from ..errors import InputError
 from ..outputs import OUT_DIR, UNREACHABLE, write_file
 from ..ingest import _max_nesting
 from ..profile import Profile
-from ..safe_json import jsonl_records
+from ..safe_json import JsonProfileError, jsonl_records
 from ..yaml_profile import scalar_rule
 from . import otel_genai
 
@@ -317,14 +317,28 @@ def _read(path: Path, subject: str) -> _FileRead | str:
         raw = path.read_bytes()
     except OSError as exc:
         return f"could not be read: {exc.strerror}"
-    documents = [(1, raw)] if path.suffix.lower() == ".json" else jsonl_records(raw)
+    jsonl = path.suffix.lower() != ".json"
+    documents = jsonl_records(raw) if jsonl else [(1, raw)]
     read = _FileRead()
     for number, document in documents:
         try:
             read.results.append(_adapt(document, subject))
         except ValueError as exc:
-            read.bad_lines.append((number, str(exc)))
+            read.bad_lines.append(
+                (number, _at_file_line(exc, number) if jsonl else str(exc))
+            )
     return read
+
+
+def _at_file_line(exc: ValueError, number: int) -> str:
+    """``exc``'s reason with a JSON profile rule placed at the file's line ``number``: a JSON Lines record
+    is one line, so the reader's own count is always 1."""
+    adapter = exc.__cause__
+    if isinstance(adapter, otel_genai.AdapterError) and isinstance(
+        adapter.__cause__, JsonProfileError
+    ):
+        return f"{adapter.reason}: {JsonProfileError(adapter.__cause__.rule, number)}"
+    return str(exc)
 
 
 def scan(

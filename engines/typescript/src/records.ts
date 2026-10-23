@@ -20,7 +20,7 @@ import { DEFAULT_LENS } from "./bundled";
 import { CanonicalizationError, canonicalString } from "./canonical";
 import { InputError } from "./errors";
 import { maxNesting } from "./ingest";
-import { jsonlByteRecords } from "./json";
+import { JsonProfileError, jsonlByteRecords } from "./json";
 import { type AdaptResult, OtelGenaiAdapterError, adapt } from "./otelGenai";
 import { writeFile } from "./outputs";
 import { type Profile, profileFromDict } from "./profile";
@@ -227,6 +227,16 @@ export function rawDepth(payload: Uint8Array): number {
 /** Why a document is not a trace export, as Python's `_adapt` raises it. */
 class NotRecord extends Error {}
 
+/** `exc`'s reason with a JSON profile rule placed at the file's line `number`: a JSON Lines record is one
+ * line, so the reader's own count is always 1. Mirrors Python's `_at_file_line`. */
+function atFileLine(exc: NotRecord, number: number): string {
+  const adapter = exc.cause;
+  if (adapter instanceof OtelGenaiAdapterError && adapter.cause instanceof JsonProfileError) {
+    return `${adapter.reason}: ${new JsonProfileError(adapter.cause.rule, number).message}`;
+  }
+  return exc.message;
+}
+
 /** Adapt one OTLP/JSON document; throw {@link NotRecord} with the reason when it is not a trace export. */
 function adaptDocument(payload: Uint8Array, subject: string): AdaptResult {
   if (rawDepth(payload) > MAX_RECORD_DEPTH) {
@@ -243,7 +253,7 @@ function adaptDocument(payload: Uint8Array, subject: string): AdaptResult {
   } catch (exc) {
     if (exc instanceof OtelGenaiAdapterError) {
       // A document outside the JSON profile names the rule and line, the same in every engine (SPEC 8.7).
-      throw new NotRecord(exc.message);
+      throw new NotRecord(exc.message, { cause: exc });
     }
     if (exc instanceof CanonicalizationError) {
       throw new NotRecord(exc.message);
@@ -405,8 +415,8 @@ function readRecordFile(path: string, subject: string): FileRead | string {
   } catch (err) {
     return `could not be read: ${strerror(err)}`;
   }
-  const documents: Array<[number, Uint8Array]> =
-    suffix(basename(path)) === ".json" ? [[1, raw]] : jsonlByteRecords(raw);
+  const jsonl = suffix(basename(path)) !== ".json";
+  const documents: Array<[number, Uint8Array]> = jsonl ? jsonlByteRecords(raw) : [[1, raw]];
   const read: FileRead = { results: [], badLines: [] };
   for (const [number, document] of documents) {
     try {
@@ -415,7 +425,7 @@ function readRecordFile(path: string, subject: string): FileRead | string {
       if (!(exc instanceof NotRecord)) {
         throw exc;
       }
-      read.badLines.push([number, exc.message]);
+      read.badLines.push([number, jsonl ? atFileLine(exc, number) : exc.message]);
     }
   }
   return read;

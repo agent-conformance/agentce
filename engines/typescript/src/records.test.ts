@@ -310,7 +310,7 @@ test("JSON Lines split at LF alone (a CRLF's CR is dropped, a lone CR is not a l
   assert.deepEqual(summary.unrecognised_lines[19], {
     path: "bad.jsonl",
     line: 20,
-    reason: "invalid_json: outside the JSON profile: syntax at line 1 (SPEC 8.7)",
+    reason: "invalid_json: outside the JSON profile: syntax at line 20 (SPEC 8.7)",
   });
 });
 

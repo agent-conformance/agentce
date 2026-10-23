@@ -542,18 +542,22 @@ PINNED_NOT_READ = {
         "not read: deep.json: nested too deeply to parse safely",
         "not read: nest.jsonl line 2: nested too deeply to parse safely",
     ],
+    # SPEC 8.7: a document outside the JSON profile names the rule and the file line.
     "strings": [
-        "not read: empty.json: invalid_json: not valid JSON",
-        "not read: junk.json: invalid_json: not valid JSON",
-        "not read: latin1.json: invalid_encoding: not valid UTF-8",
-        "not read: lone-agent.json: invalid_encoding: a string holds a lone surrogate, which "
-        "UTF-8 cannot carry",
-        "not read: lone-service.json: invalid_encoding: a string holds a lone surrogate, which "
-        "UTF-8 cannot carry",
-        "not read: nan.json: not_otlp: top-level value is not a JSON object",
+        "not read: empty.json: invalid_json: outside the JSON profile: syntax at line 1 (SPEC 8.7)",
+        "not read: inf-tokens.json: invalid_json: outside the JSON profile: infinity at line 1 (SPEC 8.7)",
+        "not read: junk.json: invalid_json: outside the JSON profile: syntax at line 1 (SPEC 8.7)",
+        "not read: latin1.json: invalid_encoding: outside the JSON profile: invalid_utf8 at line 1 (SPEC 8.7)",
+        "not read: lone-agent.json: invalid_json: outside the JSON profile: lone_surrogate at line 1 (SPEC 8.7)",
+        "not read: lone-dropped.json: invalid_json: outside the JSON profile: lone_surrogate at line 1 (SPEC 8.7)",
+        "not read: lone-service.json: invalid_json: outside the JSON profile: lone_surrogate at line 1 (SPEC 8.7)",
+        "not read: nan-attr.json: invalid_json: outside the JSON profile: nan at line 1 (SPEC 8.7)",
+        "not read: nan-field.json: invalid_json: outside the JSON profile: nan at line 1 (SPEC 8.7)",
+        "not read: nan.json: invalid_json: outside the JSON profile: nan at line 1 (SPEC 8.7)",
     ],
     "lines": [
-        f"not read: bad25.jsonl line {n}: invalid_json: not valid JSON"
+        f"not read: bad25.jsonl line {n}: invalid_json: outside the JSON profile: syntax at line {n} "
+        "(SPEC 8.7)"
         for n in range(1, 21)
     ],
     "compressed": [

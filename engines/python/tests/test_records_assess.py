@@ -1393,3 +1393,20 @@ def test_a_long_one_line_key_is_written_as_a_plain_key_inside_the_yaml_profile()
     assert (
         yaml.dump({key: "v"}, Dumper=_ProfileDumper, sort_keys=False) == f"{key}: v\n"
     )
+
+
+def test_a_json_lines_record_outside_the_profile_names_its_file_line(
+    tmp_path: Path,
+) -> None:
+    """A JSON Lines record is one line, so the profile rule is placed at the file's line (SPEC 8.7)."""
+    path = tmp_path / "bad.jsonl"
+    path.write_bytes(b'{"resourceSpans":[]}\n{bad\n\xff\n')
+    read = records._read(path, "s")
+    assert not isinstance(read, str)
+    assert read.bad_lines[1:] == [
+        (2, "invalid_json: outside the JSON profile: syntax at line 2 (SPEC 8.7)"),
+        (
+            3,
+            "invalid_encoding: outside the JSON profile: invalid_utf8 at line 3 (SPEC 8.7)",
+        ),
+    ]
