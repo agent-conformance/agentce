@@ -23,7 +23,7 @@ import {
   unreadableError,
   unreadableRel,
 } from "./errors";
-import { NonCanonicalNumber, parseJson } from "./json";
+import { MAX_JSON_DEPTH, NonCanonicalNumber, parseJson, tooDeep } from "./json";
 import { pyTruthy } from "./readiness";
 import {
   coveredFiles,
@@ -170,9 +170,9 @@ function* trustEntries(
   }
 }
 
-/** The deepest container nesting {@link parseUntrustedJson} accepts (mirrors `signing.MAX_JSON_DEPTH`,
- * Jackson's own default); all three engines enforce it with the same byte pre-scan. */
-export const MAX_JSON_DEPTH = 1000;
+/** The deepest container nesting {@link parseUntrustedJson} accepts (`json.ts`, mirrors
+ * `safe_json.MAX_JSON_DEPTH`). */
+export { MAX_JSON_DEPTH };
 
 /** The generic text of the untrusted parser's own refusals; it names no parser error. */
 const NOT_READABLE_JSON = "not readable JSON";
@@ -183,34 +183,6 @@ export class JsonTooDeep extends Error {
   constructor() {
     super(NOT_READABLE_JSON);
   }
-}
-
-/** Whether `raw` opens more than {@link MAX_JSON_DEPTH} containers at once, counting `[` and `{` up and
- * `]` and `}` down outside strings (a backslash in a string skips the next byte). Run before parsing,
- * so depth is found first whatever else is wrong with the bytes. Mirrors `signing._too_deep`. */
-function tooDeep(raw: Buffer): boolean {
-  let depth = 0;
-  let inString = false;
-  for (let i = 0; i < raw.length; i++) {
-    const byte = raw[i];
-    if (inString) {
-      if (byte === 0x5c) {
-        i++;
-      } else if (byte === 0x22) {
-        inString = false;
-      }
-    } else if (byte === 0x22) {
-      inString = true;
-    } else if (byte === 0x5b || byte === 0x7b) {
-      depth++;
-      if (depth > MAX_JSON_DEPTH) {
-        return true;
-      }
-    } else if (byte === 0x5d || byte === 0x7d) {
-      depth--;
-    }
-  }
-  return false;
 }
 
 const LONE_SURROGATE = /[\uD800-\uDFFF]/u;

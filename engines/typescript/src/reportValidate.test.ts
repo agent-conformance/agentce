@@ -23,7 +23,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { quickstartDir } from "./bundled";
 import { validateReport } from "./reportValidate";
-import { runJson } from "./testSupport";
+import { REPORT_FILE_RULE_CASES, ruleCaseContent, runJson } from "./testSupport";
 
 const ENGINE = join(__dirname, "..");
 const REPO = join(ENGINE, "..", "..");
@@ -743,11 +743,8 @@ test("18.167: a recorded data file that went missing, and one that does not pars
     ]);
     writeFileSync(join(out, "integrity.jsonl"), "{}\nnot json\n");
     writeFileSync(join(out, "coverage.json"), "{");
-    const problems = validateReport(out).map((p) => p.split(" (")[0]);
-    assert.deepEqual(problems, [
-      "integrity.jsonl: line 2 is not valid JSON",
-      "coverage.json: invalid JSON",
-    ]);
+    const problems = validateReport(out).map((p) => p.split(": cannot be read: ")[0]);
+    assert.deepEqual(problems, ["integrity.jsonl", "coverage.json"]);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
@@ -762,5 +759,27 @@ test("18.167: a failed validation names its key, each problem and a fix", () => 
     assert.equal(envelope.valid, false);
   } finally {
     rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test("report --validate refuses a data file readiness cannot read, and only such a file (18.184q)", () => {
+  const base = freshFullReport();
+  try {
+    for (const ruleCase of REPORT_FILE_RULE_CASES) {
+      if (ruleCase.validate === null) {
+        continue;
+      }
+      const out = mkdtempSync(join(tmpdir(), "agentce-report-file-rule-"));
+      try {
+        cpSync(base, out, { recursive: true });
+        writeFileSync(join(out, ruleCase.file), ruleCaseContent(ruleCase) ?? "");
+        const named = validateReport(out).filter((p) => p.startsWith(`${ruleCase.file}:`));
+        assert.equal(named.length > 0, ruleCase.validate === "refused", `${ruleCase.id}: ${named}`);
+      } finally {
+        rmSync(out, { recursive: true, force: true });
+      }
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true });
   }
 });

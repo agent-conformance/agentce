@@ -56,12 +56,21 @@ const NEEDS_TOKEN_SCAN = /[0-9][.eE]|[0-9]{16}/;
 export const MAX_INT_STR_DIGITS = 4300;
 const NUMBER_TOKEN = /-?(?:0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?/y;
 
+interface ReaderOptions {
+  /** Read `NaN`, `Infinity` and `-Infinity` as Python's `json.loads` does. */
+  readonly pythonConstants?: boolean;
+  /** Refuse a key written twice in one object, compared decoded (`"st\u0061tus"` repeats `"status"`). */
+  readonly uniqueKeys?: boolean;
+  /** Return every number as `JSON.parse` would, never as a {@link NonCanonicalNumber}. */
+  readonly plainNumbers?: boolean;
+}
+
 class Reader {
   private pos = 0;
 
   constructor(
     private readonly text: string,
-    private readonly pythonConstants = false,
+    private readonly options: ReaderOptions = {},
   ) {}
 
   fail(what: string): never {
@@ -109,7 +118,7 @@ class Reader {
         return result;
       }
     }
-    if (this.pythonConstants) {
+    if (this.options.pythonConstants === true) {
       // Python's `json.loads` reads these three words as floats; the canonical form refuses a float,
       // so each is kept as a non-canonical number carrying Python's own `repr` of it.
       for (const [word, repr] of PYTHON_CONSTANTS) {
@@ -130,11 +139,15 @@ class Reader {
     }
     const token = match[0];
     this.pos += token.length;
-    if (match[1] !== undefined || match[2] !== undefined) {
+    const fraction = match[1] !== undefined || match[2] !== undefined;
+    if (fraction && this.options.plainNumbers !== true) {
       return new NonCanonicalNumber(token, "non_integer_number");
     }
-    if (token.length - (token[0] === "-" ? 1 : 0) > MAX_INT_STR_DIGITS) {
+    if (!fraction && token.length - (token[0] === "-" ? 1 : 0) > MAX_INT_STR_DIGITS) {
       return this.fail(`Integer literal exceeds ${MAX_INT_STR_DIGITS} digits`);
+    }
+    if (this.options.plainNumbers === true) {
+      return Number(token);
     }
     const big = BigInt(token);
     if (big > MAX_SAFE || big < -MAX_SAFE) {
@@ -198,6 +211,9 @@ class Reader {
         this.fail("Expected ':'");
       }
       this.pos += 1;
+      if (this.options.uniqueKeys === true && Object.hasOwn(members, key)) {
+        this.fail("A key is repeated in one object");
+      }
       // defineProperty keeps a `__proto__` member an ordinary own property, as JSON.parse does.
       Object.defineProperty(members, key, {
         value: this.value(),
@@ -254,5 +270,50 @@ export function parseJson(text: string, options: { pythonConstants?: boolean } =
       }
     }
   }
-  return new Reader(text, pythonConstants).document();
+  return new Reader(text, { pythonConstants }).document();
+}
+
+/** The deepest container nesting a strict reader accepts (Jackson's own default limit); all three
+ * engines enforce it with the same byte pre-scan, so they refuse at the same depth. Mirrors
+ * `safe_json.MAX_JSON_DEPTH`. */
+export const MAX_JSON_DEPTH = 1000;
+
+/** Whether `raw` opens more than {@link MAX_JSON_DEPTH} containers at once, counting `[` and `{` up and
+ * `]` and `}` down outside strings (a backslash in a string skips the next byte). Run before parsing,
+ * so depth is found first whatever else is wrong with the bytes. Mirrors `safe_json.too_deep`. */
+export function tooDeep(raw: Buffer): boolean {
+  let depth = 0;
+  let inString = false;
+  for (let i = 0; i < raw.length; i++) {
+    const byte = raw[i];
+    if (inString) {
+      if (byte === 0x5c) {
+        i++;
+      } else if (byte === 0x22) {
+        inString = false;
+      }
+    } else if (byte === 0x22) {
+      inString = true;
+    } else if (byte === 0x5b || byte === 0x7b) {
+      depth++;
+      if (depth > MAX_JSON_DEPTH) {
+        return true;
+      }
+    } else if (byte === 0x5d || byte === 0x7d) {
+      depth--;
+    }
+  }
+  return false;
+}
+
+/** Parse one report file (or one JSON Lines line of one) by the rule every engine's readiness, sign and
+ * `report --validate` share (SPEC §13.3.4 stage 4): containers nested at most {@link MAX_JSON_DEPTH}
+ * deep, no `NaN`/`Infinity`/`-Infinity`, integer literals of at most {@link MAX_INT_STR_DIGITS} digits,
+ * and no key repeated within one object. Mirrors `safe_json.load_report_json` and `Json.parseReport`;
+ * anything else throws. */
+export function parseReportJson(text: string): unknown {
+  if (tooDeep(Buffer.from(text, "utf8"))) {
+    throw new SyntaxError(`Containers nested more than ${MAX_JSON_DEPTH} deep`);
+  }
+  return new Reader(text, { uniqueKeys: true, plainNumbers: true }).document();
 }

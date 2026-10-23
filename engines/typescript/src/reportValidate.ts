@@ -16,7 +16,8 @@ import Ajv2020 from "ajv/dist/2020";
 import anyOfDef from "ajv/dist/vocabularies/applicator/anyOf";
 import oneOfDef from "ajv/dist/vocabularies/applicator/oneOf";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
-import { MAX_INT_STR_DIGITS, jsonlLines, parseJson } from "./json";
+import { MAX_INT_STR_DIGITS, jsonlLines, parseJson, parseReportJson } from "./json";
+import { dataFileProblem } from "./readiness";
 import { byteCompare, decodeUtf8Strict, joinPath } from "./util";
 
 /** Always written, regardless of `--emit`: the run's structural core. */
@@ -404,13 +405,20 @@ function validateXmlWellformed(text: string, filename: string): string[] {
   return validateXmlSingleRoot(text, filename);
 }
 
+/** Every non-blank line of `text` ({@link jsonlLines}) is one JSON object on its own, read by the
+ * report-file rule ({@link parseReportJson}). Mirrors `report._validate_jsonl`. */
 function validateJsonl(text: string, filename: string): string[] {
   const problems: string[] = [];
   for (const [n, line] of jsonlLines(text)) {
+    let value: unknown;
     try {
-      parseJsonText(line);
+      value = parseReportJson(line);
     } catch (exc) {
       problems.push(`${filename}: line ${n} is not valid JSON (${(exc as Error).message})`);
+      continue;
+    }
+    if (!isRecord(value)) {
+      problems.push(`${filename}: line ${n} is not a JSON object`);
     }
   }
   return problems;
@@ -526,7 +534,7 @@ export function validateReport(outDir: string): string[] {
     }
     let instance: unknown;
     try {
-      instance = parseJsonText(text);
+      instance = parseReportJson(text);
     } catch (exc) {
       problems.push(`${filename}: invalid JSON (${(exc as Error).message})`);
       continue;
@@ -565,14 +573,17 @@ export function validateReport(outDir: string): string[] {
       }
       continue;
     }
-    if (filename.endsWith(".jsonl")) {
-      problems.push(...validateJsonl(text, filename));
+    if (filename === "claim.json") {
+      try {
+        parseReportJson(text);
+      } catch (exc) {
+        problems.push(`${filename}: invalid JSON (${(exc as Error).message})`);
+      }
       continue;
     }
-    try {
-      parseJsonText(text);
-    } catch (exc) {
-      problems.push(`${filename}: invalid JSON (${(exc as Error).message})`);
+    const reason = dataFileProblem(filename, text);
+    if (reason !== undefined) {
+      problems.push(`${filename}: cannot be read: ${reason}`);
     }
   }
   for (const filename of OPTIONAL_ARTIFACTS) {

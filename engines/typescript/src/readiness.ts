@@ -15,7 +15,7 @@ import {
   load as yamlLoad,
 } from "js-yaml";
 import { InputError } from "./errors";
-import { jsonlLines } from "./json";
+import { jsonlLines, parseReportJson } from "./json";
 import { pyyamlScan } from "./pyyamlScanner";
 import { byteCompare, decodeUtf8Strict, joinPath, normalizePosixPath, pyRepr, pyStr } from "./util";
 
@@ -1263,16 +1263,30 @@ function strings(record: Record<string, unknown>, ...fields: string[]): Record<s
 }
 
 function parseJsonl(text: string): Record<string, unknown>[] {
-  return objects(jsonlLines(text).map(([, line]) => JSON.parse(line) as unknown));
+  return objects(jsonlLines(text).map(([, line]) => parseReportJson(line)));
 }
 
-/** integrity.jsonl: one object per line, whose `status` (when present) is a string. */
+/** Every status integrity-result.schema.json allows; a record with no status or another one is unreadable. */
+const INTEGRITY_STATUSES: ReadonlySet<string> = new Set([
+  ...GAP_INTEGRITY_STATUSES,
+  "verified",
+  "verified_weak",
+  "unsigned",
+  "time_suspect",
+]);
+
+/** integrity.jsonl: one object per line, each with a `status` from integrity-result.schema.json's enum.
+ * A record without one, or with another value, is unreadable, never read as no break. */
 function parseIntegrity(text: string): Record<string, unknown>[] {
-  return parseJsonl(text).map((record) => strings(record, "status"));
+  const records = parseJsonl(text);
+  if (records.some(({ status }) => typeof status !== "string" || !INTEGRITY_STATUSES.has(status))) {
+    throw new Error("an integrity status is missing or not one the schema allows");
+  }
+  return records;
 }
 
 function parseJsonObject(text: string): Record<string, unknown> {
-  const value: unknown = JSON.parse(text);
+  const value = parseReportJson(text);
   if (!isRecord(value)) {
     throw new Error("not a JSON object");
   }
@@ -1321,7 +1335,7 @@ function parseApplicability(text: string): Record<string, unknown>[] {
 }
 
 function parseJsonObjects(text: string): Record<string, unknown>[] {
-  const value: unknown = JSON.parse(text);
+  const value = parseReportJson(text);
   if (!Array.isArray(value)) {
     throw new Error("not a JSON array");
   }
@@ -1346,6 +1360,26 @@ function parseAssertions(text: string): Record<string, unknown>[] {
     }
   }
   return assertions;
+}
+
+/** The reader readiness applies to each report data file; `report --validate` reads them with these same
+ * readers, so a file one command refuses the other refuses too (18.184q). */
+const DATA_FILE_READERS: Readonly<Record<string, (text: string) => unknown>> = {
+  "integrity.jsonl": parseIntegrity,
+  "coverage.json": parseCoverage,
+  "applicability.jsonl": parseApplicability,
+  "quarantine.jsonl": parseJsonl,
+};
+
+/** Why readiness cannot read the report data file `name` holding `text`, or `undefined` when it can.
+ * Mirrors `readiness.data_file_problem`. */
+export function dataFileProblem(name: string, text: string): string | undefined {
+  try {
+    DATA_FILE_READERS[name](text);
+  } catch (exc) {
+    return exc instanceof Error ? exc.message : String(exc);
+  }
+  return undefined;
 }
 
 export interface ComputeReadinessOptions {
@@ -1424,6 +1458,9 @@ export function computeReadiness(
       }
     }
   }
+
+  // Read for its presence and shape only: deleting it must not read READY (SPEC §13.3.4, 18.184q).
+  reportFile("quarantine.jsonl", DATA_FILE_READERS["quarantine.jsonl"]);
 
   for (const statement of reportFile("applicability.jsonl", parseApplicability) ?? []) {
     for (const d of (statement.drift ?? []) as Record<string, unknown>[]) {

@@ -32,6 +32,7 @@ import {
   parseGapsFile,
   pythonizeTimestamp,
 } from "./readiness";
+import { REPORT_FILE_RULE_CASES, ruleCaseContent } from "./testSupport";
 import { byteCompare } from "./util";
 
 const SEVERITIES = new Map([
@@ -60,6 +61,7 @@ function report(
     join(dir, "applicability.jsonl"),
     (overrides.applicability ?? []).map((s) => `${JSON.stringify(s)}\n`).join(""),
   );
+  writeFileSync(join(dir, "quarantine.jsonl"), "");
   return dir;
 }
 
@@ -89,7 +91,13 @@ test("a clean report is READY", () => {
   assert.deepEqual(verdict.reasons, []);
 });
 
-const REPORT_FILES = ["coverage.json", "integrity.jsonl", "applicability.jsonl", "assertions.json"];
+const REPORT_FILES = [
+  "coverage.json",
+  "integrity.jsonl",
+  "applicability.jsonl",
+  "assertions.json",
+  "quarantine.jsonl",
+];
 const asRoot = process.getuid?.() === 0;
 
 /** Makes `dir/name` present but unreadable; returns a folder to reopen after the check. */
@@ -183,8 +191,9 @@ test("broken integrity is NOT READY", () => {
 });
 
 const JSONL_RECORD: Record<string, string> = {
-  "integrity.jsonl": '{"stream": "s", "status": "ok"}',
+  "integrity.jsonl": '{"stream": "s", "status": "verified"}',
   "applicability.jsonl": '{"drift": []}',
+  "quarantine.jsonl": '{"record": "r"}',
 };
 const NOT_JSONL: Record<string, (r: string) => string> = {
   vt: (r) => `${r}\u000b${r}\n`,
@@ -839,3 +848,16 @@ test("deviation: null stays readable (18.184m)", () => {
   );
   assert.equal(computeReadiness(dir, { severities: SEVERITIES }).verdict, READY);
 });
+
+for (const ruleCase of REPORT_FILE_RULE_CASES) {
+  test(`one report-file rule (18.184q): ${ruleCase.id}`, () => {
+    const dir = report();
+    const content = ruleCaseContent(ruleCase);
+    if (content === null) {
+      unlinkSync(join(dir, ruleCase.file));
+    } else {
+      writeFileSync(join(dir, ruleCase.file), content);
+    }
+    assert.deepEqual(computeReadiness(dir, { severities: SEVERITIES }).reasons, ruleCase.readiness);
+  });
+}

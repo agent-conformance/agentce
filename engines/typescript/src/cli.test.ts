@@ -76,6 +76,7 @@ function readinessReport(
   );
   writeFileSync(join(reportDir, "coverage.json"), JSON.stringify({ subjects: {} }));
   writeFileSync(join(reportDir, "applicability.jsonl"), "");
+  writeFileSync(join(reportDir, "quarantine.jsonl"), "");
   return reportDir;
 }
 
