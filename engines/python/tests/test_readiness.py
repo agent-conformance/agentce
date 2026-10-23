@@ -987,3 +987,41 @@ def test_an_unknown_flag_on_another_command_carries_that_command_s_key(
     assert "error [input.diff_unrecognized_flag]: unrecognized flag '--bogus'." in (
         capsys.readouterr().err
     )
+
+
+_RULE_CASES = json.loads(
+    (
+        _REPO_ROOT
+        / "verification"
+        / "gates"
+        / "fixtures"
+        / "report_file_rule"
+        / "cases.json"
+    ).read_text(encoding="utf-8")
+)["cases"]
+
+
+def rule_case_content(case: dict) -> str | None:
+    """A shared report-file-rule case's content, ``@@`` expanded (cases.json's description)."""
+    content = case["content"]
+    repeat = case.get("repeat")
+    if content is None or repeat is None:
+        return content
+    expansion = repeat["open"] * repeat["times"] + repeat["close"] * repeat["times"]
+    return content.replace("@@", expansion)
+
+
+@pytest.mark.parametrize("case", _RULE_CASES, ids=[c["id"] for c in _RULE_CASES])
+def test_report_file_rule(tmp_path: Path, case: dict) -> None:
+    # One report-file rule in every engine (18.184q): the same table drives readiness.test.ts and
+    # ReadinessTest.java.
+    report = _report(tmp_path)
+    content = rule_case_content(case)
+    if content is None:
+        (report / case["file"]).unlink()
+    else:
+        (report / case["file"]).write_text(content, encoding="utf-8")
+    assert (
+        compute_readiness(report, severities=_SEVERITIES)["reasons"]
+        == case["readiness"]
+    )

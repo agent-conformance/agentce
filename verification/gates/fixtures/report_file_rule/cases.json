@@ -1,0 +1,342 @@
+{
+  "description": "One report-file rule (SPEC 13.3.4 stage 4, 18.184q): each row writes `content` to `file` in a report folder that otherwise reads READY (null content deletes it). Where `repeat` is given, `@@` in content is replaced by `open` repeated `times` times followed by `close` repeated `times` times. `readiness` is the exact reasons list readiness gives; `validate` is whether report --validate over a full report with that file replaced names the file (`refused`), names nothing for it (`valid`), or is not checked (null). Read by each engine's readiness and report --validate tests (test_readiness.py and test_report.py, readiness.test.ts and reportValidate.test.ts, ReadinessTest.java and ReportValidateTest.java). Written by make_cases.py.",
+  "cases": [
+    {
+      "id": "quarantine_absent",
+      "file": "quarantine.jsonl",
+      "content": null,
+      "readiness": [
+        "missing report file quarantine.jsonl"
+      ],
+      "validate": null
+    },
+    {
+      "id": "integrity_status_missing",
+      "file": "integrity.jsonl",
+      "content": "{\"stream\": \"s\"}\n",
+      "readiness": [
+        "cannot read report file integrity.jsonl"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "integrity_status_not_in_enum",
+      "file": "integrity.jsonl",
+      "content": "{\"stream\": \"s\", \"status\": \"FAILED\"}\n",
+      "readiness": [
+        "cannot read report file integrity.jsonl"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "integrity_status_not_a_string",
+      "file": "integrity.jsonl",
+      "content": "{\"stream\": \"s\", \"status\": [\"failed\"]}\n",
+      "readiness": [
+        "cannot read report file integrity.jsonl"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "integrity_non_object_line",
+      "file": "integrity.jsonl",
+      "content": "3\n",
+      "readiness": [
+        "cannot read report file integrity.jsonl"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "applicability_non_object_line",
+      "file": "applicability.jsonl",
+      "content": "[]\n",
+      "readiness": [
+        "cannot read report file applicability.jsonl"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "quarantine_non_object_line",
+      "file": "quarantine.jsonl",
+      "content": "3\n",
+      "readiness": [
+        "cannot read report file quarantine.jsonl"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "runtime_drift_non_object_line",
+      "file": "runtime_drift.jsonl",
+      "content": "{\"subject\": \"x\"}\n[]\n",
+      "readiness": [],
+      "validate": "refused"
+    },
+    {
+      "id": "integrity_repeated_key_blocking_first",
+      "file": "integrity.jsonl",
+      "content": "{\"stream\": \"s\", \"status\": \"failed\", \"status\": \"verified\"}\n",
+      "readiness": [
+        "cannot read report file integrity.jsonl"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "integrity_repeated_key_blocking_last",
+      "file": "integrity.jsonl",
+      "content": "{\"stream\": \"s\", \"status\": \"verified\", \"status\": \"failed\"}\n",
+      "readiness": [
+        "cannot read report file integrity.jsonl"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "integrity_repeated_key_escaped",
+      "file": "integrity.jsonl",
+      "content": "{\"stream\": \"s\", \"st\\u0061tus\": \"failed\", \"status\": \"verified_weak\"}\n",
+      "readiness": [
+        "cannot read report file integrity.jsonl"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "applicability_repeated_key_blocking_first",
+      "file": "applicability.jsonl",
+      "content": "{\"drift\": [{\"kind\": \"k\", \"ref\": \"r\"}], \"drift\": []}\n",
+      "readiness": [
+        "cannot read report file applicability.jsonl"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "applicability_repeated_key_blocking_last",
+      "file": "applicability.jsonl",
+      "content": "{\"drift\": [], \"drift\": [{\"kind\": \"k\", \"ref\": \"r\"}]}\n",
+      "readiness": [
+        "cannot read report file applicability.jsonl"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "quarantine_repeated_key",
+      "file": "quarantine.jsonl",
+      "content": "{\"record\": \"a\", \"record\": \"b\"}\n",
+      "readiness": [
+        "cannot read report file quarantine.jsonl"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "coverage_repeated_key_blocking_first",
+      "file": "coverage.json",
+      "content": "{\"subjects\": {\"s\": {\"coverage_status\": \"gap\"}}, \"subjects\": {}}",
+      "readiness": [
+        "cannot read report file coverage.json"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "coverage_repeated_key_blocking_last",
+      "file": "coverage.json",
+      "content": "{\"subjects\": {}, \"subjects\": {\"s\": {\"coverage_status\": \"gap\"}}}",
+      "readiness": [
+        "cannot read report file coverage.json"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "coverage_repeated_subject_escaped",
+      "file": "coverage.json",
+      "content": "{\"subjects\": {\"s\": {\"coverage_status\": \"gap\"}, \"\\u0073\": {\"coverage_status\": \"ok\"}}}",
+      "readiness": [
+        "cannot read report file coverage.json"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "assertions_repeated_key",
+      "file": "assertions.json",
+      "content": "[{\"control\": \"OVS-03\", \"outcome\": \"insufficient_evidence\", \"outcome\": \"conformant\"}]",
+      "readiness": [
+        "cannot read report file assertions.json"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "same_key_in_two_objects_reads",
+      "file": "coverage.json",
+      "content": "{\"subjects\": {\"a\": {\"coverage_status\": \"ok\"}, \"b\": {\"coverage_status\": \"ok\"}}}",
+      "readiness": [],
+      "validate": "valid"
+    },
+    {
+      "id": "coverage_nested_1000_reads",
+      "file": "coverage.json",
+      "content": "{\"subjects\": {}, \"x\": @@}",
+      "repeat": {
+        "open": "[",
+        "close": "]",
+        "times": 999
+      },
+      "readiness": [],
+      "validate": "valid"
+    },
+    {
+      "id": "coverage_nested_1001_refused",
+      "file": "coverage.json",
+      "content": "{\"subjects\": {}, \"x\": @@}",
+      "repeat": {
+        "open": "[",
+        "close": "]",
+        "times": 1000
+      },
+      "readiness": [
+        "cannot read report file coverage.json"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "coverage_nested_100000_refused",
+      "file": "coverage.json",
+      "content": "{\"subjects\": {}, \"x\": @@}",
+      "repeat": {
+        "open": "[",
+        "close": "]",
+        "times": 99999
+      },
+      "readiness": [
+        "cannot read report file coverage.json"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "integrity_line_nested_1000_reads",
+      "file": "integrity.jsonl",
+      "content": "{\"stream\": \"s\", \"status\": \"verified\", \"x\": @@}\n",
+      "repeat": {
+        "open": "[",
+        "close": "]",
+        "times": 999
+      },
+      "readiness": [],
+      "validate": "valid"
+    },
+    {
+      "id": "integrity_line_nested_1001_refused",
+      "file": "integrity.jsonl",
+      "content": "{\"stream\": \"s\", \"status\": \"verified\", \"x\": @@}\n",
+      "repeat": {
+        "open": "[",
+        "close": "]",
+        "times": 1000
+      },
+      "readiness": [
+        "cannot read report file integrity.jsonl"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "coverage_integer_4300_digits_reads",
+      "file": "coverage.json",
+      "content": "{\"subjects\": {}, \"n\": @@}",
+      "repeat": {
+        "open": "1",
+        "close": "",
+        "times": 4300
+      },
+      "readiness": [],
+      "validate": "valid"
+    },
+    {
+      "id": "coverage_negative_integer_4300_digits_reads",
+      "file": "coverage.json",
+      "content": "{\"subjects\": {}, \"n\": -@@}",
+      "repeat": {
+        "open": "1",
+        "close": "",
+        "times": 4300
+      },
+      "readiness": [],
+      "validate": "valid"
+    },
+    {
+      "id": "coverage_integer_4301_digits_refused",
+      "file": "coverage.json",
+      "content": "{\"subjects\": {}, \"n\": @@}",
+      "repeat": {
+        "open": "1",
+        "close": "",
+        "times": 4301
+      },
+      "readiness": [
+        "cannot read report file coverage.json"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "coverage_integer_5000_digits_refused",
+      "file": "coverage.json",
+      "content": "{\"subjects\": {}, \"n\": @@}",
+      "repeat": {
+        "open": "1",
+        "close": "",
+        "times": 5000
+      },
+      "readiness": [
+        "cannot read report file coverage.json"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "coverage_nan",
+      "file": "coverage.json",
+      "content": "{\"subjects\": {}, \"x\": NaN}",
+      "readiness": [
+        "cannot read report file coverage.json"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "coverage_infinity",
+      "file": "coverage.json",
+      "content": "{\"subjects\": {}, \"x\": Infinity}",
+      "readiness": [
+        "cannot read report file coverage.json"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "integrity_negative_infinity",
+      "file": "integrity.jsonl",
+      "content": "{\"stream\": \"s\", \"status\": \"verified\", \"x\": -Infinity}\n",
+      "readiness": [
+        "cannot read report file integrity.jsonl"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "applicability_nan",
+      "file": "applicability.jsonl",
+      "content": "{\"drift\": [], \"x\": NaN}\n",
+      "readiness": [
+        "cannot read report file applicability.jsonl"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "quarantine_infinity",
+      "file": "quarantine.jsonl",
+      "content": "{\"x\": Infinity}\n",
+      "readiness": [
+        "cannot read report file quarantine.jsonl"
+      ],
+      "validate": "refused"
+    },
+    {
+      "id": "nan_inside_a_string_reads",
+      "file": "coverage.json",
+      "content": "{\"subjects\": {}, \"x\": \"NaN\"}",
+      "readiness": [],
+      "validate": "valid"
+    }
+  ]
+}

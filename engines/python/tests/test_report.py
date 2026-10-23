@@ -2273,3 +2273,33 @@ def test_validate_report_catches_a_recorded_data_file_that_went_missing(
         "integrity.jsonl",
         "coverage.json",
     ], problems
+
+
+_RULE_CASES = [
+    case
+    for case in json.loads(
+        (
+            _REPO_ROOT
+            / "verification"
+            / "gates"
+            / "fixtures"
+            / "report_file_rule"
+            / "cases.json"
+        ).read_text(encoding="utf-8")
+    )["cases"]
+    if case["validate"] is not None
+]
+
+
+@pytest.mark.parametrize("case", _RULE_CASES, ids=[c["id"] for c in _RULE_CASES])
+def test_validate_report_reads_data_files_by_the_report_file_rule(
+    tmp_path: Path, case: dict
+) -> None:
+    """report --validate refuses a file readiness cannot read, and only such a file (18.184q); the same
+    table drives reportValidate.test.ts and ReportValidateTest.java."""
+    from test_readiness import rule_case_content
+
+    report = _valid_report(tmp_path)
+    (report / case["file"]).write_text(rule_case_content(case) or "", encoding="utf-8")
+    named = [p for p in validate_report(report) if p.startswith(f"{case['file']}:")]
+    assert bool(named) == (case["validate"] == "refused"), named
