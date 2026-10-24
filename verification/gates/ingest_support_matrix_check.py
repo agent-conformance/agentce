@@ -102,8 +102,8 @@ def check_tier_layout(text: str, source: str) -> list[str]:
     problems: list[str] = []
     lines = text.splitlines()
     for number, line in enumerate(lines, 1):
-        is_tier = _TIER_LINE_RE.fullmatch(line) is not None
-        if not is_tier:
+        tier_line = _TIER_LINE_RE.fullmatch(line)
+        if tier_line is None:
             if _TIER_MENTION_RE.search(_plain(line)):
                 problems.append(
                     f"ingest.matrix.tier_line_unreadable: {source} line {number} holds a tier line the "
@@ -111,16 +111,13 @@ def check_tier_layout(text: str, source: str) -> list[str]:
                     "of its own line"
                 )
             continue
-        tier = line[2 : line.index("**", 2)]
-        for follow in lines[number:]:
-            if not follow.strip(" \t") or _TIER_LINE_RE.fullmatch(follow):
-                break
+        follow = lines[number] if number < len(lines) else ""
+        if follow.strip(" \t") and not _TIER_LINE_RE.fullmatch(follow):
             problems.append(
-                f"ingest.matrix.tier_line_wrapped: {source}'s {tier} line (line {number}) goes on to "
-                f"{follow!r}, which the gate does not read. Keep the tier line on one line and put a "
-                "blank line after it"
+                f"ingest.matrix.tier_line_wrapped: {source}'s {tier_line.group(1)} line (line {number}) "
+                f"goes on to {follow!r}, which the gate does not read. Keep the tier line on one line "
+                "and put a blank line after it"
             )
-            break
     return problems
 
 
@@ -253,18 +250,16 @@ def check(root: Path | None = None) -> list[str]:
     return problems
 
 
-FIXTURE_DEFINITION = {"url": "https://example.com/d", "version": "v1"}
-
-
 def self_test() -> int:
+    fixture_definition = {"url": "https://example.com/d", "version": "v1"}
     rows: dict[str, dict] = {
         "Claude Code session files": {
             "tier": "supported",
-            "definition": FIXTURE_DEFINITION,
+            "definition": fixture_definition,
         },
         "OpenTelemetry GenAI traces": {"tier": "supported"},
-        "Cursor CLI output": {"tier": "experimental", "definition": FIXTURE_DEFINITION},
-        "AuthZEN decisions": {"tier": "experimental", "definition": FIXTURE_DEFINITION},
+        "Cursor CLI output": {"tier": "experimental", "definition": fixture_definition},
+        "AuthZEN decisions": {"tier": "experimental", "definition": fixture_definition},
         "Datadog LLM Observability": {
             "tier": "experimental",
             "definition": {
@@ -276,7 +271,7 @@ def self_test() -> int:
         "Cedar": {"tier": "roadmap"},
     }
     cases: list[tuple[str, bool]] = []
-    fixture_cell = "[d](https://example.com/d), v1"
+    fixture_cell = f"[d]({fixture_definition['url']}), {fixture_definition['version']}"
     dd_row = (
         "| Datadog LLM Observability | Experimental "
         "| [x](https://example.com/datadog-openapi), client 2.61.0 | y |\n"
