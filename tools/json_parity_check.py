@@ -10,11 +10,11 @@ engine's result with the row's expected value: the canonical text or kept line n
 input, the rule and line of a refusal, the rendered bytes of a number, both directions of a comparison,
 whether an integer-typed field accepts the value, and canonical form's refusal text.
 
-``--cli`` runs nine real-CLI rows through the three engines built from source, each against the exit
+``--cli`` runs ten real-CLI rows through the three engines built from source, each against the exit
 code, message key and text the profile gives: a bundle manifest with a byte-order mark is read, one
 with a repeated ``files`` key is refused, a coverage denominator count ``1e20`` is shown as ``1e+20``,
 ``diff`` refuses a NaN, ``report --from`` refuses a ``rung`` of ``1.5``, a ``state_version`` of
-``true`` is refused, a malformed and a non-UTF-8 ``state.json`` are refused with --out left holding no
+``true`` is refused, a malformed, a non-UTF-8 and a ``{}`` ``state.json`` are refused with --out left holding no
 file, and ``sign`` refuses a claim holding ``5.0``. (The records row, C11, is the
 ``json-profile-`` cases of VG-QUARANTINE-NO-PASS.)
 
@@ -287,7 +287,11 @@ def cli_rows(work: Path) -> list[tuple[Any, ...]]:
                                 "--state", str(work / f"state-{engine}"), "--out", str(work / f"seed-{engine}")],
             f"{engine} assess --state",
         )  # fmt: skip
-        for name, raw in (("malformed", b"{not json"), ("nonutf8", b'{"x": "\xff\xfe"}')):
+        for name, raw in (
+            ("malformed", b"{not json"),
+            ("nonutf8", b'{"x": "\xff\xfe"}'),
+            ("empty_object", b"{}"),
+        ):
             bad = work / f"state-{name}-{engine}"
             bad.mkdir()
             (bad / "state.json").write_bytes(raw)
@@ -331,6 +335,10 @@ def cli_rows(work: Path) -> list[tuple[Any, ...]]:
              "input.state_unreadable: the state file", lambda e, n=name: work / f"bad-{n}-{e}")
             for name in ("malformed", "nonutf8")
         ),
+        ("{} state.json refused before --out is written",
+         lambda e: ["assess", "--bundle", str(QUICKSTART / "evidence"), "--profile", profile, "--state",
+                    str(work / f"state-empty_object-{e}"), "--out", str(work / f"bad-empty_object-{e}")], 3,
+         "input.state_version_incompatible: the state directory at", lambda e: work / f"bad-empty_object-{e}"),
         ("sign a claim holding 5.0", lambda e: ["sign", str(work / f"claim-{e}"), "--as", "claimant", "--dry-run"], 3,
          "sign.claim_malformed: claim.json cannot be put in canonical form: non_integer_number: 5.0."),
     ]  # fmt: skip
@@ -369,9 +377,15 @@ def check_cli() -> int:
                     )
                 # A row naming an --out folder must leave it holding no file (SPEC 8.7, 18.184s).
                 for out_dir in (u(engine) for u in untouched):
-                    written = sorted(p.name for p in out_dir.rglob("*")) if out_dir.exists() else []
+                    written = (
+                        sorted(p.name for p in out_dir.rglob("*"))
+                        if out_dir.exists()
+                        else []
+                    )
                     if written:
-                        problems.append(f"{engine} {name}: --out holds {written}, expected no file")
+                        problems.append(
+                            f"{engine} {name}: --out holds {written}, expected no file"
+                        )
     for problem in problems:
         print(f"FAIL {problem}")
     if problems:
