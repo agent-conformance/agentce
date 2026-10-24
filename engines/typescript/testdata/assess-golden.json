@@ -1195,7 +1195,7 @@
       "control_version": "2026.09",
       "crosswalk": [
         {
-          "clause": "Art. 50",
+          "clause": "Art. 86",
           "framework": "eu-ai-act",
           "verified": false
         }
@@ -1387,15 +1387,23 @@
       "evidence_strength": "strong",
       "family": "DOC",
       "mode": "automated",
-      "outcome": "conformant",
+      "outcome": "non-conformant",
       "population": {
         "applicable": 1,
-        "failed": 0
+        "failed": 1
       },
       "rung": 2,
       "severity": "medium",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
+      "violations": [
+        {
+          "constraint": "sh:hasValue",
+          "focus": "agentce:event/d1",
+          "message_key": "DOC-02.S2",
+          "path": "agentce:decisionDocumented"
+        }
+      ],
       "window": {
         "end": "2026-01-01T00:00:02Z",
         "start": "2026-01-01T00:00:00Z"
@@ -2622,29 +2630,20 @@
       "control_version": "2026.09",
       "crosswalk": [
         {
-          "clause": "Art. 50",
+          "clause": "Art. 86",
           "framework": "eu-ai-act",
           "verified": false
         }
       ],
-      "evidence": [
-        {
-          "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
-          "ref": "agentce:event/d1",
-          "source_class": "self_report"
-        }
-      ],
-      "evidence_strength": "strong",
       "family": "TRN",
       "mode": "automated",
-      "outcome": "conformant",
+      "outcome": "insufficient_evidence",
       "population": {
         "applicable": 1,
         "failed": 0
       },
       "rung": 2,
       "severity": "medium",
-      "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -2823,15 +2822,23 @@
       "evidence_strength": "strong",
       "family": "DOC",
       "mode": "automated",
-      "outcome": "conformant",
+      "outcome": "non-conformant",
       "population": {
         "applicable": 1,
-        "failed": 0
+        "failed": 1
       },
       "rung": 2,
       "severity": "medium",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
+      "violations": [
+        {
+          "constraint": "sh:hasValue",
+          "focus": "agentce:event/d1",
+          "message_key": "DOC-02.S2",
+          "path": "agentce:decisionDocumented"
+        }
+      ],
       "window": {
         "end": "2026-01-01T00:00:02Z",
         "start": "2026-01-01T00:00:00Z"
@@ -4042,29 +4049,20 @@
       "control_version": "2026.09",
       "crosswalk": [
         {
-          "clause": "Art. 50",
+          "clause": "Art. 86",
           "framework": "eu-ai-act",
           "verified": false
         }
       ],
-      "evidence": [
-        {
-          "digest": "sha256:d4a9f7dd9e7227f646c01d480a0fdbdf12213d627286826d3dcb8a13a8dff9d4",
-          "ref": "agentce:event/d1",
-          "source_class": "self_report"
-        }
-      ],
-      "evidence_strength": "strong",
       "family": "TRN",
       "mode": "automated",
-      "outcome": "conformant",
+      "outcome": "insufficient_evidence",
       "population": {
         "applicable": 1,
         "failed": 0
       },
       "rung": 2,
       "severity": "medium",
-      "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:02Z",
@@ -4243,15 +4241,23 @@
       "evidence_strength": "strong",
       "family": "DOC",
       "mode": "automated",
-      "outcome": "conformant",
+      "outcome": "non-conformant",
       "population": {
         "applicable": 1,
-        "failed": 0
+        "failed": 1
       },
       "rung": 2,
       "severity": "medium",
       "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
+      "violations": [
+        {
+          "constraint": "sh:hasValue",
+          "focus": "agentce:event/d1",
+          "message_key": "DOC-02.S2",
+          "path": "agentce:decisionDocumented"
+        }
+      ],
       "window": {
         "end": "2026-01-01T00:00:00Z",
         "start": "2026-01-01T00:00:00Z"
@@ -5364,29 +5370,20 @@
       "control_version": "2026.09",
       "crosswalk": [
         {
-          "clause": "Art. 50",
+          "clause": "Art. 86",
           "framework": "eu-ai-act",
           "verified": false
         }
       ],
-      "evidence": [
-        {
-          "digest": "sha256:f56466bad88f6ad62c52aed5aa73e39693224c23ff2ebf6c2585dbcf04a052e2",
-          "ref": "agentce:event/d1",
-          "source_class": "self_report"
-        }
-      ],
-      "evidence_strength": "strong",
       "family": "TRN",
       "mode": "automated",
-      "outcome": "conformant",
+      "outcome": "insufficient_evidence",
       "population": {
         "applicable": 1,
         "failed": 0
       },
       "rung": 2,
       "severity": "medium",
-      "source_class_satisfied": true,
       "subject": "spiffe://corp/agents/a",
       "window": {
         "end": "2026-01-01T00:00:00Z",

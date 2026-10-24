@@ -127,9 +127,9 @@
       "violations": [
         {
           "focus": "agentce:event/d1",
-          "path": "prov:atTime",
-          "constraint": "sh:minCount",
-          "message_key": "DOC-02.S1"
+          "path": "agentce:decisionDocumented",
+          "constraint": "sh:hasValue",
+          "message_key": "DOC-02.S2"
         }
       ]
     },
@@ -685,8 +685,8 @@
       "violations": [
         {
           "focus": "agentce:event/d1",
-          "path": "agentce:authorizedBy",
-          "constraint": "sh:minCount",
+          "path": "agentce:authorizationHeld",
+          "constraint": "sh:hasValue",
           "message_key": "OVS-05.S1"
         }
       ]
@@ -991,8 +991,8 @@
       "violations": [
         {
           "focus": "agentce:event/d1",
-          "path": "agentce:authorizedBy",
-          "constraint": "sh:minCount",
+          "path": "agentce:authorityRecorded",
+          "constraint": "sh:hasValue",
           "message_key": "REC-05.S1"
         }
       ]
@@ -1243,8 +1243,8 @@
       "violations": [
         {
           "focus": "agentce:event/d1",
-          "path": "agentce:authorizedBy",
-          "constraint": "sh:minCount",
+          "path": "agentce:authorizationGateCleared",
+          "constraint": "sh:hasValue",
           "message_key": "RSK-01.S1"
         }
       ]
@@ -1327,14 +1327,14 @@
       "control": "TRN-01",
       "outcome": "non-conformant",
       "population": {
-        "applicable": 2,
+        "applicable": 1,
         "failed": 1
       },
       "violations": [
         {
           "focus": "agentce:event/d1",
-          "path": "agentce:notifiedBy",
-          "constraint": "sh:minCount",
+          "path": "agentce:affectedPersonNotified",
+          "constraint": "sh:hasValue",
           "message_key": "TRN-01.S1"
         }
       ]
@@ -1447,8 +1447,8 @@
       "violations": [
         {
           "focus": "agentce:event/d1",
-          "path": "prov:atTime",
-          "constraint": "sh:minCount",
+          "path": "agentce:explanationTimed",
+          "constraint": "sh:hasValue",
           "message_key": "TRN-04.S1"
         }
       ]
@@ -1477,14 +1477,14 @@
       "control": "TRN-05",
       "outcome": "non-conformant",
       "population": {
-        "applicable": 2,
+        "applicable": 1,
         "failed": 1
       },
       "violations": [
         {
           "focus": "agentce:event/d1",
-          "path": "agentce:notifiedBy",
-          "constraint": "sh:minCount",
+          "path": "agentce:aiInteractionDisclosed",
+          "constraint": "sh:hasValue",
           "message_key": "TRN-05.S1"
         }
       ]
