@@ -65,13 +65,19 @@ def _is_table_header(line: str) -> bool:
 
 
 def _unreadable_headers(text: str) -> list[tuple[int, str]]:
-    """Piped lines that name all four header cells but are not a header copy _is_table_header reads:
-    a table in a block quote or on a list item, a linked cell, reordered or extra columns. Refused,
-    not skipped, so a header spelling nobody foresaw cannot hide a table (18.39a)."""
+    """Piped lines that hold every word of the four header cells but are not a header copy
+    _is_table_header reads: a table in a block quote or on a list item, a linked word, a <br> in a
+    cell, reordered or extra columns. The words are matched in the line's letters alone, so no
+    markup between or around them can hide one. Refused, not skipped, so a header spelling nobody
+    foresaw cannot hide a table (18.39a)."""
     found = []
     for number, line in enumerate(text.splitlines(), start=1):
-        key = _header_key(line) if "|" in line else ""
-        if all(name in key for name in _HEADER_CELLS) and not _is_table_header(line):
+        letters = (
+            re.sub(r"[^a-z]", "", html.unescape(line).casefold()) if "|" in line else ""
+        )
+        if all(word in letters for word in _HEADER_WORDS) and not _is_table_header(
+            line
+        ):
             found.append((number, line))
     return found
 
@@ -124,6 +130,7 @@ def _plain(line: str) -> str:
 
 
 _HEADER_CELLS = tuple(_header_key(cell) for cell in _split_cells(_TABLE_HEADER))
+_HEADER_WORDS = tuple(word for cell in _HEADER_CELLS for word in cell.split())
 
 
 def check_tier_layout(text: str, source: str) -> list[str]:
@@ -809,6 +816,18 @@ def self_test() -> int:
         (
             "with a linked cell",
             "| [Backend](#a) | Tier | Reader follows | Build item |",
+            None,
+            None,
+        ),
+        (
+            "with one word of a cell linked",
+            "| Backend | Tier | Reader [follows](#x) | Build item |",
+            None,
+            None,
+        ),
+        (
+            "with a <br> inside a cell",
+            "| Backend | Tier | Reader<br>follows | Build item |",
             None,
             None,
         ),

@@ -963,7 +963,7 @@
           "replace": "> | Backend | Tier | Reader follows | Build item |\n> |---|---|---|---|\n> | Honeycomb | Supported | x | y |\n\n## What works today"
         }
       ],
-      "fix_hint": "Run verification/gates/ingest_support_matrix.sh; it names the exact message key (ingest.matrix.unknown_source, .wrong_tier, .count_mismatch, .count_arithmetic, .missing_tier_line, .docs_wrong_tier, .docs_unknown_source, .docs_malformed_row, .docs_unrecognized_tier, .docs_definition_drift, .docs_table_missing, .tier_line_unreadable, .tier_line_wrapped, .docs_follows_unreadable or .docs_definition_missing) and the offending name."
+      "fix_hint": "Run verification/gates/ingest_support_matrix.sh; it names the exact message key (ingest.matrix.unknown_source, .wrong_tier, .count_mismatch, .count_arithmetic, .missing_tier_line, .docs_wrong_tier, .docs_unknown_source, .docs_malformed_row, .docs_unrecognized_tier, .docs_definition_drift, .docs_table_missing, .tier_line_unreadable, .tier_line_wrapped, .docs_follows_unreadable, .docs_definition_missing or .docs_header_unreadable) and the offending name."
     },
     {
       "id": "VG-DOC01-COMPONENTS",
