@@ -1040,21 +1040,19 @@ def rule_case_content(case: dict) -> str | None:
 @pytest.mark.parametrize("case", _RULE_CASES, ids=[c["id"] for c in _RULE_CASES])
 def test_report_file_rule(tmp_path: Path, case: dict) -> None:
     # One report-file rule in every engine (18.184q): the same table drives readiness.test.ts and
-    # ReadinessTest.java. A row whose reason names a JSON profile rule is refused, not a verdict
-    # (SPEC 8.7, 18.60): the refusal names the file and the same rule phrase.
+    # ReadinessTest.java. A row with `refused` is a file outside the JSON profile, which readiness
+    # refuses as input rather than reading NOT READY (SPEC 8.7, 18.60).
     report = _report(tmp_path)
     content = rule_case_content(case)
     if content is None:
         (report / case["file"]).unlink()
     else:
         (report / case["file"]).write_text(content, encoding="utf-8")
-    prefix = f"cannot read report file {case['file']}: "
-    profile = [r[len(prefix) :] for r in case["readiness"] if r.startswith(prefix)]
-    if profile:
+    if case["refused"] is not None:
         with pytest.raises(InputError) as caught:
             compute_readiness(report, severities=_SEVERITIES)
         assert caught.value.key == "report.validation_failed"
-        assert caught.value.cause == f"{case['file']}: {profile[0]}"
+        assert caught.value.cause == case["refused"]
         return
     assert (
         compute_readiness(report, severities=_SEVERITIES)["reasons"]

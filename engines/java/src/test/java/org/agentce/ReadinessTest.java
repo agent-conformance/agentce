@@ -1023,17 +1023,12 @@ class ReadinessTest {
             } else {
                 Files.writeString(dir.resolve(ruleCase.file()), ruleCase.content());
             }
-            // A row whose reason names a JSON profile rule is, since 18.60, a refusal naming the same file,
-            // rule and line (SPEC 8.7), never a NOT READY reason.
-            String outside = ruleCase.readiness().size() == 1
-                    && ruleCase.readiness().get(0).startsWith("cannot read report file " + ruleCase.file() + ": ")
-                    ? ruleCase.readiness().get(0).substring(("cannot read report file " + ruleCase.file() + ": ").length())
-                    : null;
-            if (outside != null) {
+            // A row with refused is a file outside the JSON profile: readiness refuses the input (SPEC 8.7, 18.60).
+            if (ruleCase.refused() != null) {
                 InputError e = assertThrows(InputError.class,
                         () -> Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()), ruleCase.id());
                 assertEquals("report.validation_failed", e.key, ruleCase.id());
-                assertEquals(ruleCase.file() + ": " + outside, e.reason, ruleCase.id());
+                assertEquals(ruleCase.refused(), e.reason, ruleCase.id());
                 continue;
             }
             assertEquals(ruleCase.readiness(),

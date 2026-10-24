@@ -1,5 +1,5 @@
 {
-  "description": "One report-file rule (SPEC 13.3.4 stage 4, 18.184q): each row writes `content` to `file` in a report folder that otherwise reads READY (null content deletes it). Where `repeat` is given, `@@` in content is replaced by `open` repeated `times` times followed by `close` repeated `times` times. `readiness` is the exact reasons list readiness gives; `validate` is whether report --validate over a full report with that file replaced names the file (`refused`), names nothing for it (`valid`), or is not checked (null). Read by each engine's readiness and report --validate tests (test_readiness.py and test_report.py, readiness.test.ts and reportValidate.test.ts, ReadinessTest.java and ReportValidateTest.java). Written by make_cases.py.",
+  "description": "One report-file rule (SPEC 13.3.4 stage 4, 18.184q): each row writes `content` to `file` in a report folder that otherwise reads READY (null content deletes it). Where `repeat` is given, `@@` in content is replaced by `open` repeated `times` times followed by `close` repeated `times` times. `readiness` is the exact reasons list readiness gives, or null where readiness refuses the input instead; `refused` is then the refusal's message (exit 3, key report.validation_failed, no readiness file: a file outside the JSON profile, SPEC 8.7, 18.60), and null otherwise. `validate` is whether report --validate over a full report with that file replaced names the file (`refused`), names nothing for it (`valid`), or is not checked (null). Read by each engine's readiness and report --validate tests (test_readiness.py and test_report.py, readiness.test.ts and reportValidate.test.ts, ReadinessTest.java and ReportValidateTest.java). Written by make_cases.py.",
   "cases": [
     {
       "id": "quarantine_absent",
@@ -8,6 +8,7 @@
       "readiness": [
         "missing report file quarantine.jsonl"
       ],
+      "refused": null,
       "validate": null
     },
     {
@@ -17,6 +18,7 @@
       "readiness": [
         "cannot read report file integrity.jsonl"
       ],
+      "refused": null,
       "validate": "refused"
     },
     {
@@ -26,6 +28,7 @@
       "readiness": [
         "cannot read report file integrity.jsonl"
       ],
+      "refused": null,
       "validate": "refused"
     },
     {
@@ -35,6 +38,7 @@
       "readiness": [
         "cannot read report file integrity.jsonl"
       ],
+      "refused": null,
       "validate": "refused"
     },
     {
@@ -44,6 +48,7 @@
       "readiness": [
         "cannot read report file integrity.jsonl"
       ],
+      "refused": null,
       "validate": "refused"
     },
     {
@@ -53,6 +58,7 @@
       "readiness": [
         "cannot read report file applicability.jsonl"
       ],
+      "refused": null,
       "validate": "refused"
     },
     {
@@ -62,6 +68,7 @@
       "readiness": [
         "cannot read report file quarantine.jsonl"
       ],
+      "refused": null,
       "validate": "refused"
     },
     {
@@ -69,96 +76,87 @@
       "file": "runtime_drift.jsonl",
       "content": "{\"subject\": \"x\"}\n[]\n",
       "readiness": [],
+      "refused": null,
       "validate": "refused"
     },
     {
       "id": "integrity_repeated_key_blocking_first",
       "file": "integrity.jsonl",
       "content": "{\"stream\": \"s\", \"status\": \"failed\", \"status\": \"verified\"}\n",
-      "readiness": [
-        "cannot read report file integrity.jsonl: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "integrity.jsonl: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
       "id": "integrity_repeated_key_blocking_last",
       "file": "integrity.jsonl",
       "content": "{\"stream\": \"s\", \"status\": \"verified\", \"status\": \"failed\"}\n",
-      "readiness": [
-        "cannot read report file integrity.jsonl: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "integrity.jsonl: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
       "id": "integrity_repeated_key_escaped",
       "file": "integrity.jsonl",
       "content": "{\"stream\": \"s\", \"st\\u0061tus\": \"failed\", \"status\": \"verified_weak\"}\n",
-      "readiness": [
-        "cannot read report file integrity.jsonl: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "integrity.jsonl: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
       "id": "applicability_repeated_key_blocking_first",
       "file": "applicability.jsonl",
       "content": "{\"drift\": [{\"kind\": \"k\", \"ref\": \"r\"}], \"drift\": []}\n",
-      "readiness": [
-        "cannot read report file applicability.jsonl: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "applicability.jsonl: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
       "id": "applicability_repeated_key_blocking_last",
       "file": "applicability.jsonl",
       "content": "{\"drift\": [], \"drift\": [{\"kind\": \"k\", \"ref\": \"r\"}]}\n",
-      "readiness": [
-        "cannot read report file applicability.jsonl: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "applicability.jsonl: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
       "id": "quarantine_repeated_key",
       "file": "quarantine.jsonl",
       "content": "{\"record\": \"a\", \"record\": \"b\"}\n",
-      "readiness": [
-        "cannot read report file quarantine.jsonl: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "quarantine.jsonl: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
       "id": "coverage_repeated_key_blocking_first",
       "file": "coverage.json",
       "content": "{\"subjects\": {\"s\": {\"coverage_status\": \"gap\"}}, \"subjects\": {}}",
-      "readiness": [
-        "cannot read report file coverage.json: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "coverage.json: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
       "id": "coverage_repeated_key_blocking_last",
       "file": "coverage.json",
       "content": "{\"subjects\": {}, \"subjects\": {\"s\": {\"coverage_status\": \"gap\"}}}",
-      "readiness": [
-        "cannot read report file coverage.json: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "coverage.json: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
       "id": "coverage_repeated_subject_escaped",
       "file": "coverage.json",
       "content": "{\"subjects\": {\"s\": {\"coverage_status\": \"gap\"}, \"\\u0073\": {\"coverage_status\": \"ok\"}}}",
-      "readiness": [
-        "cannot read report file coverage.json: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "coverage.json: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
       "id": "assertions_repeated_key",
       "file": "assertions.json",
       "content": "[{\"control\": \"OVS-03\", \"outcome\": \"insufficient_evidence\", \"outcome\": \"conformant\"}]",
-      "readiness": [
-        "cannot read report file assertions.json: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "assertions.json: outside the JSON profile: duplicate_key at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
@@ -166,6 +164,7 @@
       "file": "coverage.json",
       "content": "{\"subjects\": {\"a\": {\"coverage_status\": \"ok\"}, \"b\": {\"coverage_status\": \"ok\"}}}",
       "readiness": [],
+      "refused": null,
       "validate": "valid"
     },
     {
@@ -178,6 +177,7 @@
         "times": 999
       },
       "readiness": [],
+      "refused": null,
       "validate": "valid"
     },
     {
@@ -189,9 +189,8 @@
         "close": "]",
         "times": 1000
       },
-      "readiness": [
-        "cannot read report file coverage.json: outside the JSON profile: depth_over_limit at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "coverage.json: outside the JSON profile: depth_over_limit at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
@@ -203,9 +202,8 @@
         "close": "]",
         "times": 99999
       },
-      "readiness": [
-        "cannot read report file coverage.json: outside the JSON profile: depth_over_limit at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "coverage.json: outside the JSON profile: depth_over_limit at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
@@ -218,6 +216,7 @@
         "times": 999
       },
       "readiness": [],
+      "refused": null,
       "validate": "valid"
     },
     {
@@ -229,9 +228,8 @@
         "close": "]",
         "times": 1000
       },
-      "readiness": [
-        "cannot read report file integrity.jsonl: outside the JSON profile: depth_over_limit at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "integrity.jsonl: outside the JSON profile: depth_over_limit at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
@@ -244,6 +242,7 @@
         "times": 4300
       },
       "readiness": [],
+      "refused": null,
       "validate": "valid"
     },
     {
@@ -256,6 +255,7 @@
         "times": 4300
       },
       "readiness": [],
+      "refused": null,
       "validate": "valid"
     },
     {
@@ -267,9 +267,8 @@
         "close": "",
         "times": 4301
       },
-      "readiness": [
-        "cannot read report file coverage.json: outside the JSON profile: integer_digit_limit at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "coverage.json: outside the JSON profile: integer_digit_limit at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
@@ -281,54 +280,48 @@
         "close": "",
         "times": 5000
       },
-      "readiness": [
-        "cannot read report file coverage.json: outside the JSON profile: integer_digit_limit at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "coverage.json: outside the JSON profile: integer_digit_limit at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
       "id": "coverage_nan",
       "file": "coverage.json",
       "content": "{\"subjects\": {}, \"x\": NaN}",
-      "readiness": [
-        "cannot read report file coverage.json: outside the JSON profile: nan at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "coverage.json: outside the JSON profile: nan at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
       "id": "coverage_infinity",
       "file": "coverage.json",
       "content": "{\"subjects\": {}, \"x\": Infinity}",
-      "readiness": [
-        "cannot read report file coverage.json: outside the JSON profile: infinity at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "coverage.json: outside the JSON profile: infinity at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
       "id": "integrity_negative_infinity",
       "file": "integrity.jsonl",
       "content": "{\"stream\": \"s\", \"status\": \"verified\", \"x\": -Infinity}\n",
-      "readiness": [
-        "cannot read report file integrity.jsonl: outside the JSON profile: infinity at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "integrity.jsonl: outside the JSON profile: infinity at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
       "id": "applicability_nan",
       "file": "applicability.jsonl",
       "content": "{\"drift\": [], \"x\": NaN}\n",
-      "readiness": [
-        "cannot read report file applicability.jsonl: outside the JSON profile: nan at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "applicability.jsonl: outside the JSON profile: nan at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
       "id": "quarantine_infinity",
       "file": "quarantine.jsonl",
       "content": "{\"x\": Infinity}\n",
-      "readiness": [
-        "cannot read report file quarantine.jsonl: outside the JSON profile: infinity at line 1 (SPEC 8.7)"
-      ],
+      "readiness": null,
+      "refused": "quarantine.jsonl: outside the JSON profile: infinity at line 1 (SPEC 8.7)",
       "validate": "refused"
     },
     {
@@ -336,6 +329,7 @@
       "file": "coverage.json",
       "content": "{\"subjects\": {}, \"x\": \"NaN\"}",
       "readiness": [],
+      "refused": null,
       "validate": "valid"
     }
   ]

@@ -59,7 +59,10 @@ export interface ReportFileRuleCase {
   readonly file: string;
   readonly content: string | null;
   readonly repeat?: { readonly open: string; readonly close: string; readonly times: number };
-  readonly readiness: string[];
+  /** The exact readiness reasons, or `null` where readiness refuses the input instead. */
+  readonly readiness: string[] | null;
+  /** The refusal message (exit 3, report.validation_failed) for a file outside the JSON profile, else `null`. */
+  readonly refused: string | null;
   readonly validate: "refused" | "valid" | null;
 }
 

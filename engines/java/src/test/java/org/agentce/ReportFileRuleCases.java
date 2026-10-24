@@ -10,8 +10,10 @@ final class ReportFileRuleCases {
     private ReportFileRuleCases() {}
 
     /** One row: {@code content} is written to {@code file} ({@code null} deletes it), {@code readiness}
-     * is the exact reasons list, and {@code validate} is {@code "refused"}, {@code "valid"} or {@code null}. */
-    record Case(String id, String file, String content, List<String> readiness, String validate) {}
+     * is the exact reasons list or {@code null} where readiness refuses the input, {@code refused} is that
+     * refusal's message (a file outside the JSON profile, SPEC 8.7) or {@code null}, and {@code validate}
+     * is {@code "refused"}, {@code "valid"} or {@code null}. */
+    record Case(String id, String file, String content, List<String> readiness, String refused, String validate) {}
 
     static List<Case> all() {
         JsonNode table = Json.parseFile(
@@ -26,11 +28,17 @@ final class ReportFileRuleCases {
                         "@@",
                         repeat.get("open").textValue().repeat(times) + repeat.get("close").textValue().repeat(times));
             }
-            List<String> readiness = new ArrayList<>();
-            row.get("readiness").forEach(reason -> readiness.add(reason.textValue()));
+            List<String> readiness = null;
+            if (!row.get("readiness").isNull()) {
+                List<String> reasons = new ArrayList<>();
+                row.get("readiness").forEach(reason -> reasons.add(reason.textValue()));
+                readiness = reasons;
+            }
+            JsonNode refused = row.get("refused");
             JsonNode validate = row.get("validate");
             cases.add(new Case(
                     row.get("id").textValue(), row.get("file").textValue(), content, readiness,
+                    refused.isNull() ? null : refused.textValue(),
                     validate.isNull() ? null : validate.textValue()));
         }
         return cases;

@@ -898,13 +898,15 @@ for (const ruleCase of REPORT_FILE_RULE_CASES) {
     } else {
       writeFileSync(join(dir, ruleCase.file), content);
     }
-    // A reason naming the JSON profile is, since 18.60, readiness refusing the input instead.
-    const outside =
-      /^cannot read report file (\S+): (outside the JSON profile: (\w+) at line (\d+) .*)$/.exec(
-        ruleCase.readiness[0] ?? "",
+    // A row with `refused` is a file outside the JSON profile: readiness refuses the input (SPEC 8.7, 18.60).
+    if (ruleCase.refused !== null) {
+      assert.throws(
+        () => computeReadiness(dir, { severities: SEVERITIES }),
+        (exc: unknown) =>
+          exc instanceof InputError &&
+          exc.key === "report.validation_failed" &&
+          exc.cause === ruleCase.refused,
       );
-    if (outside !== null && ruleCase.readiness.length === 1) {
-      assertOutsideContract(dir, outside[1] as string, outside[3] as string, Number(outside[4]));
       return;
     }
     assert.deepEqual(computeReadiness(dir, { severities: SEVERITIES }).reasons, ruleCase.readiness);

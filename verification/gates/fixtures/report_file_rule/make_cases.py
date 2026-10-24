@@ -14,24 +14,34 @@ DESCRIPTION = (
     "One report-file rule (SPEC 13.3.4 stage 4, 18.184q): each row writes `content` to `file` in a report"
     " folder that otherwise reads READY (null content deletes it). Where `repeat` is given, `@@` in content is"
     " replaced by `open` repeated `times` times followed by `close` repeated `times` times. `readiness` is the"
-    " exact reasons list readiness gives; `validate` is whether report --validate over a full report with that"
+    " exact reasons list readiness gives, or null where readiness refuses the input instead; `refused` is then"
+    " the refusal's message (exit 3, key report.validation_failed, no readiness file: a file outside the JSON"
+    " profile, SPEC 8.7, 18.60), and null otherwise. `validate` is whether report --validate over a full report with that"
     " file replaced names the file (`refused`), names nothing for it (`valid`), or is not checked (null). Read"
     " by each engine's readiness and report --validate tests (test_readiness.py and test_report.py,"
     " readiness.test.ts and reportValidate.test.ts, ReadinessTest.java and ReportValidateTest.java)."
     " Written by make_cases.py."
 )
 CANNOT = "cannot read report file "
+PROFILE = "outside the JSON profile: {rule} at line 1 (SPEC 8.7)"
 ARRAYS = {"open": "[", "close": "]"}
 DIGITS = {"open": "1", "close": ""}
 
 
 def case(name, file, content, refused, repeat=None, validate=True):
+    """``refused`` is False (the file reads), True (readiness cannot read its shape: a NOT READY reason),
+    or the JSON profile rule the file breaks at line 1 (readiness refuses the input, 18.60)."""
     row = {"id": name, "file": file, "content": content}
     if repeat is not None:
         row["repeat"] = repeat
-    row["readiness"] = (
-        [CANNOT + file] if refused and file != "runtime_drift.jsonl" else []
-    )
+    if isinstance(refused, str):
+        row["readiness"] = None
+        row["refused"] = f"{file}: {PROFILE.format(rule=refused)}"
+    else:
+        row["readiness"] = (
+            [CANNOT + file] if refused and file != "runtime_drift.jsonl" else []
+        )
+        row["refused"] = None
     row["validate"] = ("refused" if refused else "valid") if validate else None
     return row
 
@@ -44,6 +54,12 @@ def digits(times):
     return {**DIGITS, "times": times}
 
 
+DUPLICATE = "duplicate_key"
+DEPTH = "depth_over_limit"
+DIGIT_LIMIT = "integer_digit_limit"
+NAN = "nan"
+INFINITY = "infinity"
+
 INTEGRITY = '{"stream": "s", "status": "verified", "x": @@}\n'
 COVERAGE_X = '{"subjects": {}, "x": @@}'
 COVERAGE_N = '{"subjects": {}, "n": @@}'
@@ -55,6 +71,7 @@ CASES = [
         "file": "quarantine.jsonl",
         "content": None,
         "readiness": ["missing report file quarantine.jsonl"],
+        "refused": None,
         "validate": None,
     },
     case("integrity_status_missing", "integrity.jsonl", '{"stream": "s"}\n', True),
@@ -83,61 +100,61 @@ CASES = [
         "integrity_repeated_key_blocking_first",
         "integrity.jsonl",
         '{"stream": "s", "status": "failed", "status": "verified"}\n',
-        True,
+        DUPLICATE,
     ),
     case(
         "integrity_repeated_key_blocking_last",
         "integrity.jsonl",
         '{"stream": "s", "status": "verified", "status": "failed"}\n',
-        True,
+        DUPLICATE,
     ),
     case(
         "integrity_repeated_key_escaped",
         "integrity.jsonl",
         '{"stream": "s", "st\\u0061tus": "failed", "status": "verified_weak"}\n',
-        True,
+        DUPLICATE,
     ),
     case(
         "applicability_repeated_key_blocking_first",
         "applicability.jsonl",
         f'{{"drift": {DRIFT}, "drift": []}}\n',
-        True,
+        DUPLICATE,
     ),
     case(
         "applicability_repeated_key_blocking_last",
         "applicability.jsonl",
         f'{{"drift": [], "drift": {DRIFT}}}\n',
-        True,
+        DUPLICATE,
     ),
     case(
         "quarantine_repeated_key",
         "quarantine.jsonl",
         '{"record": "a", "record": "b"}\n',
-        True,
+        DUPLICATE,
     ),
     case(
         "coverage_repeated_key_blocking_first",
         "coverage.json",
         '{"subjects": {"s": {"coverage_status": "gap"}}, "subjects": {}}',
-        True,
+        DUPLICATE,
     ),
     case(
         "coverage_repeated_key_blocking_last",
         "coverage.json",
         '{"subjects": {}, "subjects": {"s": {"coverage_status": "gap"}}}',
-        True,
+        DUPLICATE,
     ),
     case(
         "coverage_repeated_subject_escaped",
         "coverage.json",
         '{"subjects": {"s": {"coverage_status": "gap"}, "\\u0073": {"coverage_status": "ok"}}}',
-        True,
+        DUPLICATE,
     ),
     case(
         "assertions_repeated_key",
         "assertions.json",
         '[{"control": "OVS-03", "outcome": "insufficient_evidence", "outcome": "conformant"}]',
-        True,
+        DUPLICATE,
     ),
     case(
         "same_key_in_two_objects_reads",
@@ -147,13 +164,13 @@ CASES = [
     ),
     case("coverage_nested_1000_reads", "coverage.json", COVERAGE_X, False, nested(999)),
     case(
-        "coverage_nested_1001_refused", "coverage.json", COVERAGE_X, True, nested(1000)
+        "coverage_nested_1001_refused", "coverage.json", COVERAGE_X, DEPTH, nested(1000)
     ),
     case(
         "coverage_nested_100000_refused",
         "coverage.json",
         COVERAGE_X,
-        True,
+        DEPTH,
         nested(99999),
     ),
     case(
@@ -167,7 +184,7 @@ CASES = [
         "integrity_line_nested_1001_refused",
         "integrity.jsonl",
         INTEGRITY,
-        True,
+        DEPTH,
         nested(1000),
     ),
     case(
@@ -188,26 +205,31 @@ CASES = [
         "coverage_integer_4301_digits_refused",
         "coverage.json",
         COVERAGE_N,
-        True,
+        DIGIT_LIMIT,
         digits(4301),
     ),
     case(
         "coverage_integer_5000_digits_refused",
         "coverage.json",
         COVERAGE_N,
-        True,
+        DIGIT_LIMIT,
         digits(5000),
     ),
-    case("coverage_nan", "coverage.json", '{"subjects": {}, "x": NaN}', True),
-    case("coverage_infinity", "coverage.json", '{"subjects": {}, "x": Infinity}', True),
+    case("coverage_nan", "coverage.json", '{"subjects": {}, "x": NaN}', NAN),
+    case(
+        "coverage_infinity",
+        "coverage.json",
+        '{"subjects": {}, "x": Infinity}',
+        INFINITY,
+    ),
     case(
         "integrity_negative_infinity",
         "integrity.jsonl",
         '{"stream": "s", "status": "verified", "x": -Infinity}\n',
-        True,
+        INFINITY,
     ),
-    case("applicability_nan", "applicability.jsonl", '{"drift": [], "x": NaN}\n', True),
-    case("quarantine_infinity", "quarantine.jsonl", '{"x": Infinity}\n', True),
+    case("applicability_nan", "applicability.jsonl", '{"drift": [], "x": NaN}\n', NAN),
+    case("quarantine_infinity", "quarantine.jsonl", '{"x": Infinity}\n', INFINITY),
     case(
         "nan_inside_a_string_reads",
         "coverage.json",
