@@ -414,3 +414,21 @@ test("an out folder inside the records folder that cannot be listed collides wit
   }
   assert.equal(readFileSync(join(root, "full", "keep.txt"), "utf-8"), "mine");
 });
+
+test("an out folder inside the records folder under a folder that cannot be entered collides with the records (18.184s)", (t) => {
+  if (process.getuid?.() === 0) {
+    t.skip("this user enters a mode-000 folder");
+    return;
+  }
+  const root = folder({ "session.json": SESSION });
+  const mid = join(root, "mid");
+  mkdirSync(mid);
+  chmodSync(mid, 0o000);
+  try {
+    const { exitCode, envelope } = runJson(["assess", root, "--out", join(mid, "out")]);
+    const key = (envelope.error as { message_key?: unknown } | undefined)?.message_key;
+    assert.deepEqual([exitCode, key], [3, "input.records_out_collides"]);
+  } finally {
+    chmodSync(mid, 0o700);
+  }
+});

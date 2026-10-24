@@ -7,6 +7,7 @@
  */
 
 import {
+  type Dirent,
   accessSync,
   closeSync,
   existsSync,
@@ -39,7 +40,7 @@ import {
   evaluatedNothing,
 } from "./assess";
 import { computeBlindSpots } from "./blindSpots";
-import { confineToRoot, loadBundle } from "./bundle";
+import { confineToRoot, loadBundle, resolveLoose } from "./bundle";
 import { DEFAULT_LENS, catalogsDir as bundledCatalogsDir, quickstartDir } from "./bundled";
 import { CanonicalizationError, canonicalString } from "./canonical";
 import { type Catalog, loadCatalog } from "./catalog";
@@ -106,12 +107,14 @@ import {
   appliedDeviationIds,
   blindSpotsCliLines,
   digestBytes,
+  isDirFollowingLinks,
   renderEvidencePack,
   renderOscal,
   renderPublicStatement,
   renderReportHtml,
   renderReportMd,
   renderSarif,
+  underByIdentity,
   writeReport,
 } from "./report";
 import { REPORT_DATA_FILES, validateReport } from "./reportValidate";
@@ -899,6 +902,42 @@ function refuseEmitAndFor(emit: string | undefined, forPreset: string | undefine
   }
 }
 
+/** Refuse before anything is written when an entry under `out`, file or folder, is a link leading
+ * outside it: the run would write through it and change a file elsewhere (ruling R7; census
+ * odd-inputs line 89, 18.184s). Links are found without following them and judged by where they
+ * point, so a dangling link outside is refused too; a link inside `out` is followed as before.
+ * Python's `_refuse_links_out` under `input.out_link_outside` (packaging is not ported). */
+function refuseLinksOut(out: string): void {
+  if (!isDirFollowingLinks(out)) {
+    return;
+  }
+  const walk = (dir: string, rel: string): void => {
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return; // os.walk skips a folder it cannot list
+    }
+    entries.sort((a, b) => byteCompare(a.name, b.name));
+    for (const entry of entries) {
+      const path = joinPath(dir, entry.name);
+      if (entry.isSymbolicLink() && !underByIdentity(out, resolveLoose(path) ?? path)) {
+        throw new InputError(
+          "input.out_link_outside",
+          `${rel}${entry.name} in --out links outside the output folder, so the run would write through it and change a file elsewhere.`,
+          errorFix("input.out_link_outside"),
+        );
+      }
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        walk(joinPath(dir, entry.name), `${rel}${entry.name}/`);
+      }
+    }
+  };
+  walk(out, "");
+}
+
 /** Run a full assessment (ingest, integrity, graph, coverage, applicability, evaluate, report) — the
  * same pipeline `conformance run` exercises per corpus project, generalised to an arbitrary bundle. */
 function runAssess(options: AssessOptions): CommandResult {
@@ -999,6 +1038,10 @@ function runAssess(options: AssessOptions): CommandResult {
     trust,
     options.allowUnverified,
   );
+  // state.json is read here, once, after the catalogs as in Python, so a file that is not UTF-8 or
+  // not JSON is refused before any --out write (census odd-inputs lines 85, 87; 18.184s); Stage 6a
+  // reuses what was loaded. An incompatible state_version aborts with exit 3.
+  const state = options.state !== undefined ? StateDir.load(options.state) : null;
   // The file arguments read later are checked here too, so a run refused for one leaves --out
   // empty (census odd-inputs line 46, 18.184c).
   const domainPath =
@@ -1009,6 +1052,7 @@ function runAssess(options: AssessOptions): CommandResult {
     options.deviations !== undefined
       ? requireFile(options.deviations, "deviations", "the deviation register")
       : undefined;
+  refuseLinksOut(out);
   if (scanned !== undefined) {
     scanned.write(out, declared === undefined);
     limitations.push(RECORDS_LIMITATION);
@@ -1075,10 +1119,8 @@ function runAssess(options: AssessOptions): CommandResult {
 
   // Stage 6a: incremental state (SPEC §5.4 B7, HR-10).
   const newWindowEnd = windowEnd(profileObj.observationWindow, ingested.accepted);
-  let state: StateDir | null = null;
   let supersedes: string[] = [];
-  if (options.state !== undefined) {
-    state = StateDir.load(options.state); // incompatible state_version aborts with exit 3
+  if (state !== null) {
     [supersedes] = state.plan(bundle.digest, ingested.accepted, newWindowEnd);
   }
 

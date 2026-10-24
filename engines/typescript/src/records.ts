@@ -22,7 +22,7 @@ import { InputError } from "./errors";
 import { maxNesting } from "./ingest";
 import { JsonProfileError, jsonlByteRecords } from "./json";
 import { type AdaptResult, OtelGenaiAdapterError, adapt } from "./otelGenai";
-import { writeFile } from "./outputs";
+import { OUT_DIR, UNREACHABLE, refuse, writeFile } from "./outputs";
 import { type Profile, profileFromDict } from "./profile";
 import { safeDump } from "./pyyaml";
 import { hasInvisibleCodepoint } from "./report";
@@ -466,6 +466,26 @@ function holdsEntries(out: string): boolean {
   }
 }
 
+/** Whether looking at `path` (following links or not) is refused for permission, which Python's
+ * `signing` path checks raise as `PermissionError` rather than answer. */
+function deniedLook(path: string, follow: boolean): boolean {
+  try {
+    (follow ? statSync : lstatSync)(path);
+    return false;
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException | null)?.code;
+    return code === "EACCES" || code === "EPERM";
+  }
+}
+
+function insideAndUsed(out: string): InputError {
+  return new InputError(
+    "input.records_out_collides",
+    `the output folder ${pyRepr(basename(out))} is the records folder or lies inside it and holds files that are not a previous run's output; writing there would overwrite records.`,
+    OUT_COLLIDES_FIX,
+  );
+}
+
 /** Read every recognised trace export under `folder`; refuse a folder with none (Python's `scan`). */
 export function scanRecords(folderArg: string, options: ScanOptions = {}): ScannedRecords {
   const folder = realpathSync.native(folderArg);
@@ -474,6 +494,18 @@ export function scanRecords(folderArg: string, options: ScanOptions = {}): Scann
     const out = resolveLoose(options.exclude) ?? options.exclude;
     const stale = joinPath(out, BUNDLE_DIR);
     skip.push(stale);
+    if (
+      !within(folder, stale) &&
+      (deniedLook(stale, false) ||
+        (!isSymlink(stale) && isDir(stale) && deniedLook(joinPath(stale, "manifest.json"), true)))
+    ) {
+      // Python's PermissionError branch: an --out inside the records folder that cannot be entered
+      // cannot be shown to hold only a previous run's output, so it collides (inbox row 421).
+      if (!(within(out, folder) && !same(out, folder) && holdsEntries(out))) {
+        throw refuse(OUT_DIR, options.exclude, UNREACHABLE);
+      }
+      throw insideAndUsed(out);
+    }
     if (
       within(folder, stale) ||
       isSymlink(stale) ||
@@ -487,11 +519,7 @@ export function scanRecords(folderArg: string, options: ScanOptions = {}): Scann
     }
     if (within(out, folder)) {
       if (same(out, folder) || (statOrNull(out) !== null && !isDir(stale) && holdsEntries(out))) {
-        throw new InputError(
-          "input.records_out_collides",
-          `the output folder ${pyRepr(basename(out))} is the records folder or lies inside it and holds files that are not a previous run's output; writing there would overwrite records.`,
-          OUT_COLLIDES_FIX,
-        );
+        throw insideAndUsed(out);
       }
       skip.push(out);
     }
