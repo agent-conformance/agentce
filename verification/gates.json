@@ -1866,8 +1866,8 @@
         {
           "description": "the base ask-for-anything-missing line moved verbatim into the First minute, caught as an unmarked question over the budget",
           "file": "skills/agentce-get-evidence/SKILL.md",
-          "search": "the top gaps from the terminal output.\n\nOne question",
-          "replace": "the top gaps from the terminal output.\n\nAsk for anything missing (repository path, environments, which enforcement points exist and where\ntheir exports land, intended purpose and affected parties per subject, target catalogs, content-capture\npolicy). Never guess these.\n\nOne question"
+          "search": "the top gaps from the terminal output.\n\nAfter that",
+          "replace": "the top gaps from the terminal output.\n\nAsk for anything missing (repository path, environments, which enforcement points exist and where\ntheir exports land, intended purpose and affected parties per subject, target catalogs, content-capture\npolicy). Never guess these.\n\nAfter that"
         },
         {
           "description": "the base ask-for-anything-missing line moved back under When to use, after the First minute but under no later-step heading",
