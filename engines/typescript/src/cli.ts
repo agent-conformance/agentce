@@ -68,7 +68,15 @@ import {
   verifyBundle,
   verifyStreams,
 } from "./integrity";
-import { JsonProfileError, asParsed, isJsonInteger, notValid, readJson } from "./json";
+import {
+  JsonProfileError,
+  asParsed,
+  decodeProfile,
+  isJsonInteger,
+  notValid,
+  parseReportJson,
+  readJson,
+} from "./json";
 import { DEFAULT_LANGUAGE, availableLanguages, catalogue } from "./messages";
 import { installedNoMl } from "./noMl";
 import {
@@ -2044,18 +2052,33 @@ function readSignManifest(reportDir: string): Buffer {
       "replace the link with the file itself, inside the report directory.",
     );
   }
+  let data: Buffer | undefined;
   try {
     if (regular) {
-      return readFileSync(manifestPath);
+      data = readFileSync(manifestPath);
     }
   } catch {
     // fall through to the refusal
   }
-  throw new InputError(
-    "sign.no_manifest",
-    "the report directory has no readable manifest.json, which the signature covers.",
-    "produce the report again: `agentce assess … --out <report-dir>`.",
-  );
+  const fix = "produce the report again: `agentce assess … --out <report-dir>`.";
+  if (data === undefined) {
+    throw new InputError(
+      "sign.no_manifest",
+      "the report directory has no readable manifest.json, which the signature covers.",
+      fix,
+    );
+  }
+  try {
+    // The bytes the signature covers are a report file the engine wrote: the JSON profile, a
+    // byte-order mark refused (SPEC 8.7).
+    parseReportJson(decodeProfile(data, "refuse"));
+  } catch (exc) {
+    if (!(exc instanceof JsonProfileError)) {
+      throw exc;
+    }
+    throw new InputError("sign.no_manifest", `manifest.json: ${exc.message}`, fix);
+  }
+  return data;
 }
 
 /** claim.json as `sign` appends to it, as Python's `_read_sign_claim`: an object whose `signatures`,

@@ -238,29 +238,35 @@ test("case 9: a corrupted report.csv names each missing column", () => {
   }
 });
 
-test("case 10/11: malformed XML is reported as invalid XML for either optional XML artifact", () => {
+test("case 10/11: malformed XML is outside the reader contract for either optional XML artifact", () => {
   const out = freshFullReport();
   try {
     writeFileSync(join(out, "report.junit.xml"), "<not-closed>");
     writeFileSync(join(out, "oscal-ar.xml"), "<not-closed>");
     const problems = validateReport(out);
-    assert.ok(problems.some((p) => p.startsWith("report.junit.xml: invalid XML")));
-    assert.ok(problems.some((p) => p.startsWith("oscal-ar.xml: invalid XML")));
+    for (const name of ["report.junit.xml", "oscal-ar.xml"]) {
+      assert.ok(
+        problems.includes(
+          `${name}: outside the report-file reader contract: xml_syntax at line 1 (SPEC 8.7)`,
+        ),
+        JSON.stringify(problems),
+      );
+    }
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
 });
 
 test("a self-closing root followed by a sibling element is multiple root elements, not valid XML", () => {
-  // fast-xml-parser's own `XMLValidator.validate` only flips `reachedRoot` from the paired
-  // open/close branch, so `<a/><b/>` -- a self-closing root followed by a sibling -- slips past it
-  // (confirmed empirically); Python's `ElementTree` and Java's `XMLStreamReader` both refuse it.
+  // A library validator once let `<a/><b/>` through; the reader contract names it (SPEC 8.7).
   const out = freshFullReport();
   try {
     writeFileSync(join(out, "report.junit.xml"), '<?xml version="1.0"?>\n<a/><b/>\n');
     const problems = validateReport(out);
     assert.ok(
-      problems.some((p) => p.startsWith("report.junit.xml: invalid XML")),
+      problems.includes(
+        "report.junit.xml: outside the report-file reader contract: xml_after_root at line 2 (SPEC 8.7)",
+      ),
       JSON.stringify(problems),
     );
   } finally {
@@ -269,15 +275,15 @@ test("a self-closing root followed by a sibling element is multiple root element
 });
 
 test("a named entity reference that isn't one of XML's five predefined entities is not valid XML", () => {
-  // `XMLValidator.validate` checks an entity reference's syntax (`&word;`) but never whether `word`
-  // actually names something, so it accepts `&undefined;` outright (confirmed empirically); Python's
-  // `ElementTree` and Java's `XMLStreamReader` (DTD support off in both) both refuse it as undefined.
+  // A library validator once accepted `&undefined;`; the reader contract names it (SPEC 8.7).
   const out = freshFullReport();
   try {
     writeFileSync(join(out, "oscal-ar.xml"), '<?xml version="1.0"?>\n<a>&undefined;</a>\n');
     const problems = validateReport(out);
     assert.ok(
-      problems.some((p) => p.startsWith("oscal-ar.xml: invalid XML")),
+      problems.includes(
+        "oscal-ar.xml: outside the report-file reader contract: xml_entity at line 2 (SPEC 8.7)",
+      ),
       JSON.stringify(problems),
     );
   } finally {

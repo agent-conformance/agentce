@@ -560,7 +560,7 @@ export function checkProfile(text: string, jsonlLine?: number): void {
 
 /** The index of the first byte of `raw` that does not start a well-formed UTF-8 sequence (overlong
  * forms, encoded surrogates and code points past U+10FFFF included), or -1 when all of it is UTF-8. */
-function invalidUtf8At(raw: Uint8Array): number {
+export function invalidUtf8At(raw: Uint8Array): number {
   let i = 0;
   while (i < raw.length) {
     const b = raw[i];
@@ -595,7 +595,8 @@ function invalidUtf8At(raw: Uint8Array): number {
   return -1;
 }
 
-function countLf(raw: Uint8Array, end: number): number {
+/** The number of LF bytes in `raw` before `end`. */
+export function countLf(raw: Uint8Array, end: number): number {
   let lines = 0;
   for (let i = 0; i < end; i++) {
     if (raw[i] === 0x0a) lines += 1;
@@ -603,7 +604,8 @@ function countLf(raw: Uint8Array, end: number): number {
   return lines;
 }
 
-function hasBom(raw: Uint8Array): boolean {
+/** Whether `raw` starts with the UTF-8 byte-order mark EF BB BF. */
+export function hasBom(raw: Uint8Array): boolean {
   return raw.length >= 3 && raw[0] === BOM[0] && raw[1] === BOM[1] && raw[2] === BOM[2];
 }
 

@@ -15,10 +15,18 @@ import type { CodeKeywordDefinition, KeywordCxt } from "ajv";
 import Ajv2020 from "ajv/dist/2020";
 import anyOfDef from "ajv/dist/vocabularies/applicator/anyOf";
 import oneOfDef from "ajv/dist/vocabularies/applicator/oneOf";
-import { XMLParser, XMLValidator } from "fast-xml-parser";
-import { jsonlRecords, parseReportJson, readBundled } from "./json";
+import {
+  JsonProfileError,
+  NonCanonicalNumber,
+  decodeProfile,
+  jsonlRecords,
+  parseJson,
+  parseReportJson,
+  readBundled,
+} from "./json";
 import { dataFileProblem } from "./readiness";
-import { byteCompare, decodeUtf8Strict, joinPath } from "./util";
+import { ReaderError, checkXml, decodeReportText, isBlank, readCsv } from "./reportReader";
+import { byteCompare, joinPath } from "./util";
 
 /** Always written, regardless of `--emit`: the run's structural core. */
 const MANDATORY_ARTIFACT_SCHEMAS: Record<string, string> = {
@@ -274,124 +282,20 @@ function readArtifact(path: string): Buffer | null {
   throw new CannotRead("not a regular file");
 }
 
-/** `readArtifact`, decoded as UTF-8; text that is not UTF-8 throws `CannotRead` too, as Python's
- * `_read_artifact_text`. */
-function readArtifactText(path: string): string | null {
-  const data = readArtifact(path);
-  if (data === null) {
-    return null;
-  }
-  try {
-    return decodeUtf8Strict(data);
-  } catch (exc) {
-    throw new CannotRead((exc as Error).message);
-  }
-}
+/** How a report file's bytes become text (SPEC 8.7): a JSON or JSON Lines file by the JSON profile's
+ * decoding with a byte-order mark refused, every other format by the report-file reader contract's. */
+type Decode = (data: Buffer) => string;
+const decodeJsonText: Decode = (data) => decodeProfile(data, "refuse");
 
 function recordedOutputs(outDir: string): Record<string, string> {
   try {
-    const text = readArtifactText(joinPath(outDir, "manifest.json"));
-    const manifest = text === null ? null : parseReportJson(text);
+    const data = readArtifact(joinPath(outDir, "manifest.json"));
+    const manifest = data === null ? null : parseReportJson(decodeJsonText(data));
     const outputs = isRecord(manifest) ? manifest.outputs : undefined;
     return isRecord(outputs) ? (outputs as Record<string, string>) : {};
   } catch {
     return {}; // a manifest that cannot be read records nothing here; the schema check reports it
   }
-}
-
-// The five entities XML itself predefines (SPEC/no DTD support, matching Java's `SUPPORT_DTD=false`
-// and Python's expat-backed `ElementTree`, neither of which resolves a custom DTD-declared entity for
-// these report artifacts): any other named reference is undefined.
-const PREDEFINED_XML_ENTITIES = new Set(["amp", "lt", "gt", "apos", "quot"]);
-
-/** `fast-xml-parser`'s own `XMLValidator` checks an entity reference's *syntax* (`&word;`) but never
- * whether `word` names a real entity (confirmed empirically: it accepts `&undefined;` outright, unlike
- * Python's `ElementTree`/Java's `XMLStreamReader`, both of which refuse it as "undefined entity"). Walk
- * the raw text the same way `XMLValidator` does -- skipping comments, CDATA, and the DOCTYPE's own
- * internal subset, where a literal `&` is just text -- and refuse any named (non-numeric) reference
- * outside that set. */
-function validateXmlEntities(text: string, filename: string): string[] {
-  let i = 0;
-  while (i < text.length) {
-    if (text.startsWith("<!--", i)) {
-      const end = text.indexOf("-->", i + 4);
-      i = end === -1 ? text.length : end + 3;
-      continue;
-    }
-    if (text.startsWith("<![CDATA[", i)) {
-      const end = text.indexOf("]]>", i + 9);
-      i = end === -1 ? text.length : end + 3;
-      continue;
-    }
-    if (text.startsWith("<!DOCTYPE", i)) {
-      let depth = 1;
-      let j = i + "<!DOCTYPE".length;
-      while (j < text.length && depth > 0) {
-        if (text[j] === "<") depth++;
-        else if (text[j] === ">") depth--;
-        j++;
-      }
-      i = j;
-      continue;
-    }
-    if (text[i] === "&") {
-      const rest = text.slice(i);
-      const numeric = /^&#(x[0-9a-fA-F]+|[0-9]+);/.exec(rest);
-      if (numeric !== null) {
-        i += numeric[0].length;
-        continue;
-      }
-      const named = /^&([A-Za-z_][\w.-]*);/.exec(rest);
-      if (named !== null) {
-        if (!PREDEFINED_XML_ENTITIES.has(named[1] as string)) {
-          return [`${filename}: invalid XML (undefined entity "${named[1]}")`];
-        }
-        i += named[0].length;
-        continue;
-      }
-      i += 1; // a bare '&': XMLValidator.validate's own ampersand check already rejects this shape
-      continue;
-    }
-    i += 1;
-  }
-  return [];
-}
-
-/** `XMLValidator.validate` tracks whether the root tag closed, but never refuses a *self-closing*
- * root followed by a sibling element (confirmed empirically: `<a/><b/>` passes it outright) --
- * `reachedRoot` is only ever set from the paired open/close branch. Parse the document instead and
- * check that exactly one top-level element exists: more than one key (ignoring the `?xml` declaration
- * and comments), or a single key whose value is an array (two siblings sharing one tag name), means
- * more than one root. */
-function validateXmlSingleRoot(text: string, filename: string): string[] {
-  let parsed: unknown;
-  try {
-    parsed = new XMLParser({
-      preserveOrder: false,
-      ignoreAttributes: true,
-    }).parse(text);
-  } catch {
-    return []; // a parse failure here is XMLValidator.validate's job to report, not this check's
-  }
-  if (!isRecord(parsed)) {
-    return [];
-  }
-  const rootKeys = Object.keys(parsed).filter((k) => !k.startsWith("?") && !k.startsWith("#"));
-  const multiple =
-    rootKeys.length > 1 || (rootKeys.length === 1 && Array.isArray(parsed[rootKeys[0] as string]));
-  return multiple ? [`${filename}: invalid XML (multiple root elements)`] : [];
-}
-
-function validateXmlWellformed(text: string, filename: string): string[] {
-  const result = XMLValidator.validate(text);
-  if (result !== true) {
-    return [`${filename}: invalid XML (${result.err.msg})`];
-  }
-  const entityProblems = validateXmlEntities(text, filename);
-  if (entityProblems.length > 0) {
-    return entityProblems;
-  }
-  return validateXmlSingleRoot(text, filename);
 }
 
 /** Every non-blank line of `text` ({@link jsonlRecords}) is one JSON object on its own, read by the
@@ -413,50 +317,21 @@ function validateJsonl(text: string, filename: string): string[] {
   return problems;
 }
 
-/** A minimal RFC 4180 field splitter: exactly what `report.csv`'s own writer produces (no embedded
- * newlines are ever written into a field), enough to accept a genuine run's output and reject
- * garbage, matching Python's `csv.reader` behaviour for this bounded shape. */
-function splitCsvLine(line: string): string[] {
-  const fields: string[] = [];
-  let i = 0;
-  while (i <= line.length) {
-    let field = "";
-    if (line[i] === '"') {
-      i++;
-      while (i < line.length) {
-        if (line[i] === '"' && line[i + 1] === '"') {
-          field += '"';
-          i += 2;
-        } else if (line[i] === '"') {
-          i++;
-          break;
-        } else {
-          field += line[i];
-          i++;
-        }
-      }
-    } else {
-      while (i < line.length && line[i] !== ",") {
-        field += line[i];
-        i++;
-      }
-    }
-    fields.push(field);
-    if (line[i] === ",") {
-      i++;
-    } else {
-      break;
-    }
-  }
-  return fields;
-}
-
+/** report.csv by the RFC 4180 reader ({@link readCsv}): a reader-contract fault is its one problem;
+ * else no header row, each missing column, and each record whose field count differs from the header's. */
 function validateCsv(text: string, filename: string): string[] {
-  const lines = text.split(/\r?\n/).filter((_, i, arr) => i < arr.length - 1 || arr[i] !== "");
-  if (lines.length === 0) {
+  let rows: string[][];
+  try {
+    rows = readCsv(text);
+  } catch (exc) {
+    if (!(exc instanceof ReaderError)) {
+      throw exc;
+    }
+    return [`${filename}: ${exc.message}`];
+  }
+  if (rows.length === 0) {
     return [`${filename}: empty CSV (no header row)`];
   }
-  const rows = lines.map(splitCsvLine);
   const header = rows[0] as string[];
   const problems: string[] = [];
   for (const column of CSV_COLUMNS) {
@@ -474,20 +349,48 @@ function validateCsv(text: string, filename: string): string[] {
   return problems;
 }
 
+/** An XML report file by the hand-written XML 1.0 reader ({@link checkXml}). */
+function validateXml(text: string, filename: string): string[] {
+  try {
+    checkXml(text);
+  } catch (exc) {
+    if (!(exc instanceof ReaderError)) {
+      throw exc;
+    }
+    return [`${filename}: ${exc.message}`];
+  }
+  return [];
+}
+
 /** Read one report file for `validateReport`: its text, `null` when absent, or the problem line
  * pushed onto `problems` (returned as `undefined`) when it is there but cannot be read. */
 function readOrReport(
   outDir: string,
   filename: string,
   problems: string[],
+  decode: Decode,
+  wrap = "",
 ): string | null | undefined {
+  let data: Buffer | null;
   try {
-    return readArtifactText(joinPath(outDir, filename));
+    data = readArtifact(joinPath(outDir, filename));
   } catch (exc) {
     if (!(exc instanceof CannotRead)) {
       throw exc;
     }
     problems.push(`${filename}: cannot read (${exc.message})`);
+    return undefined;
+  }
+  if (data === null) {
+    return null;
+  }
+  try {
+    return decode(data);
+  } catch (exc) {
+    if (!(exc instanceof JsonProfileError || exc instanceof ReaderError)) {
+      throw exc;
+    }
+    problems.push(`${filename}: ${wrap}${exc.message}`);
     return undefined;
   }
 }
@@ -517,7 +420,7 @@ export function validateReport(outDir: string): string[] {
   }
   let hasAssertions = false;
   for (const [filename, schemaName] of Object.entries(ARTIFACT_SCHEMAS)) {
-    const text = readOrReport(outDir, filename, problems);
+    const text = readOrReport(outDir, filename, problems, decodeJsonText);
     if (text == null) {
       continue; // mandatory absence was already reported above; optional absence is not a problem
     }
@@ -540,17 +443,19 @@ export function validateReport(outDir: string): string[] {
       problems.push(...validateOscalArNist(instance));
     }
     if (filename === "results.sarif") {
-      problems.push(...validateSarif210(instance));
+      problems.push(...validateSarif210(instance, text));
     }
   }
   for (const filename of ["report.md", "report.html"]) {
-    const text = readOrReport(outDir, filename, problems);
-    if (text != null && text.trim() === "") {
+    const text = readOrReport(outDir, filename, problems, decodeReportText);
+    if (text != null && isBlank(text)) {
       problems.push(`${filename}: empty`);
     }
   }
   for (const filename of [...REPORT_DATA_FILES, "claim.json"]) {
-    const text = readOrReport(outDir, filename, problems);
+    // A data file's refusal reads "cannot be read: ...", as readiness's own reason does (18.184q).
+    const wrap = filename === "claim.json" ? "" : "cannot be read: ";
+    const text = readOrReport(outDir, filename, problems, decodeJsonText, wrap);
     if (text === undefined) {
       continue;
     }
@@ -576,16 +481,22 @@ export function validateReport(outDir: string): string[] {
     }
   }
   for (const filename of OPTIONAL_ARTIFACTS) {
-    const text = readOrReport(outDir, filename, problems);
+    const jsonl = filename === "runtime_drift.jsonl";
+    const text = readOrReport(
+      outDir,
+      filename,
+      problems,
+      jsonl ? decodeJsonText : decodeReportText,
+    );
     if (text == null) {
       continue; // optional: only present, and only validated, when a run actually produced it
     }
     if (filename === "report.csv") {
       problems.push(...validateCsv(text, filename));
-    } else if (filename === "runtime_drift.jsonl") {
+    } else if (jsonl) {
       problems.push(...validateJsonl(text, filename));
     } else {
-      problems.push(...validateXmlWellformed(text, filename));
+      problems.push(...validateXml(text, filename));
     }
   }
   return problems;
@@ -635,6 +546,54 @@ function validateOscalArNist(document: unknown): string[] {
 let sarifAjv: InstanceType<typeof Ajv2020> | null = null;
 let sarifValidateCache: ReturnType<InstanceType<typeof Ajv2020>["compile"]> | null = null;
 
+/** The keyword {@link compiledSarifValidator} adds beside every `"type": "integer"`: the number at
+ * that place was written without a fraction or exponent. Ajv reads `0.0` as the number 0, which draft-04
+ * `integer` would accept, so the lexeme form is kept apart (SPEC 8.7: a field the schema types as an
+ * integer refuses the float form), as Python's draft-04 checker and Java's Jackson nodes already do. */
+const INTEGER_LEXEME = "x-agentce-integer-lexeme";
+
+/** The JSON pointers (Ajv's `instancePath` form) of the numbers in the SARIF document being validated
+ * that were written in the float form; set just before a validation runs. */
+let sarifFloatPointers: ReadonlySet<string> = new Set();
+
+/** The JSON pointer of every number in `value` read in the float form (a fraction or an exponent). */
+function floatPointers(value: unknown, pointer = "", out = new Set<string>()): Set<string> {
+  if (value instanceof NonCanonicalNumber) {
+    if (value.reason === "non_integer_number") {
+      out.add(pointer);
+    }
+  } else if (Array.isArray(value)) {
+    value.forEach((item, i) => floatPointers(item, `${pointer}/${i}`, out));
+  } else if (isRecord(value)) {
+    for (const [key, item] of Object.entries(value)) {
+      floatPointers(item, `${pointer}/${key.replace(/~/g, "~0").replace(/\//g, "~1")}`, out);
+    }
+  }
+  return out;
+}
+
+/** `schema` with {@link INTEGER_LEXEME} beside every `"type": "integer"`, walked without changing it. */
+function withIntegerLexeme(schema: unknown): unknown {
+  if (Array.isArray(schema)) {
+    return schema.map(withIntegerLexeme);
+  }
+  if (!isRecord(schema)) {
+    return schema;
+  }
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(schema)) {
+    out[key] = withIntegerLexeme(value);
+  }
+  const type = schema.type;
+  const integer =
+    type === "integer" ||
+    (Array.isArray(type) && type.includes("integer") && !type.includes("number"));
+  if (integer) {
+    out[INTEGER_LEXEME] = true;
+  }
+  return out;
+}
+
 function compiledSarifValidator() {
   if (sarifValidateCache === null) {
     // The vendored OASIS schema is JSON Schema draft-04 and names itself with the draft-04 `id`
@@ -645,17 +604,35 @@ function compiledSarifValidator() {
     // left untouched.
     const raw = loadSchemaJson("sarif-2.1.0");
     const { id, ...rest } = raw as { id?: string };
-    const fixed = { $id: id, ...rest };
+    const fixed = withIntegerLexeme({ $id: id, ...rest }) as Record<string, unknown>;
     sarifAjv = newAjv({ validateSchema: false });
+    sarifAjv.addKeyword({
+      keyword: INTEGER_LEXEME,
+      type: "number",
+      schemaType: "boolean",
+      error: { message: "must be integer" },
+      validate: (
+        _schema: boolean,
+        _data: number,
+        _parent: unknown,
+        cxt?: { instancePath: string },
+      ) => !sarifFloatPointers.has(cxt?.instancePath ?? ""),
+    });
     sarifValidateCache = sarifAjv.compile(fixed);
   }
   return sarifValidateCache;
 }
 
-function validateSarif210(document: unknown): string[] {
+/** `document` (read from `text`) against the real OASIS SARIF 2.1.0 schema. */
+function validateSarif210(document: unknown, text: string): string[] {
   const validate = compiledSarifValidator();
-  if (validate(document)) {
-    return [];
+  sarifFloatPointers = floatPointers(parseJson(text));
+  try {
+    if (validate(document)) {
+      return [];
+    }
+  } finally {
+    sarifFloatPointers = new Set();
   }
   return ajvProblems("results.sarif (OASIS SARIF 2.1.0): ", document, validate.errors);
 }

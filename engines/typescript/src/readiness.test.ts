@@ -225,12 +225,22 @@ const NOT_JSONL_RULE: Record<string, string> = {
   nbsp_line: "syntax",
 };
 
-/** The NOT READY reason for an unreadable report file; one outside the JSON profile names the rule
- * and line (SPEC 8.7, 18.184x). */
-function cannotRead(name: string, rule?: string): string {
-  return rule === undefined
-    ? `cannot read report file ${name}`
-    : `cannot read report file ${name}: outside the JSON profile: ${rule} at line 1 (SPEC 8.7)`;
+/** The NOT READY reason for a report file that is there but cannot be read, or reads as JSON of the
+ * wrong shape (18.184h); a file outside the JSON profile is refused instead ({@link assertOutsideContract}). */
+function cannotRead(name: string): string {
+  return `cannot read report file ${name}`;
+}
+/** Readiness on a report folder whose `name` is outside the report-file reader contract refuses the
+ * input (exit 3, report.validation_failed) naming the file and the rule, never a verdict (SPEC 8.7,
+ * 18.60). */
+function assertOutsideContract(dir: string, name: string, rule: string, line = 1): void {
+  assert.throws(
+    () => computeReadiness(dir, { severities: SEVERITIES }),
+    (exc: unknown) =>
+      exc instanceof InputError &&
+      exc.key === "report.validation_failed" &&
+      exc.cause === `${name}: outside the JSON profile: ${rule} at line ${line} (SPEC 8.7)`,
+  );
 }
 const JSONL_OK: Record<string, (r: string) => string> = {
   crlf: (r) => `${r}\r\n`,
@@ -243,15 +253,13 @@ const JSONL_OK: Record<string, (r: string) => string> = {
 
 for (const [name, record] of Object.entries(JSONL_RECORD)) {
   for (const [id, lines] of Object.entries(NOT_JSONL)) {
-    test(`${name} line outside the JSON Lines rule (${id}) is NOT READY (18.184n)`, () => {
+    test(`${name} line outside the JSON Lines rule (${id}) is refused (18.184n, 18.60)`, () => {
       const dir = report();
       writeFileSync(join(dir, name), lines(record));
-      assert.deepEqual(computeReadiness(dir, { severities: SEVERITIES }).reasons, [
-        cannotRead(name, NOT_JSONL_RULE[id]),
-      ]);
+      assertOutsideContract(dir, name, NOT_JSONL_RULE[id] as string);
     });
   }
-  test(`${name} with a byte that is not UTF-8 is NOT READY (18.184n)`, () => {
+  test(`${name} with a byte that is not UTF-8 is refused (18.184n, 18.60)`, () => {
     const dir = report();
     writeFileSync(
       join(dir, name),
@@ -260,9 +268,7 @@ for (const [name, record] of Object.entries(JSONL_RECORD)) {
         Buffer.from([0xff, 0x22, 0x7d, 0x0a]),
       ]),
     );
-    assert.deepEqual(computeReadiness(dir, { severities: SEVERITIES }).reasons, [
-      cannotRead(name, "invalid_utf8"),
-    ]);
+    assertOutsideContract(dir, name, "invalid_utf8");
   });
   for (const [id, lines] of Object.entries(JSONL_OK)) {
     test(`${name} line inside the JSON Lines rule (${id}) stays READY (18.184n)`, () => {
@@ -816,21 +822,25 @@ const MALFORMED: [string, string, string?][] = [
   ["applicability.jsonl", '{"drift": [3]}\n'],
 ];
 for (const [name, text, rule] of MALFORMED) {
-  test(`${name} reading ${JSON.stringify(text)} is NOT READY, named (18.184h)`, () => {
+  // Text that is not JSON is outside the reader contract and refused; JSON of the wrong shape blocks.
+  const outcome = rule === undefined ? "is NOT READY, named (18.184h)" : "is refused (18.60)";
+  test(`${name} reading ${JSON.stringify(text)} ${outcome}`, () => {
     const dir = report();
     writeFileSync(join(dir, name), text);
+    if (rule !== undefined) {
+      assertOutsideContract(dir, name, rule);
+      return;
+    }
     const verdict = computeReadiness(dir, { severities: SEVERITIES });
     assert.equal(verdict.verdict, NOT_READY);
-    assert.deepEqual(verdict.reasons, [cannotRead(name, rule)]);
+    assert.deepEqual(verdict.reasons, [cannotRead(name)]);
   });
 }
 
-test("a coverage.json that is not UTF-8 is NOT READY (18.184h)", () => {
+test("a coverage.json that is not UTF-8 is refused (18.184h, 18.60)", () => {
   const dir = report();
   writeFileSync(join(dir, "coverage.json"), Buffer.from('{"subjects": {}}\xff', "latin1"));
-  assert.deepEqual(computeReadiness(dir, { severities: SEVERITIES }).reasons, [
-    cannotRead("coverage.json", "invalid_utf8"),
-  ]);
+  assertOutsideContract(dir, "coverage.json", "invalid_utf8");
 });
 
 test("an empty coverage.json object stays READY (ruling 393)", () => {
@@ -887,6 +897,15 @@ for (const ruleCase of REPORT_FILE_RULE_CASES) {
       unlinkSync(join(dir, ruleCase.file));
     } else {
       writeFileSync(join(dir, ruleCase.file), content);
+    }
+    // A reason naming the JSON profile is, since 18.60, readiness refusing the input instead.
+    const outside =
+      /^cannot read report file (\S+): (outside the JSON profile: (\w+) at line (\d+) .*)$/.exec(
+        ruleCase.readiness[0] ?? "",
+      );
+    if (outside !== null && ruleCase.readiness.length === 1) {
+      assertOutsideContract(dir, outside[1] as string, outside[3] as string, Number(outside[4]));
+      return;
     }
     assert.deepEqual(computeReadiness(dir, { severities: SEVERITIES }).reasons, ruleCase.readiness);
   });

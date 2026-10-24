@@ -15,6 +15,7 @@ import {
   Type as YamlType,
   load as yamlLoad,
 } from "js-yaml";
+import { errorFix } from "./errorCatalogue";
 import { InputError } from "./errors";
 import { JsonProfileError, decodeProfile, jsonlRecords, parseReportJson } from "./json";
 import { byteCompare, decodeUtf8Strict, joinPath, normalizePosixPath, pyRepr, pyStr } from "./util";
@@ -1435,6 +1436,9 @@ export interface ReadinessVerdict {
   readonly limitations: string[];
 }
 
+/** The key readiness and sign refuse a report file outside the reader contract with. */
+const REPORT_INVALID = "report.validation_failed";
+
 /** Returns the readiness verdict for a finished report directory (SPEC §13.3.4 stage 4), ported from
  * `compute_readiness` (`readiness.py:104-197`) exactly. `severities` maps control id to severity
  * (from the catalogs the report used); `gaps` is the set of control ids recorded in the operator's
@@ -1444,7 +1448,10 @@ export interface ReadinessVerdict {
  * **multisets, not sets**: two subjects each producing the identical high-severity-gap reason string
  * yield two entries, not one, built with `push`, never a `Set`/`Map` keyed on the message text, and
  * sorted with {@link byteCompare}, never `Array.sort()`'s default UTF-16-code-unit order -- a
- * control id, subject, stream name, or drift `ref` can carry arbitrary report content. */
+ * control id, subject, stream name, or drift `ref` can carry arbitrary report content. A report file
+ * outside the reader contract (the JSON profile, a byte-order mark and bytes that are not UTF-8
+ * included) gives no verdict: it throws `InputError` `report.validation_failed` naming the file and
+ * the rule (SPEC 8.7). */
 export function computeReadiness(
   reportDir: string,
   { severities, deviations, gaps, limitations: given }: ComputeReadinessOptions,
@@ -1463,9 +1470,14 @@ export function computeReadiness(
         return parse(text);
       }
     } catch (exc) {
-      // The profile rule and line when the file is outside the JSON profile (SPEC 8.7).
+      // A file outside the report-file reader contract (the JSON profile, a byte-order mark and bytes
+      // that are not UTF-8 included) is an input refusal, not a verdict (SPEC 8.7); a file of the
+      // wrong shape blocks as a reason.
       const rule = profileCause(exc);
-      reasons.push(`cannot read report file ${name}${rule ? `: ${rule.message}` : ""}`);
+      if (rule !== undefined) {
+        throw new InputError(REPORT_INVALID, `${name}: ${rule.message}`, errorFix(REPORT_INVALID));
+      }
+      reasons.push(`cannot read report file ${name}`);
       return undefined;
     }
     reasons.push(`missing report file ${name}`);
