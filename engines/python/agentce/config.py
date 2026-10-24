@@ -103,8 +103,8 @@ def resolve(
     except PermissionError as exc:
         raise InputError(
             "input.config_unreadable",
-            f"agentce.toml {exc.filename} could not be read ({exc.strerror}).",
-            "make agentce.toml and its folder readable, then re-run.",
+            f"the config file {exc.filename} could not be read ({exc.strerror}).",
+            "make that file and its folder readable, then re-run.",
         ) from exc
 
     resolved: list[dict[str, Any]] = []
