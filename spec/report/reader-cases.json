@@ -324,7 +324,7 @@
    "exit": 0
   },
   {
-   "id": "csv-one-extra-empty-line-crlf-ok",
+   "id": "csv-one-extra-empty-line-crlf",
    "rule": "csv_trailing_empty_line",
    "command": "report-validate",
    "file": "report.csv",
@@ -334,10 +334,12 @@
      "hex": "636f6e74726f6c2c7375626a6563742c6f7574636f6d652c636f6e74726f6c5f76657273696f6e2c72756e672c6d6f64650d0a4441542d30312c732c696e73756666696369656e745f65766964656e63652c323032362e30392c322c6175746f6d617465640d0a0d0a"
     }
    ],
-   "exit": 0
+   "exit": 3,
+   "key": "report.validation_failed",
+   "names": "has 0 field(s)"
   },
   {
-   "id": "csv-one-extra-empty-line-lf-ok",
+   "id": "csv-one-extra-empty-line-lf",
    "rule": "csv_trailing_empty_line",
    "command": "report-validate",
    "file": "report.csv",
@@ -347,7 +349,9 @@
      "hex": "636f6e74726f6c2c7375626a6563742c6f7574636f6d652c636f6e74726f6c5f76657273696f6e2c72756e672c6d6f64650a4441542d30312c732c696e73756666696369656e745f65766964656e63652c323032362e30392c322c6175746f6d617465640a0a"
     }
    ],
-   "exit": 0
+   "exit": 3,
+   "key": "report.validation_failed",
+   "names": "has 0 field(s)"
   },
   {
    "id": "csv-one-final-line-end-ok",

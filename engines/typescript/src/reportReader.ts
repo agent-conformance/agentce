@@ -51,8 +51,8 @@ export function isBlank(text: string): boolean {
 // --- CSV (RFC 4180) ---------------------------------------------------------------------------------
 
 /** The records of `text` as RFC 4180 reads them: a record ends at LF or CR LF outside quotes, a quoted
- * field may hold line ends, commas and doubled quotes, a final record end starts no record, and one
- * trailing empty line is dropped. An empty line is a record with no fields. Throws {@link ReaderError}
+ * field may hold line ends, commas and doubled quotes, and a final record end starts no record. An
+ * empty line is a record with no fields, even at the very end (SPEC 8.7). Throws {@link ReaderError}
  * for a bare CR outside quotes, text after a closing quote, a quote inside an unquoted field, or end of
  * text inside a quoted field (at the line of its opening quote). */
 export function readCsv(text: string): string[][] {
@@ -127,9 +127,6 @@ export function readCsv(text: string): string[][] {
       break;
     }
     records.push(record);
-  }
-  if (records.length > 0 && (records[records.length - 1] as string[]).length === 0) {
-    records.pop(); // the one trailing empty line RFC 4180 readers allow
   }
   return records;
 }

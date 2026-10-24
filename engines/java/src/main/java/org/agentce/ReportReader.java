@@ -92,7 +92,8 @@ public final class ReportReader {
 
     /** The records of {@code text}, each a list of fields: a record ends at LF or CR LF outside quotes; a
      * quoted field may hold line ends, commas and doubled quotes; an empty line is a record with no
-     * fields, and one empty last line (the text ends with two record ends) is dropped. A bare CR outside
+     * fields, even at the very end (SPEC 8.7: the final line end is optional, an empty line after it is
+     * refused). A bare CR outside
      * quotes, text after a closing quote, a quote inside an unquoted field or an unclosed quote throws. */
     public static List<List<String>> readCsv(String text) {
         List<List<String>> records = new ArrayList<>();
@@ -164,10 +165,6 @@ public final class ReportReader {
                 i = recordEnd(text, i);
                 break;
             }
-        }
-        int last = records.size() - 1;
-        if (last >= 0 && records.get(last).isEmpty()) {
-            records.remove(last); // one trailing empty line is allowed (RFC 4180's optional last line end)
         }
         return records;
     }

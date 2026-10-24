@@ -93,9 +93,9 @@ def _csv_field(text: str, i: int) -> tuple[str, int]:
 
 def read_csv(text: str) -> list[list[str]]:
     """The records of ``text``, each a list of fields. A record ends at LF or CR LF outside quotes; a
-    final record end does not start a new record; an empty line is a record with no fields, and one
-    such line at the very end (the text ends with two record ends) is dropped. Raises
-    :class:`ReaderError` at the first fault."""
+    final record end does not start a new record; an empty line is a record with no fields, even
+    at the very end (SPEC 8.7: the final line end is optional, an empty line after it is refused).
+    Raises :class:`ReaderError` at the first fault."""
     records: list[list[str]] = []
     n = len(text)
     i = 0
@@ -113,8 +113,6 @@ def read_csv(text: str) -> list[list[str]]:
             i += 2 if text[i] == "\r" else 1
             break
         records.append([] if empty_line else fields)
-    if len(records) > 1 and records[-1] == []:
-        records.pop()
     return records
 
 
