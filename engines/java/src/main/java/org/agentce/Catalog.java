@@ -397,6 +397,52 @@ public final class Catalog {
         return false;
     }
 
+    /** Whether {@code path}, after links, is {@code root} or lies under it, judged by folder identity; a
+     * dangling link is judged by where it points, as Python's {@code signing.inside_folder(root, path,
+     * or_root=True)} with {@code os.path.realpath} judges it. A root that cannot be looked at holds nothing. */
+    static boolean insideFolderOrRoot(Path root, Path path) {
+        Object rootId = identityOrNull(root);
+        if (rootId == null) {
+            return false;
+        }
+        for (Path up = lenientRealPath(path, 0); up != null; up = up.getParent()) {
+            if (rootId.equals(identityOrNull(up))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Object identityOrNull(Path dir) {
+        try {
+            return folderIdentity(dir, Files.readAttributes(dir, BasicFileAttributes.class));
+        } catch (IOException | IllegalStateException e) {
+            return null;
+        }
+    }
+
+    /** {@code path} with its links resolved as far as they lead, as {@code os.path.realpath} resolves it: a
+     * link to something missing resolves to where it points, and a link loop stops after 40 hops. */
+    private static Path lenientRealPath(Path path, int hops) {
+        try {
+            return path.toRealPath();
+        } catch (IOException e) {
+            Path absolute = path.toAbsolutePath().normalize();
+            Path parent = absolute.getParent();
+            if (parent == null || hops > 40) {
+                return absolute;
+            }
+            if (Files.isSymbolicLink(absolute)) {
+                try {
+                    return lenientRealPath(parent.resolve(Files.readSymbolicLink(absolute)), hops + 1);
+                } catch (IOException unreadable) {
+                    return absolute;
+                }
+            }
+            return lenientRealPath(parent, hops + 1).resolve(absolute.getFileName());
+        }
+    }
+
     private static Object identity(Path dir) {
         try {
             return folderIdentity(dir, Files.readAttributes(dir, BasicFileAttributes.class));

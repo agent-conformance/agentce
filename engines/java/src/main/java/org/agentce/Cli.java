@@ -7,6 +7,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
@@ -1107,6 +1108,41 @@ global options:
         return new InputError(key, ErrorCatalogue.errorCause(key), ErrorCatalogue.errorFix(key));
     }
 
+    /** Refuse ({@code input.out_link_outside}) before anything is written when an entry under {@code --out},
+     * file or folder, is a link leading outside it: the run would write through it and change something
+     * elsewhere (ruling R7; census odd-inputs line 89, 18.184s). Links are found without following them and
+     * judged by where they point, so a link to something missing outside is refused too; a link inside
+     * {@code --out} is followed as before. Mirrors Python's {@code _refuse_links_out}. */
+    static void refuseLinksOut(Path out) {
+        if (!Files.isDirectory(out)) {
+            return;
+        }
+        refuseLinksOut(out, out);
+    }
+
+    private static void refuseLinksOut(Path out, Path dir) {
+        List<Path> entries;
+        try (Stream<Path> listing = Files.list(dir)) {
+            entries = listing.sorted().toList();
+        } catch (IOException e) {
+            return;
+        }
+        for (Path entry : entries) {
+            if (Files.isSymbolicLink(entry)) {
+                if (!Catalog.insideFolderOrRoot(out, entry)) {
+                    String rel = out.relativize(entry).toString().replace(File.separatorChar, '/');
+                    throw new InputError(
+                            "input.out_link_outside",
+                            rel + " in --out links outside the output folder, so the run would write through it"
+                                    + " and change a file elsewhere.",
+                            ErrorCatalogue.errorFix("input.out_link_outside"));
+                }
+            } else if (Files.isDirectory(entry, LinkOption.NOFOLLOW_LINKS)) {
+                refuseLinksOut(out, entry);
+            }
+        }
+    }
+
     /** A records folder, refused in Python's order until this engine reads one (18.30, KD-074): beside
      * --bundle; a folder that does not exist; a bad --profile; --package-for-sharing (which needs a
      * bundle in every engine); and otherwise the folder itself, with input.records_unsupported. */
@@ -1167,8 +1203,12 @@ global options:
         // --state's writability is proved here, before any --out write below (writeQuarantineJsonl
         // etc.), not only when state.save() finally writes at the end of this method: a run refused
         // for an unwritable --state must leave nothing in --out that looks like a result either.
+        // state.json is read here too, once, so a file that is not UTF-8 or not JSON is refused before
+        // any --out write (census odd-inputs lines 85, 87; 18.184s); Stage 6a reuses what was loaded.
+        StateDir state = null;
         if (options.state() != null) {
             StateDir.ensureWritable(Paths.get(options.state()));
+            state = StateDir.load(Paths.get(options.state())); // incompatible state_version aborts with exit 3
         }
         // Resolved on every run, even with no --catalog-dir (python-reference.md §9).
         Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());
@@ -1182,6 +1222,7 @@ global options:
         String deviationsFile = options.deviations() != null
                 ? requireFile(options.deviations(), "deviations", "the deviation register")
                 : null;
+        refuseLinksOut(out);
 
         // Stage 1: ingest and validate. A missing/mismatching manifest aborts with exit 3.
         Bundle bundle = Bundle.load(Paths.get(bundleDir));
@@ -1236,10 +1277,9 @@ global options:
 
         // Stage 6a: incremental state (SPEC §5.4 B7, HR-10).
         String newWindowEnd = StateDir.windowEnd(profileObj.observationWindow, ingested.accepted);
-        StateDir state = null;
+        // (state was already loaded, and its writability already proved, above.)
         List<String> supersedes = List.of();
-        if (options.state() != null) {
-            state = StateDir.load(Paths.get(options.state())); // incompatible state_version aborts with exit 3
+        if (state != null) {
             supersedes = state.plan(bundle.digest(), ingested.accepted, newWindowEnd);
         }
 
