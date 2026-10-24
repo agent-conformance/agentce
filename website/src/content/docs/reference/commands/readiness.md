@@ -43,3 +43,5 @@ global options:
 ```
 
 Exit codes follow the [common CLI scheme](/reference/commands/#exit-codes).
+
+`readiness` exits `0` for READY and READY WITH LIMITATIONS and `1` for NOT READY. It exits `3` when it refuses an input, such as a report file outside the SPEC §8.7 reader contract (`report.validation_failed`), and then writes no readiness file.

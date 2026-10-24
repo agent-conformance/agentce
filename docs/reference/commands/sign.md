@@ -34,3 +34,5 @@ global options:
 ```
 
 Exit codes follow the [common CLI scheme](index.md#exit-codes).
+
+`sign` exits `3` when it refuses an input. A report file outside the SPEC §8.7 reader contract is refused with `report.validation_failed`, a bad `manifest.json` with `sign.no_manifest`, and a bad `claim.json` with `sign.claim_malformed`.

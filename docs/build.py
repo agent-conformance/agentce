@@ -80,6 +80,28 @@ _EXIT_CODES = (
     "the run exits `0`.\n"
 )
 
+# Exit notes for the command pages whose exits narrow the common scheme (SPEC §8.5, §8.7).
+_COMMAND_EXIT_NOTES = {
+    "readiness": (
+        "`readiness` exits `0` for READY and READY WITH LIMITATIONS and `1` for NOT READY. It exits "
+        "`3` when it refuses an input, such as a report file outside the SPEC §8.7 reader contract "
+        "(`report.validation_failed`), and then writes no readiness file."
+    ),
+    "sign": (
+        "`sign` exits `3` when it refuses an input. A report file outside the SPEC §8.7 reader "
+        "contract is refused with `report.validation_failed`, a bad `manifest.json` with "
+        "`sign.no_manifest`, and a bad `claim.json` with `sign.claim_malformed`."
+    ),
+}
+
+
+def _exit_line(name: str, scheme_link: str) -> str:
+    """The exit-code line of one command page, with its own note when it has one."""
+    line = f"Exit codes follow the [common CLI scheme]({scheme_link}).\n"
+    note = _COMMAND_EXIT_NOTES.get(name)
+    return f"{line}\n{note}\n" if note else line
+
+
 def _slug(heading: str) -> str:
     """GitHub-style heading anchor: lowercase, punctuation dropped, spaces to hyphens."""
     text = heading.strip().lower().replace("`", "")
@@ -188,7 +210,7 @@ def _command_pages() -> dict[Path, str]:
             "```text\n"
             f"{help_text}\n"
             "```\n\n"
-            "Exit codes follow the [common CLI scheme](index.md#exit-codes).\n"
+            f"{_exit_line(name, 'index.md#exit-codes')}"
             f"{_security_copy_section('../report-schemas/security.md') if name == 'assess' else ''}"
         )
     rows = "\n".join(
@@ -880,7 +902,7 @@ def _site_command_pages() -> dict[Path, str]:
             "```text\n"
             f"{help_text}\n"
             "```\n\n"
-            "Exit codes follow the [common CLI scheme](/reference/commands/#exit-codes).\n"
+            f"{_exit_line(name, '/reference/commands/#exit-codes')}"
             f"{_security_copy_section('/reference/report-schemas/security/') if name == 'assess' else ''}"
         )
         pages[target / f"{name}.md"] = (
