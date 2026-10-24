@@ -2,7 +2,7 @@ id: TRN-04
 version: "2026.09"
 title: Consequential decisions are timestamped for explanation
 crosswalk:
-  - {framework: eu-ai-act, clause: "Art. 50", relation: implements, verified_against_text: false}
+  - {framework: eu-ai-act, clause: "Art. 86", relation: implements, verified_against_text: false}
 applicability:
   applies_to_roles: [both]
 evaluation:
@@ -11,6 +11,7 @@ evaluation:
   min_source_class: self_report
   minimum_evidence:
     - {event: Decision, class: self_report}
+    - {event: Notice, class: any}
   shape: shapes/TRN-04.ttl
 expectations:
   - {id: S1, text: "Consequential decisions are timestamped for explanation."}

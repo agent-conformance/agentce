@@ -4,4 +4,5 @@
 
 agentce:DOC-02-Shape a sh:NodeShape ;
   sh:targetClass agentce:ConsequentialDecision ;
-  sh:property [ sh:path prov:atTime ; sh:minCount 1 ; sh:name "S1" ] .
+  sh:property [ sh:path prov:atTime ; sh:minCount 1 ; sh:name "S1" ] ;
+  sh:property [ sh:path agentce:decisionDocumented ; sh:hasValue true ; sh:name "S2" ] .

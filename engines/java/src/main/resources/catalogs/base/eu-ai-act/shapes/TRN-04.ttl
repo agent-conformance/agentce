@@ -4,4 +4,4 @@
 
 agentce:TRN-04-Shape a sh:NodeShape ;
   sh:targetClass agentce:ConsequentialDecision ;
-  sh:property [ sh:path prov:atTime ; sh:minCount 1 ; sh:name "S1" ] .
+  sh:property [ sh:path agentce:explanationTimed ; sh:hasValue true ; sh:name "S1" ] .

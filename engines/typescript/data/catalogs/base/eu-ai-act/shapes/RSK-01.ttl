@@ -4,4 +4,4 @@
 
 agentce:RSK-01-Shape a sh:NodeShape ;
   sh:targetClass agentce:ConsequentialDecision ;
-  sh:property [ sh:path agentce:authorizedBy ; sh:minCount 1 ; sh:name "S1" ] .
+  sh:property [ sh:path agentce:authorizationGateCleared ; sh:hasValue true ; sh:name "S1" ] .

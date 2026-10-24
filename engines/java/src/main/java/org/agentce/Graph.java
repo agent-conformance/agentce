@@ -24,8 +24,9 @@ import java.util.stream.Stream;
  * {@code agentce:precededBy}, {@code agentce:componentDeclared}, {@code agentce:declaredComponentsObserved},
  * {@code agentce:triggersIncident}, {@code agentce:oversightCoverageComplete},
  * {@code agentce:interventionEffective}, {@code agentce:interventionByHuman},
- * {@code agentce:incidentResponded}, {@code agentce:riskReviewed}, {@code agentce:securityRefsResolve} and
- * {@code agentce:linkedRecordsResolve}). The {@code rdfs:subClassOf*} closure is materialised so class membership
+ * {@code agentce:incidentResponded}, {@code agentce:riskReviewed}, {@code agentce:securityRefsResolve},
+ * {@code agentce:linkedRecordsResolve} and the decision-record literals DOC-02, TRN-04, OVS-05, RSK-01, REC-05,
+ * TRN-01 and TRN-05 read). The {@code rdfs:subClassOf*} closure is materialised so class membership
  * needs no inference. This is a faithful port of the reference; it must build byte-identical graphs.
  */
 public final class Graph {
@@ -374,6 +375,84 @@ public final class Graph {
     // engine-materialised class, so one shape can compare the declaration with what operated.
     private static final String COMPONENT_RECORD = "agentce:ComponentRecord";
     private static final Set<String> COMPONENT_RECORD_TYPES = Set.of("BundleLoaded", "ToolCall", "ModelCall");
+
+    /** The SPEC Digest form (§6.2.3). */
+    private static final java.util.regex.Pattern DIGEST = java.util.regex.Pattern.compile("sha256:[0-9a-f]{64}");
+
+    /** The held PolicyDecisions, Notices and Disclosures a decision's record literals read (18.37f). */
+    private static final class Gates {
+        final Map<String, JsonNode> policies = new LinkedHashMap<>();
+        // decision IRI -> the held PolicyDecisions whose refs.request names it, by graph IRI only (SPEC §6.3).
+        final Map<String, List<String>> requested = new HashMap<>();
+        final Map<String, JsonNode> notices = new HashMap<>();
+        final List<JsonNode> disclosures = new ArrayList<>();
+
+        Gates(List<JsonNode> events, java.util.function.Function<JsonNode, String> ptype) {
+            for (JsonNode event : events) {
+                String node = Iri.eventIri(event.get("id").asText());
+                String kind = ptype.apply(event);
+                if ("PolicyDecision".equals(kind)) {
+                    policies.put(node, dataOf(event));
+                    String request = str(refsOf(event).get("request"));
+                    if (request != null) {
+                        requested.computeIfAbsent(request, k -> new ArrayList<>()).add(node);
+                    }
+                } else if ("Notice".equals(kind)) {
+                    notices.put(node, dataOf(event));
+                } else if ("Disclosure".equals(kind)) {
+                    disclosures.add(dataOf(event));
+                }
+            }
+        }
+
+        /** The held PolicyDecisions that gate a decision: the one its {@code refs.authorization} names and every one
+         * whose {@code refs.request} names it. Null when there is none, or when {@code refs.authorization} is present
+         * and is not the graph IRI of a held PolicyDecision (a bare id, an unheld name, another type: approvals ruling
+         * Q1 B). */
+        List<JsonNode> linked(String node, JsonNode data) {
+            JsonNode refs = data.get("refs");
+            Set<String> names = new LinkedHashSet<>(requested.getOrDefault(node, List.of()));
+            if (refs != null && refs.isObject() && refs.has("authorization")) {
+                String authorization = str(refs.get("authorization"));
+                if (authorization == null || !policies.containsKey(authorization)) {
+                    return null;
+                }
+                names.add(authorization);
+            }
+            List<JsonNode> linked = new ArrayList<>();
+            for (String name : names) {
+                linked.add(policies.get(name));
+            }
+            return linked.isEmpty() ? null : linked;
+        }
+    }
+
+    /** A PolicyDecision names the exact policy it applied: a policy id, a version and a SPEC Digest (REC-05). */
+    private static boolean namesPolicy(JsonNode pd) {
+        String digest = str(pd.get("policy_digest"));
+        return text(pd.get("policy_id")) != null
+                && text(pd.get("policy_version")) != null
+                && digest != null
+                && DIGEST.matcher(digest).matches();
+    }
+
+    /** DOC-02: the decision records what it chose and, when it lists its options, one of them (SPEC §6.2.3). */
+    private static boolean documented(JsonNode data) {
+        String chosen = text(data.get("chosen"));
+        JsonNode options = data.get("options");
+        if (chosen == null) {
+            return false;
+        }
+        if (options == null || !options.isArray() || options.isEmpty()) {
+            return true;
+        }
+        for (JsonNode option : options) {
+            if (option.isObject() && chosen.equals(str(option.get("id")))) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     /** A non-empty string, else null. */
     static String text(JsonNode node) {
@@ -1726,6 +1805,7 @@ public final class Graph {
             for (JsonNode event : events) {
                 heldTypes.put(Iri.eventIri(event.get("id").asText()), ptype(event));
             }
+            Gates gates = new Gates(events, this::ptype);
             Set<String> unresolved = unresolvedLinks(events);
             for (JsonNode event : events) {
                 String node = Iri.eventIri(event.get("id").asText());
@@ -1748,6 +1828,7 @@ public final class Graph {
                     literal(node, "agentce:triggersIncident",
                             incidentDecisions == null || incidentDecisions.contains(node));
                     riskReviewed(node, refsOf(event), policyDecisions);
+                    decisionRecord(node, data, gates);
                 }
                 if ("Override".equals(ptype) || "Interrupt".equals(ptype)) {
                     intervention(node, ptype, event, byHuman.get(node));
@@ -1866,6 +1947,54 @@ public final class Graph {
                 }
             }
             return broken;
+        }
+
+        /** The literals DOC-02, TRN-04, OVS-05, RSK-01, REC-05, TRN-01 and TRN-05 read on a decision (18.37f). */
+        private void decisionRecord(String node, JsonNode data, Gates gates) {
+            String time = decisionTime.getOrDefault(node, "");
+            List<JsonNode> linked = gates.linked(node, data);
+            List<JsonNode> gating = linked == null ? List.of() : linked;
+            boolean held = linked != null && linked.stream().noneMatch(pd -> "deny".equals(str(pd.get("decision"))));
+            literal(node, "agentce:authorizationHeld", held);
+            literal(node, "agentce:authorizationGateCleared", held && gating.stream().allMatch(pd -> {
+                String decision = str(pd.get("decision"));
+                return "allow".equals(decision)
+                        || ("require_approval".equals(decision) && humanApprovers.containsKey(node));
+            }));
+            literal(node, "agentce:authorityRecorded", held && gating.stream().allMatch(Graph::namesPolicy));
+            literal(node, "agentce:decisionDocumented", documented(data));
+            List<JsonNode> notices = new ArrayList<>();
+            for (String notice : decisionNotice.getOrDefault(node, Set.of())) {
+                JsonNode found = gates.notices.get(notice);
+                if (found != null) {
+                    notices.add(found);
+                }
+            }
+            literal(node, "agentce:explanationTimed", notices.stream().anyMatch(n -> {
+                String delivered = str(n.get("delivered_at"));
+                if (!"explanation".equals(str(n.get("notice_type"))) || delivered == null) {
+                    return false;
+                }
+                Integer order = Structural.compareInstants(delivered, time);
+                return order != null && order >= 0;
+            }));
+            String person = text(data.get("person_ref"));
+            literal(node, "agentce:affectedPersonNotified", notices.stream().anyMatch(n ->
+                    text(n.get("person_ref")) != null
+                            && text(n.get("delivered_at")) != null
+                            && (person == null || person.equals(str(n.get("person_ref"))))));
+            JsonNode affects = data.get("affects_natural_person");
+            literal(node, "agentce:inDisclosureScope", !(affects != null && affects.isBoolean() && !affects.booleanValue()));
+            String session = text(data.get("session_id"));
+            literal(node, "agentce:aiInteractionDisclosed", session != null && gates.disclosures.stream().anyMatch(d -> {
+                String delivered = str(d.get("delivered_at"));
+                if (!"ai_interaction".equals(str(d.get("disclosure_type")))
+                        || !session.equals(str(d.get("session_id"))) || delivered == null) {
+                    return false;
+                }
+                Integer order = Structural.compareInstants(delivered, time);
+                return order != null && order <= 0;
+            }));
         }
 
         /** RSK-02 (Art. 9): a review of the decision, or a {@code refs.authorization} (or

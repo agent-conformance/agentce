@@ -136,6 +136,30 @@ agentce:incidentResponded a owl:DatatypeProperty ; rdfs:label "incident responde
 agentce:riskReviewed a owl:DatatypeProperty ; rdfs:label "risk reviewed" ;
   rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
   rdfs:comment "Whether the decision was reviewed, or its authorization names a PolicyDecision the bundle holds." .
+agentce:authorizationHeld a owl:DatatypeProperty ; rdfs:label "authorization held" ;
+  rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether a held PolicyDecision gates the decision (the one its authorization names, or one whose request names it), none of them is a deny, and any authorization it carries names a held PolicyDecision by its IRI." .
+agentce:authorizationGateCleared a owl:DatatypeProperty ; rdfs:label "authorization gate cleared" ;
+  rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether the authorization is held and every PolicyDecision that gates the decision allowed it, or required approval and a human approved the decision." .
+agentce:authorityRecorded a owl:DatatypeProperty ; rdfs:label "authority recorded" ;
+  rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether the authorization is held and every PolicyDecision that gates the decision names its policy id, policy version and a sha256 policy digest." .
+agentce:decisionDocumented a owl:DatatypeProperty ; rdfs:label "decision documented" ;
+  rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether the decision records what it chose and, when it lists its options, the chosen value is the id of one of them." .
+agentce:explanationTimed a owl:DatatypeProperty ; rdfs:label "explanation timed" ;
+  rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether an explanation Notice names the decision and was delivered at or after the decision's time, compared as instants." .
+agentce:affectedPersonNotified a owl:DatatypeProperty ; rdfs:label "affected person notified" ;
+  rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether a Notice naming the decision records the person notified and its delivery time, and names the decision's own person when the decision names one." .
+agentce:inDisclosureScope a owl:DatatypeProperty ; rdfs:label "in disclosure scope" ;
+  rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
+  rdfs:comment "False only when the decision records that it affects no natural person; a decision that does not say stays in scope." .
+agentce:aiInteractionDisclosed a owl:DatatypeProperty ; rdfs:label "AI interaction disclosed" ;
+  rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether an ai_interaction Disclosure in the decision's session was delivered at or before the decision's time, compared as instants." .
 agentce:securityRefsResolve a owl:DatatypeProperty ; rdfs:label "security references resolve" ;
   rdfs:domain agentce:ToolCall ; rdfs:range xsd:boolean ;
   rdfs:comment "Whether every authorization, delegation and instruction reference the call carries names a held PolicyDecision, DelegationIssued and Instruction respectively." .

@@ -45,15 +45,17 @@ public final class Assess {
     static final Set<String> SELF_REPORT_EQUIVALENT_CLASSES = Set.of("any", "self_report");
 
     /** The predicates whose value the SPEC §10.4 human-actor rule decides: a human's approval or review of a
-     * decision, enough human approvers, a human intervention, the review half of a risk review (18.186), and an
-     * action's CND-02 gate, which a human's approval releases (18.187). */
+     * decision, enough human approvers, a human intervention, the review half of a risk review (18.186), the human
+     * approval that clears a require_approval gate (18.37f), and an action's CND-02 gate, which a human's approval
+     * releases (18.187). */
     static final Set<String> HUMAN_ACTOR_PATHS = Set.of(
             "agentce:approvedBy",
             "agentce:gateMet",
             "agentce:reviewedBy",
             "agentce:oversightCoverageComplete",
             "agentce:interventionByHuman",
-            "agentce:riskReviewed");
+            "agentce:riskReviewed",
+            "agentce:authorizationGateCleared");
 
     /** Whether a violation's constraint reads a predicate the SPEC §10.4 human-actor rule decides and, from its
      * focus, reaches a node that fails the rule ({@code reads} gives each path's predicates, nested shapes

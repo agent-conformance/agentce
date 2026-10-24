@@ -15,6 +15,7 @@ materialised so class membership needs no inference (SPEC §7.2). Everything is 
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from collections.abc import Collection, Iterable, Iterator
 from typing import Any, NamedTuple
@@ -22,7 +23,7 @@ from typing import Any, NamedTuple
 from .domain import TOKEN_CAP, DomainBinding, token_count
 from .iri import ZERO_KEY, event_iri, is_event_ref, principal_iri
 from .store import GraphStore
-from .structural import compare_literals
+from .structural import compare_instants, compare_literals
 
 
 class UnreadableWrite(NamedTuple):
@@ -43,6 +44,8 @@ TASK_MODEL_CALL = "agentce:TaskModelCall"
 #: An action whose task budgets the records cannot tell (CND-07's evidence shape).
 BUDGET_UNJUDGED = "agentce:BudgetUnjudged"
 DATETIME = "xsd:dateTime"
+#: The SPEC Digest form (§6.2.3).
+_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 INTEGER = "xsd:integer"
 
 #: The base class hierarchy (child -> parent), mirroring spec/vocab/agentce.ttl (SPEC §6.3).
@@ -404,6 +407,65 @@ def _after_every(time: str, actions: Collection[str]) -> bool:
     return bool(actions) and all(
         compare_literals(time, action) == 1 for action in actions
     )
+
+
+class _Gates:
+    """The held PolicyDecisions, Notices and Disclosures a decision's record literals read (18.37f)."""
+
+    def __init__(self, events: list[dict[str, Any]], ptype: Any) -> None:
+        self.policies: dict[str, dict[str, Any]] = {}
+        # decision IRI -> the held PolicyDecisions whose refs.request names it, by graph IRI only (SPEC §6.3).
+        self.requested: dict[str, list[str]] = {}
+        self.notices: dict[str, dict[str, Any]] = {}
+        self.disclosures: list[dict[str, Any]] = []
+        for event in events:
+            node = event_iri(str(event["id"]))
+            kind = ptype(event)
+            if kind == "PolicyDecision":
+                self.policies[node] = _data(event)
+                request = _refs(event).get("request")
+                if isinstance(request, str):
+                    self.requested.setdefault(request, []).append(node)
+            elif kind == "Notice":
+                self.notices[node] = _data(event)
+            elif kind == "Disclosure":
+                self.disclosures.append(_data(event))
+
+    def linked(self, node: str, data: dict[str, Any]) -> list[dict[str, Any]] | None:
+        """The held PolicyDecisions that gate a decision: the one its ``refs.authorization`` names and every one whose
+        ``refs.request`` names it. ``None`` when there is none, or when ``refs.authorization`` is present and is not the
+        graph IRI of a held PolicyDecision (a bare id, an unheld name, another type: approvals ruling Q1 B)."""
+        refs = data.get("refs")
+        refs = refs if isinstance(refs, dict) else {}
+        names = set(self.requested.get(node, ()))
+        if "authorization" in refs:
+            authorization = refs["authorization"]
+            if not isinstance(authorization, str) or authorization not in self.policies:
+                return None
+            names.add(authorization)
+        return [self.policies[n] for n in sorted(names)] or None
+
+
+def _names_policy(pd: dict[str, Any]) -> bool:
+    """A PolicyDecision names the exact policy it applied: a policy id, a version and a SPEC Digest (REC-05)."""
+    digest = pd.get("policy_digest")
+    return (
+        _text(pd.get("policy_id")) is not None
+        and _text(pd.get("policy_version")) is not None
+        and isinstance(digest, str)
+        and _DIGEST.fullmatch(digest) is not None
+    )
+
+
+def _documented(data: dict[str, Any]) -> bool:
+    """DOC-02: the decision records what it chose and, when it lists its options, one of them (SPEC §6.2.3)."""
+    chosen = _text(data.get("chosen"))
+    options = data.get("options")
+    if chosen is None:
+        return False
+    if not isinstance(options, list) or not options:
+        return True
+    return any(isinstance(o, dict) and o.get("id") == chosen for o in options)
 
 
 class _TaskUsage:
@@ -1419,6 +1481,7 @@ class _Builder:
             for event in events
             if self._ptype(event) == "PolicyDecision"
         )
+        gates = _Gates(events, self._ptype)
         held_types = {event_iri(str(e["id"])): self._ptype(e) for e in events}
         unresolved = self._unresolved_links(events)
         for event in events:
@@ -1444,6 +1507,7 @@ class _Builder:
                     incident_decisions is None or node in incident_decisions,
                 )
                 self._risk_reviewed(node, _refs(event), policy_decisions)
+                self._decision_record(node, data, gates)
             if ptype in ("Override", "Interrupt"):
                 self._intervention(node, ptype, event, by_human[node])
             if ptype == "Incident":
@@ -1655,6 +1719,76 @@ class _Builder:
             or any(
                 _is_one_of(refs.get(k), policy_decisions)
                 for k in ("authorization", "request")
+            ),
+        )
+
+    def _decision_record(self, node: str, data: dict[str, Any], gates: _Gates) -> None:
+        """The literals DOC-02, TRN-04, OVS-05, RSK-01, REC-05, TRN-01 and TRN-05 read on a decision (18.37f)."""
+        time = self.decision_time.get(node, "")
+        linked = gates.linked(node, data)
+        held = linked is not None and all(pd.get("decision") != "deny" for pd in linked)
+        self._literal(node, "agentce:authorizationHeld", held)
+        self._literal(
+            node,
+            "agentce:authorizationGateCleared",
+            held
+            and all(
+                pd.get("decision") == "allow"
+                or (
+                    pd.get("decision") == "require_approval"
+                    and node in self.human_approvers
+                )
+                for pd in linked or ()
+            ),
+        )
+        self._literal(
+            node,
+            "agentce:authorityRecorded",
+            held and all(_names_policy(pd) for pd in linked or ()),
+        )
+        self._literal(node, "agentce:decisionDocumented", _documented(data))
+        notices = [
+            gates.notices[n]
+            for n in sorted(self.decision_notice.get(node, ()))
+            if n in gates.notices
+        ]
+        self._literal(
+            node,
+            "agentce:explanationTimed",
+            any(
+                n.get("notice_type") == "explanation"
+                and isinstance(n.get("delivered_at"), str)
+                and compare_instants(n["delivered_at"], time) in (0, 1)
+                for n in notices
+            ),
+        )
+        person = _text(data.get("person_ref"))
+        self._literal(
+            node,
+            "agentce:affectedPersonNotified",
+            any(
+                _text(n.get("person_ref")) is not None
+                and _text(n.get("delivered_at")) is not None
+                and (person is None or n.get("person_ref") == person)
+                for n in notices
+            ),
+        )
+        self._literal(
+            node,
+            "agentce:inDisclosureScope",
+            data.get("affects_natural_person") is not False,
+        )
+        session = _text(data.get("session_id"))
+        self._literal(
+            node,
+            "agentce:aiInteractionDisclosed",
+            session is not None
+            and any(
+                d.get("disclosure_type") == "ai_interaction"
+                and d.get("session_id") == session
+                and isinstance(d.get("delivered_at"), str)
+                and compare_instants(d["delivered_at"], time) in (-1, 0)
+                for d in gates.disclosures
             ),
         )
 

@@ -2,7 +2,7 @@
 # Build gate helper for VG-EUAIACT-CLUSTER3 (18.37f): eight eu-ai-act controls that shared three rules now each test what
 # their title says -- REC-02 a consequential decision's time; DOC-02 its time and the option it chose; TRN-04 an
 # explanation Notice delivered at or after it; OVS-05 a held PolicyDecision that gated it and did not deny it; RSK-01
-# that gate cleared (allow, transform, or require_approval released by a human approval); REC-05 the gate names its
+# that gate cleared (allow, or require_approval released by a human approval); REC-05 the gate names its
 # policy id, version and digest; TRN-01 a Notice to the affected person; TRN-05 an AI-interaction Disclosure in the
 # decision's session at or before it, where the decision affects a natural person. Each case in
 # fixtures/eu_cluster3/cases.json becomes one bundle; the real Python, TypeScript and Java CLIs assess it against the

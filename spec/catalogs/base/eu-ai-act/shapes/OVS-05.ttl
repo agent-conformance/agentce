@@ -4,4 +4,4 @@
 
 agentce:OVS-05-Shape a sh:NodeShape ;
   sh:targetClass agentce:ConsequentialDecision ;
-  sh:property [ sh:path agentce:authorizedBy ; sh:minCount 1 ; sh:name "S1" ] .
+  sh:property [ sh:path agentce:authorizationHeld ; sh:hasValue true ; sh:name "S1" ] .

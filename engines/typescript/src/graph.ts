@@ -7,7 +7,8 @@
  * `agentce:danglingRef`, `agentce:precededBy`, `agentce:componentDeclared`,
  * `agentce:declaredComponentsObserved`, `agentce:triggersIncident`, `agentce:oversightCoverageComplete`,
  * `agentce:interventionEffective`, `agentce:interventionByHuman`, `agentce:incidentResponded`,
- * `agentce:riskReviewed`, `agentce:securityRefsResolve` and `agentce:linkedRecordsResolve`). The
+ * `agentce:riskReviewed`, `agentce:securityRefsResolve`, `agentce:linkedRecordsResolve` and the decision-record
+ * literals DOC-02, TRN-04, OVS-05, RSK-01, REC-05, TRN-01 and TRN-05 read). The
  * `rdfs:subClassOf*` closure of the class hierarchy
  * (base vocabulary plus the domain binding) is materialised so class membership needs no inference.
  * This is a faithful port of the Python reference; it must build byte-identical graphs.
@@ -19,7 +20,7 @@ import type { UnreadableWrite } from "./ingest";
 import { ZERO_KEY, eventIri, isEventRef, principalIri } from "./iri";
 import { SourceClassJudge } from "./sourceClass";
 import { GraphStore } from "./store";
-import { compareLiterals } from "./structural";
+import { compareInstants, compareLiterals } from "./structural";
 import { byteCompare } from "./util";
 
 const BOOL = "xsd:boolean";
@@ -481,6 +482,73 @@ function mustOperate(kind: string | null): Family | null {
 
 export function text(value: unknown): string | null {
   return typeof value === "string" && value !== "" ? value : null;
+}
+
+/** The SPEC Digest form (§6.2.3). */
+const DIGEST = /^sha256:[0-9a-f]{64}$/;
+
+/** The held PolicyDecisions, Notices and Disclosures a decision's record literals read (18.37f). */
+class Gates {
+  readonly policies = new Map<string, Record<string, unknown>>();
+  // decision IRI -> the held PolicyDecisions whose refs.request names it, by graph IRI only (SPEC §6.3).
+  readonly requested = new Map<string, string[]>();
+  readonly notices = new Map<string, Record<string, unknown>>();
+  readonly disclosures: Record<string, unknown>[] = [];
+
+  constructor(events: Event[], ptype: (event: Event) => string) {
+    for (const event of events) {
+      const node = eventIri(String(event.id));
+      const kind = ptype(event);
+      if (kind === "PolicyDecision") {
+        this.policies.set(node, dataOf(event));
+        const request = refsOf(event).request;
+        if (typeof request === "string") {
+          const list = this.requested.get(request) ?? [];
+          list.push(node);
+          this.requested.set(request, list);
+        }
+      } else if (kind === "Notice") {
+        this.notices.set(node, dataOf(event));
+      } else if (kind === "Disclosure") {
+        this.disclosures.push(dataOf(event));
+      }
+    }
+  }
+
+  /** The held PolicyDecisions that gate a decision: the one its `refs.authorization` names and every one whose
+   * `refs.request` names it. `null` when there is none, or when `refs.authorization` is present and is not the graph
+   * IRI of a held PolicyDecision (a bare id, an unheld name, another type: approvals ruling Q1 B). */
+  linked(node: string, data: Record<string, unknown>): Record<string, unknown>[] | null {
+    const refs = isRecord(data.refs) ? data.refs : {};
+    const names = new Set(this.requested.get(node) ?? []);
+    if ("authorization" in refs) {
+      const authorization = refs.authorization;
+      if (typeof authorization !== "string" || !this.policies.has(authorization)) return null;
+      names.add(authorization);
+    }
+    const linked = [...names].map((n) => this.policies.get(n) as Record<string, unknown>);
+    return linked.length > 0 ? linked : null;
+  }
+}
+
+/** A PolicyDecision names the exact policy it applied: a policy id, a version and a SPEC Digest (REC-05). */
+function namesPolicy(pd: Record<string, unknown>): boolean {
+  const digest = pd.policy_digest;
+  return (
+    text(pd.policy_id) !== null &&
+    text(pd.policy_version) !== null &&
+    typeof digest === "string" &&
+    DIGEST.test(digest)
+  );
+}
+
+/** DOC-02: the decision records what it chose and, when it lists its options, one of them (SPEC §6.2.3). */
+function documented(data: Record<string, unknown>): boolean {
+  const chosen = text(data.chosen);
+  const options = data.options;
+  if (chosen === null) return false;
+  if (!Array.isArray(options) || options.length === 0) return true;
+  return options.some((o) => isRecord(o) && o.id === chosen);
 }
 
 // [kind, name, pins] for each named component a BundleLoaded manifest declares, where pins holds its
@@ -1606,6 +1674,7 @@ class Builder {
       events.filter((e) => this.ptype(e) === "PolicyDecision").map((e) => eventIri(String(e.id))),
     );
     const heldTypes = new Map(events.map((e) => [eventIri(String(e.id)), this.ptype(e)]));
+    const gates = new Gates(events, (e) => this.ptype(e));
     const unresolved = this.unresolvedLinks(events);
     for (const event of events) {
       const node = eventIri(String(event.id));
@@ -1631,6 +1700,7 @@ class Builder {
           incidentDecisions === null || incidentDecisions.has(node),
         );
         this.riskReviewed(node, refsOf(event), policyDecisions);
+        this.decisionRecord(node, data, gates);
       }
       if (ptype === "Override" || ptype === "Interrupt") {
         this.intervention(node, ptype, event, byHuman.get(node) === true);
@@ -1761,6 +1831,62 @@ class Builder {
       }
     }
     return broken;
+  }
+
+  /** The literals DOC-02, TRN-04, OVS-05, RSK-01, REC-05, TRN-01 and TRN-05 read on a decision (18.37f). */
+  private decisionRecord(node: string, data: Record<string, unknown>, gates: Gates): void {
+    const time = this.decisionTime.get(node) ?? "";
+    const linked = gates.linked(node, data);
+    const held = linked?.every((pd) => pd.decision !== "deny") === true;
+    this.literal(node, "agentce:authorizationHeld", held);
+    this.literal(
+      node,
+      "agentce:authorizationGateCleared",
+      held &&
+        (linked ?? []).every(
+          (pd) =>
+            pd.decision === "allow" ||
+            (pd.decision === "require_approval" && this.humanApprovers.has(node)),
+        ),
+    );
+    this.literal(node, "agentce:authorityRecorded", held && (linked ?? []).every(namesPolicy));
+    this.literal(node, "agentce:decisionDocumented", documented(data));
+    const notices = [...(this.decisionNotice.get(node) ?? [])]
+      .map((n) => gates.notices.get(n))
+      .filter((n): n is Record<string, unknown> => n !== undefined);
+    this.literal(
+      node,
+      "agentce:explanationTimed",
+      notices.some((n) => {
+        if (n.notice_type !== "explanation" || typeof n.delivered_at !== "string") return false;
+        const order = compareInstants(n.delivered_at, time);
+        return order === 0 || order === 1;
+      }),
+    );
+    const person = text(data.person_ref);
+    this.literal(
+      node,
+      "agentce:affectedPersonNotified",
+      notices.some(
+        (n) =>
+          text(n.person_ref) !== null &&
+          text(n.delivered_at) !== null &&
+          (person === null || n.person_ref === person),
+      ),
+    );
+    this.literal(node, "agentce:inDisclosureScope", data.affects_natural_person !== false);
+    const session = text(data.session_id);
+    this.literal(
+      node,
+      "agentce:aiInteractionDisclosed",
+      session !== null &&
+        gates.disclosures.some((d) => {
+          if (d.disclosure_type !== "ai_interaction" || d.session_id !== session) return false;
+          if (typeof d.delivered_at !== "string") return false;
+          const order = compareInstants(d.delivered_at, time);
+          return order === -1 || order === 0;
+        }),
+    );
   }
 
   /** RSK-02 (Art. 9): a review of the decision, or a `refs.authorization` (or `refs.request`) naming a

@@ -145,8 +145,8 @@ for c in ("OVS-05", "RSK-01", "REC-05"):
     case(f"{k}-deny-via-request", c, [policy("p1"), policy("p2", request="d1", decision="deny"), authorized()], NC,
          ["d1"])
     case(f"{k}-order-reversed", c, [authorized(), policy("p1")], CF)
-    # A gate the decision names that the engine quarantined cannot be read: the records cannot show it.
-    case(f"{k}-pd-quarantined", c, [policy("p1", decision=7), policy("p9"), authorized()], IE, quarantined=1)
+    # A gate the engine quarantined is not held, so the decision names no held gate; quarantine never reads better.
+    case(f"{k}-pd-quarantined", c, [policy("p1", decision=7), policy("p9"), authorized()], NC, ["d1"], quarantined=1)
     # The schema quarantines a non-string reference, so the decision is not held and nothing is judged.
     case(f"{k}-authorization-not-string", c, [policy("p1", request="d1"), dec("d1", refs={"authorization": 7})], IE,
          quarantined=1)

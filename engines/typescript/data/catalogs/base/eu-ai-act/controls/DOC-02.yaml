@@ -14,6 +14,7 @@ evaluation:
   shape: shapes/DOC-02.ttl
 expectations:
   - {id: S1, text: "Consequential decisions are documented with a time of record."}
+  - {id: S2, text: "Each consequential decision records what it chose, and one of its listed options when it lists them."}
 severity: medium
 evidence_strength: strong
 tolerance: {kind: count, max: 0}
