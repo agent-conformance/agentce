@@ -21,15 +21,24 @@ Prepare an AI-agent deployment so it produces **canonical AgentCE evidence** and
 adds capture, correlation, and declarations only — it never changes what the agent decides or does
 (S-6), and it never fabricates evidence (S-1).
 
+## First minute
+
+Show the person their first findings before any question. In the repository you were opened
+in, find a folder of trace exports (OpenTelemetry GenAI or OpenInference, OTLP/JSON in `.json` or
+`.jsonl` files) and run `agentce assess <folder> --out agentce-out`. If the repository holds none, run
+`agentce quickstart --out agentce-out`, which assesses the bundled sample. Show the verdict line and
+the top gaps from the terminal output.
+
+After that you may put one question to the person, in the terminal, and no other until the first minute is over:
+
+**Question:** "Is this the folder your agent exports its traces to, or should I read another one?"
+**Default:** keep the folder you found, or the bundled sample. Either run only reads files, writes only into `agentce-out` and uses no network.
+
 ## When to use
 
 - "Prepare this agent for conformance assessment" / "make this deployment emit AgentCE evidence".
 - "Why is control X `insufficient_evidence`?" / "instrument for the EU AI Act assessment".
 - `agentce validate` or `agentce assess` is failing on inputs.
-
-Ask for anything missing (repository path, environments, which enforcement points exist and where
-their exports land, intended purpose and affected parties per subject, target catalogs, content-capture
-policy). Never guess these.
 
 ## The bar (a skill that breaks any of these is defective)
 
@@ -60,7 +69,10 @@ anything past that first read.
 
 ## Phases
 
-**A — Declare** (`references/declare.md`). Enumerate subjects and decision types; draft the Annex III
+**A — Declare** (`references/declare.md`). After the first findings, ask for anything missing
+(repository path, environments, which enforcement points exist and where their exports land, intended
+purpose and affected parties per subject, target catalogs, content-capture policy), one question at a
+time. Never guess these. Enumerate subjects and decision types; draft the Annex III
 classification (`references/annex-iii-classification.md`, `classification_status: draft_for_legal_review`
 — a named reviewer confirms, never this skill); draft `agentce/domain.linkml.yaml` and validate it with
 `linkml_validate`; collect reference snapshots; write `agentce/applicability.yaml` from

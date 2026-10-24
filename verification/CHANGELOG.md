@@ -3,6 +3,18 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.131.0
+
+- Added `VG-UX-ONE-QUESTION` (18.40a, tier quick): a person gets their first findings before any question, and at
+  most one question in the first minute, asked at the terminal, with the safe answer as its default. Each approved
+  skill now has a `## First minute` section: an `agentce assess` or `agentce quickstart` command, then at most one
+  `**Question:**` line with a `**Default:**` line. The gate refuses a question before that command, a second
+  question, a question or default that would sign, publish, send or delete, and an instruction to ask that comes
+  before the section or outside a Phase or Stage. It also runs `agentce quickstart` and `agentce assess <trace
+  folder>` in all three engines at a terminal with nothing typed: a command that waits for an answer or prints a
+  question counts against the same one-question budget. `agentce-get-evidence` moves its "ask for anything missing"
+  line into Phase A. Nine seeded faults: six in the skill text, and one prompt in each engine's quickstart.
+
 ## 0.130.0
 
 - `VG-INGEST-SUPPORT-MATRIX` (18.39a, changed) reads every copy of the trace-store table's header, however GFM lets

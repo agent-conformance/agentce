@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.130.0",
+  "suite_version": "0.131.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -1822,6 +1822,85 @@
         }
       ],
       "fix_hint": "Run verification/gates/ux_next_step.sh; verification/gates/ux_next_step.py --list-raised-keys names every key it expects documented, and its stderr names exactly which key is unregistered, stale, or missing an actor phrase."
+    },
+    {
+      "id": "VG-UX-ONE-QUESTION",
+      "title": "At most one question in the first minute, asked at the terminal, with the safe answer as its default: the approved skills' First minute sections and the three engines' first-run commands share one question",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/ux_one_question.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java"
+      ],
+      "timeout_s": 600,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "the reader's self-test passes; every skills/*/SKILL.md has a '## First minute' section that names an `agentce assess` or `agentce quickstart` command before its one **Question:** line, each question has a **Default:** line, neither names an action beyond reading and writing into the output folder, and no ask instruction sits before the section or after it outside a Phase or Stage heading; agentce quickstart and agentce assess <trace folder> in Python, TypeScript and Java each finish inside 60 s at a pseudo-terminal with nothing typed and print no question; the skills' most questions plus the engines' questions is at most 1",
+        "fail": "a skill has no First minute section, no first command, a question before it, more than one question, a question with no default, an unsafe question or default, or an ask instruction outside its place; or an engine's first-run command waits at the terminal or prints a question; or the shared budget is over 1"
+      },
+      "faults": [
+        {
+          "description": "get-evidence's First minute gains a second question, caught by the question count",
+          "file": "skills/agentce-get-evidence/SKILL.md",
+          "search": "**Default:** keep the folder you found, or the bundled sample.",
+          "replace": "**Question:** \"Which catalog should I use?\"\n**Default:** baseline.\n**Default:** keep the folder you found, or the bundled sample."
+        },
+        {
+          "description": "a line before the First minute tells the assistant to ask for the repository path, caught as an ask before the first findings",
+          "file": "skills/agentce-get-evidence/SKILL.md",
+          "search": "(S-6), and it never fabricates evidence (S-1).\n\n## First minute",
+          "replace": "(S-6), and it never fabricates evidence (S-1). Ask for the repository path before you run anything.\n\n## First minute"
+        },
+        {
+          "description": "get-evidence's default answer signs the report, caught by the safe-default check",
+          "file": "skills/agentce-get-evidence/SKILL.md",
+          "search": "**Default:** keep the folder you found, or the bundled sample.",
+          "replace": "**Default:** sign the report, and keep the folder you found."
+        },
+        {
+          "description": "the base ask-for-anything-missing line moved verbatim into the First minute, caught as an unmarked question over the budget",
+          "file": "skills/agentce-get-evidence/SKILL.md",
+          "search": "the top gaps from the terminal output.\n\nOne question",
+          "replace": "the top gaps from the terminal output.\n\nAsk for anything missing (repository path, environments, which enforcement points exist and where\ntheir exports land, intended purpose and affected parties per subject, target catalogs, content-capture\npolicy). Never guess these.\n\nOne question"
+        },
+        {
+          "description": "the base ask-for-anything-missing line moved back under When to use, after the First minute but under no later-step heading",
+          "file": "skills/agentce-get-evidence/SKILL.md",
+          "search": "- `agentce validate` or `agentce assess` is failing on inputs.\n",
+          "replace": "- `agentce validate` or `agentce assess` is failing on inputs.\n\nAsk for anything missing (repository path, environments, which enforcement points exist and where\ntheir exports land, intended purpose and affected parties per subject, target catalogs, content-capture\npolicy). Never guess these.\n"
+        },
+        {
+          "description": "get-evidence's question becomes sign-and-publish with a default of yes, caught by reading the question with the deny list",
+          "file": "skills/agentce-get-evidence/SKILL.md",
+          "search": "**Question:** \"Is this the folder your agent exports its traces to, or should I read another one?\"\n**Default:** keep the folder you found, or the bundled sample.",
+          "replace": "**Question:** \"Sign and publish the report now?\"\n**Default:** yes."
+        },
+        {
+          "description": "Python quickstart prompts and waits at the terminal, caught by the 60 s deadline",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    result = CommandResult(command=\"quickstart\")\n",
+          "replace": "    result = CommandResult(command=\"quickstart\")\n    input(\"Overwrite the output folder? [y/N] \")\n"
+        },
+        {
+          "description": "TypeScript quickstart writes a [y/N] prompt and reads stdin, caught at the terminal",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "function cmdQuickstart(args: Scan): CommandResult {\n",
+          "replace": "function cmdQuickstart(args: Scan): CommandResult {\n  process.stdout.write(\"Overwrite the output folder? [y/N] \");\n  readFileSync(0);\n"
+        },
+        {
+          "description": "Java quickstart prints a [y/N] prompt and reads System.in, caught at the terminal",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "        CommandResult result = new CommandResult(\"quickstart\");\n",
+          "replace": "        CommandResult result = new CommandResult(\"quickstart\");\n        System.out.print(\"Overwrite the output folder? [y/N] \");\n        System.out.flush();\n        try { System.in.read(); } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }\n"
+        }
+      ],
+      "fix_hint": "Run verification/gates/ux_one_question.sh; each stderr line names the key, the file and line or the engine and command. Keep a skill's first minute to one **Question:** line after its first agentce command, with a **Default:** that only reads and writes into the output folder; move other asks under a Phase or Stage heading; an engine's first-run command never prompts."
     },
     {
       "id": "VG-AUDITOR-VIEW",

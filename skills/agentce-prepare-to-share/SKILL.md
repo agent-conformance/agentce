@@ -24,6 +24,19 @@ logic lives in the engine (`agentce readiness`), never in this skill, so signing
 script. The skill never modifies code, evidence, `assertions.json`, or the manifest; never relabels an
 outcome; never creates a deviation without a named approver and expiry; and never signs anything.
 
+## First minute
+
+Show the person where the report stands before any question. Run
+`agentce assess --bundle <bundle> --profile agentce/applicability.yaml --out agentce-out` on the
+bundle and profile the repository already holds (the `agentce-get-evidence` skill writes them), then
+`agentce readiness agentce-out`. Show the assessment's verdict line and the readiness verdict from the
+terminal output.
+
+After that you may put one question to the person, in the terminal, and no other until the first minute is over:
+
+**Question:** "Who will read this report: your developers, compliance, security, an auditor or a buyer?"
+**Default:** every format, written into `agentce-out`; nothing leaves this machine.
+
 ## Version pins
 
 Every script verifies these pins against the installed engine before doing anything (S-5) and stops
