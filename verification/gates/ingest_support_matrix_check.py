@@ -38,6 +38,7 @@ _FOLLOWS_RE = re.compile(r"\[[^\]]+\]\(([^)\s]+)\),\s*(\S.*)")
 _TIER_MENTION_RE = re.compile(
     r"\b(?:" + "|".join(_KNOWN_TIERS) + r")\s*\(\s*\d", re.IGNORECASE
 )
+_ESCAPE_RE = re.compile(r"\\(.)")
 _MARKUP_RE = re.compile(r"<[^>]*>|[*_`~]")
 _INVISIBLE_RE = re.compile(r"[\u00ad\u200b-\u200f\u2060-\u2064\ufeff]")
 
@@ -91,7 +92,8 @@ def parse_tier_line(names_text: str) -> tuple[list[str], int | None]:
 def _plain(line: str) -> str:
     """The line with entities decoded, invisible characters dropped and emphasis, code-span and HTML markup
     removed, so a tier claim is found however it is spelled."""
-    return _MARKUP_RE.sub("", _INVISIBLE_RE.sub("", html.unescape(line)))
+    unescaped = _ESCAPE_RE.sub(r"\1", html.unescape(line))
+    return _MARKUP_RE.sub("", _INVISIBLE_RE.sub("", unescaped))
 
 
 def check_tier_layout(text: str, source: str) -> list[str]:
@@ -101,15 +103,25 @@ def check_tier_layout(text: str, source: str) -> list[str]:
     the same paragraph but would never be checked)."""
     problems: list[str] = []
     lines = text.splitlines()
+    # The renderer reads a paragraph, not a line (CommonMark 4.8), so a claim split over a soft line break is
+    # looked for in the paragraph's other lines joined by a space.
+    paragraph: list[tuple[int, str]] = []
+    for number, line in [*enumerate(lines, 1), (len(lines) + 1, "")]:
+        if line.strip(" \t"):
+            if _TIER_LINE_RE.fullmatch(line) is None:
+                paragraph.append((number, line))
+            continue
+        joined = " ".join(text for _, text in paragraph)
+        if paragraph and _TIER_MENTION_RE.search(_plain(joined)):
+            problems.append(
+                f"ingest.matrix.tier_line_unreadable: {source} line {paragraph[0][0]} holds a tier line "
+                f"the gate cannot read: {joined!r}. Write it as **<Tier>** (<count>): <names> at the "
+                "start of its own line"
+            )
+        paragraph = []
     for number, line in enumerate(lines, 1):
         tier_line = _TIER_LINE_RE.fullmatch(line)
         if tier_line is None:
-            if _TIER_MENTION_RE.search(_plain(line)):
-                problems.append(
-                    f"ingest.matrix.tier_line_unreadable: {source} line {number} holds a tier line the "
-                    f"gate cannot read: {line!r}. Write it as **<Tier>** (<count>): <names> at the start "
-                    "of its own line"
-                )
             continue
         follow = lines[number] if number < len(lines) else ""
         if follow.strip(" \t") and not _TIER_LINE_RE.fullmatch(follow):
@@ -731,6 +743,8 @@ def self_test() -> int:
         "bold italic": "***Experimental*** (1): Honeycomb.",
         "lower case": "**experimental** (1): Honeycomb.",
         "a code span": "`Experimental` (1): Honeycomb.",
+        "a claim split over a soft line break": "We also list **Experimental**\n(1): Honeycomb.",
+        "backslash-escaped emphasis": "\\*\\*Experimental\\*\\* (1): Honeycomb.",
     }.items():
         cases.append(
             (
