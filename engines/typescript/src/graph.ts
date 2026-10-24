@@ -606,6 +606,9 @@ class Builder {
   private readonly outcomeDecision = new Map<string, string>(); // Outcome IRI -> its refs.decision IRI, if any
   private readonly decisionNotice = new Map<string, Set<string>>(); // Decision IRI -> every notifying Notice IRI (order-independent)
   private readonly danglingNodes = new Set<string>(); // event IRI -> has >=1 agentce:danglingRef literal
+  // TRN-03: Decisions whose rationale_claim_ref, and Notices whose content_ref, is an event ref naming no held
+  // event (18.37h). Kept apart from danglingNodes so INT-03, REC-06 and INC-04 do not move.
+  private readonly explanationUnresolved = new Set<string>();
   private readonly instructionUntrusted = new Map<string, boolean>(); // Instruction IRI -> untrusted flag
   // Instructions that declare no source class: ROB-02 taint seeds of their own (18.127).
   private readonly instructionUnclassed = new Set<string>();
@@ -765,6 +768,7 @@ class Builder {
     this.mapConduct(node, ptype, data);
     this.mapComponents(node, ptype, data);
     this.dangling(node, event);
+    this.explanationPointer(node, ptype, data);
 
     if (ptype === "DelegationIssued") {
       this.mapDelegationPrincipals(data.chain);
@@ -2085,6 +2089,18 @@ class Builder {
     }
   }
 
+  /** TRN-03 (18.37h): a Decision's rationale_claim_ref or a Notice's content_ref written as a Ref (SPEC §3) must
+   * name a held event. A Digest, a URI or a bare id is not a Ref and names no event, so it is not judged, as
+   * `dangling` treats refs.*. */
+  private explanationPointer(node: string, ptype: string, data: Record<string, unknown>): void {
+    const key =
+      ptype === "Decision" ? "rationale_claim_ref" : ptype === "Notice" ? "content_ref" : undefined;
+    const value = key === undefined ? undefined : data[key];
+    if (typeof value === "string" && isEventRef(value) && !this.eventIris.has(value)) {
+      this.explanationUnresolved.add(node);
+    }
+  }
+
   /** INC-01 (SPEC §7.4): an adverse outcome is linked to the consequential decision it resulted
    * from; a non-adverse outcome carries no such expectation and is vacuously linked. A
    * `refs.decision` that is missing, dangling (names no ingested event), or resolves to a decision
@@ -2102,25 +2118,18 @@ class Builder {
   }
 
   /** TRN-03 (SPEC §7.6): affected persons are informed (notifiedBy a Notice) and the evidence chain
-   * resolves on both ends of that notification -- no danglingRef on the decision itself (every ref
-   * or `used` value it names resolves to an ingested event) AND no danglingRef on the Notice that
-   * notified it (round-2 critic finding: a Notice's own dangling ref, e.g. a free-form
-   * explanation_ref, must not be invisible just because `dangling` lands the literal on the Notice
-   * node, not the Decision node) -- so the evidence an explanation would be built from is actually
-   * present on both legs. A decision can be notifiedBy more than one Notice; checking only the last
-   * one mapped made the result depend on event order, so this checks every notifying Notice and
-   * passes if any one of them is clean (a verifier-found regression, fixed this item). Scoped
-   * narrower than the Notice's own content_ref or the Decision's own rationale_claim_ref (SPEC model
-   * attributes, not refs edges): neither is materialised as a graph reference anywhere today, so
-   * neither can dangle in this model yet -- disclosed, out of this item's scope (see this item's
-   * contract, split to 18.37h). */
+   * resolves on both ends of that notification. The decision carries no danglingRef (every ref or `used`
+   * value it names resolves to an ingested event) and its own rationale_claim_ref, written as a Ref, names a
+   * held event; and at least one Notice that notified it is clean in the same two ways, its content_ref in
+   * place of the rationale (18.37h). A decision can be notifiedBy more than one Notice, so every notifying
+   * Notice is checked and any clean one passes, whatever the event order. Resolution is direct: the named
+   * event must be held; whether its own refs resolve is REC-06's question. */
   private explanationReconstructable(node: string): void {
+    const clean = (n: string): boolean =>
+      !this.danglingNodes.has(n) && !this.explanationUnresolved.has(n);
     const notices = this.decisionNotice.get(node);
     const reconstructable =
-      !!notices &&
-      notices.size > 0 &&
-      !this.danglingNodes.has(node) &&
-      [...notices].some((notice) => !this.danglingNodes.has(notice));
+      !!notices && notices.size > 0 && clean(node) && [...notices].some(clean);
     this.store.addLiteral(
       node,
       "agentce:explanationReconstructable",

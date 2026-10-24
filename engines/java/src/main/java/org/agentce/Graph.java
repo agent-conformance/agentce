@@ -670,6 +670,9 @@ public final class Graph {
         private final Map<String, String> outcomeDecision = new LinkedHashMap<>(); // Outcome IRI -> its refs.decision IRI, if any
         private final Map<String, Set<String>> decisionNotice = new LinkedHashMap<>(); // Decision IRI -> every notifying Notice IRI (order-independent)
         private final Set<String> danglingNodes = new LinkedHashSet<>(); // event IRI -> has >=1 agentce:danglingRef literal
+        // TRN-03: Decisions whose rationale_claim_ref, and Notices whose content_ref, is an event ref naming no held
+        // event (18.37h). Kept apart from danglingNodes so INT-03, REC-06 and INC-04 do not move.
+        private final Set<String> explanationUnresolved = new LinkedHashSet<>();
         private final Map<String, Boolean> instructionUntrusted = new LinkedHashMap<>(); // Instruction IRI -> untrusted flag
         // Instructions that declare no source class: ROB-02 taint seeds of their own (18.127).
         private final Set<String> instructionUnclassed = new LinkedHashSet<>();
@@ -818,6 +821,7 @@ public final class Graph {
             mapConduct(node, ptype, data);
             mapComponents(node, ptype, data);
             dangling(node, event);
+            explanationPointer(node, ptype, data);
 
             if ("DelegationIssued".equals(ptype)) {
                 mapDelegationPrincipals(data.get("chain"));
@@ -2162,6 +2166,18 @@ public final class Graph {
             literal(node, "agentce:interventionByHuman", byHuman);
         }
 
+        /** TRN-03 (18.37h): a Decision's rationale_claim_ref or a Notice's content_ref written as a Ref (SPEC §3)
+         * must name a held event. A Digest, a URI or a bare id is not a Ref and names no event, so it is not
+         * judged, as dangling() treats refs.*. */
+        private void explanationPointer(String node, String ptype, JsonNode data) {
+            String key = "Decision".equals(ptype) ? "rationale_claim_ref" : "Notice".equals(ptype) ? "content_ref" : null;
+            JsonNode value = key == null ? null : data.get(key);
+            if (value != null && value.isTextual() && Iri.isEventRef(value.textValue())
+                    && !eventIris.contains(value.textValue())) {
+                explanationUnresolved.add(node);
+            }
+        }
+
         private void dangling(String node, JsonNode event) {
             for (String value : refCandidates(event)) {
                 if (Iri.isEventRef(value) && !eventIris.contains(value)) {
@@ -2187,27 +2203,25 @@ public final class Graph {
         }
 
         /** TRN-03 (SPEC §7.6): affected persons are informed (notifiedBy a Notice) and the evidence
-         * chain resolves on both ends of that notification -- no danglingRef on the decision itself
-         * (every ref or "used" value it names resolves to an ingested event) AND no danglingRef on
-         * the Notice that notified it (round-2 critic finding: a Notice's own dangling ref, e.g. a
-         * free-form explanation_ref, must not be invisible just because dangling() lands the literal
-         * on the Notice node, not the Decision node) -- so the evidence an explanation would be built
-         * from is actually present on both legs. A decision can be notifiedBy more than one Notice;
-         * checking only the last one mapped made the result depend on event order, so this checks
-         * every notifying Notice and passes if any one of them is clean (a verifier-found regression,
-         * fixed this item). Scoped narrower than the Notice's own content_ref or the Decision's own
-         * rationale_claim_ref (SPEC model attributes, not refs edges): neither is materialised as a
-         * graph reference anywhere today, so neither can dangle in this model yet -- disclosed, out
-         * of this item's scope (see this item's contract, split to 18.37h). */
+         * chain resolves on both ends of that notification. The decision carries no danglingRef (every
+         * ref or "used" value it names resolves to an ingested event) and its own rationale_claim_ref,
+         * written as a Ref, names a held event; and at least one Notice that notified it is clean in the
+         * same two ways, its content_ref in place of the rationale (18.37h). A decision can be
+         * notifiedBy more than one Notice, so every notifying Notice is checked and any clean one
+         * passes, whatever the event order. Resolution is direct: the named event must be held; whether
+         * its own refs resolve is REC-06's question. */
         private void explanationReconstructable(String node) {
             Set<String> notices = decisionNotice.get(node);
-            boolean reconstructable =
-                    notices != null
-                            && !notices.isEmpty()
-                            && !danglingNodes.contains(node)
-                            && notices.stream().anyMatch(notice -> !danglingNodes.contains(notice));
+            boolean reconstructable = notices != null
+                    && !notices.isEmpty()
+                    && explanationClean(node)
+                    && notices.stream().anyMatch(this::explanationClean);
             store.addLiteral(
                     node, "agentce:explanationReconstructable", reconstructable ? "true" : "false", BOOL);
+        }
+
+        private boolean explanationClean(String node) {
+            return !danglingNodes.contains(node) && !explanationUnresolved.contains(node);
         }
 
         /**

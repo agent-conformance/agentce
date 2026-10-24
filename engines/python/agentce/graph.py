@@ -574,6 +574,9 @@ class _Builder:
         self.dangling_nodes: set[str] = (
             set()
         )  # event IRI -> has >=1 agentce:danglingRef literal
+        # TRN-03: Decisions whose rationale_claim_ref, and Notices whose content_ref, is an event ref naming no held
+        # event (18.37h). Kept apart from dangling_nodes so INT-03, REC-06 and INC-04 do not move.
+        self.explanation_unresolved: set[str] = set()
         # DOC-01: family -> declared name -> the union of its declared pins over every BundleLoaded
         # manifest in the subject's records (empty: any version matches), so event order does not
         # matter and an unpinned declaration never cancels another manifest's pin (18.37j).
@@ -692,6 +695,7 @@ class _Builder:
         self._map_conduct(node, ptype, data)
         self._map_components(node, ptype, data)
         self._dangling(node, event)
+        self._explanation_pointer(node, ptype, data)
 
         if ptype == "DelegationIssued":
             self._map_delegation_principals(data.get("chain"))
@@ -1919,6 +1923,19 @@ class _Builder:
                 self.store.add_literal(node, "agentce:danglingRef", value)
                 self.dangling_nodes.add(node)
 
+    def _explanation_pointer(self, node: str, ptype: str, data: dict[str, Any]) -> None:
+        """TRN-03 (18.37h): a Decision's ``rationale_claim_ref`` or a Notice's ``content_ref`` written as a Ref
+        (SPEC §3) must name a held event. A Digest, a URI or a bare id is not a Ref and names no event, so it is not
+        judged, as ``_dangling`` treats ``refs.*``."""
+        key = {"Decision": "rationale_claim_ref", "Notice": "content_ref"}.get(ptype)
+        value = data.get(key) if key else None
+        if (
+            isinstance(value, str)
+            and is_event_ref(value)
+            and value not in self.event_iris
+        ):
+            self.explanation_unresolved.add(node)
+
     def _chain_verified(self, node: str, data: dict[str, Any]) -> None:
         self._literal(node, "agentce:chainVerified", _delegation_verified(data))
 
@@ -1970,24 +1987,22 @@ class _Builder:
 
     def _explanation_reconstructable(self, node: str) -> None:
         """TRN-03 (SPEC §7.6): affected persons are informed (``notifiedBy`` a ``Notice``) and the
-        evidence chain resolves on both ends of that notification -- no ``danglingRef`` on the
-        decision itself (every ``refs.*``/``used`` value it names resolves to an ingested event) AND
-        no ``danglingRef`` on at least one Notice that notified it (round-2 critic finding: a Notice's
-        own dangling ``refs.*`` value, e.g. a free-form ``explanation_ref``, must not be invisible just
-        because `_dangling` lands the literal on the Notice node, not the Decision node) -- so the
-        evidence an explanation would be built from is actually present on both legs. A decision can be
-        ``notifiedBy`` more than one Notice; checking only the last one mapped made the result depend
-        on event order, so this checks every notifying Notice and passes if any one of them is clean
-        (a verifier-found regression, fixed this item). Scoped narrower than the Notice's own
-        ``content_ref`` or the Decision's own ``rationale_claim_ref`` (SPEC model attributes, not
-        ``refs.*`` edges): neither is materialised as a graph reference anywhere today, so neither can
-        dangle in this model yet -- that is new graph-builder work, not a drop-in check, and is
-        disclosed and out of this item's scope (see this item's contract, split to 18.37h)."""
+        evidence chain resolves on both ends of that notification. The decision carries no ``danglingRef``
+        (every ``refs.*``/``used`` value it names resolves to an ingested event) and its own
+        ``rationale_claim_ref``, written as a Ref, names a held event; and at least one Notice that notified it
+        is clean in the same two ways, its ``content_ref`` in place of the rationale (18.37h). A decision can be
+        ``notifiedBy`` more than one Notice, so every notifying Notice is checked and any clean one passes,
+        whatever the event order. Resolution is direct: the named event must be held; whether its own refs
+        resolve is REC-06's question."""
+
+        def clean(n: str) -> bool:
+            return n not in self.dangling_nodes and n not in self.explanation_unresolved
+
         notices = self.decision_notice.get(node)
         reconstructable = (
             notices is not None
-            and node not in self.dangling_nodes
-            and any(notice not in self.dangling_nodes for notice in notices)
+            and clean(node)
+            and any(clean(notice) for notice in notices)
         )
         self.store.add_literal(
             node,
