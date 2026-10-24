@@ -3,6 +3,15 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.129.0
+
+- `VG-INGEST-SUPPORT-MATRIX` (18.39c, changed) refuses README and docs copy it cannot read instead of skipping it. A
+  tier claim written anywhere but as a one-line `**<Tier>** (<count>): <names>` line (a list item, a quote, a heading,
+  mid-sentence, other emphasis or HTML) fails with `ingest.matrix.tier_line_unreadable`. A tier line that runs on to
+  a line the gate does not read fails with `ingest.matrix.tier_line_wrapped`. A Reader-follows cell not written
+  `[label](url), version` fails with `ingest.matrix.docs_follows_unreadable`, and a docs row whose matrix row has no
+  definition to check against fails with `ingest.matrix.docs_definition_missing`. Three new seeded faults.
+
 ## 0.128.0
 
 - `VG-EUAIACT-CLUSTER4` (18.37h, changed) runs 96 cases (was 76). TRN-03 now checks the two explanation pointers the

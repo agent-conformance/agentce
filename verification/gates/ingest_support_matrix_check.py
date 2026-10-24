@@ -16,6 +16,7 @@ reason is never guessed from a generic diff.
 
 from __future__ import annotations
 
+import html
 import re
 import sys
 from pathlib import Path
@@ -31,7 +32,14 @@ _TIER_LINE_RE = re.compile(
 _MORE_RE = re.compile(r"^and (\d+) more$")
 _TRAILER_RE = re.compile(r"\s*—\s*(?:see the full matrix|help wanted)\s*$")
 _TABLE_HEADER = "| Backend | Tier | Reader follows | Build item |"
-_FOLLOWS_RE = re.compile(r"\]\(([^)]+)\),\s*(.+)$")
+_FOLLOWS_RE = re.compile(r"\[[^\]]+\]\(([^)\s]+)\),\s*(\S.*)")
+# A tier claim written any other way than a _TIER_LINE_RE line (18.39c): once emphasis, code spans, HTML tags,
+# entities, invisible characters and case are set aside, a tier word followed by a parenthesised count.
+_TIER_MENTION_RE = re.compile(
+    r"\b(?:" + "|".join(_KNOWN_TIERS) + r")\s*\(\s*\d", re.IGNORECASE
+)
+_MARKUP_RE = re.compile(r"<[^>]*>|[*_`~]")
+_INVISIBLE_RE = re.compile(r"[\u00ad\u200b-\u200f\u2060-\u2064\ufeff]")
 
 
 def _extract_table_rows(text: str) -> list[list[str]]:
@@ -80,10 +88,46 @@ def parse_tier_line(names_text: str) -> tuple[list[str], int | None]:
     return tokens, more
 
 
+def _plain(line: str) -> str:
+    """The line with entities decoded, invisible characters dropped and emphasis, code-span and HTML markup
+    removed, so a tier claim is found however it is spelled."""
+    return _MARKUP_RE.sub("", _INVISIBLE_RE.sub("", html.unescape(line)))
+
+
+def check_tier_layout(text: str, source: str) -> list[str]:
+    """Refuse a tier claim the tier-line scan cannot read (18.39c): a line that is not a tier line but holds
+    one (a list item, a quote, an indented line, a heading, mid-sentence, other markup), and a tier line whose
+    paragraph goes on to a line that is not itself a tier line (CommonMark 4.8: the wrapped names render in
+    the same paragraph but would never be checked)."""
+    problems: list[str] = []
+    lines = text.splitlines()
+    for number, line in enumerate(lines, 1):
+        is_tier = _TIER_LINE_RE.fullmatch(line) is not None
+        if not is_tier:
+            if _TIER_MENTION_RE.search(_plain(line)):
+                problems.append(
+                    f"ingest.matrix.tier_line_unreadable: {source} line {number} holds a tier line the "
+                    f"gate cannot read: {line!r}. Write it as **<Tier>** (<count>): <names> at the start "
+                    "of its own line"
+                )
+            continue
+        tier = line[2 : line.index("**", 2)]
+        for follow in lines[number:]:
+            if not follow.strip(" \t") or _TIER_LINE_RE.fullmatch(follow):
+                break
+            problems.append(
+                f"ingest.matrix.tier_line_wrapped: {source}'s {tier} line (line {number}) goes on to "
+                f"{follow!r}, which the gate does not read. Keep the tier line on one line and put a "
+                "blank line after it"
+            )
+            break
+    return problems
+
+
 def check_tier_lines(
     rows_by_name: dict[str, dict], text: str, source: str
 ) -> list[str]:
-    problems: list[str] = []
+    problems = check_tier_layout(text, source)
     seen_tiers: set[str] = set()
     for tier_label, count_s, names_text in _TIER_LINE_RE.findall(text):
         tier = tier_label.lower()
@@ -155,9 +199,21 @@ def check_trace_store_docs(rows_by_name: dict[str, dict], text: str) -> list[str
                 f"ingest.matrix.docs_wrong_tier: trace-store-connectors.md's table says "
                 f"{name!r} is {tier_text}, but the matrix grades it {row['tier']}"
             )
-        m = _FOLLOWS_RE.search(follows.strip())
+        m = _FOLLOWS_RE.fullmatch(follows.strip())
         definition = row.get("definition") or {}
-        if m and definition.get("url") and definition.get("version"):
+        if m is None:
+            problems.append(
+                f"ingest.matrix.docs_follows_unreadable: trace-store-connectors.md's table gives "
+                f"{name!r} the Reader-follows cell {follows!r}, not [label](url), version, so its "
+                "definition cannot be checked"
+            )
+        elif not (definition.get("url") and definition.get("version")):
+            problems.append(
+                f"ingest.matrix.docs_definition_missing: trace-store-connectors.md's table names "
+                f"{name!r}, but its matrix row has no definition.url and definition.version to check "
+                "the Reader-follows cell against"
+            )
+        else:
             doc_url, doc_version = m.group(1).strip(), m.group(2).strip()
             if doc_url != definition["url"]:
                 problems.append(
@@ -197,12 +253,18 @@ def check(root: Path | None = None) -> list[str]:
     return problems
 
 
+FIXTURE_DEFINITION = {"url": "https://example.com/d", "version": "v1"}
+
+
 def self_test() -> int:
     rows: dict[str, dict] = {
-        "Claude Code session files": {"tier": "supported"},
+        "Claude Code session files": {
+            "tier": "supported",
+            "definition": FIXTURE_DEFINITION,
+        },
         "OpenTelemetry GenAI traces": {"tier": "supported"},
-        "Cursor CLI output": {"tier": "experimental"},
-        "AuthZEN decisions": {"tier": "experimental"},
+        "Cursor CLI output": {"tier": "experimental", "definition": FIXTURE_DEFINITION},
+        "AuthZEN decisions": {"tier": "experimental", "definition": FIXTURE_DEFINITION},
         "Datadog LLM Observability": {
             "tier": "experimental",
             "definition": {
@@ -214,6 +276,11 @@ def self_test() -> int:
         "Cedar": {"tier": "roadmap"},
     }
     cases: list[tuple[str, bool]] = []
+    fixture_cell = "[d](https://example.com/d), v1"
+    dd_row = (
+        "| Datadog LLM Observability | Experimental "
+        "| [x](https://example.com/datadog-openapi), client 2.61.0 | y |\n"
+    )
 
     good_readme = (
         "**Supported** (2): Claude Code session files, OpenTelemetry GenAI traces.\n"
@@ -345,10 +412,10 @@ def self_test() -> int:
     good_table = (
         "| Backend | Tier | Reader follows | Build item |\n"
         "|---|---|---|---|\n"
-        "| Cursor CLI output | Experimental | x | y |\n"
-        "| AuthZEN decisions | Experimental | x | y |\n"
-        "| Datadog LLM Observability | Experimental | x | y |\n"
-        "| Claude Code session files | Supported | x | y |\n"
+        f"| Cursor CLI output | Experimental | {fixture_cell} | y |\n"
+        f"| AuthZEN decisions | Experimental | {fixture_cell} | y |\n"
+        + dd_row
+        + f"| Claude Code session files | Supported | {fixture_cell} | y |\n"
     )
     cases.append(
         (
@@ -383,7 +450,7 @@ def self_test() -> int:
     )
 
     unknown_table = good_table.replace(
-        "| Datadog LLM Observability | Experimental | x | y |\n",
+        dd_row,
         "| Honeycomb | Supported | x | y |\n",
     )
     cases.append(
@@ -397,7 +464,7 @@ def self_test() -> int:
     )
 
     drift_version_table = good_table.replace(
-        "| Datadog LLM Observability | Experimental | x | y |\n",
+        dd_row,
         "| Datadog LLM Observability | Experimental | [x](https://example.com/datadog-openapi), client 9.9.9 | y |\n",
     )
     cases.append(
@@ -411,7 +478,7 @@ def self_test() -> int:
     )
 
     drift_url_table = good_table.replace(
-        "| Datadog LLM Observability | Experimental | x | y |\n",
+        dd_row,
         "| Datadog LLM Observability | Experimental | [x](https://wrong.example/schema), client 2.61.0 | y |\n",
     )
     cases.append(
@@ -425,7 +492,7 @@ def self_test() -> int:
     )
 
     agreeing_table = good_table.replace(
-        "| Datadog LLM Observability | Experimental | x | y |\n",
+        dd_row,
         "| Datadog LLM Observability | Experimental | [x](https://example.com/datadog-openapi), client 2.61.0 | y |\n",
     )
     cases.append(
@@ -461,7 +528,7 @@ def self_test() -> int:
     )
 
     bold_tier_overclaim_table = good_table.replace(
-        "| Datadog LLM Observability | Experimental | x | y |\n",
+        dd_row,
         "| Datadog LLM Observability | **Supported** | x | y |\n",
     )
     cases.append(
@@ -476,7 +543,7 @@ def self_test() -> int:
     )
 
     unrecognized_tier_table = good_table.replace(
-        "| Datadog LLM Observability | Experimental | x | y |\n",
+        dd_row,
         "| Datadog LLM Observability | GA | x | y |\n",
     )
     cases.append(
@@ -604,6 +671,122 @@ def self_test() -> int:
             has(
                 check_trace_store_docs(rows, second_table), "docs_wrong_tier", "Datadog"
             ),
+        )
+    )
+
+    # 18.39c: a tier claim the tier-line scan cannot read, and a Reader-follows cell it cannot parse, are
+    # refused rather than read past.
+    spaced_readme = good_readme.replace(".\n", ".\n\n")
+    layout_ok = {
+        "tier lines each followed by a blank line": spaced_readme,
+        "tier lines back to back": good_readme,
+        "the last tier line at the end of the file with no newline": good_readme.rstrip(
+            "\n"
+        ),
+        "a spaces-and-tabs line after a tier line": good_readme + " \t\nMore prose.\n",
+        "a bold tier word with no count": spaced_readme
+        + "**Supported** means a reader ships.\n",
+    }
+    for label, text in layout_ok.items():
+        cases.append(
+            (
+                f"{label} reports no layout problem",
+                check_tier_layout(text, "README.md") == [],
+            )
+        )
+    experimental = "**Experimental** (3): Cursor CLI output, AuthZEN decisions, Datadog LLM Observability."
+    for label, follow in {
+        "a soft wrap": "\nHoneycomb.",
+        "a two-space hard break": "  \nHoneycomb.",
+        "a backslash hard break": "\\\nHoneycomb.",
+        "a list item right under the line": "\n- Honeycomb",
+        "a quote right under the line": "\n> Honeycomb",
+    }.items():
+        text = spaced_readme.replace(experimental, experimental + follow)
+        cases.append(
+            (
+                f"a tier line that goes on by {label} is tier_line_wrapped",
+                has(
+                    check_tier_lines(rows, text, "README.md"),
+                    "tier_line_wrapped",
+                    "Honeycomb",
+                ),
+            )
+        )
+    claim = "**Experimental** (1): Honeycomb."
+    for label, line in {
+        "a '-' list item": "- " + claim,
+        "a '*' list item": "* " + claim,
+        "a '+' list item": "+ " + claim,
+        "a numbered list item": "1. " + claim,
+        "a block quote": "> " + claim,
+        "an indented line": "    " + claim,
+        "a heading": "## " + claim,
+        "a mid-sentence claim": "We also list " + claim,
+        "a space before the colon": "**Experimental** (1) : Honeycomb.",
+        "no space before the count": "**Experimental**(1): Honeycomb.",
+        "underscore emphasis": "__Experimental__ (1): Honeycomb.",
+        "an underscore-emphasis list item": "- __Experimental__ (1): Honeycomb.",
+        "a <b> tag": "<b>Experimental</b> (1): Honeycomb.",
+        "a <strong> tag": "<strong>Experimental</strong> (1): Honeycomb.",
+        "an &nbsp; entity": "**Experimental**&nbsp;(1): Honeycomb.",
+        "a zero-width space": "**Experimental**\u200b (1): Honeycomb.",
+        "the count inside the bold": "**Experimental (1):** Honeycomb.",
+        "italic": "*Experimental* (1): Honeycomb.",
+        "bold italic": "***Experimental*** (1): Honeycomb.",
+        "lower case": "**experimental** (1): Honeycomb.",
+        "a code span": "`Experimental` (1): Honeycomb.",
+    }.items():
+        cases.append(
+            (
+                f"a tier claim written as {label} is tier_line_unreadable",
+                has(
+                    check_tier_lines(rows, spaced_readme + line + "\n", "README.md"),
+                    "tier_line_unreadable",
+                    "Honeycomb",
+                ),
+            )
+        )
+    for label, cell in {
+        "plain text": "Datadog docs 9.9.9",
+        "a link with no version": "[x](https://example.com/datadog-openapi)",
+        "a link and a comma with nothing after": "[x](https://example.com/datadog-openapi),",
+        "text before the link": "see [x](https://example.com/datadog-openapi), client 2.61.0",
+        "a version only": "client 2.61.0",
+    }.items():
+        table = good_table.replace(
+            dd_row, f"| Datadog LLM Observability | Experimental | {cell} | y |\n"
+        )
+        cases.append(
+            (
+                f"a Reader-follows cell written as {label} is docs_follows_unreadable",
+                has(
+                    check_trace_store_docs(rows, table),
+                    "docs_follows_unreadable",
+                    "Datadog",
+                ),
+            )
+        )
+    no_definition = {**rows, "Cursor CLI output": {"tier": "experimental"}}
+    cases.append(
+        (
+            "a docs row whose matrix row has no definition is docs_definition_missing",
+            has(
+                check_trace_store_docs(no_definition, good_table),
+                "docs_definition_missing",
+                "Cursor",
+            ),
+        )
+    )
+    wrong_tier_unreadable = good_table.replace(
+        dd_row, "| Datadog LLM Observability | Supported | x | y |\n"
+    )
+    found = check_trace_store_docs(rows, wrong_tier_unreadable)
+    cases.append(
+        (
+            "a wrong-tier row's unreadable cell is reported too",
+            has(found, "docs_wrong_tier", "Datadog")
+            and has(found, "docs_follows_unreadable", "Datadog"),
         )
     )
 

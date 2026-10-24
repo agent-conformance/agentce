@@ -232,9 +232,9 @@ allow:
 
   - path: verification/gates/ingest_support_matrix_check.py
     pattern: example-domain
-    count: 3
+    count: 9
     class: legitimate
-    justification: "The self-test's seeded-fault fixtures use the reserved example.com domain (RFC 2606) as a stand-in URL for a non-matrix docs-table row (Honeycomb) and a definition-drift probe; a named test double in the checker's own self-test, never an unfinished part of the gate."
+    justification: "The self-test's seeded-fault fixtures use the reserved example.com domain (RFC 2606) as a stand-in URL for a non-matrix docs-table row (Honeycomb) , a definition-drift probe, the fixture rows' definition URL and the Reader-follows cell probes (18.39c); a named test double in the checker's own self-test, never an unfinished part of the gate."
 
   - path: engines/python/agentce/report.py
     pattern: placeholder
