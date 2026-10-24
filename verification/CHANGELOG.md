@@ -3,6 +3,18 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.125.0
+
+- `VG-REPORT-VALIDATE` (18.60, changed): every engine reads report files by the SPEC 8.7 report-file reader
+  contract. The gate now builds the TypeScript and Java engines and runs `tools/report_validate_reader_census.py`,
+  which checks `spec/report/reader-cases.json` keeps a case for every reader class and every command that reaches
+  it, and `tools/report_validate_parity_check.py --reader-cases`, which runs each case through `report --validate`,
+  `readiness`, `sign` or `diff` in all three engines. Each must give the case's exit, key and named rule at the same
+  lines and leave the folder unchanged. Six more seeded faults: Python's CSV reader accepting text after a closing
+  quote, TypeScript's splitting records on LF only, Java's XML check accepting a DOCTYPE, Python's readiness answering
+  NOT READY instead of refusing with exit 3, Python's sign reading `manifest.json` without the JSON profile, and the
+  table losing its only `csv_unclosed_quote` case.
+
 ## 0.124.0
 
 - `VG-OUT-LINK-CONTAINMENT` (18.184zd, changed): an `--out` the engine cannot look at is refused

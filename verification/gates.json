@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.124.0",
+  "suite_version": "0.125.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -533,7 +533,7 @@
     },
     {
       "id": "VG-REPORT-VALIDATE",
-      "title": "report --validate performs real schema-validation of report artifacts, including the two-stage real-third-party-standard check for oscal-ar.json, in all three engines",
+      "title": "report --validate performs real schema-validation of report artifacts, including the two-stage real-third-party-standard check for oscal-ar.json, in all three engines, and every engine reads report files by the SPEC 8.7 report-file reader contract: each case of spec/report/reader-cases.json gives the table's exit, key and named rule through report --validate, readiness, sign and diff in all three engines (18.60)",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -542,6 +542,7 @@
       ],
       "requires": [
         "uv",
+        "node",
         "pnpm",
         "java",
         "jq"
@@ -549,8 +550,8 @@
       "timeout_s": 900,
       "invariant": "Evaluator modules carry determinism tests (order, locale, and clock independence) and golden files.",
       "rubric": {
-        "pass": "each engine validates a clean, fully-emitted report directory (exit 0, valid=true); each engine catches a copy whose oscal-ar.json satisfies AgentCE's own bounded local profile but violates the real vendored NIST OSCAL 1.1.2 standard (exit 3, valid=false, a problem naming 'oscal-ar.json (NIST OSCAL 1.1.2)'); each engine refuses a report directory that does not exist (exit 3, keyed input.validate_not_a_directory) before opening any artifact; each engine refuses a report whose optional auditor.json cannot be read (exit 3, keyed report.validation_failed, the one problem 'auditor.json: cannot read (permission denied)')",
-        "fail": "any engine fails the clean report, accepts the real-schema-only OSCAL violation as valid or without naming the real standard, accepts a missing report directory, or reads an unreadable artifact as absent"
+        "pass": "each engine validates a clean, fully-emitted report directory (exit 0, valid=true); each engine catches a copy whose oscal-ar.json satisfies AgentCE's own bounded local profile but violates the real vendored NIST OSCAL 1.1.2 standard (exit 3, valid=false, a problem naming 'oscal-ar.json (NIST OSCAL 1.1.2)'); each engine refuses a report directory that does not exist (exit 3, keyed input.validate_not_a_directory) before opening any artifact; each engine refuses a report whose optional auditor.json cannot be read (exit 3, keyed report.validation_failed, the one problem 'auditor.json: cannot read (permission denied)'); tools/report_validate_reader_census.py finds a case in spec/report/reader-cases.json for every SPEC 8.7 reader class and command that reaches it, and no engine reader function outside the census; tools/report_validate_parity_check.py --reader-cases gives every case's exit, key and named rule in all three engines, at the same lines, with the folder left unchanged (no readiness file, no signature written), and each engine's clean base validates, reads READY and signs",
+        "fail": "any engine fails the clean report, accepts the real-schema-only OSCAL violation as valid or without naming the real standard, accepts a missing report directory, or reads an unreadable artifact as absent; the case table loses a reader class's only case, or any engine accepts, refuses or names a reader case other than the table says (readiness answering NOT READY instead of refusing a file outside the JSON profile with exit 3 report.validation_failed, sign reading a manifest.json outside the profile instead of refusing it sign.no_manifest), or a refused run changes the folder"
       },
       "faults": [
         {
@@ -564,9 +565,45 @@
           "file": "engines/python/agentce/report.py",
           "search": "    except PermissionError as exc:\n        raise _CannotRead(\"permission denied\") from exc\n",
           "replace": "    except PermissionError:\n        return None\n"
+        },
+        {
+          "description": "Python's read_csv accepts text after a closing quote again, so a CSV field like \"DAT-01\"x reads as valid (18.60)",
+          "file": "engines/python/agentce/report_reader.py",
+          "search": "        if i < n and text[i] not in \",\\n\" and not text.startswith(\"\\r\\n\", i):\n            raise ReaderError(\"csv_text_after_quote\"",
+          "replace": "        if False and i < n and text[i] not in \",\\n\" and not text.startswith(\"\\r\\n\", i):\n            raise ReaderError(\"csv_text_after_quote\""
+        },
+        {
+          "description": "TypeScript's readCsv splits records on LF only, ignoring quotes, so a quoted line end breaks the record and a CR LF row end is a bare CR (18.60)",
+          "file": "engines/typescript/src/reportReader.ts",
+          "search": "export function readCsv(text: string): string[][] {\n",
+          "replace": "export function readCsv(text: string): string[][] {\n  if (text.includes(\"\\n\")) {\n    return text.split(\"\\n\").flatMap((line) => (line === \"\" ? [] : readCsv(line)));\n  }\n"
+        },
+        {
+          "description": "Java's checkXml accepts a DOCTYPE before the root element, skipping it instead of refusing xml_dtd (18.60)",
+          "file": "engines/java/src/main/java/org/agentce/ReportReader.java",
+          "search": "                } else if (at(\"<!DOCTYPE\")) {\n                    throw new ScanFault(\"xml_dtd\", i);\n                } else if (at(\"<?\")) {\n                    processingInstruction();\n                } else if (afterRoot) {",
+          "replace": "                } else if (at(\"<!DOCTYPE\")) {\n                    i = s.indexOf('>', i) + 1;\n                } else if (at(\"<?\")) {\n                    processingInstruction();\n                } else if (afterRoot) {"
+        },
+        {
+          "description": "Python's compute_readiness answers NOT READY (exit 1) for a report file outside the JSON profile instead of refusing it with exit 3 report.validation_failed (18.60)",
+          "file": "engines/python/agentce/readiness.py",
+          "search": "            if rule is not None:\n                raise InputError(\n                    REPORT_INVALID,",
+          "replace": "            if False and rule is not None:\n                raise InputError(\n                    REPORT_INVALID,"
+        },
+        {
+          "description": "Python's sign reads manifest.json leniently again, skipping the JSON profile parse, so a manifest with a byte-order mark, a repeated key or bytes that are not UTF-8 is signed instead of refused sign.no_manifest (18.60)",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    try:\n        read_json(data, bom=\"refuse\")\n    except JsonProfileError as exc:\n        raise InputError(\"sign.no_manifest\"",
+          "replace": "    try:\n        pass\n    except JsonProfileError as exc:\n        raise InputError(\"sign.no_manifest\""
+        },
+        {
+          "description": "spec/report/reader-cases.json loses its only csv_unclosed_quote case, so the reader census finds a SPEC 8.7 reader class with no case (18.60)",
+          "file": "spec/report/reader-cases.json",
+          "search": "  {\n   \"id\": \"csv-unclosed-quote\",\n   \"rule\": \"csv_unclosed_quote\",\n   \"command\": \"report-validate\",\n   \"file\": \"report.csv\",\n   \"edits\": [\n    {\n     \"op\": \"write\",\n     \"hex\": \"636f6e74726f6c2c7375626a6563742c6f7574636f6d652c636f6e74726f6c5f76657273696f6e2c72756e672c6d6f64650a4441542d30312c732c696e73756666696369656e745f65766964656e63652c323032362e30392c322c6175746f6d617465640a224441542d3032\"\n    }\n   ],\n   \"exit\": 3,\n   \"key\": \"report.validation_failed\",\n   \"names\": \"csv_unclosed_quote\"\n  },\n",
+          "replace": ""
         }
       ],
-      "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/report.py's validate_report, ported field-for-field in engines/typescript/src/reportValidate.ts and engines/java/src/main/java/org/agentce/ReportValidate.java."
+      "fix_hint": "Run the gate's command and read the FAIL lines; the reference implementation is engines/python/agentce/report.py's validate_report, ported field-for-field in engines/typescript/src/reportValidate.ts and engines/java/src/main/java/org/agentce/ReportValidate.java; a reader-case FAIL names the case in spec/report/reader-cases.json, and each engine's reader is engines/python/agentce/report_reader.py, engines/typescript/src/reportReader.ts and engines/java/src/main/java/org/agentce/ReportReader.java."
     },
     {
       "id": "VG-WHAT-THEY-DID",

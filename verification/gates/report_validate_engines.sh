@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Build gate helper for VG-REPORT-VALIDATE: `agentce report --validate` performs real
 # schema-validation of report artifacts, including the two-stage real-third-party-standard check
-# for oscal-ar.json, in all three engines.
+# for oscal-ar.json, in all three engines, and every engine reads report files by the SPEC 8.7 report-file reader
+# contract: tools/report_validate_parity_check.py --reader-cases runs every case of spec/report/reader-cases.json
+# (report --validate, readiness, sign, diff) in all three engines, and tools/report_validate_reader_census.py checks
+# the table keeps a case for every reader class and every engine's reader names only census classes (18.60).
 #
 # Reuses tools/report_validate_parity_check.py's own build_base_report/seed_oscal_nist_fault (the
 # same builders 18.27's own C3/C4 checks use) rather than authoring a second, independently-drifting
@@ -38,7 +41,10 @@ corrupted="$(jq -r .corrupted "$fixture_json")"
 unreadable="$(jq -r .unreadable "$fixture_json")"
 missing="$work/does-not-exist"
 
-(cd "$root/engines/java" && ./gradlew --no-daemon --quiet installDist)
+# Build here: a gate's place in a CI shard decides which gates ran before it, and a seeded fault in an engine's
+# source only reaches the parity tool through a fresh build.
+(cd "$root/engines/typescript" && pnpm install --frozen-lockfile >/dev/null && pnpm --silent build >/dev/null)
+(cd "$root/engines/java" && ./gradlew --no-daemon --quiet :assemble installDist)
 
 run_validate() {
   local engine="$1"
@@ -99,5 +105,16 @@ for engine in python typescript java; do
   fi
 done
 
-[ "$status" -eq 0 ] && echo "report-validate: all three engines validate the clean report, catch the real-schema-only OSCAL violation, refuse an unreadable auditor.json, and refuse a missing report directory"
+# SPEC 8.7 report-file reader contract (18.60): the case table covers every reader class, and every case gives the
+# table's exit, key and named rule in all three engines with the folder left unchanged.
+if ! (cd "$root" && env -u VIRTUAL_ENV uv run --project tools --frozen python tools/report_validate_reader_census.py); then
+  echo "report-validate: spec/report/reader-cases.json or an engine's reader is outside the reader census" >&2
+  status=1
+fi
+if ! (cd "$root" && env -u VIRTUAL_ENV uv run --project tools --frozen python tools/report_validate_parity_check.py --reader-cases); then
+  echo "report-validate: an engine does not read report files by the SPEC 8.7 reader contract (spec/report/reader-cases.json)" >&2
+  status=1
+fi
+
+[ "$status" -eq 0 ] && echo "report-validate: all three engines validate the clean report, catch the real-schema-only OSCAL violation, refuse an unreadable auditor.json, refuse a missing report directory, and read every reader-cases.json case by the SPEC 8.7 reader contract"
 exit "$status"
