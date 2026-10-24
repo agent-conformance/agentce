@@ -76,7 +76,6 @@ JAVA_JSON = "engines/java/src/main/java/org/agentce/Json.java"
 JAVA_REPORT = "engines/java/src/main/java/org/agentce/ReportValidate.java"
 #: The module per engine whose every public function the census must name.
 READER_MODULES = {"python": PY_READER, "typescript": TS_READER, "java": JAVA_READER}
-LANGUAGE = {"python": "python", "typescript": "typescript", "java": "java"}
 
 Readers = Mapping[str, tuple[tuple[str, str], ...]]
 
@@ -378,7 +377,7 @@ def check_code(
             for path, name in cls.readers[engine]:
                 named.setdefault(path, set()).add(name)
     language_of = {
-        path: LANGUAGE[engine]
+        path: engine
         for cls in census
         for engine in ENGINES
         for path, _ in cls.readers[engine]
@@ -395,7 +394,7 @@ def check_code(
         text = source(path)
         if text is None:
             continue  # reported above
-        for name in public_functions(LANGUAGE[engine], text):
+        for name in public_functions(engine, text):
             if name not in named.get(path, set()):
                 problems.append(
                     f"code: {path} public function {name} is in no census class"
@@ -450,7 +449,7 @@ def _synthetic_sources(census: tuple[ReaderClass, ...]) -> dict[str, str]:
                     "python": f"def {name}(data: bytes) -> str:\n    return ''\n",
                     "typescript": f"export function {name}(data: Buffer): string {{\n  return '';\n}}\n",
                     "java": f'    public static String {name}(byte[] data) {{\n        return "";\n    }}\n',
-                }[LANGUAGE[engine]]
+                }[engine]
                 if line not in texts.setdefault(path, []):
                     texts[path].append(line)
     sources = {path: "".join(lines) for path, lines in texts.items()}

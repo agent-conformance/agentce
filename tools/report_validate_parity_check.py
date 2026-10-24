@@ -71,55 +71,22 @@ CATALOG_DIR = ROOT / "spec" / "catalogs" / "base" / "eu-ai-act"
 ZERO_DIGEST = "sha256:" + "0" * 64
 
 
-def _run(cmd: list[str], *, cwd: Path | None = None) -> tuple[str, int]:
-    """Run `cmd`, returning `(stdout, exit_code)`; a non-zero exit is expected for most cases here,
-    so the caller judges the exit code."""
-    proc = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
-    return proc.stdout, proc.returncode
+def _validate(engine: str, report_dir: Path) -> tuple[str, int]:
+    """`engine`'s own `report --validate --json` (TypeScript and Java must be built first); a
+    non-zero exit is expected for most cases here, so the caller judges the exit code."""
+    return run_engine(engine, ["report", "--validate", str(report_dir), "--json"])
 
 
 def python_validate(report_dir: Path) -> tuple[str, int]:
-    """The real Python engine's own `report --validate` (console-script form, so this script's own
-    environment never needs `agentce` installed)."""
-    return _run(
-        [
-            "uv",
-            "run",
-            "--frozen",
-            "--project",
-            str(PY_ENGINE),
-            "agentce",
-            "report",
-            "--validate",
-            str(report_dir),
-            "--json",
-        ],
-        cwd=ROOT,
-    )
+    return _validate("python", report_dir)
 
 
 def typescript_validate(report_dir: Path) -> tuple[str, int]:
-    """The built TypeScript engine's `report --validate` (`pnpm build` must have run first)."""
-    return _run(
-        ["node", str(_ts_entry()), "report", "--validate", str(report_dir), "--json"],
-        cwd=ROOT,
-    )
+    return _validate("typescript", report_dir)
 
 
 def java_validate(report_dir: Path) -> tuple[str, int]:
-    """The built Java engine's `report --validate` (`./gradlew :assemble` must have run first)."""
-    return _run(
-        [
-            "java",
-            "-jar",
-            str(_java_jar()),
-            "report",
-            "--validate",
-            str(report_dir),
-            "--json",
-        ],
-        cwd=ROOT,
-    )
+    return _validate("java", report_dir)
 
 
 QUICKSTART_ARGS = [
