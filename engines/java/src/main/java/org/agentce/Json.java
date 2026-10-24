@@ -631,7 +631,7 @@ public final class Json {
 
     /** The index of the first byte of {@code raw} that does not start a well-formed UTF-8 sequence
      * (overlong forms, encoded surrogates and code points past U+10FFFF included), or -1. */
-    static int invalidUtf8At(byte[] raw, int from) {
+    private static int invalidUtf8At(byte[] raw, int from) {
         int i = from;
         while (i < raw.length) {
             int b = raw[i] & 0xFF;

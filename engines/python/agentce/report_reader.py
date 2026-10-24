@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-BOM = b"\xef\xbb\xbf"
+from .safe_json import JsonProfileError, _decode
 
 
 class ReaderError(ValueError):
@@ -37,12 +37,10 @@ def decode_report_text(data: bytes) -> str:
     """``data`` decoded as strict UTF-8: a leading byte-order mark is ``bom``; an invalid or overlong
     sequence, an encoded surrogate, a code point over U+10FFFF or a truncated sequence is
     ``invalid_utf8`` at the line of its first byte."""
-    if data.startswith(BOM):
-        raise ReaderError("bom", 1)
     try:
-        return data.decode("utf-8")
-    except UnicodeDecodeError as exc:
-        raise ReaderError("invalid_utf8", data.count(b"\n", 0, exc.start) + 1) from None
+        return _decode(data, "refuse")
+    except JsonProfileError as exc:
+        raise ReaderError(exc.rule, exc.line) from None
 
 
 def is_blank(text: str) -> bool:

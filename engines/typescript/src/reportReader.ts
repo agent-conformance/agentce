@@ -9,7 +9,7 @@
  * component.
  */
 
-import { countLf, hasBom, invalidUtf8At } from "./json";
+import { JsonProfileError, decodeProfile } from "./json";
 
 /** A file outside the reader contract: `rule` is a token of `spec/report/reader-cases.json`, `line` is
  * 1 + the LF characters before the fault. The reader stops at the first fault. */
@@ -27,14 +27,14 @@ export class ReaderError extends Error {
  * overlong form, an encoded surrogate, a code point past U+10FFFF, a truncated sequence) are
  * `invalid_utf8` at the line of the first bad byte. */
 export function decodeReportText(data: Buffer): string {
-  if (hasBom(data)) {
-    throw new ReaderError("bom", 1);
+  try {
+    return decodeProfile(data, "refuse");
+  } catch (err) {
+    if (err instanceof JsonProfileError) {
+      throw new ReaderError(err.rule, err.line);
+    }
+    throw err;
   }
-  const bad = invalidUtf8At(data);
-  if (bad >= 0) {
-    throw new ReaderError("invalid_utf8", countLf(data, bad) + 1);
-  }
-  return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(data);
 }
 
 /** Whether `text` holds only space, tab, CR and LF (none at all included): the empty check's one set. */

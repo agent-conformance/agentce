@@ -1,6 +1,5 @@
 package org.agentce;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -47,20 +46,11 @@ public final class ReportReader {
      * sequence, encoded surrogate, code point past U+10FFFF or truncated sequence is {@code invalid_utf8}
      * at the line of its first byte. */
     public static String decodeReportText(byte[] data) {
-        if (Json.hasBom(data)) {
-            throw new ReaderException("bom", 1);
+        try {
+            return Json.decodeProfile(data, Json.Bom.REFUSE);
+        } catch (Json.JsonProfileError e) {
+            throw new ReaderException(e.rule(), e.line());
         }
-        int bad = Json.invalidUtf8At(data, 0);
-        if (bad >= 0) {
-            int line = 1;
-            for (int k = 0; k < bad; k++) {
-                if (data[k] == '\n') {
-                    line += 1;
-                }
-            }
-            throw new ReaderException("invalid_utf8", line);
-        }
-        return new String(data, StandardCharsets.UTF_8);
     }
 
     /** Whether {@code text} holds only space, tab, CR and LF (none at all included). */
