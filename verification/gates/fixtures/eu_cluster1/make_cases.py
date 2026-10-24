@@ -22,9 +22,10 @@ def ref(i):
     return f"agentce:event/{i}"
 
 
-# Every decision records its options and the one it chose, as the corpus generator's do, so DOC-02 (18.37f) reads it
-# documented and the assess exit stays the INC-03, OVS and RSK cases' own.
-CHOICE = {"options": [{"id": "approve", "label": "Approve"}, {"id": "decline", "label": "Decline"}], "chosen": "approve"}
+# Every decision records its options, the one it chose and the AI system's role in it, as the corpus generator's do, so
+# DOC-02 (18.37f) and TRN-02 (18.37g) read it documented and the assess exit stays the INC-03, OVS and RSK cases' own.
+CHOICE = {"options": [{"id": "approve", "label": "Approve"}, {"id": "decline", "label": "Decline"}], "chosen": "approve",
+          "ai_role": "recommendation"}
 
 
 def dec(i, dtype="dom:CreditDecision", **k):

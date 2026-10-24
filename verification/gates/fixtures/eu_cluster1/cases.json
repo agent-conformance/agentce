@@ -29,7 +29,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -138,7 +139,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -167,7 +169,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -278,7 +281,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -307,7 +311,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -439,7 +444,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -468,7 +474,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -602,7 +609,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -631,7 +639,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -743,7 +752,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -772,7 +782,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -881,7 +892,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -910,7 +922,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -1021,7 +1034,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -1128,7 +1142,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -1157,7 +1172,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -1297,7 +1313,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -1326,7 +1343,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -1490,7 +1508,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -1519,7 +1538,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -1631,7 +1651,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -1660,7 +1681,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -1796,7 +1818,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -1882,7 +1905,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -1911,7 +1935,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -2020,7 +2045,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -2106,7 +2132,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -2135,7 +2162,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -2223,7 +2251,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -2335,7 +2364,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -2419,7 +2449,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -2508,7 +2539,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -2598,7 +2630,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -2688,7 +2721,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -2756,7 +2790,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -2842,7 +2877,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -2927,7 +2963,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -2987,7 +3024,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         }
       ],
@@ -3026,7 +3064,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -3112,7 +3151,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -3174,7 +3214,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -3241,6 +3282,7 @@
               }
             ],
             "chosen": "approve",
+            "ai_role": "recommendation",
             "oversight_modality": "dual_control"
           }
         },
@@ -3375,6 +3417,7 @@
               }
             ],
             "chosen": "approve",
+            "ai_role": "recommendation",
             "oversight_modality": "dual_control"
           }
         },
@@ -3489,7 +3532,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -3729,7 +3773,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         }
       ],
@@ -3788,6 +3833,7 @@
               }
             ],
             "chosen": "approve",
+            "ai_role": "recommendation",
             "refs": {
               "authorization": "agentce:event/p1"
             }
@@ -3819,7 +3865,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -3905,7 +3952,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -3934,7 +3982,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -4023,6 +4072,7 @@
               }
             ],
             "chosen": "approve",
+            "ai_role": "recommendation",
             "refs": {
               "authorization": "agentce:event/p1"
             }
@@ -4054,7 +4104,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -4162,6 +4213,7 @@
               }
             ],
             "chosen": "approve",
+            "ai_role": "recommendation",
             "refs": {
               "authorization": "agentce:event/p9"
             }
@@ -4193,7 +4245,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -4282,6 +4335,7 @@
               }
             ],
             "chosen": "approve",
+            "ai_role": "recommendation",
             "refs": {
               "authorization": "agentce:event/a2"
             }
@@ -4313,7 +4367,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -4401,7 +4456,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {
@@ -4461,7 +4517,8 @@
                 "label": "Decline"
               }
             ],
-            "chosen": "approve"
+            "chosen": "approve",
+            "ai_role": "recommendation"
           }
         },
         {

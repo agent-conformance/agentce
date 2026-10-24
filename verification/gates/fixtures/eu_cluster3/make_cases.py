@@ -31,8 +31,10 @@ def ref(i):
     return f"agentce:event/{i}"
 
 
+# Every decision records the AI system's role in it, as the corpus generator's do, so TRN-02 (18.37g) holds and the
+# assess exit stays the case's own.
 def dec(i, dtype="dom:CreditDecision", **k):
-    return ev(i, "Decision", decision_type=dtype, **k)
+    return ev(i, "Decision", decision_type=dtype, **{"ai_role": "recommendation", **k})
 
 
 CHOICE = {"options": [{"id": "approve", "label": "Approve"}, {"id": "decline", "label": "Decline"}], "chosen": "approve"}
