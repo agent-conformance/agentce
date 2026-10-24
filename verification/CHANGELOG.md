@@ -3,6 +3,24 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.127.0
+
+- `VG-EUAIACT-CLUSTER4` (18.37g, new, tier quick) runs 76 cases through the real Python, TypeScript and Java CLIs.
+  The last eleven eu-ai-act controls that shared a rule now each test what their title says. REC-03 needs every input
+  a consequential decision names to be a held record, and at least one. DAT-01 needs one of those inputs to be a data
+  read, a ResourceAccess read or a MemoryRead. TRN-02 needs the decision to record the AI system's role in it
+  (`ai_role`). INT-04 needs an integrity block on the call at a strength SPEC 6.6 can verify for an enforcement point,
+  or any block for an independent system. ROB-01 needs the call's effect classified. ROB-04 needs a held, verified
+  delegation issued at or before the call and expiring after it, compared as instants. ROB-03 names the references it
+  checks. DAT-02 and DOC-04 move to rung 3 and read not_assessed, since no record shows their measurement. Thirty-one
+  seeded faults: thirteen in Python, nine each in TypeScript and Java.
+- `VG-CATALOG-RULE-UNIQUE` (18.37g, changed): the last six eu-ai-act pairs leave the baseline, every pair list is empty
+  and every ceiling is 0.
+- The CI `demo-fault` job runs on 48 lanes (was 45): with VG-EUAIACT-CLUSTER4's thirty-one faults, estimated at 1453 s
+  from VG-EUAIACT-CLUSTER2's measured time, the heaviest of 45 shards was 13.4 minutes, over the 12.0 lane bound.
+- `VG-EUAIACT-CLUSTER1` and `VG-EUAIACT-CLUSTER3` (18.37g, changed): every case decision records the AI system's role,
+  so TRN-02 holds and each case keeps its own assess exit code.
+
 ## 0.126.0
 
 - `VG-EUAIACT-CLUSTER3` (18.37f, new, tier quick) runs 107 cases through the real Python, TypeScript and Java CLIs.

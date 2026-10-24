@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.126.0",
+  "suite_version": "0.127.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -4859,6 +4859,218 @@
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "!(affects != null && affects.isBoolean() && !affects.booleanValue())",
           "replace": "affects != null && affects.isBoolean() && affects.booleanValue()"
+        }
+      ]
+    },
+    {
+      "id": "VG-EUAIACT-CLUSTER4",
+      "title": "The last eleven eu-ai-act controls that shared a rule each test what their title says in all three engines (18.37g): REC-03 every input a consequential decision names is a held record; DAT-01 one of them is a data read; TRN-02 the decision records the AI system's role in it; INT-04 an integrity block backs the call at a strength SPEC 6.6 verifies; ROB-01 the call's effect is classified; ROB-04 the call ran under a held, verified delegation issued at or before it and expiring after it; ROB-03 names the references it checks; DAT-02 and DOC-04 read not_assessed",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/eu_cluster4.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/eu_cluster4/cases.json (76: REC-03 inputs held, self_report input, and none, empty, dangling, bare, quarantined, not a string, one of two; DAT-01 a ResourceAccess read or a MemoryRead beside a dangling one, and a ModelCall only, a write, an unnamed read, none, dangling, bare, quarantined, one of two; TRN-02 each ai_role, and no role, no agent, an invalid role, one of two, with REC-01 keeping the agent alone; INT-04 anchored, signed (partial), independent at any strength, and chained, no block, independent with no block, self_report, one of two; ROB-01 classified, and no effect_class, an invalid one, self_report, chained (partial), one of two; ROB-04 in force, expiry with an offset after, a self_report delegation, and expired, expiring at the call, an offset before, no expiry, unplaceable, unverified, dangling, bare, another type, none, issued after the call, one of two, with OVS-04 keeping the verified delegation alone; DAT-02 and DOC-04 not assessed; order reversed and not consequential for each) gives the expected outcome of its control, failing events, quarantine count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "fail": "any case gives another outcome, another set of failing events, another quarantine count or another exit code in any engine"
+      },
+      "fix_hint": "Each engine's graph builder sets the six literals in two places: inputsRecorded, dataConsumedRecorded and aiRoleRecorded on a Decision (graph.py _decision_inputs, graph.ts decisionInputs, Graph.java decisionInputs), and classCorroborated, effectClassified and delegationInForce on a ToolCall (graph.py _call_record, graph.ts callRecord, Graph.java callRecord); the shapes in spec/catalogs/base/eu-ai-act/shapes read them with sh:hasValue true. Run `ENGINES=python bash verification/gates/eu_cluster4.sh` (or typescript, java) for one engine.",
+      "faults": [
+        {
+          "description": "Python counts any non-empty inputs list, so REC-03 reads a decision naming a dangling input conformant (rec03-input-dangling)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "bool(records) and all(r is not None for r in records),",
+          "replace": "bool(records),"
+        },
+        {
+          "description": "Python resolves a bare event id as an input, so REC-03 reads a bare input conformant (rec03-input-bare)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "held.get(name) if isinstance(name, str) else None",
+          "replace": "(held.get(name) or held.get(\"agentce:event/\" + name)) if isinstance(name, str) else None"
+        },
+        {
+          "description": "Python counts a ResourceAccess write as a data read, so DAT-01 reads it conformant (dat01-resource-write)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "ptype == \"ResourceAccess\" and _data(event).get(\"operation\") == \"read\"",
+          "replace": "ptype == \"ResourceAccess\""
+        },
+        {
+          "description": "Python counts a ModelCall as a data read, so DAT-01 reads a decision whose only input is a model call conformant (dat01-modelcall-only)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "return ptype == \"MemoryRead\" or (",
+          "replace": "return ptype in (\"MemoryRead\", \"ModelCall\") or ("
+        },
+        {
+          "description": "Python reads an absent ai_role as recorded, so TRN-02 reads a decision with no role conformant (trn02-no-role)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "node, \"agentce:aiRoleRecorded\", _is_one_of(data.get(\"ai_role\"), _AI_ROLES)",
+          "replace": "node, \"agentce:aiRoleRecorded\", data.get(\"ai_role\") is None or _is_one_of(data.get(\"ai_role\"), _AI_ROLES)"
+        },
+        {
+          "description": "Python ignores the integrity strength of an enforcement-point call, so INT-04 reads an export_chained call conformant (int04-chained)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "                    source == \"enforcement_point\"\n                    and _is_one_of(integrity.get(\"strength\"), _VERIFIABLE_STRENGTHS)\n",
+          "replace": "                    source == \"enforcement_point\"\n"
+        },
+        {
+          "description": "Python corroborates an independent-system call with no integrity block, so INT-04 reads it conformant (int04-independent-none, int04-one-of-two)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "            isinstance(integrity, dict)\n            and (\n                source == \"independent_system\"\n                or (\n                    source == \"enforcement_point\"\n                    and _is_one_of(integrity.get(\"strength\"), _VERIFIABLE_STRENGTHS)\n                )\n            ),",
+          "replace": "            (\n                source == \"independent_system\"\n                or (\n                    isinstance(integrity, dict)\n                    and source == \"enforcement_point\"\n                    and _is_one_of(integrity.get(\"strength\"), _VERIFIABLE_STRENGTHS)\n                )\n            ),"
+        },
+        {
+          "description": "Python corroborates an enforcement-point call with no integrity block, so INT-04 reads it conformant (int04-no-integrity)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "            isinstance(integrity, dict)\n            and (\n                source == \"independent_system\"\n                or (\n                    source == \"enforcement_point\"\n                    and _is_one_of(integrity.get(\"strength\"), _VERIFIABLE_STRENGTHS)\n                )\n            ),",
+          "replace": "            (\n                (isinstance(integrity, dict) and source == \"independent_system\")\n                or (\n                    source == \"enforcement_point\"\n                    and (integrity is None or _is_one_of(integrity.get(\"strength\"), _VERIFIABLE_STRENGTHS))\n                )\n            ),"
+        },
+        {
+          "description": "Python reads an absent effect_class as classified, so ROB-01 reads an unclassified call conformant (rob01-no-effect-class)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "_is_one_of(data.get(\"effect_class\"), _EFFECT_CLASSES)",
+          "replace": "data.get(\"effect_class\") is None or _is_one_of(data.get(\"effect_class\"), _EFFECT_CLASSES)"
+        },
+        {
+          "description": "Python ignores a delegation's expiry, so ROB-04 reads an expired delegation conformant (rob04-expired)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "            and isinstance(expires, str)\n            and compare_instants(expires, call) == 1\n",
+          "replace": "            and isinstance(expires, str)\n"
+        },
+        {
+          "description": "Python compares the expiry and the call time as text, so ROB-04 reads an expiry before the call, written with a +02:00 offset, conformant (rob04-expires-offset-before)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "compare_instants(expires, call) == 1",
+          "replace": "expires > call"
+        },
+        {
+          "description": "Python treats an expiry equal to the call time as in force, so ROB-04 reads it conformant (rob04-expires-at-call)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "compare_instants(expires, call) == 1",
+          "replace": "compare_instants(expires, call) in (0, 1)"
+        },
+        {
+          "description": "Python ignores when a delegation was issued, so ROB-04 reads one issued after the call conformant (rob04-issued-after-call)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "compare_instants(str(grant.get(\"time\", \"\")), call) in (-1, 0)",
+          "replace": "compare_instants(str(grant.get(\"time\", \"\")), call) is not None"
+        },
+        {
+          "description": "TypeScript counts any non-empty inputs list (rec03-input-dangling)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "records.length > 0 && records.every((r) => r !== undefined),",
+          "replace": "records.length > 0,"
+        },
+        {
+          "description": "TypeScript counts a ResourceAccess write as a data read (dat01-resource-write)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "(ptype === \"ResourceAccess\" && dataOf(event).operation === \"read\")",
+          "replace": "ptype === \"ResourceAccess\""
+        },
+        {
+          "description": "TypeScript reads an absent ai_role as recorded (trn02-no-role)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "this.literal(node, \"agentce:aiRoleRecorded\", isOneOf(data.ai_role, AI_ROLES));",
+          "replace": "this.literal(node, \"agentce:aiRoleRecorded\", data.ai_role === undefined || isOneOf(data.ai_role, AI_ROLES));"
+        },
+        {
+          "description": "TypeScript ignores the integrity strength of an enforcement-point call (int04-chained)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "(source === \"enforcement_point\" && isOneOf(integrity.strength, VERIFIABLE_STRENGTHS))",
+          "replace": "source === \"enforcement_point\""
+        },
+        {
+          "description": "TypeScript corroborates an independent-system call with no integrity block (int04-independent-none, int04-one-of-two)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "      isRecord(integrity) &&\n        (source === \"independent_system\" ||\n          (source === \"enforcement_point\" && isOneOf(integrity.strength, VERIFIABLE_STRENGTHS))),",
+          "replace": "      source === \"independent_system\" ||\n        (isRecord(integrity) &&\n          source === \"enforcement_point\" &&\n          isOneOf(integrity.strength, VERIFIABLE_STRENGTHS)),"
+        },
+        {
+          "description": "TypeScript reads an absent effect_class as classified (rob01-no-effect-class)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "isOneOf(data.effect_class, EFFECT_CLASSES)",
+          "replace": "(data.effect_class === undefined || isOneOf(data.effect_class, EFFECT_CLASSES))"
+        },
+        {
+          "description": "TypeScript ignores a delegation's expiry (rob04-expired)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "        compareInstants(expires, call) === 1 &&\n",
+          "replace": ""
+        },
+        {
+          "description": "TypeScript treats an expiry equal to the call time as in force (rob04-expires-at-call)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "compareInstants(expires, call) === 1",
+          "replace": "(compareInstants(expires, call) ?? -1) >= 0"
+        },
+        {
+          "description": "TypeScript ignores when a delegation was issued (rob04-issued-after-call)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "(issued === -1 || issued === 0)",
+          "replace": "issued !== null"
+        },
+        {
+          "description": "Java counts any non-empty inputs list (rec03-input-dangling)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "!records.isEmpty() && !records.contains(null)",
+          "replace": "!records.isEmpty()"
+        },
+        {
+          "description": "Java counts a ResourceAccess write as a data read (dat01-resource-write)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "|| (\"ResourceAccess\".equals(ptype) && \"read\".equals(str(dataOf(event).get(\"operation\"))));",
+          "replace": "|| \"ResourceAccess\".equals(ptype);"
+        },
+        {
+          "description": "Java reads an absent ai_role as recorded (trn02-no-role)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "isOneOf(data.get(\"ai_role\"), AI_ROLES)",
+          "replace": "(data.get(\"ai_role\") == null || isOneOf(data.get(\"ai_role\"), AI_ROLES))"
+        },
+        {
+          "description": "Java ignores the integrity strength of an enforcement-point call (int04-chained)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "\n                                    && isOneOf(integrity.get(\"strength\"), VERIFIABLE_STRENGTHS)",
+          "replace": ""
+        },
+        {
+          "description": "Java corroborates an independent-system call with no integrity block (int04-independent-none, int04-one-of-two)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "integrity != null && integrity.isObject()\n                    && (\"independent_system\".equals(source)\n                            || (\"enforcement_point\".equals(source)",
+          "replace": "(\"independent_system\".equals(source)\n                            || (integrity != null && integrity.isObject() && \"enforcement_point\".equals(source)"
+        },
+        {
+          "description": "Java reads an absent effect_class as classified (rob01-no-effect-class)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "isOneOf(data.get(\"effect_class\"), EFFECT_CLASSES)",
+          "replace": "(data.get(\"effect_class\") == null || isOneOf(data.get(\"effect_class\"), EFFECT_CLASSES))"
+        },
+        {
+          "description": "Java ignores a delegation's expiry (rob04-expired)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "\n                        && Integer.valueOf(1).equals(Structural.compareInstants(expires, call))",
+          "replace": ""
+        },
+        {
+          "description": "Java treats an expiry equal to the call time as in force (rob04-expires-at-call)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "Integer.valueOf(1).equals(Structural.compareInstants(expires, call))",
+          "replace": "Objects.requireNonNullElse(Structural.compareInstants(expires, call), -1) >= 0"
+        },
+        {
+          "description": "Java ignores when a delegation was issued (rob04-issued-after-call)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "&& issued != null && issued <= 0;",
+          "replace": "&& issued != null;"
         }
       ]
     },
