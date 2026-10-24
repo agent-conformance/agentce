@@ -3,7 +3,8 @@
  * `report --validate`, readiness, sign and `diff` read, the same in every engine, with no library as
  * the reference. Bytes are strict UTF-8 with no byte-order mark; CSV is RFC 4180; XML is well-formed
  * XML 1.0 with no DTD, no entity beyond the five predefined, nothing after the root element, no
- * character outside `Char` and every prefix bound; the empty check uses one whitespace set. JSON and
+ * character outside `Char`, every prefix bound, the reserved `xml` and `xmlns` prefixes and namespace
+ * names kept and no two attributes with one expanded name; the empty check uses one whitespace set. JSON and
  * JSON Lines files keep the JSON profile reader (`json.ts`). Mirrors Python's `report_reader` and
  * Java's `ReportReader` (harness/remediation/evidence/P18-18.60/design.md). No network, no learned
  * component.
@@ -133,7 +134,33 @@ export function readCsv(text: string): string[][] {
 
 // --- XML 1.0 well-formedness ------------------------------------------------------------------------
 
-const PREDEFINED_ENTITIES: ReadonlySet<string> = new Set(["amp", "lt", "gt", "quot", "apos"]);
+const PREDEFINED_ENTITIES: ReadonlyMap<string, string> = new Map([
+  ["amp", "&"],
+  ["lt", "<"],
+  ["gt", ">"],
+  ["quot", '"'],
+  ["apos", "'"],
+]);
+
+/** The two reserved namespace names (Namespaces in XML 1.0, section 3). */
+const XML_NS = "http://www.w3.org/XML/1998/namespace";
+const XMLNS_NS = "http://www.w3.org/2000/xmlns/";
+
+/** An attribute value already checked by the scanner, normalized as XML 1.0 section 3.3.3 reads it:
+ * each line end, tab or LF becomes a space, then each reference becomes its character. */
+function normalizedValue(raw: string): string {
+  return raw
+    .replace(/\r\n?|[\t\n]/g, " ")
+    .replace(
+      /&(?:#x([0-9a-fA-F]+)|#([0-9]+)|([^;]+));/g,
+      (_: string, hex?: string, dec?: string, entity?: string) =>
+        entity !== undefined
+          ? (PREDEFINED_ENTITIES.get(entity) as string)
+          : String.fromCodePoint(
+              Number.parseInt(hex ?? (dec as string), hex !== undefined ? 16 : 10),
+            ),
+    );
+}
 
 /** XML 1.0 `Char`: #x9, #xA, #xD, #x20-#xD7FF, #xE000-#xFFFD, #x10000-#x10FFFF. */
 function isXmlChar(cp: number): boolean {
@@ -195,7 +222,8 @@ class XmlFault {
 
 interface OpenElement {
   readonly name: string;
-  readonly prefixes: ReadonlySet<string>;
+  /** The prefixes this element declares, each to its namespace name. */
+  readonly namespaces: ReadonlyMap<string, string>;
 }
 
 /** The hand-written scanner {@link checkXml} runs: prolog, one root element, then Misc. */
@@ -248,11 +276,22 @@ class XmlScanner {
     return parts.length === 2 ? (parts[0] as string) : "";
   }
 
-  private bound(prefix: string, own: ReadonlySet<string>): boolean {
-    if (prefix === "" || prefix === "xml" || own.has(prefix)) {
-      return true;
+  /** The namespace name `prefix` is bound to in scope, or undefined when it is unbound. */
+  private namespaceOf(prefix: string, own: ReadonlyMap<string, string>): string | undefined {
+    if (prefix === "xml") {
+      return XML_NS;
     }
-    return this.stack.some((element) => element.prefixes.has(prefix));
+    const ns = own.get(prefix);
+    if (ns !== undefined) {
+      return ns;
+    }
+    for (let k = this.stack.length - 1; k >= 0; k--) {
+      const outer = (this.stack[k] as OpenElement).namespaces.get(prefix);
+      if (outer !== undefined) {
+        return outer;
+      }
+    }
+    return undefined;
   }
 
   scan(): void {
@@ -345,7 +384,8 @@ class XmlScanner {
     this.pos = end + 3;
   }
 
-  /** `<?target ...?>`; a target `xml` in any case is the declaration out of place. */
+  /** `<?target ...?>`; a target `xml` in any case is the declaration out of place, and a target has
+   * no colon. */
   private processingInstruction(): void {
     const start = this.pos;
     this.pos += 2;
@@ -403,14 +443,16 @@ class XmlScanner {
     this.pos += 1;
   }
 
-  /** A start tag at `<`; returns whether it was an empty-element tag. */
+  /** A start tag at `<`; returns whether it was an empty-element tag. A declaration that breaks a
+   * reserved prefix or namespace name, and two attributes with one expanded name, are `xml_syntax`
+   * (Namespaces in XML 1.0, sections 3 and 6.3). */
   private startTag(): boolean {
     const start = this.pos;
     this.pos += 1;
     const name = this.name();
-    const attributes: Array<[string, number]> = [];
+    const attributes: Array<[string, number, string]> = [];
     const seen = new Set<string>();
-    const prefixes = new Set<string>();
+    const namespaces = new Map<string, string>();
     let empty: boolean;
     for (;;) {
       const spaced = this.skipSpace();
@@ -466,25 +508,47 @@ class XmlScanner {
         if (value === "") {
           this.fail("xml_syntax", at);
         }
-        prefixes.add(attribute.slice("xmlns:".length));
+        namespaces.set(attribute.slice("xmlns:".length), normalizedValue(value));
       }
-      attributes.push([attribute, at]);
+      attributes.push([attribute, at, value]);
     }
     const prefix = this.prefixOf(name, start + 1);
     if (prefix === "xmlns") {
       this.fail("xml_syntax", start + 1);
     }
-    if (!this.bound(prefix, prefixes)) {
+    if (prefix !== "" && this.namespaceOf(prefix, namespaces) === undefined) {
       this.fail("xml_unbound_prefix", start + 1);
     }
-    for (const [attribute, at] of attributes) {
+    const expanded = new Set<string>();
+    for (const [attribute, at, value] of attributes) {
       const attributePrefix = this.prefixOf(attribute, at);
-      if (attributePrefix !== "xmlns" && !this.bound(attributePrefix, prefixes)) {
+      if (attributePrefix === "") {
+        const ns = attribute === "xmlns" ? normalizedValue(value) : "";
+        if (ns === XML_NS || ns === XMLNS_NS) {
+          this.fail("xml_syntax", at);
+        }
+        continue;
+      }
+      const local = attribute.slice(attributePrefix.length + 1);
+      if (attributePrefix === "xmlns") {
+        const ns = namespaces.get(local) as string;
+        if (local === "xmlns" || ns === XMLNS_NS || (local === "xml") !== (ns === XML_NS)) {
+          this.fail("xml_syntax", at);
+        }
+        continue;
+      }
+      const ns = this.namespaceOf(attributePrefix, namespaces);
+      if (ns === undefined) {
         this.fail("xml_unbound_prefix", at);
       }
+      const key = JSON.stringify([ns, local]);
+      if (expanded.has(key)) {
+        this.fail("xml_syntax", at);
+      }
+      expanded.add(key);
     }
     if (!empty) {
-      this.stack.push({ name, prefixes });
+      this.stack.push({ name, namespaces });
     }
     return empty;
   }
@@ -568,7 +632,9 @@ function lineAt(text: string, index: number): number {
 
 /** Throw {@link ReaderError} unless `text` is a well-formed XML 1.0 document under the contract: the
  * first fault in text order names its token (`xml_dtd`, `xml_entity`, `xml_after_root`,
- * `xml_control_char`, `xml_unbound_prefix`, else `xml_syntax`). */
+ * `xml_control_char`, `xml_unbound_prefix`, else `xml_syntax`, which covers the reserved prefixes and
+ * namespace names, an attribute's expanded name twice on one element and a colon in a processing-
+ * instruction target). */
 export function checkXml(text: string): void {
   const control = firstNonXmlChar(text);
   let fault: XmlFault | undefined;

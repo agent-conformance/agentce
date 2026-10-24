@@ -3,17 +3,23 @@ package org.agentce;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * The report-file reader contract (SPEC 8.7) for the files {@code report --validate} reads that are not
  * JSON: {@code report.csv}, {@code report.junit.xml}, {@code oscal-ar.xml}, {@code report.md} and {@code
  * report.html}. Bytes are strict UTF-8 with no byte-order mark; CSV is RFC 4180; XML is well-formed XML
- * 1.0 with no DTD, no entity beyond the five predefined, nothing after the root, no control character and
- * every prefix bound; the empty check uses space, tab, CR and LF. Hand-written so no library decides an
- * outcome; the same design as Python's {@code report_reader.py} and TypeScript's {@code reportReader.ts}
+ * 1.0 with no DTD, no entity beyond the five predefined, nothing after the root, no control character,
+ * every prefix bound, the reserved {@code xml} and {@code xmlns} prefixes and namespace names kept and no
+ * two attributes with one expanded name; the empty check uses space, tab, CR and LF. Hand-written so no
+ * library decides an outcome; the same design as Python's {@code report_reader.py} and TypeScript's {@code
+ * reportReader.ts}
  * ({@code harness/remediation/evidence/P18-18.60/design.md}). A file outside the contract throws {@link
  * ReaderException} naming the first fault's rule and line.
  */
@@ -180,7 +186,24 @@ public final class ReportReader {
 
     // --- XML 1.0 well-formedness ---------------------------------------------------------------------
 
-    private static final Set<String> PREDEFINED_ENTITIES = Set.of("amp", "lt", "gt", "quot", "apos");
+    private static final Map<String, String> PREDEFINED_ENTITIES =
+            Map.of("amp", "&", "lt", "<", "gt", ">", "quot", "\"", "apos", "'");
+    /** The two reserved namespace names (Namespaces in XML 1.0, section 3). */
+    private static final String XML_NS = "http://www.w3.org/XML/1998/namespace";
+    private static final String XMLNS_NS = "http://www.w3.org/2000/xmlns/";
+    private static final Pattern VALUE_SPACE = Pattern.compile("\r\n?|[\t\n]");
+    private static final Pattern VALUE_REF = Pattern.compile("&(?:#x([0-9a-fA-F]+)|#([0-9]+)|([^;]+));");
+
+    /** An attribute value already checked by the scanner, normalized as XML 1.0 section 3.3.3 reads it:
+     * each line end, tab or LF becomes a space, then each reference becomes its character. */
+    static String normalizedValue(String raw) {
+        Matcher m = VALUE_REF.matcher(VALUE_SPACE.matcher(raw).replaceAll(" "));
+        return m.replaceAll(r -> Matcher.quoteReplacement(r.group(3) != null
+                ? PREDEFINED_ENTITIES.get(r.group(3))
+                : Character.toString(r.group(1) != null
+                        ? Integer.parseInt(r.group(1), 16)
+                        : Integer.parseInt(r.group(2)))));
+    }
 
     /** Whether {@code cp} is an XML 1.0 {@code Char}. */
     static boolean isXmlChar(long cp) {
@@ -255,8 +278,10 @@ public final class ReportReader {
         private final String s;
         private final int n;
         private int i;
-        /** The prefixes bound on each open element, innermost first. */
-        private final Deque<Set<String>> scopes = new ArrayDeque<>();
+        /** The prefixes each open element declares, each to its namespace name, innermost first. */
+        private final Deque<Map<String, String>> scopes = new ArrayDeque<>();
+        /** The names of the open elements, innermost first. */
+        private final Deque<String> tags = new ArrayDeque<>();
 
         XmlScanner(String text) {
             this.s = text;
@@ -385,8 +410,8 @@ public final class ReportReader {
             i += 2;
             int nameAt = i;
             String target = name();
-            if (target.equalsIgnoreCase("xml")) {
-                throw syntax(nameAt); // an XML declaration not at offset 0, or a reserved target
+            if (target.equalsIgnoreCase("xml") || target.indexOf(':') >= 0) {
+                throw syntax(nameAt); // an XML declaration not at offset 0, a reserved target, or a colon
             }
             if (at("?>")) {
                 i += 2;
@@ -428,25 +453,34 @@ public final class ReportReader {
             return qname.substring(0, colon);
         }
 
-        private boolean bound(String prefix, Set<String> own) {
-            if (prefix.equals("xml") || own.contains(prefix)) {
-                return true;
+        /** The namespace name {@code prefix} is bound to in scope, or {@code null} when it is unbound. */
+        private String namespaceOf(String prefix, Map<String, String> own) {
+            if (prefix.equals("xml")) {
+                return XML_NS;
             }
-            for (Set<String> scope : scopes) {
-                if (scope.contains(prefix)) {
-                    return true;
+            if (own.containsKey(prefix)) {
+                return own.get(prefix);
+            }
+            for (Map<String, String> scope : scopes) {
+                if (scope.containsKey(prefix)) {
+                    return scope.get(prefix);
                 }
             }
-            return false;
+            return null;
         }
 
-        private void element() {
+        /** A start tag at {@code <}; returns whether it was an empty-element tag, and pushes the element
+         * when it was not. A declaration that breaks a reserved prefix or namespace name, and two
+         * attributes with one expanded name, are {@code xml_syntax} (Namespaces in XML 1.0, sections 3
+         * and 6.3). */
+        private boolean startTag() {
             int start = i;
             i += 1;
             String tag = name();
             List<String> attributeNames = new ArrayList<>();
             List<Integer> attributeAt = new ArrayList<>();
-            Set<String> own = new HashSet<>();
+            List<String> attributeValues = new ArrayList<>();
+            Map<String, String> own = new HashMap<>();
             boolean empty;
             while (true) {
                 boolean space = skipSpace();
@@ -477,37 +511,115 @@ public final class ReportReader {
                 String value = attributeValue();
                 attributeNames.add(attribute);
                 attributeAt.add(nameAt);
+                attributeValues.add(value);
                 String attributePrefix = prefix(attribute, nameAt);
                 if ("xmlns".equals(attributePrefix)) {
                     if (value.isEmpty()) {
                         throw syntax(nameAt);
                     }
-                    own.add(attribute.substring(6));
+                    own.put(attribute.substring(6), normalizedValue(value));
                 }
             }
             String tagPrefix = prefix(tag, start + 1);
             if ("xmlns".equals(tagPrefix)) {
                 throw syntax(start + 1);
             }
-            if (tagPrefix != null && !bound(tagPrefix, own)) {
+            if (tagPrefix != null && namespaceOf(tagPrefix, own) == null) {
                 throw new ScanFault("xml_unbound_prefix", start + 1);
             }
+            Set<List<String>> expanded = new HashSet<>();
             for (int k = 0; k < attributeNames.size(); k++) {
-                String p = prefix(attributeNames.get(k), attributeAt.get(k));
-                if (p != null && !p.equals("xmlns") && !bound(p, own)) {
-                    throw new ScanFault("xml_unbound_prefix", attributeAt.get(k));
+                String attribute = attributeNames.get(k);
+                int nameAt = attributeAt.get(k);
+                String p = prefix(attribute, nameAt);
+                if (p == null) {
+                    if (attribute.equals("xmlns")) {
+                        String ns = normalizedValue(attributeValues.get(k));
+                        if (ns.equals(XML_NS) || ns.equals(XMLNS_NS)) {
+                            throw syntax(nameAt);
+                        }
+                    }
+                    continue;
+                }
+                String local = attribute.substring(p.length() + 1);
+                if (p.equals("xmlns")) {
+                    String ns = own.get(local);
+                    if (local.equals("xmlns") || ns.equals(XMLNS_NS)
+                            || local.equals("xml") != ns.equals(XML_NS)) {
+                        throw syntax(nameAt);
+                    }
+                    continue;
+                }
+                String ns = namespaceOf(p, own);
+                if (ns == null) {
+                    throw new ScanFault("xml_unbound_prefix", nameAt);
+                }
+                if (!expanded.add(List.of(ns, local))) {
+                    throw syntax(nameAt);
                 }
             }
-            if (empty) {
+            if (!empty) {
+                scopes.push(own);
+                tags.push(tag);
+            }
+            return empty;
+        }
+
+        /** The root element and everything inside it, with an explicit stack so nesting depth has no
+         * limit. */
+        private void element() {
+            if (startTag()) {
                 return;
             }
-            scopes.push(own);
-            content(tag);
-            scopes.pop();
+            while (!tags.isEmpty()) {
+                if (i >= n) {
+                    throw syntax(i); // an unclosed element
+                }
+                char c = s.charAt(i);
+                if (c == '<') {
+                    if (at("</")) {
+                        int nameAt = i + 2;
+                        i += 2;
+                        String closing = name();
+                        if (!closing.equals(tags.peek())) {
+                            throw syntax(nameAt);
+                        }
+                        skipSpace();
+                        if (i >= n || s.charAt(i) != '>') {
+                            throw syntax(i);
+                        }
+                        i += 1;
+                        tags.pop();
+                        scopes.pop();
+                    } else if (at("<!--")) {
+                        comment();
+                    } else if (at("<![CDATA[")) {
+                        int close = s.indexOf("]]>", i + 9);
+                        if (close < 0) {
+                            throw syntax(i);
+                        }
+                        i = close + 3;
+                    } else if (at("<!DOCTYPE")) {
+                        throw new ScanFault("xml_dtd", i);
+                    } else if (at("<?")) {
+                        processingInstruction();
+                    } else if (at("<!")) {
+                        throw syntax(i);
+                    } else {
+                        startTag();
+                    }
+                } else if (c == '&') {
+                    reference();
+                } else if (c == ']' && at("]]>")) {
+                    throw syntax(i);
+                } else {
+                    i += 1;
+                }
+            }
         }
 
         /** A quoted attribute value; {@code <} in it is {@code xml_syntax}, references are checked. The
-         * returned text is the raw value (only its emptiness is read). */
+         * returned text is the raw value, before normalization. */
         private String attributeValue() {
             if (i >= n || (s.charAt(i) != '"' && s.charAt(i) != '\'')) {
                 throw syntax(i);
@@ -571,55 +683,8 @@ public final class ReportReader {
                 throw syntax(start);
             }
             i += 1;
-            if (!PREDEFINED_ENTITIES.contains(entity)) {
+            if (!PREDEFINED_ENTITIES.containsKey(entity)) {
                 throw new ScanFault("xml_entity", start);
-            }
-        }
-
-        private void content(String tag) {
-            while (true) {
-                if (i >= n) {
-                    throw syntax(i); // an unclosed element
-                }
-                char c = s.charAt(i);
-                if (c == '<') {
-                    if (at("</")) {
-                        int nameAt = i + 2;
-                        i += 2;
-                        String closing = name();
-                        if (!closing.equals(tag)) {
-                            throw syntax(nameAt);
-                        }
-                        skipSpace();
-                        if (i >= n || s.charAt(i) != '>') {
-                            throw syntax(i);
-                        }
-                        i += 1;
-                        return;
-                    } else if (at("<!--")) {
-                        comment();
-                    } else if (at("<![CDATA[")) {
-                        int close = s.indexOf("]]>", i + 9);
-                        if (close < 0) {
-                            throw syntax(i);
-                        }
-                        i = close + 3;
-                    } else if (at("<!DOCTYPE")) {
-                        throw new ScanFault("xml_dtd", i);
-                    } else if (at("<?")) {
-                        processingInstruction();
-                    } else if (at("<!")) {
-                        throw syntax(i);
-                    } else {
-                        element();
-                    }
-                } else if (c == '&') {
-                    reference();
-                } else if (c == ']' && at("]]>")) {
-                    throw syntax(i);
-                } else {
-                    i += 1;
-                }
             }
         }
     }

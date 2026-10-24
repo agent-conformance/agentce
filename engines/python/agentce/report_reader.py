@@ -4,8 +4,9 @@
 ``report.html`` by one written contract, the same in every engine, with no library deciding the
 outcome: strict UTF-8 with no byte-order mark (:func:`decode_report_text`), CSV by RFC 4180
 (:func:`read_csv`), well-formed XML 1.0 with no DTD, no entity beyond the five predefined, nothing after
-the root element, no control character and every prefix bound (:func:`check_xml`), and one whitespace
-set for the empty-file check (:func:`is_blank`). JSON and JSON Lines files keep the JSON profile
+the root element, no control character, every prefix bound, the reserved ``xml`` and ``xmlns``
+prefixes and namespace names kept and no two attributes with one expanded name (:func:`check_xml`),
+and one whitespace set for the empty-file check (:func:`is_blank`). JSON and JSON Lines files keep the JSON profile
 (``safe_json``). The rule ids are the ``rule`` tokens of ``spec/report/reader-cases.json``;
 ``reportReader.ts`` and ``ReportReader.java`` apply the same rules.
 """
@@ -126,13 +127,31 @@ _NAME = re.compile(f"[{_NAME_START}][{_NAME_START}{_NAME_EXTRA}]*")
 #: A character outside XML 1.0 ``Char`` (section 2.2).
 _NOT_CHAR = re.compile("[^\t\n\r\u0020-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]")
 _WS = " \t\r\n"
-_PREDEFINED = frozenset({"amp", "lt", "gt", "quot", "apos"})
+_PREDEFINED = {"amp": "&", "lt": "<", "gt": ">", "quot": '"', "apos": "'"}
 _VERSION = re.compile(r"1\.[0-9]+")
 _ENC_NAME = re.compile(r"[A-Za-z][A-Za-z0-9._\-]*")
 _STANDALONE = re.compile("yes|no")
 _HEX_REF = re.compile("[0-9a-fA-F]+;")
 _DEC_REF = re.compile("[0-9]+;")
 _TEXT_STOP = re.compile("[<&]")
+_VALUE_SPACE = re.compile("\r\n?|[\t\n]")
+_VALUE_REF = re.compile("&(?:#x([0-9a-fA-F]+)|#([0-9]+)|([^;]+));")
+#: The two reserved namespace names (Namespaces in XML 1.0, section 3).
+_XML_NS = "http://www.w3.org/XML/1998/namespace"
+_XMLNS_NS = "http://www.w3.org/2000/xmlns/"
+
+
+def _ref_value(m: re.Match[str]) -> str:
+    hex_digits, dec_digits, entity = m.groups()
+    if entity is not None:
+        return _PREDEFINED[entity]
+    return chr(int(hex_digits, 16) if hex_digits is not None else int(dec_digits))
+
+
+def _normalized(raw: str) -> str:
+    """An attribute value already checked by the scanner, normalized as XML 1.0 section 3.3.3 reads
+    it: each line end, tab or LF becomes a space, then each reference becomes its character."""
+    return _VALUE_REF.sub(_ref_value, _VALUE_SPACE.sub(" ", raw))
 
 
 def _is_char(cp: int) -> bool:
@@ -204,11 +223,11 @@ class _Xml:
 
     def pi(self) -> None:
         """At ``<?`` (not the declaration at offset 0): a processing instruction whose target is not
-        ``xml`` in any case."""
+        ``xml`` in any case and has no colon."""
         self.i += 2
         at = self.i
         target = self.name()
-        if target.lower() == "xml":
+        if target.lower() == "xml" or ":" in target:
             raise self.fail("xml_syntax", at)
         if not self.startswith("?>"):
             if not self.skip_ws():
@@ -287,13 +306,15 @@ class _Xml:
             raise self.fail("xml_control_char", at)
         self.i = m.end()
 
-    def start_tag(self, scopes: list[frozenset[str]]) -> tuple[str, bool]:
+    def start_tag(self, scopes: list[dict[str, str]]) -> tuple[str, bool]:
         """At ``<`` + a name: the start tag. Return its raw name and whether it was empty (``/>``);
-        push its namespace scope when it was not."""
+        push its namespace scope (prefix to namespace name) when it was not. A declaration that breaks
+        a reserved prefix or namespace name, and two attributes with one expanded name, are
+        ``xml_syntax`` (Namespaces in XML 1.0, sections 3 and 6.3)."""
         self.i += 1
         name, name_at = self.qname()
-        attributes: list[tuple[str, int]] = []
-        declared: set[str] = set()
+        attributes: list[tuple[str, int, str]] = []
+        declared: dict[str, str] = {}
         while True:
             spaced = self.skip_ws()
             if self.startswith("/>") or self.startswith(">"):
@@ -301,7 +322,7 @@ class _Xml:
             if not spaced:
                 raise self.fail("xml_syntax")
             attr, attr_at = self.qname()
-            if any(attr == seen for seen, _ in attributes):
+            if any(attr == seen for seen, _, _ in attributes):
                 raise self.fail("xml_syntax", attr_at)
             self.eq()
             quote = self.text[self.i : self.i + 1]
@@ -321,22 +342,41 @@ class _Xml:
                     self.reference()
                 else:
                     self.i += 1
+            value = self.text[value_at : self.i]
             if attr.startswith("xmlns:"):
-                if self.i == value_at:
+                if not value:
                     raise self.fail("xml_syntax", attr_at)
-                declared.add(attr[6:])
+                declared[attr[6:]] = _normalized(value)
             self.i += 1
-            attributes.append((attr, attr_at))
-        scope = scopes[-1] | declared if declared else scopes[-1]
+            attributes.append((attr, attr_at, value))
+        scope = {**scopes[-1], **declared} if declared else scopes[-1]
         prefix = name.partition(":")[0] if ":" in name else None
         if prefix == "xmlns":
             raise self.fail("xml_syntax", name_at)
         if prefix is not None and prefix != "xml" and prefix not in scope:
             raise self.fail("xml_unbound_prefix", name_at)
-        for attr, attr_at in attributes:
-            prefix = attr.partition(":")[0] if ":" in attr else None
-            if prefix not in (None, "xml", "xmlns") and prefix not in scope:
+        expanded: set[tuple[str, str]] = set()
+        for attr, attr_at, value in attributes:
+            if ":" not in attr:
+                if attr == "xmlns" and _normalized(value) in (_XML_NS, _XMLNS_NS):
+                    raise self.fail("xml_syntax", attr_at)
+                continue
+            prefix, _, local = attr.partition(":")
+            if prefix == "xmlns":
+                ns = declared[local]
+                if (
+                    local == "xmlns"
+                    or ns == _XMLNS_NS
+                    or (local == "xml") != (ns == _XML_NS)
+                ):
+                    raise self.fail("xml_syntax", attr_at)
+                continue
+            bound = _XML_NS if prefix == "xml" else scope.get(prefix)
+            if bound is None:
                 raise self.fail("xml_unbound_prefix", attr_at)
+            if (bound, local) in expanded:
+                raise self.fail("xml_syntax", attr_at)
+            expanded.add((bound, local))
         empty = self.startswith("/>")
         self.i += 2 if empty else 1
         if not empty:
@@ -366,7 +406,7 @@ class _Xml:
         if self.i >= self.n or not self.startswith("<"):
             raise self.fail("xml_syntax")
         names: list[str] = []
-        scopes: list[frozenset[str]] = [frozenset()]
+        scopes: list[dict[str, str]] = [{}]
         name, empty = self.start_tag(scopes)
         if not empty:
             names.append(name)
@@ -418,5 +458,7 @@ def check_xml(text: str) -> None:
     """Raise :class:`ReaderError` unless ``text`` is one well-formed, namespace-conforming XML 1.0
     document with no DTD, no entity reference beyond the five predefined, nothing after the root
     element but whitespace, comments and processing instructions, every character a ``Char`` (raw or
-    referenced) and every prefix bound. The first fault in text order is the one named."""
+    referenced), every prefix bound, the reserved prefixes and namespace names kept, no attribute's
+    expanded name twice on one element and no colon in a processing-instruction target. The first
+    fault in text order is the one named."""
     _Xml(text).document()
