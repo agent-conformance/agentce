@@ -1975,8 +1975,8 @@ public final class Graph {
                 if (!"explanation".equals(str(n.get("notice_type"))) || delivered == null) {
                     return false;
                 }
-                Integer order = Structural.compareInstants(delivered, time);
-                return order != null && order >= 0;
+                Integer sinceDecision = Structural.compareInstants(delivered, time);
+                return sinceDecision != null && sinceDecision >= 0;
             }));
             String person = text(data.get("person_ref"));
             literal(node, "agentce:affectedPersonNotified", notices.stream().anyMatch(n ->
@@ -1992,8 +1992,8 @@ public final class Graph {
                         || !session.equals(str(d.get("session_id"))) || delivered == null) {
                     return false;
                 }
-                Integer order = Structural.compareInstants(delivered, time);
-                return order != null && order <= 0;
+                Integer sinceDecision = Structural.compareInstants(delivered, time);
+                return sinceDecision != null && sinceDecision <= 0;
             }));
         }
 

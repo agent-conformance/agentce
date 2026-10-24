@@ -3,6 +3,20 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.126.0
+
+- `VG-EUAIACT-CLUSTER3` (18.37f, new, tier quick) runs 107 cases through the real Python, TypeScript and Java CLIs.
+  Eight eu-ai-act controls shared three rules. DOC-02, REC-02 and TRN-04 all checked that a consequential decision had
+  a time; OVS-05, REC-05 and RSK-01 all checked that it had an authorization edge; TRN-01 and TRN-05 both checked that
+  it had a notification edge. Each now tests what its title says. REC-02 keeps the time. DOC-02 also needs the option
+  the decision chose. TRN-04 needs an explanation Notice delivered at or after the decision and cites Art. 86. OVS-05
+  needs a held PolicyDecision that gated the decision and did not deny it. RSK-01 needs that gate cleared, by allow or
+  by a require_approval a human approved. REC-05 needs the gate to name its policy id, version and digest. TRN-01 needs
+  a Notice that reaches the affected person. TRN-05 needs an AI-interaction Disclosure in the decision's session at or
+  before it, for every decision that does not say it affects no natural person. Thirty seeded faults, ten per engine.
+- `VG-CATALOG-RULE-UNIQUE` (18.37f, changed): five eu-ai-act pairs leave the baseline (DOC-02 with REC-02 and TRN-04,
+  OVS-05 with REC-05 and RSK-01, TRN-01 with TRN-05), and the eu-ai-act ceiling drops from 11 to 6.
+
 ## 0.125.0
 
 - `VG-REPORT-VALIDATE` (18.60, changed): every engine reads report files by the SPEC 8.7 report-file reader

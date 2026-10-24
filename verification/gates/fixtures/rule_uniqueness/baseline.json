@@ -6,7 +6,7 @@
     "employment": 0,
     "finance": 0,
     "insurance": 0,
-    "eu-ai-act": 11,
+    "eu-ai-act": 6,
     "nist-ai-rmf": 0
   },
   "pairs": {
@@ -18,15 +18,10 @@
     "eu-ai-act": [
       ["DAT-01", "DAT-02"],
       ["DAT-01", "REC-03"],
-      ["DOC-02", "REC-02"],
-      ["DOC-02", "TRN-04"],
       ["DOC-04", "REC-01"],
       ["DOC-04", "TRN-02"],
       ["INT-04", "ROB-01"],
-      ["OVS-04", "ROB-04"],
-      ["OVS-05", "REC-05"],
-      ["OVS-05", "RSK-01"],
-      ["TRN-01", "TRN-05"]
+      ["OVS-04", "ROB-04"]
     ],
     "nist-ai-rmf": []
   }

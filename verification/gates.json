@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.125.0",
+  "suite_version": "0.126.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -4655,6 +4655,212 @@
         }
       ],
       "fix_hint": "Each engine's catalog loader reads evaluation.requires_denominator (catalog.py _requires_denominator, catalog.ts requiresDenominator, Catalog.java requiresDenominator); assess lowers a verdict to insufficient_evidence unless a declared denominator of one of its kinds set the covered row's count and the captured count equals it (_denominator_unshown, denominatorUnshown); the graph builder sets securityRefsResolve and linkedRecordsResolve (graph.py _security_refs_resolve and _unresolved_links, with the same names in graph.ts and Graph.java). Run `ENGINES=python bash verification/gates/eu_cluster2.sh` (or typescript, java) for one engine."
+    },
+    {
+      "id": "VG-EUAIACT-CLUSTER3",
+      "title": "Eight eu-ai-act controls that shared three rules each test what their title says in all three engines (18.37f): REC-02 a consequential decision's time; DOC-02 its time and the option it chose; TRN-04 an explanation Notice delivered at or after it; OVS-05 a held PolicyDecision that gated it and did not deny it; RSK-01 that gate cleared (allow, or require_approval released by a human approval); REC-05 the gate names its policy id, version and digest; TRN-01 a Notice to the affected person; TRN-05 an AI-interaction Disclosure in the decision's session at or before it, where the decision affects a natural person",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/eu_cluster3.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java",
+        "jq"
+      ],
+      "timeout_s": 1800,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "every case in verification/gates/fixtures/eu_cluster3/cases.json (107: DOC-02 chosen in or without options and the non-conformant cells: no chosen, empty or non-string chosen, chosen outside its options, one of two; REC-02 timestamped; TRN-04 explanation Notice after, equal, by bare id, reversed, and before, of another type, unplaceable, naming another decision, none or quarantined; OVS-05, RSK-01 and REC-05 authorization or request naming a held PolicyDecision, self_report, reversed, and deny, bare, unheld, of another type, not a string, none, no PolicyDecision held, quarantined; RSK-01 require_approval with and without a human approval, transform, no decision value; REC-05 missing or malformed policy id, version or digest; TRN-01 Notice to the person and without person_ref or delivered_at, another person, another decision; TRN-05 Disclosure in session before or at the decision and in another session, after it, of another type, no session_id, none, quarantined, and affects_natural_person false, absent or not a boolean; not consequential reads not_applicable) gives the expected outcome of its control, failing events, quarantine count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "fail": "any case gives another outcome, another set of failing events, another quarantine count or another exit code in any engine"
+      },
+      "fix_hint": "Each engine's graph builder sets the eight decision literals in one place (graph.py _Gates and _decision_record, graph.ts Gates and decisionRecord, Graph.java Gates and decisionRecord), and the seven shapes in spec/catalogs/base/eu-ai-act/shapes read them with sh:hasValue true. Run `ENGINES=python bash verification/gates/eu_cluster3.sh` (or typescript, java) for one engine.",
+      "faults": [
+        {
+          "description": "Python counts an authorization even when a gating PolicyDecision denies, so OVS-05 reads a denied decision conformant (ovs05-deny)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "held = linked is not None and all(pd.get(\"decision\") != \"deny\" for pd in linked)",
+          "replace": "held = linked is not None"
+        },
+        {
+          "description": "Python skips a refs.authorization that names no held PolicyDecision and keeps the one whose refs.request names the decision, so a bare authorization reads conformant (ovs05-bare)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "            if not isinstance(authorization, str) or authorization not in self.policies:\n                return None\n            names.add(authorization)\n",
+          "replace": "            if isinstance(authorization, str) and authorization in self.policies:\n                names.add(authorization)\n"
+        },
+        {
+          "description": "Python clears a require_approval gate with no human approval, so RSK-01 reads an unapproved gate conformant (rsk01-require-approval-unapproved)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "pd.get(\"decision\") == \"require_approval\"\n                    and node in self.human_approvers",
+          "replace": "pd.get(\"decision\") == \"require_approval\""
+        },
+        {
+          "description": "Python clears a transform gate, so RSK-01 reads conformant on a PolicyDecision that only transformed the request (rsk01-transform)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "pd.get(\"decision\") == \"allow\"\n                or (",
+          "replace": "pd.get(\"decision\") in (\"allow\", \"transform\")\n                or ("
+        },
+        {
+          "description": "Python accepts any string as a policy digest, so REC-05 reads a malformed digest conformant (rec05-digest-malformed)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "        and isinstance(digest, str)\n        and _DIGEST.fullmatch(digest) is not None\n",
+          "replace": "        and isinstance(digest, str)\n"
+        },
+        {
+          "description": "Python ignores a decision's options, so DOC-02 reads a choice outside them conformant (doc02-chosen-not-in-options)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "    return any(isinstance(o, dict) and o.get(\"id\") == chosen for o in options)",
+          "replace": "    return True"
+        },
+        {
+          "description": "Python ignores the time order of an explanation Notice, so TRN-04 reads one delivered before the decision conformant (trn04-explanation-before)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "compare_instants(n[\"delivered_at\"], time) in (0, 1)",
+          "replace": "compare_instants(n[\"delivered_at\"], time) is not None"
+        },
+        {
+          "description": "Python ignores the decision's person_ref, so TRN-01 reads a Notice to another person conformant (trn01-person-mismatch)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "                and (person is None or n.get(\"person_ref\") == person)\n",
+          "replace": ""
+        },
+        {
+          "description": "Python ignores the Disclosure's session, so TRN-05 reads a Disclosure from another session conformant (trn05-other-session)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "                and d.get(\"session_id\") == session\n",
+          "replace": ""
+        },
+        {
+          "description": "Python keeps a decision in TRN-05's population only when affects_natural_person is true, so a decision missing the member reads not_applicable (trn05-no-person)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "data.get(\"affects_natural_person\") is not False,",
+          "replace": "data.get(\"affects_natural_person\") is True,"
+        },
+        {
+          "description": "TypeScript counts an authorization even when a gating PolicyDecision denies (ovs05-deny)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "const held = linked?.every((pd) => pd.decision !== \"deny\") === true;",
+          "replace": "const held = linked !== null;"
+        },
+        {
+          "description": "TypeScript skips a refs.authorization that names no held PolicyDecision, so a bare authorization reads conformant (ovs05-bare)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "      if (typeof authorization !== \"string\" || !this.policies.has(authorization)) return null;\n      names.add(authorization);\n",
+          "replace": "      if (typeof authorization === \"string\" && this.policies.has(authorization)) names.add(authorization);\n"
+        },
+        {
+          "description": "TypeScript clears a require_approval gate with no human approval (rsk01-require-approval-unapproved)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "(pd.decision === \"require_approval\" && this.humanApprovers.has(node))",
+          "replace": "pd.decision === \"require_approval\""
+        },
+        {
+          "description": "TypeScript clears a transform gate (rsk01-transform)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "            pd.decision === \"allow\" ||\n",
+          "replace": "            pd.decision === \"allow\" ||\n            pd.decision === \"transform\" ||\n"
+        },
+        {
+          "description": "TypeScript accepts any string as a policy digest (rec05-digest-malformed)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "    typeof digest === \"string\" &&\n    DIGEST.test(digest)\n",
+          "replace": "    typeof digest === \"string\"\n"
+        },
+        {
+          "description": "TypeScript ignores a decision's options (doc02-chosen-not-in-options)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "  return options.some((o) => isRecord(o) && o.id === chosen);",
+          "replace": "  return true;"
+        },
+        {
+          "description": "TypeScript ignores the time order of an explanation Notice (trn04-explanation-before)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "        return order === 0 || order === 1;",
+          "replace": "        return order !== null;"
+        },
+        {
+          "description": "TypeScript ignores the decision's person_ref (trn01-person-mismatch)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "          text(n.delivered_at) !== null &&\n          (person === null || n.person_ref === person),",
+          "replace": "          text(n.delivered_at) !== null,"
+        },
+        {
+          "description": "TypeScript ignores the Disclosure's session (trn05-other-session)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "if (d.disclosure_type !== \"ai_interaction\" || d.session_id !== session) return false;",
+          "replace": "if (d.disclosure_type !== \"ai_interaction\") return false;"
+        },
+        {
+          "description": "TypeScript keeps a decision in TRN-05's population only when affects_natural_person is true (trn05-no-person)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "data.affects_natural_person !== false);",
+          "replace": "data.affects_natural_person === true);"
+        },
+        {
+          "description": "Java counts an authorization even when a gating PolicyDecision denies (ovs05-deny)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "boolean held = linked != null && linked.stream().noneMatch(pd -> \"deny\".equals(str(pd.get(\"decision\"))));",
+          "replace": "boolean held = linked != null;"
+        },
+        {
+          "description": "Java skips a refs.authorization that names no held PolicyDecision, so a bare authorization reads conformant (ovs05-bare)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "                if (authorization == null || !policies.containsKey(authorization)) {\n                    return null;\n                }\n                names.add(authorization);\n",
+          "replace": "                if (authorization != null && policies.containsKey(authorization)) {\n                    names.add(authorization);\n                }\n"
+        },
+        {
+          "description": "Java clears a require_approval gate with no human approval (rsk01-require-approval-unapproved)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "(\"require_approval\".equals(decision) && humanApprovers.containsKey(node))",
+          "replace": "\"require_approval\".equals(decision)"
+        },
+        {
+          "description": "Java clears a transform gate (rsk01-transform)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "return \"allow\".equals(decision)\n",
+          "replace": "return \"allow\".equals(decision) || \"transform\".equals(decision)\n"
+        },
+        {
+          "description": "Java accepts any string as a policy digest (rec05-digest-malformed)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "                && digest != null\n                && DIGEST.matcher(digest).matches();",
+          "replace": "                && digest != null;"
+        },
+        {
+          "description": "Java ignores a decision's options (doc02-chosen-not-in-options)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "if (option.isObject() && chosen.equals(str(option.get(\"id\")))) {",
+          "replace": "if (option.isObject()) {"
+        },
+        {
+          "description": "Java ignores the time order of an explanation Notice (trn04-explanation-before)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "return sinceDecision != null && sinceDecision >= 0;",
+          "replace": "return sinceDecision != null;"
+        },
+        {
+          "description": "Java ignores the decision's person_ref (trn01-person-mismatch)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "                            && text(n.get(\"delivered_at\")) != null\n                            && (person == null || person.equals(str(n.get(\"person_ref\"))))));",
+          "replace": "                            && text(n.get(\"delivered_at\")) != null));"
+        },
+        {
+          "description": "Java ignores the Disclosure's session (trn05-other-session)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "                        || !session.equals(str(d.get(\"session_id\"))) || delivered == null) {",
+          "replace": "                        || delivered == null) {"
+        },
+        {
+          "description": "Java keeps a decision in TRN-05's population only when affects_natural_person is true (trn05-no-person)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "!(affects != null && affects.isBoolean() && !affects.booleanValue())",
+          "replace": "affects != null && affects.isBoolean() && affects.booleanValue()"
+        }
+      ]
     },
     {
       "id": "VG-ENGINE-GOLDENS-FRESH",
