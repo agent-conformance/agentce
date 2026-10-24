@@ -19,7 +19,7 @@ fails the check.
 | Field | Value |
 |---|---|
 | Corpus set | v1 |
-| Manifest SHA-256 | `sha256:f26f01eb85799b8bedcd6253fcb9ace714f5244cce649199882dcc6719ada362` |
+| Manifest SHA-256 | `sha256:2d254ebe568a3413410a93c1e658d8c56f8048dee3139755d68d8b4d68bf593e` |
 | Projects | 30 (credit domain × six implementation styles × five variants) |
 | Corpus version | 2026.09 |
 | Validated catalog | eu-ai-act@2026.09 |
@@ -62,3 +62,8 @@ fails the check.
   counts the subject's accepted events per type and is listed with its sha256 in the bundle manifest. The
   coverage-gap project keeps its own denominator beside it, so it still reads a gap. Every authored ground
   truth holds unchanged; `corpus/quickstart` carries the same denominator.
+- **v1 (2026.09), pin re-extended (18.37f)** — the corpus was still unpublished, so the pin was again
+  corrected in place. DOC-02 now reads whether a decision records what it chose (SPEC §6.2.3 `chosen`,
+  one of its `options` when it lists them), so `generate.py`'s `DECISION_CHOICE` gives every generated
+  Decision two options and the one it chose. `corpus/quickstart` is the credit/langgraph/known-pass
+  project and carries the same decision.

@@ -12,4 +12,4 @@ Consequential decisions are timestamped for explanation.
 | Rung | 2 |
 | Catalog | EU AI Act base catalog (base) |
 
-Crosswalked to clause(s) Art. 50. Clause numbers only are cited; standard text is never reproduced.
+Crosswalked to clause(s) Art. 86. Clause numbers only are cited; standard text is never reproduced.

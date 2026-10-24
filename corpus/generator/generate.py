@@ -77,6 +77,14 @@ BASE_CONTEXT = "https://agent-conformance.org/contexts/evidence/v1"
 GENESIS_PREV = "0" * 64
 CONSEQUENTIAL = "dom:CreditDecision"
 MINOR = "dom:MinorInquiry"
+#: What every generated Decision records it chose between (SPEC §6.2.3 options and chosen), so DOC-02 can read it.
+DECISION_CHOICE: dict[str, Any] = {
+    "options": [
+        {"id": "approve", "label": "Approve"},
+        {"id": "decline", "label": "Decline"},
+    ],
+    "chosen": "approve",
+}
 
 # Reserved-for-test fictional principals (SPEC §11.3: clearly fictional, no real persons).
 HUMAN_OFFICER = "urn:example:person:credit-officer-7"
@@ -353,6 +361,7 @@ def _scenario(
                 "self_report",
                 {
                     "decision_type": domain.minor,
+                    **DECISION_CHOICE,
                     "affects_natural_person": False,
                     "legal_or_significant_effect": False,
                     "agent": agent,
@@ -394,6 +403,7 @@ def _scenario(
                     "self_report",
                     {
                         "decision_type": domain.consequential,
+                        **DECISION_CHOICE,
                         "oversight_modality": "review_before",
                         "affects_natural_person": True,
                         "legal_or_significant_effect": True,
@@ -486,6 +496,7 @@ def _scenario(
     # 1. The consequential decision (drives REC-04).
     decision_data: dict[str, Any] = {
         "decision_type": domain.consequential,
+        **DECISION_CHOICE,
         "oversight_modality": oversight,
         "affects_natural_person": True,
         "legal_or_significant_effect": True,
@@ -1094,6 +1105,7 @@ def _agent_chain(
     del_id = f"{prefix}-del1"
     decision_data: dict[str, Any] = {
         "decision_type": domain.consequential,
+        **DECISION_CHOICE,
         "oversight_modality": "review_before",
         "affects_natural_person": True,
         "legal_or_significant_effect": True,

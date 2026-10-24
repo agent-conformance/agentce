@@ -27,6 +27,7 @@ This is the report the vendored quickstart project renders end to end with defau
 - `ModelCall (self_report)`: unlocks 3 check(s), needed by 0 more; rung 1 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: otel-genai.
 - `Notice (self_report)`: unlocks 3 check(s), needed by 0 more; rung 2 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: oversight.
 - `PolicyDecision (self_report)`: unlocks 3 check(s), needed by 0 more; rung 3 -- a request to platform or security. Adapters that can supply this: mcp-gateway, policy-engines.
+- `Disclosure (self_report)`: unlocks 1 check(s), needed by 0 more; rung 2 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: no adapter today.
 - `MemoryRead (enforcement_point)`: unlocks 1 check(s), needed by 0 more; rung 3 -- a request to platform or security. Adapters that can supply this: no adapter today.
 
 ### Records that don't show enough, with no single fix
@@ -39,19 +40,19 @@ This is the report the vendored quickstart project renders end to end with defau
 
 Top gaps:
 
-- insufficient evidence: DAT-01, DAT-02, DOC-03, INC-03, OVS-01 (+10 more gaps)
+- insufficient evidence: DAT-01, DAT-02, DOC-03, INC-03, OVS-01 (+11 more gaps)
 - not assessed: DAT-03, DAT-04, DOC-05, OVS-09, ROB-05 (+4 more gaps)
 
 Next step: Supply the missing evidence, or complete the manual checks, for the controls listed under Top gaps, then run the assessment again.
 
 ## Outcome summary
 
-- `conformant`: 23
+- `conformant`: 22
 - `non-conformant`: 0
 - `partial`: 0
 - `not applicable`: 2
 - `not assessed`: 9
-- `insufficient evidence`: 15
+- `insufficient evidence`: 16
 
 ## Assertions
 
@@ -224,9 +225,8 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
 - **Affected persons informed and explanation reconstructable** (`TRN-03` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
   - `eu-ai-act Art. 26(11) / 86 (clause reference unverified)`
   - Remediation: trn-evidence-at-source
-- **Consequential decisions are timestamped for explanation** (`TRN-04` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
-  - `eu-ai-act Art. 50 (clause reference unverified)`
-  - Evidence: `agentce:event/langgraph-known-pass-dec1`
+- **Consequential decisions are timestamped for explanation** (`TRN-04` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
+  - `eu-ai-act Art. 86 (clause reference unverified)`
   - Remediation: trn-evidence-at-source
 - **AI-interaction disclosure is present where required** (`TRN-05` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
   - `eu-ai-act Art. 50 (clause reference unverified)`
