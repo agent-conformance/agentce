@@ -228,6 +228,12 @@ public final class ReportReader {
                 || (cp >= 0x300 && cp <= 0x36F) || (cp >= 0x203F && cp <= 0x2040);
     }
 
+    /** A Namespaces in XML 1.0 {@code NCName}: a non-empty XML Name with no colon. Only for a part of a
+     * name the scanner has already read, so every character after the first is a {@code NameChar}. */
+    static boolean isNcName(String part) {
+        return !part.isEmpty() && part.indexOf(':') < 0 && isNameStartChar(part.codePointAt(0));
+    }
+
     private static boolean isXmlSpace(char c) {
         return c == ' ' || c == '\t' || c == '\r' || c == '\n';
     }
@@ -252,8 +258,8 @@ public final class ReportReader {
             faultAt = e.index;
             found = fault(e.rule, text, e.index);
         }
-        // The scan reads the text in order, so a character outside Char before its own fault came first.
-        if (badChar >= 0 && badChar < faultAt) {
+        // The scan reads the text in order, so a character outside Char at or before its own fault came first.
+        if (badChar >= 0 && badChar <= faultAt) {
             throw fault("xml_control_char", text, badChar);
         }
         if (found != null) {
@@ -440,17 +446,23 @@ public final class ReportReader {
             return s.substring(start, i);
         }
 
-        /** The prefix of a qualified name ({@code null} when it has none); more than one colon or an empty
-         * side is {@code xml_syntax}. */
-        private String prefix(String qname, int at) {
+        /** A QName at {@code i} (Namespaces in XML 1.0, section 4), checked as it is read: an NCName, or
+         * two NCNames joined by one colon; anything else is {@code xml_syntax}. */
+        private String qname() {
+            int start = i;
+            String qname = name();
             int colon = qname.indexOf(':');
-            if (colon < 0) {
-                return null;
+            if (colon < 0 ? !isNcName(qname)
+                    : !isNcName(qname.substring(0, colon)) || !isNcName(qname.substring(colon + 1))) {
+                throw syntax(start);
             }
-            if (colon == 0 || colon == qname.length() - 1 || qname.indexOf(':', colon + 1) >= 0) {
-                throw syntax(at);
-            }
-            return qname.substring(0, colon);
+            return qname;
+        }
+
+        /** The prefix of a QName already read by {@link #qname}, or {@code null} when it has none. */
+        private static String prefix(String qname) {
+            int colon = qname.indexOf(':');
+            return colon < 0 ? null : qname.substring(0, colon);
         }
 
         /** The namespace name {@code prefix} is bound to in scope, or {@code null} when it is unbound. */
@@ -476,7 +488,7 @@ public final class ReportReader {
         private boolean startTag() {
             int start = i;
             i += 1;
-            String tag = name();
+            String tag = qname();
             List<String> attributeNames = new ArrayList<>();
             List<Integer> attributeAt = new ArrayList<>();
             List<String> attributeValues = new ArrayList<>();
@@ -498,7 +510,7 @@ public final class ReportReader {
                     throw syntax(i);
                 }
                 int nameAt = i;
-                String attribute = name();
+                String attribute = qname();
                 if (attributeNames.contains(attribute)) {
                     throw syntax(nameAt);
                 }
@@ -512,7 +524,7 @@ public final class ReportReader {
                 attributeNames.add(attribute);
                 attributeAt.add(nameAt);
                 attributeValues.add(value);
-                String attributePrefix = prefix(attribute, nameAt);
+                String attributePrefix = prefix(attribute);
                 if ("xmlns".equals(attributePrefix)) {
                     if (value.isEmpty()) {
                         throw syntax(nameAt);
@@ -520,7 +532,7 @@ public final class ReportReader {
                     own.put(attribute.substring(6), normalizedValue(value));
                 }
             }
-            String tagPrefix = prefix(tag, start + 1);
+            String tagPrefix = prefix(tag);
             if ("xmlns".equals(tagPrefix)) {
                 throw syntax(start + 1);
             }
@@ -531,7 +543,7 @@ public final class ReportReader {
             for (int k = 0; k < attributeNames.size(); k++) {
                 String attribute = attributeNames.get(k);
                 int nameAt = attributeAt.get(k);
-                String p = prefix(attribute, nameAt);
+                String p = prefix(attribute);
                 if (p == null) {
                     if (attribute.equals("xmlns")) {
                         String ns = normalizedValue(attributeValues.get(k));

@@ -156,10 +156,21 @@ function normalizedValue(raw: string): string {
       (_: string, hex?: string, dec?: string, entity?: string) =>
         entity !== undefined
           ? (PREDEFINED_ENTITIES.get(entity) as string)
-          : String.fromCodePoint(
-              Number.parseInt(hex ?? (dec as string), hex !== undefined ? 16 : 10),
-            ),
+          : String.fromCodePoint(charRefValue(hex ?? (dec as string), hex !== undefined ? 16 : 10)),
     );
+}
+
+/** A character reference's digits, at the cursor, through the closing `;`. */
+const HEX_REF = /([0-9a-fA-F]+);/y;
+const DEC_REF = /([0-9]+);/y;
+
+/** The code point of a character reference's digits, every digit read (leading zeros allowed, as the
+ * XML 1.0 CharRef production does), or Infinity past U+10FFFF, as nine or more significant digits always are. */
+function charRefValue(digits: string, radix: number): number {
+  const significant = digits.replace(/^0+/, "");
+  return significant.length > 8
+    ? Number.POSITIVE_INFINITY
+    : Number.parseInt(significant || "0", radix);
 }
 
 /** XML 1.0 `Char`: #x9, #xA, #xD, #x20-#xD7FF, #xE000-#xFFFD, #x10000-#x10FFFF. */
@@ -208,6 +219,17 @@ function isNameChar(cp: number): boolean {
     (cp >= 0x203f && cp <= 0x2040)
   );
 }
+
+/** A Namespaces in XML 1.0 `NCName`: a non-empty XML Name with no colon. Only for a part of a name
+ * the scanner has already read, so every character after the first is a `NameChar`. */
+const isNcName = (part: string): boolean =>
+  part !== "" && isNameStartChar(part.codePointAt(0) as number);
+
+/** The prefix of a QName already read by `qname` (`""` for none). */
+const prefixOf = (qname: string): string => {
+  const colon = qname.indexOf(":");
+  return colon < 0 ? "" : qname.slice(0, colon);
+};
 
 const isXmlSpace = (c: string | undefined): boolean =>
   c === " " || c === "\t" || c === "\r" || c === "\n";
@@ -267,13 +289,16 @@ class XmlScanner {
     return this.text.slice(start, this.pos);
   }
 
-  /** The prefix of a QName (`""` for none); a name with two colons or an empty side is a syntax fault. */
-  private prefixOf(qname: string, at: number): string {
+  /** A QName at the cursor (Namespaces in XML 1.0, section 4), checked as it is read: an NCName, or
+   * two NCNames joined by one colon; anything else is a syntax fault. */
+  private qname(): string {
+    const start = this.pos;
+    const qname = this.name();
     const parts = qname.split(":");
-    if (parts.length > 2 || parts.some((p) => p === "")) {
-      this.fail("xml_syntax", at);
+    if (parts.length > 2 || !parts.every(isNcName)) {
+      this.fail("xml_syntax", start);
     }
-    return parts.length === 2 ? (parts[0] as string) : "";
+    return qname;
   }
 
   /** The namespace name `prefix` is bound to in scope, or undefined when it is unbound. */
@@ -413,19 +438,16 @@ class XmlScanner {
     const text = this.text;
     if (text[start + 1] === "#") {
       const hex = text[start + 2] === "x";
-      const match = (hex ? /^[0-9a-fA-F]+;/ : /^[0-9]+;/).exec(
-        text.slice(start + (hex ? 3 : 2), start + (hex ? 3 : 2) + 16),
-      );
+      const pattern = hex ? HEX_REF : DEC_REF;
+      pattern.lastIndex = start + (hex ? 3 : 2);
+      const match = pattern.exec(text);
       if (match === null) {
         this.fail("xml_syntax", start);
       }
-      const digits = match[0].slice(0, -1);
-      const cp =
-        digits.length > 8 ? Number.POSITIVE_INFINITY : Number.parseInt(digits, hex ? 16 : 10);
-      if (!isXmlChar(cp)) {
+      if (!isXmlChar(charRefValue(match[1] as string, hex ? 16 : 10))) {
         this.fail("xml_control_char", start);
       }
-      this.pos = start + (hex ? 3 : 2) + match[0].length;
+      this.pos = pattern.lastIndex;
       return;
     }
     this.pos = start + 1;
@@ -449,7 +471,7 @@ class XmlScanner {
   private startTag(): boolean {
     const start = this.pos;
     this.pos += 1;
-    const name = this.name();
+    const name = this.qname();
     const attributes: Array<[string, number, string]> = [];
     const seen = new Set<string>();
     const namespaces = new Map<string, string>();
@@ -470,7 +492,7 @@ class XmlScanner {
         this.fail("xml_syntax");
       }
       const at = this.pos;
-      const attribute = this.name();
+      const attribute = this.qname();
       if (seen.has(attribute)) {
         this.fail("xml_syntax", at);
       }
@@ -503,7 +525,7 @@ class XmlScanner {
       }
       const value = this.text.slice(valueStart, this.pos);
       this.pos += 1;
-      const prefix = this.prefixOf(attribute, at);
+      const prefix = prefixOf(attribute);
       if (prefix === "xmlns") {
         if (value === "") {
           this.fail("xml_syntax", at);
@@ -512,7 +534,7 @@ class XmlScanner {
       }
       attributes.push([attribute, at, value]);
     }
-    const prefix = this.prefixOf(name, start + 1);
+    const prefix = prefixOf(name);
     if (prefix === "xmlns") {
       this.fail("xml_syntax", start + 1);
     }
@@ -521,7 +543,7 @@ class XmlScanner {
     }
     const expanded = new Set<string>();
     for (const [attribute, at, value] of attributes) {
-      const attributePrefix = this.prefixOf(attribute, at);
+      const attributePrefix = prefixOf(attribute);
       if (attributePrefix === "") {
         const ns = attribute === "xmlns" ? normalizedValue(value) : "";
         if (ns === XML_NS || ns === XMLNS_NS) {
