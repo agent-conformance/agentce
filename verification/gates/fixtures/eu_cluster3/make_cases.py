@@ -35,9 +35,11 @@ def dec(i, dtype="dom:CreditDecision", **k):
     return ev(i, "Decision", decision_type=dtype, **k)
 
 
+CHOICE = {"options": [{"id": "approve", "label": "Approve"}, {"id": "decline", "label": "Decline"}], "chosen": "approve"}
+
+
 def documented(i="d1", **k):
-    return dec(i, options=[{"id": "approve", "label": "Approve"}, {"id": "decline", "label": "Decline"}],
-               chosen="approve", **k)
+    return dec(i, **CHOICE, **k)
 
 
 def policy(i, request=None, **k):
@@ -46,7 +48,7 @@ def policy(i, request=None, **k):
     data.update(k)
     if request:
         data["refs"] = {"request": ref(request)}
-    return ev(i, "PolicyDecision", **{key: v for key, v in data.items() if v is not None})
+    return ev(i, "PolicyDecision", **data)
 
 
 def authorized(i="d1", pd="p1", **k):
@@ -57,13 +59,13 @@ def notice(i, d="d1", notice_type="subject_of_ai_decision", **k):
     data = {"person_ref": "agentce:principal/applicant-fictional-0001", "notice_type": notice_type,
             "delivered_at": T0, "channel": "email", "content_ref": DIGEST, "refs": {"decision": d and ref(d)}}
     data.update(k)
-    return ev(i, "Notice", **{key: v for key, v in data.items() if v is not None})
+    return ev(i, "Notice", **data)
 
 
 def disclosure(i, session="s-1", disclosure_type="ai_interaction", **k):
     data = {"disclosure_type": disclosure_type, "delivered_at": T0, "mechanism": "banner", "session_id": session}
     data.update(k)
-    return ev(i, "Disclosure", **{key: v for key, v in data.items() if v is not None})
+    return ev(i, "Disclosure", **data)
 
 
 def person_dec(i="d1", **k):
@@ -120,8 +122,7 @@ case("trn04-delivered-unparseable", "TRN-04", [dec("d1"), notice("n1", notice_ty
      delivered_at="next tuesday")], NC, ["d1"])
 case("trn04-other-decision", "TRN-04", [dec("d1"), dec("d2", "dom:Lookup"),
      notice("n1", d="d2", notice_type="explanation")], NC, ["d1"])
-case("trn04-bare-id", "TRN-04", [dec("d1"), dict(notice("n1", notice_type="explanation"),
-     data=dict(notice("n1", notice_type="explanation")["data"], refs={"decision": "d1"}))], CF)
+case("trn04-bare-id", "TRN-04", [dec("d1"), notice("n1", notice_type="explanation", refs={"decision": "d1"})], CF)
 case("trn04-no-notice", "TRN-04", [dec("d1")], IE)
 case("trn04-one-of-two", "TRN-04", [dec("d1"), dec("d2"), notice("n1", notice_type="explanation")], NC, ["d2"])
 case("trn04-order-reversed", "TRN-04", [notice("n1", notice_type="explanation"), dec("d1")], CF)
@@ -211,7 +212,7 @@ case("trn05-person-not-bool", "TRN-05", [disclosure("x1", delivered_at=LATER), p
 case("trn05-person-false", "TRN-05", [disclosure("x1"), person_dec(affects_natural_person=False)], NA)
 case("trn05-not-consequential", "TRN-05", [disclosure("x1"), person_dec(dtype="dom:Lookup")], NA)
 
-# A None member is left out of the record.
+# A None member is left out of the record (the helpers pass None to drop a member).
 for c in C.values():
     for e in c["events"]:
         e["data"] = {k: v for k, v in e["data"].items() if v is not None}
