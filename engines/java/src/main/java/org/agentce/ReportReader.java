@@ -2,6 +2,7 @@ package org.agentce;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -229,9 +230,10 @@ public final class ReportReader {
     }
 
     /** A Namespaces in XML 1.0 {@code NCName}: a non-empty XML Name with no colon. Only for a part of a
-     * name the scanner has already read, so every character after the first is a {@code NameChar}. */
-    static boolean isNcName(String part) {
-        return !part.isEmpty() && part.indexOf(':') < 0 && isNameStartChar(part.codePointAt(0));
+     * name the scanner has already read and split at its colons, so every character after the first is
+     * a {@code NameChar} and none is a colon. */
+    private static boolean isNcName(String part) {
+        return !part.isEmpty() && isNameStartChar(part.codePointAt(0));
     }
 
     private static boolean isXmlSpace(char c) {
@@ -451,9 +453,8 @@ public final class ReportReader {
         private String qname() {
             int start = i;
             String qname = name();
-            int colon = qname.indexOf(':');
-            if (colon < 0 ? !isNcName(qname)
-                    : !isNcName(qname.substring(0, colon)) || !isNcName(qname.substring(colon + 1))) {
+            String[] parts = qname.split(":", -1);
+            if (parts.length > 2 || !Arrays.stream(parts).allMatch(ReportReader::isNcName)) {
                 throw syntax(start);
             }
             return qname;

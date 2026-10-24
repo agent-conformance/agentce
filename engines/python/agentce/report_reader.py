@@ -124,9 +124,7 @@ _NAME_START = (
 )
 _NAME_EXTRA = "\\-.0-9\u00b7\u0300-\u036f\u203f-\u2040"
 _NAME = re.compile(f"[{_NAME_START}][{_NAME_START}{_NAME_EXTRA}]*")
-#: Namespaces in XML 1.0 NCName: a Name with no colon (section 3).
-_NCNAME_START = _NAME_START[1:]
-_NCNAME = re.compile(f"[{_NCNAME_START}][{_NCNAME_START}{_NAME_EXTRA}]*")
+_NAME_START_CHAR = re.compile(f"[{_NAME_START}]")
 #: A character outside XML 1.0 ``Char`` (section 2.2).
 _NOT_CHAR = re.compile("[^\t\n\r\u0020-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]")
 _WS = " \t\r\n"
@@ -144,24 +142,22 @@ _XML_NS = "http://www.w3.org/XML/1998/namespace"
 _XMLNS_NS = "http://www.w3.org/2000/xmlns/"
 
 
-def _charref_value(digits: str, base: int) -> int | None:
+def _charref_value(digits: str, base: int) -> int:
     """The code point of a character reference's digits, every digit read (leading zeros allowed, as
-    the XML 1.0 CharRef production does), or None past U+10FFFF. Leading zeros are dropped before
-    ``int()`` so its digit limit never applies; nine or more significant digits always pass U+10FFFF."""
+    the XML 1.0 CharRef production does); 0x110000, outside ``Char``, past U+10FFFF. Leading zeros are
+    dropped before ``int()`` so its digit limit never applies; nine or more significant digits always
+    pass U+10FFFF."""
     significant = digits.lstrip("0")
-    return None if len(significant) > 8 else int(significant or "0", base)
+    return 0x110000 if len(significant) > 8 else int(significant or "0", base)
 
 
 def _ref_value(m: re.Match[str]) -> str:
     hex_digits, dec_digits, entity = m.groups()
     if entity is not None:
         return _PREDEFINED[entity]
-    cp = (
-        _charref_value(hex_digits, 16)
-        if hex_digits is not None
-        else _charref_value(dec_digits, 10)
+    return chr(
+        _charref_value(hex_digits or dec_digits, 16 if hex_digits is not None else 10)
     )
-    return chr(cp or 0)  # the scanner already refused a value past U+10FFFF
 
 
 def _normalized(raw: str) -> str:
@@ -219,7 +215,10 @@ class _Xml:
         at = self.i
         name = self.name()
         parts = name.split(":")
-        if len(parts) > 2 or not all(_NCNAME.fullmatch(part) for part in parts):
+        # name() matched every character; an NCName part is non-empty and starts with a NameStartChar.
+        if len(parts) > 2 or not all(
+            part and _NAME_START_CHAR.match(part) for part in parts
+        ):
             raise self.fail("xml_syntax", at)
         return name, at
 
@@ -317,8 +316,7 @@ class _Xml:
             return
         if m is None:
             raise self.fail("xml_syntax", at)
-        cp = _charref_value(m.group()[:-1], base)
-        if cp is None or not _is_char(cp):
+        if not _is_char(_charref_value(m.group()[:-1], base)):
             raise self.fail("xml_control_char", at)
         self.i = m.end()
 
