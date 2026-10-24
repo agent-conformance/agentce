@@ -3,6 +3,17 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.123.0
+
+- `VG-OUT-LINK-CONTAINMENT` (18.184s, added): a run never writes through a link in `--out` that leads outside it
+  (SPEC 8.7, ruling R7). `tools/out_link_containment_check.py` runs the real Python, TypeScript and Java
+  `quickstart --out` with `integrity.jsonl`, `manifest.json` or the folder `packs` linked outside; each must exit 3
+  with `input.out_link_outside` naming the entry, leave the outside file or folder unchanged and write nothing into
+  `--out`. Three seeded faults (each engine's guard skipped).
+- `VG-JSON-PROFILE` (18.184s, changed): two more CLI rows, a malformed and a non-UTF-8 `state.json`, refused
+  `input.state_unreadable` with `--out` left holding no file in all three engines. One more seeded fault (Python
+  writes to `--out` before it reads `state.json`).
+
 ## 0.122.0
 
 - `VG-QUARANTINE-NO-PASS` (18.184r, changed): an OVS-07 target whose `@context` is `1.5` has no canonical form
