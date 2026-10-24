@@ -906,9 +906,17 @@ function refuseEmitAndFor(emit: string | undefined, forPreset: string | undefine
  * outside it: the run would write through it and change a file elsewhere (ruling R7; census
  * odd-inputs line 89, 18.184s). Links are found without following them and judged by where they
  * point, so a dangling link outside is refused too; a link inside `out` is followed as before.
- * Python's `_refuse_links_out` under `input.out_link_outside` (packaging is not ported). */
+ * Python's `_refuse_links_out` under `input.out_link_outside` (packaging is not ported). An `out`
+ * that cannot be looked at (EACCES, ENAMETOOLONG) is left to the first write, which refuses it
+ * `input.out_dir_unwritable`. */
 function refuseLinksOut(out: string): void {
-  if (!isDirFollowingLinks(out)) {
+  let isDir: boolean;
+  try {
+    isDir = isDirFollowingLinks(out);
+  } catch {
+    return;
+  }
+  if (!isDir) {
     return;
   }
   const walk = (dir: string, rel: string): void => {

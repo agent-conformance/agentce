@@ -5,6 +5,7 @@
  */
 import assert from "node:assert/strict";
 import {
+  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -205,3 +206,27 @@ test("a link inside --out is followed (18.184s)", () => {
     assert.ok(lstatSync(join(out, "notes-link.txt")).isSymbolicLink());
   });
 });
+
+for (const command of ["assess", "quickstart"]) {
+  for (const where of ["unenterable parent", "name too long"]) {
+    test(`${command} --out with ${where} is input.out_dir_unwritable, never internal.unexpected (18.184zd)`, (t) => {
+      if (where === "unenterable parent" && process.getuid?.() === 0) {
+        t.skip("root enters any folder");
+        return;
+      }
+      inScratch((dir) => {
+        const shut = join(dir, "shut");
+        mkdirSync(shut);
+        const out = where === "unenterable parent" ? join(shut, "out") : join(dir, "n".repeat(300));
+        const argv = command === "assess" ? assess(out) : ["quickstart", "--out", out];
+        chmodSync(shut, 0o000);
+        try {
+          const { exitCode, key } = run(argv);
+          assert.deepEqual([exitCode, key], [3, "input.out_dir_unwritable"]);
+        } finally {
+          chmodSync(shut, 0o755);
+        }
+      });
+    });
+  }
+}

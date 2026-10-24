@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.123.0",
+  "suite_version": "0.124.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -2026,7 +2026,7 @@
     },
     {
       "id": "VG-OUT-LINK-CONTAINMENT",
-      "title": "a run never writes through a link in --out that leads outside it: quickstart --out with integrity.jsonl, manifest.json or the folder packs linked outside is refused input.out_link_outside with nothing written in all three engines (18.184s)",
+      "title": "a run never writes through a link in --out that leads outside it: quickstart --out with integrity.jsonl, manifest.json or the folder packs linked outside is refused input.out_link_outside with nothing written in all three engines (18.184s), and an --out under a folder that cannot be entered or with a too-long name is refused input.out_dir_unwritable, never internal.unexpected (18.184zd)",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -2041,8 +2041,8 @@
       "timeout_s": 900,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "for each of the three links, the real Python, TypeScript and Java CLIs exit 3 with input.out_link_outside naming the entry, the outside file or folder is unchanged, and --out holds only the link",
-        "fail": "any engine writes through the link, changes the outside file or folder, writes anything into --out, or refuses with another exit code or key"
+        "pass": "for each of the three links, the real Python, TypeScript and Java CLIs exit 3 with input.out_link_outside naming the entry, the outside file or folder is unchanged, and --out holds only the link; and quickstart --out under a folder that cannot be entered (skipped as root) or with a too-long name exits 3 with input.out_dir_unwritable in all three engines",
+        "fail": "any engine writes through the link, changes the outside file or folder, writes anything into --out, or refuses with another exit code or key, or an --out that cannot be entered or whose name is too long gives anything but exit 3 with input.out_dir_unwritable"
       },
       "fix_hint": "run verification/gates/out_link_containment.sh and read the first FAIL line; the guards are _refuse_links_out in engines/python/agentce/commands/__init__.py, refuseLinksOut in engines/typescript/src/cli.ts and Cli.refuseLinksOut in engines/java/src/main/java/org/agentce/Cli.java",
       "faults": [
@@ -2063,6 +2063,18 @@
           "file": "engines/java/src/main/java/org/agentce/Cli.java",
           "search": "        refuseLinksOut(out);\n",
           "replace": "        Objects.requireNonNull(out);\n"
+        },
+        {
+          "description": "Python's --out link guard raises on an --out it cannot look at",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    if not signing.is_directory(out_dir, unreadable_is_absent=True):\n        return\n    for top, dirs, files in os.walk(out_dir, followlinks=False):",
+          "replace": "    if not signing.is_directory(out_dir):\n        return\n    for top, dirs, files in os.walk(out_dir, followlinks=False):"
+        },
+        {
+          "description": "TypeScript's --out link guard raises on an --out it cannot look at",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "  try {\n    isDir = isDirFollowingLinks(out);\n  } catch {\n    return;\n  }",
+          "replace": "  isDir = isDirFollowingLinks(out);"
         }
       ]
     },

@@ -3,6 +3,13 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.124.0
+
+- `VG-OUT-LINK-CONTAINMENT` (18.184zd, changed): an `--out` the engine cannot look at is refused
+  `input.out_dir_unwritable`, never `internal.unexpected`. The check now also runs `quickstart --out` under a folder
+  that cannot be entered (skipped as root) and with a too-long name in all three engines. The link guard 18.184s added
+  raised on these in Python and TypeScript. Two more seeded faults (the Python and TypeScript guards raising again).
+
 ## 0.123.0
 
 - `VG-OUT-LINK-CONTAINMENT` (18.184s, added): a run never writes through a link in `--out` that leads outside it

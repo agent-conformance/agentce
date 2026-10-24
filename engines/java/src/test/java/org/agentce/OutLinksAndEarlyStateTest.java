@@ -159,4 +159,27 @@ class OutLinksAndEarlyStateTest {
         assertEquals(0, env.get("exit_code").asInt(), env.toString());
         assertTrue(Files.isSymbolicLink(out.resolve("notes-link.txt")));
     }
+
+    /** 18.184zd: an --out under a folder that cannot be entered, or with a too-long name, is unwritable. */
+    @ParameterizedTest
+    @MethodSource("unlookable")
+    void anOutThatCannotBeLookedAtIsUnwritable(String command, boolean tooLong, @TempDir Path dir) throws IOException {
+        org.junit.jupiter.api.Assumptions.assumeTrue(tooLong || !"root".equals(System.getProperty("user.name")));
+        Path shut = Files.createDirectory(dir.resolve("shut"));
+        Path out = tooLong ? dir.resolve("n".repeat(300)) : shut.resolve("out");
+        String[] argv = command.equals("assess") ? assess(out) : new String[] {"quickstart", "--out", out.toString()};
+        shut.toFile().setExecutable(false, false);
+        shut.toFile().setReadable(false, false);
+        try {
+            assertRefused(Fixtures.runJson(argv), "input.out_dir_unwritable");
+        } finally {
+            shut.toFile().setReadable(true, false);
+            shut.toFile().setExecutable(true, false);
+        }
+    }
+
+    static Stream<Arguments> unlookable() {
+        return Stream.of(Arguments.of("assess", false), Arguments.of("assess", true),
+                Arguments.of("quickstart", false), Arguments.of("quickstart", true));
+    }
 }

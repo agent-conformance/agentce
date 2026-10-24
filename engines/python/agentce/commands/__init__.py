@@ -2211,8 +2211,9 @@ def _refuse_links_out(out_dir: Path, *, packaging: bool) -> None:
     is followed as before. With ``packaging`` (--package-for-sharing) the key is
     ``input.package_link_outside``, since the package would not hold the target, else
     ``input.out_link_outside``. A link planted after this check is
-    the residual R7 records."""
-    if not signing.is_directory(out_dir):
+    the residual R7 records. An --out that cannot be looked at is left to the first write, which
+    refuses it ``input.out_dir_unwritable``."""
+    if not signing.is_directory(out_dir, unreadable_is_absent=True):
         return
     for top, dirs, files in os.walk(out_dir, followlinks=False):
         for name in sorted([*dirs, *files]):
