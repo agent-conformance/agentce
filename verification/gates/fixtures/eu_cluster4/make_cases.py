@@ -186,6 +186,48 @@ case("rob04-not-consequential", "ROB-04", [dl(expires=EARLIER), dec(dtype="dom:L
 case("ovs04-expired", "OVS-04", [dl(expires=EARLIER), dec(), delegated()], CF)
 case("ovs04-unverified", "OVS-04", [dl(status="failed"), dec(), delegated()], NC, ["t1"])
 
+# TRN-03 (Art. 26(11), 86): a decision's rationale_claim_ref and its notice's content_ref, when written as a Ref
+# (SPEC 3), name a held event (18.37h); a Digest, a URI or a bare id names no event and is not judged. Any one clean
+# notice is enough; a dangling rationale fails whatever the notices.
+def trn_dec(i="d1", **k):
+    return dec(i, ai_role="sole", **k)
+
+
+def notice(i="n1", d="d1", notice_type="subject_of_ai_decision", **k):
+    return ev(i, "Notice", cls="independent_system", person_ref="p-1", notice_type=notice_type, delivered_at=T0,
+              channel="email", refs={"decision": ref(d)}, **k)
+
+
+case("trn03-clean", "TRN-03", [trn_dec(), notice()], CF)
+case("trn03-rationale-held", "TRN-03", [mc(), trn_dec(rationale_claim_ref=ref("m1")), notice()], CF)
+case("trn03-rationale-self", "TRN-03", [trn_dec(rationale_claim_ref=ref("d1")), notice()], CF)
+case("trn03-rationale-dangling", "TRN-03", [trn_dec(rationale_claim_ref=ref("zz")), notice()], NC, ["d1"])
+case("trn03-rationale-dangling-late-notice", "TRN-03", [notice(), trn_dec(rationale_claim_ref=ref("zz"))], NC,
+     ["d1"])
+case("trn03-rationale-digest", "TRN-03", [trn_dec(rationale_claim_ref=DIGEST), notice()], CF)
+case("trn03-rationale-blob", "TRN-03", [trn_dec(rationale_claim_ref="blob://rationale/1"), notice()], CF)
+# The ModelCall's operation fails the schema, so it is quarantined and not held; it sits in its own stream so the
+# decision's chain still verifies.
+case("trn03-rationale-to-quarantined", "TRN-03",
+     [ev("m1", "ModelCall", cls="enforcement_point", operation=7), trn_dec(rationale_claim_ref=ref("m1")), notice()], NC, ["d1"],
+     quarantined=1)
+case("trn03-rationale-bare-id", "TRN-03", [mc(), trn_dec(rationale_claim_ref="m1"), notice()], CF)
+case("trn03-content-held", "TRN-03", [mc(), trn_dec(), notice(content_ref=ref("m1"))], CF)
+case("trn03-content-dangling", "TRN-03", [trn_dec(), notice(content_ref=ref("zz"))], NC, ["d1"])
+case("trn03-content-blob", "TRN-03", [trn_dec(), notice(content_ref="blob://notice/1")], CF)
+case("trn03-content-digest", "TRN-03", [trn_dec(), notice(content_ref=DIGEST)], CF)
+case("trn03-explanation-notice-content-dangling", "TRN-03",
+     [trn_dec(), notice(notice_type="explanation", content_ref=ref("zz"))], NC, ["d1"])
+case("trn03-two-notices-one-clean", "TRN-03", [trn_dec(), notice(content_ref=ref("zz")), notice("n2")], CF)
+case("trn03-two-notices-one-clean-reversed", "TRN-03", [trn_dec(), notice("n2"), notice(content_ref=ref("zz"))], CF)
+case("trn03-two-notices-both-dangling", "TRN-03",
+     [trn_dec(), notice(content_ref=ref("zz")), notice("n2", content_ref=ref("yy"))], NC, ["d1"])
+case("trn03-one-of-two", "TRN-03",
+     [trn_dec(), notice(), trn_dec("d2", rationale_claim_ref=ref("zz")), notice("n2", d="d2")], NC, ["d2"])
+# TRN-03's minimum evidence names a Notice.
+case("trn03-no-notice", "TRN-03", [trn_dec()], IE)
+case("trn03-not-consequential", "TRN-03", [trn_dec(dtype="dom:Lookup", rationale_claim_ref=ref("zz"))], NA)
+
 # DAT-02 and DOC-04 are rung-3 measurements against declared thresholds that no engine makes yet.
 case("dat02-not-assessed", "DAT-02", [mc(), ra(), dec(inputs=[ref("r1")])], NS)
 case("doc04-not-assessed", "DOC-04", [dec(ai_role="sole")], NS)

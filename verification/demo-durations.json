@@ -44,7 +44,7 @@
       }
     ],
     "measured": "per gate and run, the gap between its 'RED on the seeded fault' log line and the previous one in its job (the first from the start of the job's demo step); per-job setup is not included",
-    "combined": "the longest measured over the runs listed, in whole seconds, so a gate's estimate covers the slowest job it has had (the same gate took half or twice as long from one run to the next); 18.200 re-timed every gate from runs 38870560963, 38875282332, 38950489932, 38959429891 and 38968242880 (its demo-fault (23) job from attempt 2) and kept none below its earlier recorded seconds; 18.202 scaled VG-ROB02-UNTRUSTED from 1066 s for 21 seeded faults to 1830 s for 36 (1066 x 36 / 21, rounded up), then measured at 2259 s for 36 in run 38988512694 (b23f9336; its 8 chunks summed to 2686 s, times 37 / 44), scaled to 2443 s for 39 (2259 x 40 / 37, rounded up), then to 2627 s for 42 (2443 x 43 / 40, rounded up), until a run measures it; 18.37f scaled VG-EUAIACT-CLUSTER3 from VG-EUAIACT-CLUSTER2 (650 s for 16 runs over 68 cases) to 1982 s for 31 runs over 107 cases (650 x 31 / 16 x 107 / 68, rounded up), until a run measures it; 18.37g scaled VG-EUAIACT-CLUSTER4 from VG-EUAIACT-CLUSTER2 (650 s for 16 runs over 68 cases) to 1453 s for 32 runs over 76 cases (650 x 32 / 16 x 76 / 68, rounded up), until a run measures it"
+    "combined": "the longest measured over the runs listed, in whole seconds, so a gate's estimate covers the slowest job it has had (the same gate took half or twice as long from one run to the next); 18.200 re-timed every gate from runs 38870560963, 38875282332, 38950489932, 38959429891 and 38968242880 (its demo-fault (23) job from attempt 2) and kept none below its earlier recorded seconds; 18.202 scaled VG-ROB02-UNTRUSTED from 1066 s for 21 seeded faults to 1830 s for 36 (1066 x 36 / 21, rounded up), then measured at 2259 s for 36 in run 38988512694 (b23f9336; its 8 chunks summed to 2686 s, times 37 / 44), scaled to 2443 s for 39 (2259 x 40 / 37, rounded up), then to 2627 s for 42 (2443 x 43 / 40, rounded up), until a run measures it; 18.37f scaled VG-EUAIACT-CLUSTER3 from VG-EUAIACT-CLUSTER2 (650 s for 16 runs over 68 cases) to 1982 s for 31 runs over 107 cases (650 x 31 / 16 x 107 / 68, rounded up), until a run measures it; 18.37g scaled VG-EUAIACT-CLUSTER4 from VG-EUAIACT-CLUSTER2 (650 s for 16 runs over 68 cases) to 1453 s for 32 runs over 76 cases (650 x 32 / 16 x 76 / 68, rounded up); 18.37h scaled it to 2008 s for 35 runs over 96 cases (1453 x 35 / 32 x 96 / 76, rounded up), until a run measures it"
   },
   "default_seconds": 300,
   "max_chunk_seconds": 240,
@@ -136,6 +136,6 @@
     "VG-SOURCE-CLASS": 245,
     "VG-TASK-BUDGET": 168,
     "VG-EUAIACT-CLUSTER3": 1982,
-    "VG-EUAIACT-CLUSTER4": 1453
+    "VG-EUAIACT-CLUSTER4": 2008
   }
 }

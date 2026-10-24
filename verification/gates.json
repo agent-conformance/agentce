@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.127.0",
+  "suite_version": "0.128.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -4864,7 +4864,7 @@
     },
     {
       "id": "VG-EUAIACT-CLUSTER4",
-      "title": "The last eleven eu-ai-act controls that shared a rule each test what their title says in all three engines (18.37g): REC-03 every input a consequential decision names is a held record; DAT-01 one of them is a data read; TRN-02 the decision records the AI system's role in it; INT-04 an integrity block backs the call at a strength SPEC 6.6 verifies; ROB-01 the call's effect is classified; ROB-04 the call ran under a held, verified delegation issued at or before it and expiring after it; ROB-03 names the references it checks; DAT-02 and DOC-04 read not_assessed",
+      "title": "The last eleven eu-ai-act controls that shared a rule each test what their title says in all three engines (18.37g): REC-03 every input a consequential decision names is a held record; DAT-01 one of them is a data read; TRN-02 the decision records the AI system's role in it; INT-04 an integrity block backs the call at a strength SPEC 6.6 verifies; ROB-01 the call's effect is classified; ROB-04 the call ran under a held, verified delegation issued at or before it and expiring after it; ROB-03 names the references it checks; TRN-03 (18.37h) needs a decision's rationale_claim_ref and its notice's content_ref, written as an event ref, to name a held event; DAT-02 and DOC-04 read not_assessed",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -4881,10 +4881,10 @@
       "timeout_s": 1800,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every case in verification/gates/fixtures/eu_cluster4/cases.json (76: REC-03 inputs held, self_report input, and none, empty, dangling, bare, quarantined, not a string, one of two; DAT-01 a ResourceAccess read or a MemoryRead beside a dangling one, and a ModelCall only, a write, an unnamed read, none, dangling, bare, quarantined, one of two; TRN-02 each ai_role, and no role, no agent, an invalid role, one of two, with REC-01 keeping the agent alone; INT-04 anchored, signed (partial), independent at any strength, and chained, no block, independent with no block, self_report, one of two; ROB-01 classified, and no effect_class, an invalid one, self_report, chained (partial), one of two; ROB-04 in force, expiry with an offset after, a self_report delegation, and expired, expiring at the call, an offset before, no expiry, unplaceable, unverified, dangling, bare, another type, none, issued after the call, one of two, with OVS-04 keeping the verified delegation alone; DAT-02 and DOC-04 not assessed; order reversed and not consequential for each) gives the expected outcome of its control, failing events, quarantine count and assess exit code from the real Python, TypeScript and Java CLIs",
+        "pass": "every case in verification/gates/fixtures/eu_cluster4/cases.json (96: REC-03 inputs held, self_report input, and none, empty, dangling, bare, quarantined, not a string, one of two; DAT-01 a ResourceAccess read or a MemoryRead beside a dangling one, and a ModelCall only, a write, an unnamed read, none, dangling, bare, quarantined, one of two; TRN-02 each ai_role, and no role, no agent, an invalid role, one of two, with REC-01 keeping the agent alone; INT-04 anchored, signed (partial), independent at any strength, and chained, no block, independent with no block, self_report, one of two; ROB-01 classified, and no effect_class, an invalid one, self_report, chained (partial), one of two; ROB-04 in force, expiry with an offset after, a self_report delegation, and expired, expiring at the call, an offset before, no expiry, unplaceable, unverified, dangling, bare, another type, none, issued after the call, one of two, with OVS-04 keeping the verified delegation alone; TRN-03 a rationale_claim_ref naming a held event, the decision itself, a Digest, a URI or a bare id, a content_ref naming a held event, a Digest or a URI, one clean notice beside a dangling one in either order, and a dangling rationale with the notice before or after, one to a quarantined record, a dangling content_ref, on an explanation notice, on both notices, one of two, no notice; DAT-02 and DOC-04 not assessed; order reversed and not consequential for each) gives the expected outcome of its control, failing events, quarantine count and assess exit code from the real Python, TypeScript and Java CLIs",
         "fail": "any case gives another outcome, another set of failing events, another quarantine count or another exit code in any engine"
       },
-      "fix_hint": "Each engine's graph builder sets the six literals in two places: inputsRecorded, dataConsumedRecorded and aiRoleRecorded on a Decision (graph.py _decision_inputs, graph.ts decisionInputs, Graph.java decisionInputs), and classCorroborated, effectClassified and delegationInForce on a ToolCall (graph.py _call_record, graph.ts callRecord, Graph.java callRecord); the shapes in spec/catalogs/base/eu-ai-act/shapes read them with sh:hasValue true. Run `ENGINES=python bash verification/gates/eu_cluster4.sh` (or typescript, java) for one engine.",
+      "fix_hint": "Each engine's graph builder sets the six literals in two places: inputsRecorded, dataConsumedRecorded and aiRoleRecorded on a Decision (graph.py _decision_inputs, graph.ts decisionInputs, Graph.java decisionInputs), and classCorroborated, effectClassified and delegationInForce on a ToolCall (graph.py _call_record, graph.ts callRecord, Graph.java callRecord); TRN-03's explanationReconstructable also reads the explanation pointers (graph.py _explanation_pointer, graph.ts explanationPointer, Graph.java explanationPointer); the shapes in spec/catalogs/base/eu-ai-act/shapes read them with sh:hasValue true. Run `ENGINES=python bash verification/gates/eu_cluster4.sh` (or typescript, java) for one engine.",
       "faults": [
         {
           "description": "Python counts any non-empty inputs list, so REC-03 reads a decision naming a dangling input conformant (rec03-input-dangling)",
@@ -5071,6 +5071,24 @@
           "file": "engines/java/src/main/java/org/agentce/Graph.java",
           "search": "&& issued != null && issued <= 0;",
           "replace": "&& issued != null;"
+        },
+        {
+          "description": "Python leaves a decision's rationale_claim_ref unchecked (trn03-rationale-dangling)",
+          "file": "engines/python/agentce/graph.py",
+          "search": "key = {\"Decision\": \"rationale_claim_ref\", \"Notice\": \"content_ref\"}.get(ptype)",
+          "replace": "key = {\"Notice\": \"content_ref\"}.get(ptype)"
+        },
+        {
+          "description": "TypeScript leaves a notice's content_ref unchecked (trn03-content-dangling)",
+          "file": "engines/typescript/src/graph.ts",
+          "search": "ptype === \"Decision\" ? \"rationale_claim_ref\" : ptype === \"Notice\" ? \"content_ref\" : undefined;",
+          "replace": "ptype === \"Decision\" ? \"rationale_claim_ref\" : undefined;"
+        },
+        {
+          "description": "Java ignores a notifying notice's unresolved content_ref (trn03-content-dangling)",
+          "file": "engines/java/src/main/java/org/agentce/Graph.java",
+          "search": "notices.stream().anyMatch(this::explanationClean);",
+          "replace": "notices.stream().anyMatch(notice -> !danglingNodes.contains(notice));"
         }
       ]
     },

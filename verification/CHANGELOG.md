@@ -3,6 +3,17 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.128.0
+
+- `VG-EUAIACT-CLUSTER4` (18.37h, changed) runs 96 cases (was 76). TRN-03 now checks the two explanation pointers the
+  model defines: a consequential decision's `rationale_claim_ref` and the `content_ref` of the notice that informed
+  the person. Written as an event ref, each must name a held event; a Digest, a URI or a bare id names no event and is
+  not judged. One clean notice is enough, and a dangling rationale fails whatever the notices say. Twenty new cases
+  and three new seeded faults, one per engine.
+- The demo-fault estimate for `VG-EUAIACT-CLUSTER4` is scaled to 2008 s for 35 runs over 96 cases until a run
+  measures it. The CI `demo-fault` job runs on 49 lanes (was 48): at 48 the heaviest shard was 12.1 minutes, over the
+  12.0 lane bound.
+
 ## 0.127.0
 
 - `VG-EUAIACT-CLUSTER4` (18.37g, new, tier quick) runs 76 cases through the real Python, TypeScript and Java CLIs.

@@ -4,7 +4,9 @@
 # of them is a data read (ResourceAccess read or MemoryRead); TRN-02 the agent and the AI system's role (ai_role); REC-01
 # keeps the agent alone; INT-04 an enforcement-point call carries an integrity block at a strength SPEC 6.6 can verify;
 # ROB-01 the trusted source classified the call's effect; ROB-04 the verified delegation had not expired at the call;
-# OVS-04 keeps the verified delegation alone; DAT-02 and DOC-04 are rung-3 measurements that read not_assessed. Each
+# OVS-04 keeps the verified delegation alone; TRN-03 (18.37h) a decision's rationale_claim_ref and its notice's
+# content_ref, written as an event ref, name a held event; DAT-02 and DOC-04 are rung-3 measurements that read
+# not_assessed. Each
 # case in fixtures/eu_cluster4/cases.json becomes one bundle; the real Python, TypeScript and Java CLIs assess it
 # against the eu-ai-act catalog, and the named control's outcome, failing events, quarantine count and exit code must
 # match. A case's "strength" map sets a source's integrity strength after chaining ("none" drops the block); the hash
