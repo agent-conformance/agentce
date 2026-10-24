@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -1124,8 +1125,14 @@ global options:
         List<Path> entries;
         try (Stream<Path> listing = Files.list(dir)) {
             entries = listing.sorted().toList();
-        } catch (IOException e) {
-            return;
+        } catch (IOException | UncheckedIOException e) {
+            // A folder that can be written but not listed could hold a link leading outside (18.184zd).
+            String label = dir.equals(out) ? "--out"
+                    : out.relativize(dir).toString().replace(File.separatorChar, '/') + " in --out";
+            throw new InputError(
+                    "input.out_dir_unwritable",
+                    label + " cannot be listed, so the run cannot check it for links leading outside.",
+                    ErrorCatalogue.errorFix("input.out_dir_unwritable"));
         }
         for (Path entry : entries) {
             if (Files.isSymbolicLink(entry)) {

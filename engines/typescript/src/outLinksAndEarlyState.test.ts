@@ -208,23 +208,35 @@ test("a link inside --out is followed (18.184s)", () => {
 });
 
 for (const command of ["assess", "quickstart"]) {
-  for (const where of ["unenterable parent", "name too long"]) {
+  for (const where of ["unenterable parent", "name too long", "unlistable"]) {
     test(`${command} --out with ${where} is input.out_dir_unwritable, never internal.unexpected (18.184zd)`, (t) => {
-      if (where === "unenterable parent" && process.getuid?.() === 0) {
+      if (where !== "name too long" && process.getuid?.() === 0) {
         t.skip("root enters any folder");
         return;
       }
       inScratch((dir) => {
         const shut = join(dir, "shut");
         mkdirSync(shut);
-        const out = where === "unenterable parent" ? join(shut, "out") : join(dir, "n".repeat(300));
+        const out =
+          where === "unenterable parent"
+            ? join(shut, "out")
+            : where === "unlistable"
+              ? shut
+              : join(dir, "n".repeat(300));
+        if (where === "unlistable") {
+          writeFileSync(join(dir, "outside"), "kept\n");
+          symlinkSync(join(dir, "outside"), join(shut, "integrity.jsonl"));
+        }
         const argv = command === "assess" ? assess(out) : ["quickstart", "--out", out];
-        chmodSync(shut, 0o000);
+        chmodSync(shut, where === "unlistable" ? 0o300 : 0o000);
         try {
           const { exitCode, key } = run(argv);
           assert.deepEqual([exitCode, key], [3, "input.out_dir_unwritable"]);
         } finally {
           chmodSync(shut, 0o755);
+        }
+        if (where === "unlistable") {
+          assert.equal(readFileSync(join(dir, "outside"), "utf-8"), "kept\n");
         }
       });
     });

@@ -2212,10 +2212,26 @@ def _refuse_links_out(out_dir: Path, *, packaging: bool) -> None:
     ``input.package_link_outside``, since the package would not hold the target, else
     ``input.out_link_outside``. A link planted after this check is
     the residual R7 records. An --out that cannot be looked at is left to the first write, which
-    refuses it ``input.out_dir_unwritable``."""
+    refuses it ``input.out_dir_unwritable``; a folder in it that cannot be listed is refused with that
+    key here, since it could hide such a link."""
     if not signing.is_directory(out_dir, unreadable_is_absent=True):
         return
-    for top, dirs, files in os.walk(out_dir, followlinks=False):
+
+    def unlistable(exc: OSError) -> None:
+        # A folder that can be written but not listed could hold a link leading outside (18.184zd).
+        folder = Path(exc.filename or out_dir)
+        label = (
+            "--out"
+            if folder == out_dir
+            else f"{folder.relative_to(out_dir).as_posix()} in --out"
+        )
+        raise InputError(
+            "input.out_dir_unwritable",
+            f"{label} cannot be listed, so the run cannot check it for links leading outside.",
+            MESSAGE_KEYS["input.out_dir_unwritable"].fix,
+        )
+
+    for top, dirs, files in os.walk(out_dir, followlinks=False, onerror=unlistable):
         for name in sorted([*dirs, *files]):
             entry = Path(top) / name
             if os.path.islink(entry) and not signing.inside_folder(

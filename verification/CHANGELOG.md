@@ -8,7 +8,10 @@ fails if a gate in `gates.json` is not named in this file.
 - `VG-OUT-LINK-CONTAINMENT` (18.184zd, changed): an `--out` the engine cannot look at is refused
   `input.out_dir_unwritable`, never `internal.unexpected`. The check now also runs `quickstart --out` under a folder
   that cannot be entered (skipped as root) and with a too-long name in all three engines. The link guard 18.184s added
-  raised on these in Python and TypeScript. Two more seeded faults (the Python and TypeScript guards raising again).
+  raised on these in Python and TypeScript. An `--out`, or a folder under it, that can be written but not listed is
+  now refused `input.out_dir_unwritable` too, since it could hide a link leading outside (all three engines wrote
+  through one); the check runs a mode-300 `--out` holding such a link. Five more seeded faults (the Python and
+  TypeScript guards raising again, and each engine's guard skipping a folder it cannot list).
 
 ## 0.123.0
 

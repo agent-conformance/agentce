@@ -163,23 +163,35 @@ class OutLinksAndEarlyStateTest {
     /** 18.184zd: an --out under a folder that cannot be entered, or with a too-long name, is unwritable. */
     @ParameterizedTest
     @MethodSource("unlookable")
-    void anOutThatCannotBeLookedAtIsUnwritable(String command, boolean tooLong, @TempDir Path dir) throws IOException {
-        org.junit.jupiter.api.Assumptions.assumeTrue(tooLong || !"root".equals(System.getProperty("user.name")));
+    void anOutThatCannotBeLookedAtIsUnwritable(String command, String where, @TempDir Path dir) throws IOException {
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+                where.equals("tooLong") || !"root".equals(System.getProperty("user.name")));
         Path shut = Files.createDirectory(dir.resolve("shut"));
-        Path out = tooLong ? dir.resolve("n".repeat(300)) : shut.resolve("out");
+        Path out = switch (where) {
+            case "tooLong" -> dir.resolve("n".repeat(300));
+            case "unlistable" -> shut;
+            default -> shut.resolve("out");
+        };
+        if (where.equals("unlistable")) {
+            Files.writeString(dir.resolve("outside"), "kept\n");
+            Files.createSymbolicLink(shut.resolve("integrity.jsonl"), dir.resolve("outside"));
+        }
         String[] argv = command.equals("assess") ? assess(out) : new String[] {"quickstart", "--out", out.toString()};
-        shut.toFile().setExecutable(false, false);
         shut.toFile().setReadable(false, false);
+        if (!where.equals("unlistable")) {
+            shut.toFile().setExecutable(false, false);
+        }
         try {
             assertRefused(Fixtures.runJson(argv), "input.out_dir_unwritable");
         } finally {
             shut.toFile().setReadable(true, false);
             shut.toFile().setExecutable(true, false);
         }
+        assertEquals("kept\n", where.equals("unlistable") ? Files.readString(dir.resolve("outside")) : "kept\n");
     }
 
     static Stream<Arguments> unlookable() {
-        return Stream.of(Arguments.of("assess", false), Arguments.of("assess", true),
-                Arguments.of("quickstart", false), Arguments.of("quickstart", true));
+        return Stream.of("assess", "quickstart").flatMap(c -> Stream.of("unenterable", "tooLong", "unlistable")
+                .map(w -> Arguments.of(c, w)));
     }
 }

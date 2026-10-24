@@ -7,7 +7,7 @@ link in a fresh quickstart --out, runs ``quickstart --out``, and expects exit 3 
 the link. The links: ``integrity.jsonl`` and ``manifest.json`` to an outside file, and the folder
 ``packs`` to an outside folder. Then two --out paths the engine cannot look at (item 18.184zd): one under a
 folder that cannot be entered (skipped when run as root, which enters any folder) and one whose last name is
-too long; each must be refused ``input.out_dir_unwritable`` with exit 3, never ``internal.unexpected``.
+too long, and an --out that can be written but not listed holding a link to an outside file; each must be refused ``input.out_dir_unwritable`` with exit 3, never ``internal.unexpected``.
 
 Usage (from the repository root, after ``pnpm build`` in engines/typescript and
 ``./gradlew :assemble installDist`` in engines/java):
@@ -87,9 +87,16 @@ def unwritable_problems_for(engine: str, work: Path) -> list[str]:
     shut = work / f"{engine}-shut"
     shut.mkdir()
     cases = [("a name too long", work / f"{engine}-{'n' * 300}")]
+    blind = work / f"{engine}-blind"
+    blind.mkdir()
+    outside = work / f"{engine}-blind-outside"
+    outside.write_text(KEPT, encoding="utf-8")
+    (blind / "integrity.jsonl").symlink_to(outside)
     if os.geteuid() != 0:
         cases.append(("a folder that cannot be entered", shut / "out"))
+        cases.append(("a folder that can be written but not listed", blind))
     shut.chmod(0)
+    blind.chmod(0o300)
     try:
         for what, out in cases:
             proc = subprocess.run(
@@ -102,11 +109,14 @@ def unwritable_problems_for(engine: str, work: Path) -> list[str]:
             text = re.sub(r"error \[([a-z_.]+)\]: ", r"\1: ", proc.stdout + proc.stderr)
             if proc.returncode != 3 or "input.out_dir_unwritable" not in text:
                 problems.append(
-                    f"{engine} quickstart --out under {what}: expected exit 3 and input.out_dir_unwritable, "
+                    f"{engine} quickstart --out ({what}): expected exit 3 and input.out_dir_unwritable, "
                     f"got exit {proc.returncode}: {text.strip()[-300:]}"
                 )
     finally:
         shut.chmod(0o755)
+        blind.chmod(0o755)
+    if outside.read_text(encoding="utf-8") != KEPT:
+        problems.append(f"{engine} wrote through a link in an --out it cannot list")
     return problems
 
 
@@ -122,7 +132,7 @@ def main() -> int:
         return 1
     print(
         f"PASS {len(LINKS)} links in --out leading outside are refused input.out_link_outside with nothing "
-        "written, and an --out that cannot be entered or whose name is too long is refused "
+        "written, and an --out that cannot be entered, listed or named is refused "
         "input.out_dir_unwritable, in python, typescript and java"
     )
     return 0

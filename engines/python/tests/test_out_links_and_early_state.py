@@ -162,23 +162,29 @@ def test_a_link_inside_out_is_followed(
 
 
 @pytest.mark.parametrize("command", ["assess", "quickstart"])
-@pytest.mark.parametrize("where", ["unenterable_parent", "name_too_long"])
+@pytest.mark.parametrize("where", ["unenterable_parent", "name_too_long", "unlistable"])
 def test_an_out_that_cannot_be_looked_at_is_unwritable(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], command: str, where: str
 ) -> None:
     """18.184zd: the link guard leaves such an --out to the first write; never internal.unexpected."""
     shut = tmp_path / "shut"
     shut.mkdir()
+    if where != "name_too_long" and os.geteuid() == 0:
+        pytest.skip("root enters and lists any folder")
     if where == "unenterable_parent":
-        if os.geteuid() == 0:
-            pytest.skip("root enters any folder")
         out = shut / "out"
+    elif where == "unlistable":
+        out = shut
+        (tmp_path / "outside").write_text("kept\n", encoding="utf-8")
+        (out / "integrity.jsonl").symlink_to(tmp_path / "outside")
     else:
         out = tmp_path / ("n" * 300)
     argv = _assess(out) if command == "assess" else ["quickstart", "--out", str(out)]
-    shut.chmod(0)
+    shut.chmod(0o300 if where == "unlistable" else 0)
     try:
         code, env = _run(argv, capsys)
     finally:
         shut.chmod(0o755)
     assert (code, env["error"]["key"]) == (3, "input.out_dir_unwritable")
+    if where == "unlistable":
+        assert (tmp_path / "outside").read_text(encoding="utf-8") == "kept\n"

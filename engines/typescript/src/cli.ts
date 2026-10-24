@@ -924,7 +924,12 @@ function refuseLinksOut(out: string): void {
     try {
       entries = readdirSync(dir, { withFileTypes: true });
     } catch {
-      return; // os.walk skips a folder it cannot list
+      // A folder that can be written but not listed could hold a link leading outside (18.184zd).
+      throw new InputError(
+        "input.out_dir_unwritable",
+        `${rel === "" ? "--out" : `${rel.slice(0, -1)} in --out`} cannot be listed, so the run cannot check it for links leading outside.`,
+        errorFix("input.out_dir_unwritable"),
+      );
     }
     entries.sort((a, b) => byteCompare(a.name, b.name));
     for (const entry of entries) {
