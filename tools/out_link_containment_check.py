@@ -39,6 +39,20 @@ def _snapshot(path: Path) -> list[tuple[str, str]]:
     )
 
 
+def _quickstart(engine: str, out: Path) -> tuple[int, str]:
+    """Run quickstart into ``out``: its exit code and output, with ``error [key]: `` shortened to ``key: ``."""
+    proc = subprocess.run(
+        cli_argv(engine) + ["quickstart", "--out", str(out)],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+        check=False,
+    )
+    return proc.returncode, re.sub(
+        r"error \[([a-z_.]+)\]: ", r"\1: ", proc.stdout + proc.stderr
+    )
+
+
 def problems_for(engine: str, work: Path) -> list[str]:
     problems: list[str] = []
     for entry, folder in LINKS:
@@ -54,22 +68,12 @@ def problems_for(engine: str, work: Path) -> list[str]:
         out = case / "out"
         out.mkdir()
         (out / entry).symlink_to(outside, target_is_directory=folder)
-        proc = subprocess.run(
-            cli_argv(engine) + ["quickstart", "--out", str(out)],
-            capture_output=True,
-            text=True,
-            cwd=ROOT,
-            check=False,
-        )
-        text = re.sub(r"error \[([a-z_.]+)\]: ", r"\1: ", proc.stdout + proc.stderr)
+        code, text = _quickstart(engine, out)
         where = f"{engine} quickstart --out with {entry} linked outside"
-        if (
-            proc.returncode != 3
-            or f"input.out_link_outside: {entry} in --out" not in text
-        ):
+        if code != 3 or f"input.out_link_outside: {entry} in --out" not in text:
             problems.append(
                 f"{where}: expected exit 3 and input.out_link_outside naming {entry}, got exit "
-                f"{proc.returncode}: {text.strip()[-300:]}"
+                f"{code}: {text.strip()[-300:]}"
             )
         if _snapshot(outside) != before:
             problems.append(
@@ -82,7 +86,8 @@ def problems_for(engine: str, work: Path) -> list[str]:
 
 
 def unwritable_problems_for(engine: str, work: Path) -> list[str]:
-    """--out under a folder that cannot be entered, and --out with a too-long name: input.out_dir_unwritable."""
+    """--out with a too-long name, under a folder that cannot be entered, or one that can be written but
+    not listed (holding a link outside, which must not be written through): input.out_dir_unwritable."""
     problems: list[str] = []
     shut = work / f"{engine}-shut"
     shut.mkdir()
@@ -99,18 +104,11 @@ def unwritable_problems_for(engine: str, work: Path) -> list[str]:
     blind.chmod(0o300)
     try:
         for what, out in cases:
-            proc = subprocess.run(
-                cli_argv(engine) + ["quickstart", "--out", str(out)],
-                capture_output=True,
-                text=True,
-                cwd=ROOT,
-                check=False,
-            )
-            text = re.sub(r"error \[([a-z_.]+)\]: ", r"\1: ", proc.stdout + proc.stderr)
-            if proc.returncode != 3 or "input.out_dir_unwritable" not in text:
+            code, text = _quickstart(engine, out)
+            if code != 3 or "input.out_dir_unwritable" not in text:
                 problems.append(
                     f"{engine} quickstart --out ({what}): expected exit 3 and input.out_dir_unwritable, "
-                    f"got exit {proc.returncode}: {text.strip()[-300:]}"
+                    f"got exit {code}: {text.strip()[-300:]}"
                 )
     finally:
         shut.chmod(0o755)

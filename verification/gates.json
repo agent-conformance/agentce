@@ -2073,8 +2073,8 @@
         {
           "description": "TypeScript's --out link guard raises on an --out it cannot look at",
           "file": "engines/typescript/src/cli.ts",
-          "search": "  try {\n    isDir = isDirFollowingLinks(out);\n  } catch {\n    return;\n  }",
-          "replace": "  isDir = isDirFollowingLinks(out);"
+          "search": "    if (code === \"EACCES\" || code === \"EPERM\" || code === \"ENAMETOOLONG\") {\n      return;\n    }\n",
+          "replace": ""
         },
         {
           "description": "Python's --out link guard skips a folder it cannot list",

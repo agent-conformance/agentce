@@ -907,17 +907,19 @@ function refuseEmitAndFor(emit: string | undefined, forPreset: string | undefine
  * odd-inputs line 89, 18.184s). Links are found without following them and judged by where they
  * point, so a dangling link outside is refused too; a link inside `out` is followed as before.
  * Python's `_refuse_links_out` under `input.out_link_outside` (packaging is not ported). An `out`
- * that cannot be looked at (EACCES, ENAMETOOLONG) is left to the first write, which refuses it
+ * that cannot be looked at (EACCES, EPERM, ENAMETOOLONG) is left to the first write, which refuses it
  * `input.out_dir_unwritable`. */
 function refuseLinksOut(out: string): void {
-  let isDir: boolean;
   try {
-    isDir = isDirFollowingLinks(out);
-  } catch {
-    return;
-  }
-  if (!isDir) {
-    return;
+    if (!isDirFollowingLinks(out)) {
+      return;
+    }
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "EACCES" || code === "EPERM" || code === "ENAMETOOLONG") {
+      return;
+    }
+    throw err;
   }
   const walk = (dir: string, rel: string): void => {
     let entries: Dirent[];

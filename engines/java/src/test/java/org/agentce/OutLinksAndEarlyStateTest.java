@@ -187,7 +187,9 @@ class OutLinksAndEarlyStateTest {
             shut.toFile().setReadable(true, false);
             shut.toFile().setExecutable(true, false);
         }
-        assertEquals("kept\n", where.equals("unlistable") ? Files.readString(dir.resolve("outside")) : "kept\n");
+        if (where.equals("unlistable")) {
+            assertEquals("kept\n", Files.readString(dir.resolve("outside")));
+        }
     }
 
     static Stream<Arguments> unlookable() {

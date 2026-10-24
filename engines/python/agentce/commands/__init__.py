@@ -2219,12 +2219,8 @@ def _refuse_links_out(out_dir: Path, *, packaging: bool) -> None:
 
     def unlistable(exc: OSError) -> None:
         # A folder that can be written but not listed could hold a link leading outside (18.184zd).
-        folder = Path(exc.filename or out_dir)
-        label = (
-            "--out"
-            if folder == out_dir
-            else f"{folder.relative_to(out_dir).as_posix()} in --out"
-        )
+        rel = unreadable_rel(out_dir, exc)
+        label = f"{rel} in --out" if rel else "--out"
         raise InputError(
             "input.out_dir_unwritable",
             f"{label} cannot be listed, so the run cannot check it for links leading outside.",
