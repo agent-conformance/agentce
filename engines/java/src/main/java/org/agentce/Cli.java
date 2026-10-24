@@ -1200,20 +1200,20 @@ global options:
         // --state and --deviations are read, and before any output is written (SPEC §7).
         FailOn.Expression failOn = options.failOn() != null ? FailOn.parse(options.failOn()) : null;
         Path out = Paths.get(options.out());
-        // --state's writability is proved here, before any --out write below (writeQuarantineJsonl
-        // etc.), not only when state.save() finally writes at the end of this method: a run refused
-        // for an unwritable --state must leave nothing in --out that looks like a result either.
-        // state.json is read here too, once, so a file that is not UTF-8 or not JSON is refused before
-        // any --out write (census odd-inputs lines 85, 87; 18.184s); Stage 6a reuses what was loaded.
+        // Resolved on every run, even with no --catalog-dir (python-reference.md §9).
+        Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());
+        Resolved resolved = resolveCatalogs(
+                options.catalog(), profileObj, options.catalogDirs(), trust, options.allowUnverified());
+        // --state's writability is proved here, after the catalogs as Python does and before any --out
+        // write below (writeQuarantineJsonl etc.): a run refused for an unwritable --state must leave
+        // nothing in --out that looks like a result either. state.json is read here too, once, so a file
+        // that is not UTF-8 or not JSON is refused before any --out write (census odd-inputs lines 85,
+        // 87; 18.184s); Stage 6a reuses what was loaded.
         StateDir state = null;
         if (options.state() != null) {
             StateDir.ensureWritable(Paths.get(options.state()));
             state = StateDir.load(Paths.get(options.state())); // incompatible state_version aborts with exit 3
         }
-        // Resolved on every run, even with no --catalog-dir (python-reference.md §9).
-        Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());
-        Resolved resolved = resolveCatalogs(
-                options.catalog(), profileObj, options.catalogDirs(), trust, options.allowUnverified());
         // The file arguments read later are checked here too, so a run refused for one leaves --out
         // empty (census odd-inputs line 46, 18.184c).
         String domainPath = options.domain() != null
