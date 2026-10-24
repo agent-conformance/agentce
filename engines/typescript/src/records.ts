@@ -18,7 +18,7 @@ import { summarizeActivity } from "./activity";
 import { confineToRoot, resolveLoose, safeIsFile } from "./bundle";
 import { DEFAULT_LENS } from "./bundled";
 import { CanonicalizationError, canonicalString } from "./canonical";
-import { InputError } from "./errors";
+import { InputError, isPermissionError } from "./errors";
 import { maxNesting } from "./ingest";
 import { JsonProfileError, jsonlByteRecords } from "./json";
 import { type AdaptResult, OtelGenaiAdapterError, adapt } from "./otelGenai";
@@ -473,8 +473,7 @@ function deniedLook(path: string, follow: boolean): boolean {
     (follow ? statSync : lstatSync)(path);
     return false;
   } catch (err) {
-    const code = (err as NodeJS.ErrnoException | null)?.code;
-    return code === "EACCES" || code === "EPERM";
+    return isPermissionError(err);
   }
 }
 
@@ -501,10 +500,8 @@ export function scanRecords(folderArg: string, options: ScanOptions = {}): Scann
     ) {
       // Python's PermissionError branch: an --out inside the records folder that cannot be entered
       // cannot be shown to hold only a previous run's output, so it collides (inbox row 421).
-      if (!(within(out, folder) && !same(out, folder) && holdsEntries(out))) {
-        throw refuse(OUT_DIR, options.exclude, UNREACHABLE);
-      }
-      throw insideAndUsed(out);
+      if (within(out, folder) && !same(out, folder) && holdsEntries(out)) throw insideAndUsed(out);
+      throw refuse(OUT_DIR, options.exclude, UNREACHABLE);
     }
     if (
       within(folder, stale) ||

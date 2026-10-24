@@ -2049,8 +2049,8 @@
         {
           "description": "Python's --out link guard is skipped",
           "file": "engines/python/agentce/commands/__init__.py",
-          "search": "    _refuse_links_out(\n        out_dir,\n",
-          "replace": "    (lambda *_: None)(\n        out_dir,\n"
+          "search": "    _refuse_links_out(out_dir, packaging=package_for_sharing)\n",
+          "replace": "    (lambda *_, **__: None)(out_dir, packaging=package_for_sharing)\n"
         },
         {
           "description": "TypeScript's --out link guard is skipped",

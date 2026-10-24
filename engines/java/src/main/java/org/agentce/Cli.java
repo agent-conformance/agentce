@@ -1129,7 +1129,8 @@ global options:
         }
         for (Path entry : entries) {
             if (Files.isSymbolicLink(entry)) {
-                if (!Catalog.insideFolderOrRoot(out, entry)) {
+                String resolved = Bundle.resolveLoose(entry);
+                if (!Bundle.underByIdentity(out, resolved == null ? entry : Path.of(resolved))) {
                     String rel = out.relativize(entry).toString().replace(File.separatorChar, '/');
                     throw new InputError(
                             "input.out_link_outside",

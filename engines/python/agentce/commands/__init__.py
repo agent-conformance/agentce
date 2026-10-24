@@ -1553,12 +1553,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             raw_catalog_dirs,
             deviations_path,
         )
-    _refuse_links_out(
-        out_dir,
-        "input.package_link_outside"
-        if package_for_sharing
-        else "input.out_link_outside",
-    )
+    _refuse_links_out(out_dir, packaging=package_for_sharing)
     if scanned is not None:
         scanned.write(out_dir, write_profile=derived_profile)
         limitations.append(RECORDS_LIMITATION)
@@ -2208,13 +2203,14 @@ def _check_package_path_overlap(
             )
 
 
-def _refuse_links_out(out_dir: Path, key: str) -> None:
-    """Refuse (``key``) before anything is written when an entry under ``--out``, file or folder, is a
+def _refuse_links_out(out_dir: Path, *, packaging: bool) -> None:
+    """Refuse before anything is written when an entry under ``--out``, file or folder, is a
     link leading outside it: the run would write through it and change something elsewhere (ruling
     R7; census odd-inputs line 89, 18.184s). Links are found without following them and judged by
     where they point, so a link to something missing outside is refused too; a link inside ``--out``
-    is followed as before. ``input.package_link_outside`` under --package-for-sharing, whose package
-    would not hold the target, else ``input.out_link_outside``. A link planted after this check is
+    is followed as before. With ``packaging`` (--package-for-sharing) the key is
+    ``input.package_link_outside``, since the package would not hold the target, else
+    ``input.out_link_outside``. A link planted after this check is
     the residual R7 records."""
     if not signing.is_directory(out_dir):
         return
@@ -2225,18 +2221,19 @@ def _refuse_links_out(out_dir: Path, key: str) -> None:
                 out_dir, entry, or_root=True
             ):
                 rel = entry.relative_to(out_dir).as_posix()
-                message = (
-                    f"--package-for-sharing: {rel} in --out links outside the output folder, so "
-                    "the package would not hold it."
-                    if key == "input.package_link_outside"
-                    else f"{rel} in --out links outside the output folder, so the run would "
-                    "write through it and change a file elsewhere."
-                )
-                raise InputError(
-                    key,
-                    message,
-                    MESSAGE_KEYS[key].fix,
-                )
+                if packaging:
+                    key = "input.package_link_outside"
+                    message = (
+                        f"--package-for-sharing: {rel} in --out links outside the output "
+                        "folder, so the package would not hold it."
+                    )
+                else:
+                    key = "input.out_link_outside"
+                    message = (
+                        f"{rel} in --out links outside the output folder, so the run would "
+                        "write through it and change a file elsewhere."
+                    )
+                raise InputError(key, message, MESSAGE_KEYS[key].fix)
 
 
 def _resolve_catalogs(
