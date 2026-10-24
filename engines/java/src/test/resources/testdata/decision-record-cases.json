@@ -1,0 +1,1315 @@
+{
+ "_description": "18.37f: the eight decision-record literals, one case per row; the same table as engines/python/tests/test_graph_decision_record.py CASES.",
+ "domain": {
+  "decision_types": [
+   {
+    "id": "agentce:CreditDecision",
+    "subclass_of": "agentce:ConsequentialDecision",
+    "consequential": true
+   }
+  ]
+ },
+ "decision": "agentce:event/d1",
+ "cases": [
+  {
+   "name": "held",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "refs": {
+       "authorization": "agentce:event/p1"
+      }
+     }
+    },
+    {
+     "id": "p1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "PolicyDecision",
+      "policy_id": "p",
+      "policy_version": "1",
+      "policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision": "allow"
+     }
+    }
+   ],
+   "literal": "authorizationHeld",
+   "want": "true"
+  },
+  {
+   "name": "held via request",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision"
+     }
+    },
+    {
+     "id": "p1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "PolicyDecision",
+      "policy_id": "p",
+      "policy_version": "1",
+      "policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision": "allow",
+      "refs": {
+       "request": "agentce:event/d1"
+      }
+     }
+    }
+   ],
+   "literal": "authorizationHeld",
+   "want": "true"
+  },
+  {
+   "name": "deny",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "refs": {
+       "authorization": "agentce:event/p1"
+      }
+     }
+    },
+    {
+     "id": "p1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "PolicyDecision",
+      "policy_id": "p",
+      "policy_version": "1",
+      "policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision": "deny"
+     }
+    }
+   ],
+   "literal": "authorizationHeld",
+   "want": "false"
+  },
+  {
+   "name": "deny via request",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "refs": {
+       "authorization": "agentce:event/p1"
+      }
+     }
+    },
+    {
+     "id": "p1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "PolicyDecision",
+      "policy_id": "p",
+      "policy_version": "1",
+      "policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision": "allow"
+     }
+    },
+    {
+     "id": "p2",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "PolicyDecision",
+      "policy_id": "p",
+      "policy_version": "1",
+      "policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision": "deny",
+      "refs": {
+       "request": "agentce:event/d1"
+      }
+     }
+    }
+   ],
+   "literal": "authorizationHeld",
+   "want": "false"
+  },
+  {
+   "name": "bare",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "refs": {
+       "authorization": "p1"
+      }
+     }
+    },
+    {
+     "id": "p1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "PolicyDecision",
+      "policy_id": "p",
+      "policy_version": "1",
+      "policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision": "allow",
+      "refs": {
+       "request": "agentce:event/d1"
+      }
+     }
+    }
+   ],
+   "literal": "authorizationHeld",
+   "want": "false"
+  },
+  {
+   "name": "unheld",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "refs": {
+       "authorization": "agentce:event/p1"
+      }
+     }
+    }
+   ],
+   "literal": "authorizationHeld",
+   "want": "false"
+  },
+  {
+   "name": "not a string",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "refs": {
+       "authorization": 7
+      }
+     }
+    },
+    {
+     "id": "p1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "PolicyDecision",
+      "policy_id": "p",
+      "policy_version": "1",
+      "policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision": "allow"
+     }
+    }
+   ],
+   "literal": "authorizationHeld",
+   "want": "false"
+  },
+  {
+   "name": "none",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision"
+     }
+    },
+    {
+     "id": "p1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "PolicyDecision",
+      "policy_id": "p",
+      "policy_version": "1",
+      "policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision": "allow"
+     }
+    }
+   ],
+   "literal": "authorizationHeld",
+   "want": "false"
+  },
+  {
+   "name": "allow clears",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "refs": {
+       "authorization": "agentce:event/p1"
+      }
+     }
+    },
+    {
+     "id": "p1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "PolicyDecision",
+      "policy_id": "p",
+      "policy_version": "1",
+      "policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision": "allow"
+     }
+    }
+   ],
+   "literal": "authorizationGateCleared",
+   "want": "true"
+  },
+  {
+   "name": "transform",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "refs": {
+       "authorization": "agentce:event/p1"
+      }
+     }
+    },
+    {
+     "id": "p1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "PolicyDecision",
+      "policy_id": "p",
+      "policy_version": "1",
+      "policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision": "transform"
+     }
+    }
+   ],
+   "literal": "authorizationGateCleared",
+   "want": "false"
+  },
+  {
+   "name": "no decision value",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "refs": {
+       "authorization": "agentce:event/p1"
+      }
+     }
+    },
+    {
+     "id": "p1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "PolicyDecision",
+      "policy_id": "p",
+      "policy_version": "1",
+      "policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     }
+    }
+   ],
+   "literal": "authorizationGateCleared",
+   "want": "false"
+  },
+  {
+   "name": "require_approval unapproved",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "refs": {
+       "authorization": "agentce:event/p1"
+      }
+     }
+    },
+    {
+     "id": "p1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "PolicyDecision",
+      "policy_id": "p",
+      "policy_version": "1",
+      "policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision": "require_approval"
+     }
+    }
+   ],
+   "literal": "authorizationGateCleared",
+   "want": "false"
+  },
+  {
+   "name": "identity",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "refs": {
+       "authorization": "agentce:event/p1"
+      }
+     }
+    },
+    {
+     "id": "p1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "PolicyDecision",
+      "policy_id": "p",
+      "policy_version": "1",
+      "policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision": "allow"
+     }
+    }
+   ],
+   "literal": "authorityRecorded",
+   "want": "true"
+  },
+  {
+   "name": "digest malformed",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "refs": {
+       "authorization": "agentce:event/p1"
+      }
+     }
+    },
+    {
+     "id": "p1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "PolicyDecision",
+      "policy_id": "p",
+      "policy_version": "1",
+      "policy_digest": "sha256:XYZ",
+      "decision": "allow"
+     }
+    }
+   ],
+   "literal": "authorityRecorded",
+   "want": "false"
+  },
+  {
+   "name": "digest not a string",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "refs": {
+       "authorization": "agentce:event/p1"
+      }
+     }
+    },
+    {
+     "id": "p1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "PolicyDecision",
+      "policy_id": "p",
+      "policy_version": "1",
+      "policy_digest": 1,
+      "decision": "allow"
+     }
+    }
+   ],
+   "literal": "authorityRecorded",
+   "want": "false"
+  },
+  {
+   "name": "empty version",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "refs": {
+       "authorization": "agentce:event/p1"
+      }
+     }
+    },
+    {
+     "id": "p1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.PolicyDecision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "PolicyDecision",
+      "policy_id": "p",
+      "policy_version": "",
+      "policy_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "decision": "allow"
+     }
+    }
+   ],
+   "literal": "authorityRecorded",
+   "want": "false"
+  },
+  {
+   "name": "chosen in options",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "options": [
+       {
+        "id": "a"
+       },
+       {
+        "id": "b"
+       }
+      ],
+      "chosen": "b"
+     }
+    }
+   ],
+   "literal": "decisionDocumented",
+   "want": "true"
+  },
+  {
+   "name": "chosen, no options",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "chosen": "a"
+     }
+    }
+   ],
+   "literal": "decisionDocumented",
+   "want": "true"
+  },
+  {
+   "name": "no chosen",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision"
+     }
+    }
+   ],
+   "literal": "decisionDocumented",
+   "want": "false"
+  },
+  {
+   "name": "chosen not a string",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "chosen": 3
+     }
+    }
+   ],
+   "literal": "decisionDocumented",
+   "want": "false"
+  },
+  {
+   "name": "chosen outside",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "options": [
+       {
+        "id": "a"
+       }
+      ],
+      "chosen": "b"
+     }
+    }
+   ],
+   "literal": "decisionDocumented",
+   "want": "false"
+  },
+  {
+   "name": "options not objects",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "options": [
+       "a"
+      ],
+      "chosen": "a"
+     }
+    }
+   ],
+   "literal": "decisionDocumented",
+   "want": "false"
+  },
+  {
+   "name": "explanation after",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision"
+     }
+    },
+    {
+     "id": "n1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:02:00Z",
+     "type": "org.agent-conformance.evidence.Notice.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Notice",
+      "notice_type": "explanation",
+      "person_ref": "p:1",
+      "delivered_at": "2026-01-01T00:02:00Z",
+      "refs": {
+       "decision": "agentce:event/d1"
+      }
+     }
+    }
+   ],
+   "literal": "explanationTimed",
+   "want": "true"
+  },
+  {
+   "name": "explanation equal",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision"
+     }
+    },
+    {
+     "id": "n1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:02:00Z",
+     "type": "org.agent-conformance.evidence.Notice.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Notice",
+      "notice_type": "explanation",
+      "person_ref": "p:1",
+      "delivered_at": "2026-01-01T00:01:00Z",
+      "refs": {
+       "decision": "agentce:event/d1"
+      }
+     }
+    }
+   ],
+   "literal": "explanationTimed",
+   "want": "true"
+  },
+  {
+   "name": "explanation before",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision"
+     }
+    },
+    {
+     "id": "n1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:02:00Z",
+     "type": "org.agent-conformance.evidence.Notice.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Notice",
+      "notice_type": "explanation",
+      "person_ref": "p:1",
+      "delivered_at": "2026-01-01T00:00:00Z",
+      "refs": {
+       "decision": "agentce:event/d1"
+      }
+     }
+    }
+   ],
+   "literal": "explanationTimed",
+   "want": "false"
+  },
+  {
+   "name": "explanation unplaceable",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision"
+     }
+    },
+    {
+     "id": "n1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:02:00Z",
+     "type": "org.agent-conformance.evidence.Notice.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Notice",
+      "notice_type": "explanation",
+      "person_ref": "p:1",
+      "delivered_at": "soon",
+      "refs": {
+       "decision": "agentce:event/d1"
+      }
+     }
+    }
+   ],
+   "literal": "explanationTimed",
+   "want": "false"
+  },
+  {
+   "name": "other notice type",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision"
+     }
+    },
+    {
+     "id": "n1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:02:00Z",
+     "type": "org.agent-conformance.evidence.Notice.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Notice",
+      "notice_type": "adverse_action",
+      "person_ref": "p:1",
+      "delivered_at": "2026-01-01T00:02:00Z",
+      "refs": {
+       "decision": "agentce:event/d1"
+      }
+     }
+    }
+   ],
+   "literal": "explanationTimed",
+   "want": "false"
+  },
+  {
+   "name": "notified",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "person_ref": "p:1"
+     }
+    },
+    {
+     "id": "n1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:02:00Z",
+     "type": "org.agent-conformance.evidence.Notice.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Notice",
+      "notice_type": "explanation",
+      "person_ref": "p:1",
+      "delivered_at": "2026-01-01T00:02:00Z",
+      "refs": {
+       "decision": "agentce:event/d1"
+      }
+     }
+    }
+   ],
+   "literal": "affectedPersonNotified",
+   "want": "true"
+  },
+  {
+   "name": "other person",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "person_ref": "p:2"
+     }
+    },
+    {
+     "id": "n1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:02:00Z",
+     "type": "org.agent-conformance.evidence.Notice.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Notice",
+      "notice_type": "explanation",
+      "person_ref": "p:1",
+      "delivered_at": "2026-01-01T00:02:00Z",
+      "refs": {
+       "decision": "agentce:event/d1"
+      }
+     }
+    }
+   ],
+   "literal": "affectedPersonNotified",
+   "want": "false"
+  },
+  {
+   "name": "no person_ref",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision"
+     }
+    },
+    {
+     "id": "n1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:02:00Z",
+     "type": "org.agent-conformance.evidence.Notice.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Notice",
+      "notice_type": "explanation",
+      "person_ref": null,
+      "delivered_at": "2026-01-01T00:02:00Z",
+      "refs": {
+       "decision": "agentce:event/d1"
+      }
+     }
+    }
+   ],
+   "literal": "affectedPersonNotified",
+   "want": "false"
+  },
+  {
+   "name": "no notice",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision"
+     }
+    }
+   ],
+   "literal": "affectedPersonNotified",
+   "want": "false"
+  },
+  {
+   "name": "in scope by default",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision"
+     }
+    }
+   ],
+   "literal": "inDisclosureScope",
+   "want": "true"
+  },
+  {
+   "name": "not a boolean",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "affects_natural_person": "no"
+     }
+    }
+   ],
+   "literal": "inDisclosureScope",
+   "want": "true"
+  },
+  {
+   "name": "out of scope",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "affects_natural_person": false
+     }
+    }
+   ],
+   "literal": "inDisclosureScope",
+   "want": "false"
+  },
+  {
+   "name": "disclosed",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "session_id": "s1"
+     }
+    },
+    {
+     "id": "x1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:00:00Z",
+     "type": "org.agent-conformance.evidence.Disclosure.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Disclosure",
+      "disclosure_type": "ai_interaction",
+      "session_id": "s1",
+      "delivered_at": "2026-01-01T00:00:00Z"
+     }
+    }
+   ],
+   "literal": "aiInteractionDisclosed",
+   "want": "true"
+  },
+  {
+   "name": "disclosed at",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "session_id": "s1"
+     }
+    },
+    {
+     "id": "x1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:00:00Z",
+     "type": "org.agent-conformance.evidence.Disclosure.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Disclosure",
+      "disclosure_type": "ai_interaction",
+      "session_id": "s1",
+      "delivered_at": "2026-01-01T00:01:00Z"
+     }
+    }
+   ],
+   "literal": "aiInteractionDisclosed",
+   "want": "true"
+  },
+  {
+   "name": "disclosed after",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "session_id": "s1"
+     }
+    },
+    {
+     "id": "x1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:00:00Z",
+     "type": "org.agent-conformance.evidence.Disclosure.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Disclosure",
+      "disclosure_type": "ai_interaction",
+      "session_id": "s1",
+      "delivered_at": "2026-01-01T00:02:00Z"
+     }
+    }
+   ],
+   "literal": "aiInteractionDisclosed",
+   "want": "false"
+  },
+  {
+   "name": "other session",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "session_id": "s2"
+     }
+    },
+    {
+     "id": "x1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:00:00Z",
+     "type": "org.agent-conformance.evidence.Disclosure.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Disclosure",
+      "disclosure_type": "ai_interaction",
+      "session_id": "s1",
+      "delivered_at": "2026-01-01T00:00:00Z"
+     }
+    }
+   ],
+   "literal": "aiInteractionDisclosed",
+   "want": "false"
+  },
+  {
+   "name": "no session_id",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision"
+     }
+    },
+    {
+     "id": "x1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:00:00Z",
+     "type": "org.agent-conformance.evidence.Disclosure.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Disclosure",
+      "disclosure_type": "ai_interaction",
+      "session_id": "s1",
+      "delivered_at": "2026-01-01T00:00:00Z"
+     }
+    }
+   ],
+   "literal": "aiInteractionDisclosed",
+   "want": "false"
+  },
+  {
+   "name": "other type",
+   "events": [
+    {
+     "id": "d1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:01:00Z",
+     "type": "org.agent-conformance.evidence.Decision.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Decision",
+      "decision_type": "agentce:CreditDecision",
+      "session_id": "s1"
+     }
+    },
+    {
+     "id": "x1",
+     "source": "urn:agentce:source:src",
+     "subject": "spiffe://corp/agents/a",
+     "time": "2026-01-01T00:00:00Z",
+     "type": "org.agent-conformance.evidence.Disclosure.v1",
+     "agentcesourceclass": "independent_system",
+     "data": {
+      "@type": "Disclosure",
+      "disclosure_type": "synthetic_marking",
+      "session_id": "s1",
+      "delivered_at": "2026-01-01T00:00:00Z"
+     }
+    }
+   ],
+   "literal": "aiInteractionDisclosed",
+   "want": "false"
+  }
+ ]
+}
