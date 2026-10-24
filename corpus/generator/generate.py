@@ -77,14 +77,18 @@ BASE_CONTEXT = "https://agent-conformance.org/contexts/evidence/v1"
 GENESIS_PREV = "0" * 64
 CONSEQUENTIAL = "dom:CreditDecision"
 MINOR = "dom:MinorInquiry"
-#: What every generated Decision records it chose between (SPEC §6.2.3 options and chosen), so DOC-02 can read it.
+#: What every generated Decision records it chose between (SPEC §6.2.3 options and chosen), so DOC-02 can read it, and
+#: the AI system's role in it (ai_role), so TRN-02 can.
 DECISION_CHOICE: dict[str, Any] = {
     "options": [
         {"id": "approve", "label": "Approve"},
         {"id": "decline", "label": "Decline"},
     ],
     "chosen": "approve",
+    "ai_role": "recommendation",
 }
+#: When every generated delegation expires: after the observation window, so ROB-04 reads each call in force.
+DELEGATION_EXPIRES = "2026-12-31T23:59:59.000Z"
 
 # Reserved-for-test fictional principals (SPEC §11.3: clearly fictional, no real persons).
 HUMAN_OFFICER = "urn:example:person:credit-officer-7"
@@ -431,6 +435,7 @@ def _scenario(
                         ],
                         "verification": {"status": "verified", "method": "rfc8693"},
                         "scope_granted": list(domain.scope_granted),
+                        "expires": DELEGATION_EXPIRES,
                     },
                 )
             )
@@ -530,6 +535,7 @@ def _scenario(
                     "method": "rfc8693",
                 },
                 "scope_granted": list(domain.scope_granted),
+                "expires": DELEGATION_EXPIRES,
             },
         )
     )
@@ -1133,6 +1139,7 @@ def _agent_chain(
                 ],
                 "verification": {"status": "verified", "method": "rfc8693"},
                 "scope_granted": list(domain.scope_granted),
+                "expires": DELEGATION_EXPIRES,
             },
         )
     )

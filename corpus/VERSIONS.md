@@ -67,3 +67,8 @@ fails the check.
   one of its `options` when it lists them), so `generate.py`'s `DECISION_CHOICE` gives every generated
   Decision two options and the one it chose. `corpus/quickstart` is the credit/langgraph/known-pass
   project and carries the same decision.
+- **v1 (2026.09), pin re-extended (18.37g)** — the corpus was still unpublished, so the pin was again
+  corrected in place. TRN-02 now reads the AI system's role in a decision (SPEC §6.2.3 `ai_role`), and ROB-04
+  reads whether a call's delegation had expired. `DECISION_CHOICE` gives every generated Decision
+  `ai_role: recommendation`, and every generated DelegationIssued expires at `DELEGATION_EXPIRES`, after the
+  observation window. `corpus/quickstart` carries the same decision and delegation fields.
