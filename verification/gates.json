@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.122.0",
+  "suite_version": "0.123.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -1971,7 +1971,7 @@
     },
     {
       "id": "VG-JSON-PROFILE",
-      "title": "every engine reads JSON under the SPEC 8.7 profile: each row of the shared case table spec/report/json-cases.json gives the table's result through every engine's reader, number rendering and comparison, seven real-CLI rows give the profile's exit code, key and text in all three engines, and a records line outside the profile never makes a non-conformant control read better (18.184x)",
+      "title": "every engine reads JSON under the SPEC 8.7 profile: each row of the shared case table spec/report/json-cases.json gives the table's result through every engine's reader, number rendering and comparison, nine real-CLI rows give the profile's exit code, key and text in all three engines, a malformed or non-UTF-8 state.json leaving --out holding no file (18.184s), and a records line outside the profile never makes a non-conformant control read better (18.184x)",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -1987,8 +1987,8 @@
       "timeout_s": 900,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "tools/json_parity_check.py --self-test catches its seeded faults; every case-table row's result from the Python, TypeScript and Java json-cases seams equals the table's; the seven --cli rows give the expected exit code, key and text in all three engines; and the json-profile- cases of VG-QUARANTINE-NO-PASS read insufficient_evidence with a quarantine entry naming the rule",
-        "fail": "the table loses a rule's row or a required rendering or comparison, an engine reads, refuses, renders or compares a row other than the table says, a CLI row's exit code, key or text differs from the profile's, or a records line outside the profile lets ROB-02 read better than non-conformant"
+        "pass": "tools/json_parity_check.py --self-test catches its seeded faults; every case-table row's result from the Python, TypeScript and Java json-cases seams equals the table's; the nine --cli rows give the expected exit code, key and text in all three engines, and the two bad state.json rows leave --out holding no file; and the json-profile- cases of VG-QUARANTINE-NO-PASS read insufficient_evidence with a quarantine entry naming the rule",
+        "fail": "the table loses a rule's row or a required rendering or comparison, an engine reads, refuses, renders or compares a row other than the table says, a CLI row's exit code, key or text differs from the profile's, a refused bad state.json leaves a file in --out, or a records line outside the profile lets ROB-02 read better than non-conformant"
       },
       "fix_hint": "run verification/gates/json_profile.sh and read the first FAIL line; each engine's reader is engines/python/agentce/safe_json.py, engines/typescript/src/json.ts and engines/java/src/main/java/org/agentce/Json.java, the seams are agentce.tools.json_cases, src/seams.ts and org.agentce.Seams, and the cases are spec/report/json-cases.json",
       "faults": [
@@ -2015,6 +2015,54 @@
           "file": "engines/typescript/src/cli.ts",
           "search": "    claim = parseUntrustedJson(readFileSync(claimPath));",
           "replace": "    claim = JSON.parse(readFileSync(claimPath, \"utf8\"));"
+        },
+        {
+          "description": "Python writes to --out before it reads state.json",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "        StateDir.ensure_writable(Path(state_arg))\n        state = StateDir.load(\n",
+          "replace": "        StateDir.ensure_writable(Path(state_arg))\n        out_dir.mkdir(parents=True, exist_ok=True)\n        (out_dir / \"quarantine.jsonl\").write_text(\"\")\n        state = StateDir.load(\n"
+        }
+      ]
+    },
+    {
+      "id": "VG-OUT-LINK-CONTAINMENT",
+      "title": "a run never writes through a link in --out that leads outside it: quickstart --out with integrity.jsonl, manifest.json or the folder packs linked outside is refused input.out_link_outside with nothing written in all three engines (18.184s)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/out_link_containment.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "java"
+      ],
+      "timeout_s": 900,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "for each of the three links, the real Python, TypeScript and Java CLIs exit 3 with input.out_link_outside naming the entry, the outside file or folder is unchanged, and --out holds only the link",
+        "fail": "any engine writes through the link, changes the outside file or folder, writes anything into --out, or refuses with another exit code or key"
+      },
+      "fix_hint": "run verification/gates/out_link_containment.sh and read the first FAIL line; the guards are _refuse_links_out in engines/python/agentce/commands/__init__.py, refuseLinksOut in engines/typescript/src/cli.ts and Cli.refuseLinksOut in engines/java/src/main/java/org/agentce/Cli.java",
+      "faults": [
+        {
+          "description": "Python's --out link guard is skipped",
+          "file": "engines/python/agentce/commands/__init__.py",
+          "search": "    _refuse_links_out(\n        out_dir,\n",
+          "replace": "    (lambda *_: None)(\n        out_dir,\n"
+        },
+        {
+          "description": "TypeScript's --out link guard is skipped",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "  refuseLinksOut(out);\n",
+          "replace": "  void out;\n"
+        },
+        {
+          "description": "Java's --out link guard is skipped",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "        refuseLinksOut(out);\n",
+          "replace": "        Objects.requireNonNull(out);\n"
         }
       ]
     },
@@ -3321,8 +3369,8 @@
         {
           "description": "Java's assess parses the --fail-on expression after the catalogs resolve, so a bad expression with an unknown --catalog is refused for the catalog (O3)",
           "file": "engines/java/src/main/java/org/agentce/Cli.java",
-          "search": "        FailOn.Expression failOn = options.failOn() != null ? FailOn.parse(options.failOn()) : null;\n        Path out = Paths.get(options.out());\n        // --state's writability is proved here, before any --out write below (writeQuarantineJsonl\n        // etc.), not only when state.save() finally writes at the end of this method: a run refused\n        // for an unwritable --state must leave nothing in --out that looks like a result either.\n        if (options.state() != null) {\n            StateDir.ensureWritable(Paths.get(options.state()));\n        }\n        // Resolved on every run, even with no --catalog-dir (python-reference.md §9).\n        Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());\n        Resolved resolved = resolveCatalogs(\n                options.catalog(), profileObj, options.catalogDirs(), trust, options.allowUnverified());\n",
-          "replace": "        Path out = Paths.get(options.out());\n        // --state's writability is proved here, before any --out write below (writeQuarantineJsonl\n        // etc.), not only when state.save() finally writes at the end of this method: a run refused\n        // for an unwritable --state must leave nothing in --out that looks like a result either.\n        if (options.state() != null) {\n            StateDir.ensureWritable(Paths.get(options.state()));\n        }\n        // Resolved on every run, even with no --catalog-dir (python-reference.md §9).\n        Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());\n        Resolved resolved = resolveCatalogs(\n                options.catalog(), profileObj, options.catalogDirs(), trust, options.allowUnverified());\n        FailOn.Expression failOn = options.failOn() != null ? FailOn.parse(options.failOn()) : null;\n"
+          "search": "        FailOn.Expression failOn = options.failOn() != null ? FailOn.parse(options.failOn()) : null;\n        Path out = Paths.get(options.out());\n        // Resolved on every run, even with no --catalog-dir (python-reference.md §9).\n        Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());\n        Resolved resolved = resolveCatalogs(\n                options.catalog(), profileObj, options.catalogDirs(), trust, options.allowUnverified());\n",
+          "replace": "        Path out = Paths.get(options.out());\n        // Resolved on every run, even with no --catalog-dir (python-reference.md §9).\n        Verify.TrustRoot trust = effectiveTrustRoot(options.trustRootFlag());\n        Resolved resolved = resolveCatalogs(\n                options.catalog(), profileObj, options.catalogDirs(), trust, options.allowUnverified());\n        FailOn.Expression failOn = options.failOn() != null ? FailOn.parse(options.failOn()) : null;\n"
         },
         {
           "description": "Python evaluates the list of OR-groups with all() instead of any(), so `or` acts as `and` (F1, F4)",

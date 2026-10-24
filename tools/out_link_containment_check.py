@@ -1,0 +1,93 @@
+"""out_link_containment_check - a run never writes through a link in --out that leads outside it (item 18.184s).
+
+SPEC 8.7 has a run write only under --out and --state, and ruling R7 refuses a link under --out that leads
+outside before anything is written. For each of the three engines built from source, the check plants one
+link in a fresh quickstart --out, runs ``quickstart --out``, and expects exit 3 with
+``input.out_link_outside`` naming the entry, the outside file or folder unchanged, and --out holding only
+the link. The links: ``integrity.jsonl`` and ``manifest.json`` to an outside file, and the folder
+``packs`` to an outside folder.
+
+Usage (from the repository root, after ``pnpm build`` in engines/typescript and
+``./gradlew :assemble installDist`` in engines/java):
+    out_link_containment_check.py
+"""
+
+from __future__ import annotations
+
+import re
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+from json_parity_check import ENGINES, ROOT, cli_argv
+
+KEPT = "kept\n"
+LINKS = (("integrity.jsonl", False), ("manifest.json", False), ("packs", True))
+
+
+def _snapshot(path: Path) -> list[tuple[str, str]]:
+    if path.is_file():
+        return [("", path.read_text(encoding="utf-8"))]
+    return sorted(
+        (p.relative_to(path).as_posix(), p.read_text(encoding="utf-8"))
+        for p in path.rglob("*")
+        if p.is_file()
+    )
+
+
+def problems_for(engine: str, work: Path) -> list[str]:
+    problems: list[str] = []
+    for entry, folder in LINKS:
+        case = work / f"{engine}-{entry}"
+        outside = case / "outside"
+        if folder:
+            outside.mkdir(parents=True)
+            (outside / "kept.txt").write_text(KEPT, encoding="utf-8")
+        else:
+            case.mkdir(parents=True)
+            outside.write_text(KEPT, encoding="utf-8")
+        before = _snapshot(outside)
+        out = case / "out"
+        out.mkdir()
+        (out / entry).symlink_to(outside, target_is_directory=folder)
+        proc = subprocess.run(
+            cli_argv(engine) + ["quickstart", "--out", str(out)],
+            capture_output=True,
+            text=True,
+            cwd=ROOT,
+            check=False,
+        )
+        text = re.sub(r"error \[([a-z_.]+)\]: ", r"\1: ", proc.stdout + proc.stderr)
+        where = f"{engine} quickstart --out with {entry} linked outside"
+        if proc.returncode != 3 or f"input.out_link_outside: {entry} in --out" not in text:
+            problems.append(
+                f"{where}: expected exit 3 and input.out_link_outside naming {entry}, got exit "
+                f"{proc.returncode}: {text.strip()[-300:]}"
+            )
+        if _snapshot(outside) != before:
+            problems.append(f"{where}: the outside {'folder' if folder else 'file'} was changed")
+        held = sorted(p.relative_to(out).as_posix() for p in out.iterdir())
+        if held != [entry]:
+            problems.append(f"{where}: --out holds {held}, expected only the link")
+    return problems
+
+
+def main() -> int:
+    problems: list[str] = []
+    with tempfile.TemporaryDirectory() as tmp:
+        for engine in ENGINES:
+            problems += problems_for(engine, Path(tmp))
+    for problem in problems:
+        print(f"FAIL {problem}")
+    if problems:
+        return 1
+    print(
+        f"PASS {len(LINKS)} links in --out leading outside are refused input.out_link_outside with nothing "
+        "written, in python, typescript and java"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

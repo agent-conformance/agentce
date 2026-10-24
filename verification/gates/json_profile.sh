@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build gate helper for VG-JSON-PROFILE (18.184x): every engine reads JSON under the SPEC 8.7 profile. The shared case
 # table spec/report/json-cases.json goes through each engine's json-cases seam and every result must equal the table's
-# (tools/json_parity_check.py); seven real-CLI rows give the profile's exit code, key and text in all three engines;
+# (tools/json_parity_check.py); nine real-CLI rows give the profile's exit code, key and text in all three engines (a bad state.json leaves --out empty);
 # and a records line outside the profile on the write that makes ROB-02 non-conformant is quarantined naming the rule
 # and never reads better (the json-profile- cases of VG-QUARANTINE-NO-PASS).
 set -euo pipefail
