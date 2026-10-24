@@ -181,7 +181,7 @@ function principalKey(principal: Record<string, unknown>): string {
   return pyStrip(text(principal.id) ?? "");
 }
 
-function isOneOf(value: unknown, values: ReadonlySet<string>): boolean {
+function isOneOf(value: unknown, values: { has(value: string): boolean }): boolean {
   return typeof value === "string" && values.has(value);
 }
 
@@ -1670,9 +1670,6 @@ class Builder {
   private materialise(events: Event[]): void {
     const byHuman = this.mapOversight(events);
     const incidentDecisions = this.incidentDecisions(events);
-    const policyDecisions = new Set(
-      events.filter((e) => this.ptype(e) === "PolicyDecision").map((e) => eventIri(String(e.id))),
-    );
     const heldTypes = new Map(events.map((e) => [eventIri(String(e.id)), this.ptype(e)]));
     const gates = new Gates(events, (e) => this.ptype(e));
     const unresolved = this.unresolvedLinks(events);
@@ -1699,7 +1696,7 @@ class Builder {
           "agentce:triggersIncident",
           incidentDecisions === null || incidentDecisions.has(node),
         );
-        this.riskReviewed(node, refsOf(event), policyDecisions);
+        this.riskReviewed(node, refsOf(event), gates.policies);
         this.decisionRecord(node, data, gates);
       }
       if (ptype === "Override" || ptype === "Interrupt") {
@@ -1894,7 +1891,7 @@ class Builder {
   private riskReviewed(
     node: string,
     refs: Record<string, unknown>,
-    policyDecisions: Set<string>,
+    policyDecisions: { has(value: string): boolean },
   ): void {
     this.literal(
       node,

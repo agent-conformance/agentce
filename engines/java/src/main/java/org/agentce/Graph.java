@@ -1795,12 +1795,6 @@ public final class Graph {
         private void materialise(List<JsonNode> events) {
             Map<String, Boolean> byHuman = mapOversight(events);
             Set<String> incidentDecisions = incidentDecisions(events);
-            Set<String> policyDecisions = new LinkedHashSet<>();
-            for (JsonNode event : events) {
-                if ("PolicyDecision".equals(ptype(event))) {
-                    policyDecisions.add(Iri.eventIri(event.get("id").asText()));
-                }
-            }
             Map<String, String> heldTypes = new HashMap<>();
             for (JsonNode event : events) {
                 heldTypes.put(Iri.eventIri(event.get("id").asText()), ptype(event));
@@ -1827,7 +1821,7 @@ public final class Graph {
                     oversightCoverage(node, data);
                     literal(node, "agentce:triggersIncident",
                             incidentDecisions == null || incidentDecisions.contains(node));
-                    riskReviewed(node, refsOf(event), policyDecisions);
+                    riskReviewed(node, refsOf(event), gates.policies.keySet());
                     decisionRecord(node, data, gates);
                 }
                 if ("Override".equals(ptype) || "Interrupt".equals(ptype)) {

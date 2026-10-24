@@ -164,7 +164,7 @@ _SECURITY_REFS = (
 )
 
 
-def _is_one_of(value: Any, values: frozenset[str]) -> bool:
+def _is_one_of(value: Any, values: Collection[str]) -> bool:
     return isinstance(value, str) and value in values
 
 
@@ -1476,11 +1476,6 @@ class _Builder:
     def _materialise(self, events: list[dict[str, Any]]) -> None:
         by_human = self._map_oversight(events)
         incident_decisions = self._incident_decisions(events)
-        policy_decisions = frozenset(
-            event_iri(str(event["id"]))
-            for event in events
-            if self._ptype(event) == "PolicyDecision"
-        )
         gates = _Gates(events, self._ptype)
         held_types = {event_iri(str(e["id"])): self._ptype(e) for e in events}
         unresolved = self._unresolved_links(events)
@@ -1506,7 +1501,7 @@ class _Builder:
                     "agentce:triggersIncident",
                     incident_decisions is None or node in incident_decisions,
                 )
-                self._risk_reviewed(node, _refs(event), policy_decisions)
+                self._risk_reviewed(node, _refs(event), gates.policies.keys())
                 self._decision_record(node, data, gates)
             if ptype in ("Override", "Interrupt"):
                 self._intervention(node, ptype, event, by_human[node])
@@ -1707,7 +1702,7 @@ class _Builder:
         return broken
 
     def _risk_reviewed(
-        self, node: str, refs: dict[str, Any], policy_decisions: frozenset[str]
+        self, node: str, refs: dict[str, Any], policy_decisions: Collection[str]
     ) -> None:
         """RSK-02 (Art. 9): a review of the decision, or a ``refs.authorization`` (or
         ``refs.request``) naming a ``PolicyDecision`` the bundle holds. A name that leads to no
