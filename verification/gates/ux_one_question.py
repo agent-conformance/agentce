@@ -43,7 +43,11 @@ TRACE_FIXTURE = (
 )
 FIRST_MINUTE_S = 60.0
 BUDGET = 1
-RUNS = ("quickstart", "assess")
+# The first-run commands: the arguments after `agentce`, given an output folder and a trace folder.
+RUNS = {
+    "quickstart": lambda out, traces: ["quickstart", "--out", out],
+    "assess": lambda out, traces: ["assess", traces, "--out", out],
+}
 
 SECTION = "## First minute"
 QUESTION = "**Question:**"
@@ -61,6 +65,12 @@ UNSAFE = re.compile(
 ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07]*\x07")
 YES_NO = re.compile(r"\[(?:y/n|yes/no)\]|\((?:y/n|yes/no)\)", re.IGNORECASE)
 ENDS_IN_QUESTION = re.compile(r"\?[\s\"'*`)]*$")
+QUESTION_MARK = re.compile(r"\?(?:\W|$)")
+
+
+def is_ask(line: str) -> bool:
+    """A skill line that asks the person something, or tells the assistant to."""
+    return bool(ASK.search(line) or QUESTION_MARK.search(line))
 
 
 def engine_commands() -> dict[str, list[str]]:
@@ -68,7 +78,7 @@ def engine_commands() -> dict[str, list[str]]:
         (ROOT / "engines/java/build/libs").glob("agentce-*-all.jar"),
         key=lambda p: p.stat().st_mtime,
     )
-    ts = ROOT / "engines/typescript/dist/cli.js"
+    ts = ROOT / "engines/typescript/bin/agentce.js"  # the npm bin a user runs
     if not jars or not ts.is_file():
         raise SystemExit(
             "ux.one_question.not_built: source verification/gates/build_engines.sh first"
@@ -90,8 +100,9 @@ def engine_commands() -> dict[str, list[str]]:
 def run_at_terminal(argv: list[str], timeout: float) -> tuple[int | None, str]:
     """Run argv with a pseudo-terminal as stdin, stdout and stderr, and type nothing.
 
-    Returns (exit code, terminal text); the exit code is None when the command was still running at
-    the deadline, which with nothing typed means it is waiting for an answer.
+    Returns (exit code, terminal text). The exit code is None when the command printed a question,
+    which stops it at once, or was still running at the deadline, which with nothing typed means it is
+    waiting for an answer.
     """
     env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
     env["NO_COLOR"] = "1"
@@ -118,6 +129,8 @@ def run_at_terminal(argv: list[str], timeout: float) -> tuple[int | None, str]:
                 if not data:
                     return proc.wait(), decode(chunks)
                 chunks.append(data)
+                if question_lines(decode(chunks)):
+                    break
             elif proc.poll() is not None:
                 return proc.returncode, decode(chunks)
         os.killpg(proc.pid, signal.SIGKILL)
@@ -147,16 +160,19 @@ def cli_leg(errors: list[str]) -> int:
         traces.mkdir()
         shutil.copy(TRACE_FIXTURE, traces / "input.json")
         for engine, base in engine_commands().items():
-            for name in RUNS:
+            for name, args in RUNS.items():
                 out = str(Path(tmp) / f"{engine}-{name}")
-                args = (
-                    ["quickstart", "--out", out]
-                    if name == "quickstart"
-                    else ["assess", str(traces), "--out", out]
+                code, text = run_at_terminal(
+                    base + args(out, str(traces)), FIRST_MINUTE_S
                 )
-                code, text = run_at_terminal(base + args, FIRST_MINUTE_S)
                 where = f"{engine} agentce {name}"
-                if code is None:
+                found = question_lines(text)
+                for line in found:
+                    errors.append(
+                        f"ux.one_question.cli_asked: {where} printed a question: {line!r}. "
+                        "Remove the prompt or give it a flag."
+                    )
+                if code is None and not found:
                     last = (
                         text.rstrip().rsplit("\n", 1)[-1].strip() or "(nothing printed)"
                     )
@@ -165,13 +181,7 @@ def cli_leg(errors: list[str]) -> int:
                         f"{FIRST_MINUTE_S:.0f} s at a terminal with nothing typed, so it is waiting "
                         f"for an answer; last line: {last!r}. Remove the prompt or give it a flag."
                     )
-                    asked += 1
-                    continue
-                found = question_lines(text)
-                for line in found:
-                    errors.append(
-                        f"ux.one_question.cli_asked: {where} printed a question: {line!r}"
-                    )
+                    found = [last]
                 asked += len(found)
                 print(
                     f"ux-one-question: {where}: exit {code}, {len(found)} question(s)"
@@ -197,13 +207,14 @@ def prose(lines: list[str]) -> list[tuple[int, str]]:
 
 def read_skill(rel: str, text: str, errors: list[str]) -> int:
     """Check one SKILL.md's first minute; return how many questions it asks there."""
-    lines = prose(text.split("\n"))
+    raw = text.split("\n")
+    lines = prose(raw)
     start = next((n for n, line in lines if line.rstrip() == SECTION), None)
     if start is None:  # with no first minute, every ask comes before the first findings
         errors.append(
             f"ux.one_question.skill_no_first_minute: {rel} has no '{SECTION}' section"
         )
-        start = end = len(text.split("\n")) + 1
+        start = end = len(raw) + 1
     else:
         end = next(
             (n for n, line in lines if n > start and line.startswith("## ")),
@@ -215,7 +226,9 @@ def read_skill(rel: str, text: str, errors: list[str]) -> int:
     for n, line in lines:
         if line.startswith(("## ", "### ")):
             heading = line
-        if not ASK.search(line) or start <= n < end:
+        # Before the section any question counts; after it, only an instruction to ask (a "?" there
+        # is the skill quoting what a person says, as in "When to use").
+        if start <= n < end or not (is_ask(line) if n < start else ASK.search(line)):
             continue
         if n < start:
             errors.append(
@@ -228,12 +241,6 @@ def read_skill(rel: str, text: str, errors: list[str]) -> int:
                 f"ask under {heading.strip()!r}, which names no step after the first minute: "
                 f"{line.strip()!r}. Move it under a Phase or Stage heading."
             )
-    for n, line in lines:
-        if n < start and ENDS_IN_QUESTION.search(line):
-            errors.append(
-                f"ux.one_question.skill_asks_before_first_minute: {rel}:{n} asks {line.strip()!r}"
-            )
-
     if not body:
         return 0
     first_command = next((n for n, line in body if FIRST_COMMAND.search(line)), None)
@@ -247,8 +254,7 @@ def read_skill(rel: str, text: str, errors: list[str]) -> int:
     unmarked = [
         (n, line)
         for n, line in body
-        if not line.startswith((QUESTION, DEFAULT))
-        and (ASK.search(line) or re.search(r"\?(?:\W|$)", line))
+        if not line.startswith((QUESTION, DEFAULT)) and is_ask(line)
     ]
     count = len(asks) + len(unmarked)
     if count > BUDGET:
@@ -279,7 +285,7 @@ def read_skill(rel: str, text: str, errors: list[str]) -> int:
         if not answer or bad:
             errors.append(
                 f"ux.one_question.skill_default_unsafe: {rel}:{n} "
-                f"{'is empty' if not answer else 'names ' + repr(bad.group(0)) if bad else ''}; "
+                f"{'is empty' if not bad else f'names {bad.group(0)!r}'}; "
                 "the question and its default may only read, write into the output folder and send nothing"
             )
     return count
@@ -298,7 +304,10 @@ def skill_leg(errors: list[str]) -> int:
     return most
 
 
-GOOD = """---
+GOOD_QUESTION = '**Question:** "Is this the folder your traces land in, or should I read another one?"'
+GOOD_DEFAULT = "**Default:** keep the folder you found; it only reads files and writes into agentce-out."
+GOOD = (
+    """---
 name: demo
 description: "Use when asked to? never a question here"
 ---
@@ -310,8 +319,11 @@ Intro.
 
 Run `agentce assess traces --out agentce-out` and show the verdict.
 
-**Question:** "Is this the folder your traces land in, or should I read another one?"
-**Default:** keep the folder you found; it only reads files and writes into agentce-out.
+"""
+    + GOOD_QUESTION
+    + "\n"
+    + GOOD_DEFAULT
+    + """
 
 ```
 echo "a fenced line? not a question"
@@ -321,16 +333,17 @@ echo "a fenced line? not a question"
 
 **A**. After the first findings, ask for the intended purpose, one question at a time.
 """
+)
 
 SELF_TEST: list[tuple[str, str, set[str]]] = [
     ("clean, one question", GOOD, set()),
     (
         "clean, no question",
         GOOD.replace(
-            '**Question:** "Is this the folder your traces land in, or should I read another one?"\n',
+            GOOD_QUESTION + "\n",
             "",
         ).replace(
-            "**Default:** keep the folder you found; it only reads files and writes into agentce-out.\n",
+            GOOD_DEFAULT + "\n",
             "",
         ),
         set(),
@@ -380,7 +393,7 @@ SELF_TEST: list[tuple[str, str, set[str]]] = [
     (
         "no default",
         GOOD.replace(
-            "**Default:** keep the folder you found; it only reads files and writes into agentce-out.\n",
+            GOOD_DEFAULT + "\n",
             "",
         ),
         {"skill_no_default"},
@@ -388,7 +401,7 @@ SELF_TEST: list[tuple[str, str, set[str]]] = [
     (
         "empty default",
         GOOD.replace(
-            "**Default:** keep the folder you found; it only reads files and writes into agentce-out.",
+            GOOD_DEFAULT,
             "**Default:**",
         ),
         {"skill_default_unsafe"},
@@ -411,7 +424,7 @@ SELF_TEST: list[tuple[str, str, set[str]]] = [
     (
         "unsafe question, default yes",
         GOOD.replace(
-            '"Is this the folder your traces land in, or should I read another one?"',
+            GOOD_QUESTION.removeprefix("**Question:** "),
             '"Sign and publish the report now?"',
         ).replace("keep the folder you found;", "yes;"),
         {"skill_default_unsafe"},
@@ -434,6 +447,16 @@ SELF_TEST: list[tuple[str, str, set[str]]] = [
 ]
 
 
+TERMINAL_CASES: list[tuple[str, bool]] = [
+    ("Continue? ", True),
+    ("Overwrite the output folder [y/N] ", True),
+    ("Proceed (yes/no)", True),
+    ('Use the sample? "', True),
+    ("Next step: run the assessment again.", False),
+    ("see docs/errors.md?plain=1 for more", False),
+]
+
+
 def self_test() -> int:
     failed = 0
     for name, text, want in SELF_TEST:
@@ -446,23 +469,18 @@ def self_test() -> int:
                 f"self-test FAIL {name}: want {sorted(want)}, got {sorted(got)}: {errors}",
                 file=sys.stderr,
             )
-    for line, asks in [
-        ("Continue? ", True),
-        ("Overwrite the output folder [y/N] ", True),
-        ("Proceed (yes/no)", True),
-        ('Use the sample? "', True),
-        ("Next step: run the assessment again.", False),
-        ("see docs/errors.md?plain=1 for more", False),
-    ]:
-        if bool(question_lines(line)) != asks:
+    for line, asks_question in TERMINAL_CASES:
+        if bool(question_lines(line)) != asks_question:
             failed += 1
             print(
-                f"self-test FAIL question_lines({line!r}) should be {asks}",
+                f"self-test FAIL question_lines({line!r}) should be {asks_question}",
                 file=sys.stderr,
             )
     if failed:
         return 1
-    print(f"UX-ONE-QUESTION SELF-TEST OK ({len(SELF_TEST) + 6} cases)")
+    print(
+        f"UX-ONE-QUESTION SELF-TEST OK ({len(SELF_TEST) + len(TERMINAL_CASES)} cases)"
+    )
     return 0
 
 
