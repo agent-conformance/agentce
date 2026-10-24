@@ -24,8 +24,26 @@ another engine's real verdict over a shared directory. This check does.
   message text is deliberately not compared byte-for-byte (each engine's own JSON Schema validator
   library phrases it differently; see the python reference's "Design notes").
 
+* The reader-case pass (SPEC 8.7 report-file reader contract, item 18.60) reads
+  `spec/report/reader-cases.json`. Each engine writes its own full base report with its own `assess`
+  (an engine that refuses `--emit` with `input.emit_unsupported` writes its core outputs and gets
+  report.csv, report.junit.xml and oscal-ar.xml from Python's base). For every case and every engine it
+  copies that engine's base, applies the case's edits and runs the case's command in that engine:
+  `report --validate <dir> --json`, `readiness <dir> --json`, `sign --json <dir> --as claimant --profile
+  kms --key tools/fixtures/sign/test-key.pem`, or `diff <base>/<file> <dir>/<file> --json`. It asserts
+  the exit equals the case's; on exit 3 the key (validate's top-level `message_key`, an input error's
+  Python `error.key` or TypeScript and Java `error.message_key`) equals the case's, `names` is in a
+  problem line that names the file (validate) or in the error's text, the run changed nothing in the
+  folder (for sign: no signature written, claim.json unchanged; for readiness: no readiness file), and
+  the three engines name the same reader-contract rules at the same lines. Each engine's clean base must
+  also validate 0 in all three engines, read READY and sign with exit 0. The self-test judges the real
+  table with synthetic answers: a matching answer passes, the case with its exit flipped fails, an
+  fake engine that always answers valid fails every refusal, and so do a refusal for the wrong reason, a
+  wrong key, a refused sign that wrote a signature and engines naming different lines.
+
 Usage:
-    report_validate_parity_check.py             # needs `pnpm build` (TS) and `:assemble` (Java) run first
+    report_validate_parity_check.py                  # needs `pnpm build` (TS) and `:assemble` (Java) run first
+    report_validate_parity_check.py --reader-cases   # the reader-case pass only
     report_validate_parity_check.py --self-test
 """
 
@@ -82,33 +100,19 @@ def python_validate(report_dir: Path) -> tuple[str, int]:
 
 def typescript_validate(report_dir: Path) -> tuple[str, int]:
     """The built TypeScript engine's `report --validate` (`pnpm build` must have run first)."""
-    entry = TS_ENGINE / "dist" / "cli.js"
-    if not entry.is_file():
-        raise SystemExit(
-            f"typescript dist is not built: {entry} is missing "
-            "(run `pnpm build` in engines/typescript first)"
-        )
     return _run(
-        ["node", str(entry), "report", "--validate", str(report_dir), "--json"],
+        ["node", str(_ts_entry()), "report", "--validate", str(report_dir), "--json"],
         cwd=ROOT,
     )
 
 
 def java_validate(report_dir: Path) -> tuple[str, int]:
     """The built Java engine's `report --validate` (`./gradlew :assemble` must have run first)."""
-    jars = sorted(
-        (JAVA_ENGINE / "build" / "libs").glob("agentce-*-all.jar"),
-        key=lambda p: p.stat().st_mtime,
-    )
-    if not jars:
-        raise SystemExit(
-            "java runnable jar is not built (run `./gradlew :assemble -q` in engines/java first)"
-        )
     return _run(
         [
             "java",
             "-jar",
-            str(jars[-1]),
+            str(_java_jar()),
             "report",
             "--validate",
             str(report_dir),
@@ -903,6 +907,464 @@ def run_census_cases(tmp: Path, base: Path, failures: list[str]) -> int:
     return len(cases)
 
 
+# --- The reader-case pass (SPEC 8.7 report-file reader contract, item 18.60) ---------------------
+
+READER_CASES = ROOT / "spec" / "report" / "reader-cases.json"
+SIGN_KEY = ROOT / "tools" / "fixtures" / "sign" / "test-key.pem"
+FULL_EMIT = "md,html,oscal,sarif,pack,junit,csv,oscal_xml"
+READER_ENGINES = ("python", "typescript", "java")
+#: A reader-contract fault as every engine words it, file and message alike: the rule and its line.
+READER_MARK = re.compile(
+    r"outside the (?:JSON profile|report-file reader contract): [a-z0-9_]+ at line \d+"
+)
+
+
+def _ts_entry() -> Path:
+    entry = TS_ENGINE / "dist" / "cli.js"
+    if not entry.is_file():
+        raise SystemExit(
+            f"typescript dist is not built: {entry} is missing "
+            "(run `pnpm build` in engines/typescript first)"
+        )
+    return entry
+
+
+def _java_jar() -> Path:
+    jars = sorted(
+        (JAVA_ENGINE / "build" / "libs").glob("agentce-*-all.jar"),
+        key=lambda p: p.stat().st_mtime,
+    )
+    if not jars:
+        raise SystemExit(
+            "java runnable jar is not built (run `./gradlew :assemble -q` in engines/java first)"
+        )
+    return jars[-1]
+
+
+def engine_argv(engine: str) -> list[str]:
+    """The command that runs `engine`'s own CLI: Python's console script, the built TypeScript
+    `dist/cli.js`, the built Java runnable jar."""
+    if engine == "python":
+        return ["uv", "run", "--frozen", "--project", str(PY_ENGINE), "agentce"]
+    if engine == "typescript":
+        return ["node", str(_ts_entry())]
+    return ["java", "-jar", str(_java_jar())]
+
+
+def run_engine(engine: str, args: list[str]) -> tuple[str, int]:
+    """One engine command with `LC_ALL=C.UTF-8` and no inherited `AGENTCE_OPERATOR` or `VIRTUAL_ENV`."""
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in ("AGENTCE_OPERATOR", "VIRTUAL_ENV")
+    }
+    env["LC_ALL"] = "C.UTF-8"
+    proc = subprocess.run(
+        [*engine_argv(engine), *args],
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+        cwd=ROOT,
+        env=env,
+    )
+    return proc.stdout, proc.returncode
+
+
+#: The --emit outputs an engine that cannot write --emit yet (TypeScript and Java until 18.16b,
+#: `input.emit_unsupported`) gets from Python's full base, so every case's file is in its folder.
+EMIT_ONLY = ("report.csv", "report.junit.xml", "oscal-ar.xml")
+
+
+def build_engine_base(
+    engine: str, directory: Path, python_base: Path | None = None
+) -> Path:
+    """`engine`'s own `assess` with every `--emit` token over the quickstart project (the arguments
+    `build_base_report` gives Python's), so each case edits a folder the engine under test wrote.
+    An engine that refuses `--emit` with `input.emit_unsupported` writes its core outputs instead
+    and gets `EMIT_ONLY` copied from `python_base` (each engine's validate reads those files
+    whenever they are present)."""
+    out = directory / f"base-{engine}"
+    core = ["assess", *QUICKSTART_ARGS, "--out", str(out)]
+    stdout, code = run_engine(engine, [*core, "--emit", FULL_EMIT, "--json"])
+    if code == 3 and python_base is not None:
+        answer = answer_texts("assess", stdout)
+        if answer is not None and answer[0] == "input.emit_unsupported":
+            shutil.rmtree(out, ignore_errors=True)
+            stdout, code = run_engine(engine, core)
+            if code in (0, 1, 2):
+                for name in EMIT_ONLY:
+                    if not (out / name).exists():
+                        shutil.copyfile(python_base / name, out / name)
+    if code not in (0, 1, 2):
+        raise SystemExit(
+            f"{engine}: building the reader-case base failed (exit {code}):\n{stdout}"
+        )
+    return out
+
+
+def load_reader_cases(path: Path = READER_CASES) -> list[dict[str, Any]]:
+    cases: list[dict[str, Any]] = json.loads(path.read_text(encoding="utf-8"))["cases"]
+    return cases
+
+
+def apply_edits(data: bytes | None, edits: list[dict[str, Any]]) -> bytes | None:
+    """The case's edits applied in order to a file's bytes (None: the file does not exist); None
+    back when an edit cannot apply (no such file, or `find_hex` not in it)."""
+    for edit in edits:
+        content = bytes.fromhex(edit["hex"])
+        op = edit["op"]
+        if op == "write":
+            data = content
+            continue
+        if data is None:
+            return None
+        if op == "prepend":
+            data = content + data
+        elif op == "append":
+            data = data + content
+        else:
+            find = bytes.fromhex(edit["find_hex"])
+            if find not in data:
+                return None
+            data = data.replace(find, content, 1 if op == "replace" else -1)
+    return data
+
+
+def snapshot(directory: Path) -> dict[str, bytes | None]:
+    """Every path under `directory`, mapped to its bytes (None for a folder)."""
+    return {
+        p.relative_to(directory).as_posix(): (None if p.is_dir() else p.read_bytes())
+        for p in sorted(directory.rglob("*"))
+    }
+
+
+def changed_paths(
+    before: dict[str, bytes | None], after: dict[str, bytes | None]
+) -> list[str]:
+    return sorted(
+        path
+        for path in before.keys() | after.keys()
+        if before.get(path, b"\0absent") != after.get(path, b"\0absent")
+    )
+
+
+def reader_command(case: dict[str, Any], case_dir: Path, base: Path) -> list[str]:
+    """The argv of the case's command: `report --validate`, `readiness`, `sign` with the kms test
+    key (a clean report signs with exit 0 in every engine), or `diff` of the base's file against the
+    edited one."""
+    command = case["command"]
+    if command == "report-validate":
+        return ["report", "--validate", str(case_dir), "--json"]
+    if command == "readiness":
+        return ["readiness", str(case_dir), "--json"]
+    if command == "sign":
+        return [
+            "sign",
+            "--json",
+            str(case_dir),
+            "--as",
+            "claimant",
+            "--profile",
+            "kms",
+            "--key",
+            str(SIGN_KEY),
+        ]
+    if command == "diff":
+        return [
+            "diff",
+            str(base / case["file"]),
+            str(case_dir / case["file"]),
+            "--json",
+        ]
+    raise SystemExit(f"reader case {case['id']}: unknown command {command!r}")
+
+
+def _strings(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [s for v in value.values() for s in _strings(v)]
+    if isinstance(value, list):
+        return [s for v in value for s in _strings(v)]
+    return []
+
+
+def answer_texts(command: str, out: str) -> tuple[Any, list[str]] | None:
+    """(message key, texts) of a refusal: `report --validate`'s top-level `message_key` and problem
+    lines, or an input error's key (Python `error.key`, TypeScript and Java `error.message_key`) and
+    every text of its error object. None when the output is no `--json` envelope."""
+    try:
+        env = json.loads(out)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(env, dict):
+        return None
+    if command == "report-validate":
+        return env.get("message_key"), _strings(env.get("problems"))
+    error = env.get("error")
+    if not isinstance(error, dict):
+        return None, []
+    return error.get("key", error.get("message_key")), _strings(error)
+
+
+def judge_reader_case(
+    case: dict[str, Any], engine: str, out: str, code: int, changed: list[str]
+) -> list[str]:
+    """One engine's answer to one case against the table: exit, then on a refusal the key, the
+    `names` text in a problem line naming the file (validate) or in the error, and nothing written."""
+    where = f"reader {case['id']}: {engine}"
+    if code != case["exit"]:
+        return [
+            f"{where}: exit {code}, expected {case['exit']} ({out.strip()[:300]!r})"
+        ]
+    if code != 3:
+        return []
+    answer = answer_texts(case["command"], out)
+    if answer is None:
+        return [f"{where}: exit 3 with no --json envelope ({out.strip()[:300]!r})"]
+    key, texts = answer
+    problems: list[str] = []
+    if key != case["key"]:
+        problems.append(f"{where}: key {key!r}, expected {case['key']!r}")
+    named = [t for t in texts if case["names"] in t]
+    if not named:
+        problems.append(f"{where}: nothing names {case['names']!r}: {texts}")
+    elif case["command"] == "report-validate" and not any(
+        t.startswith(case["file"]) for t in named
+    ):
+        problems.append(
+            f"{where}: the line naming {case['names']!r} does not name {case['file']}: {named}"
+        )
+    if changed:
+        what = (
+            "signatures/ or claim.json" if case["command"] == "sign" else "the folder"
+        )
+        problems.append(
+            f"{where}: a refused {case['command']} changed {what}: {changed}"
+        )
+    return problems
+
+
+def compare_reader_marks(
+    case: dict[str, Any], outs: dict[str, tuple[str, int]]
+) -> list[str]:
+    """When every engine refused, each names the same reader-contract rules at the same lines."""
+    if any(code != 3 for _, code in outs.values()):
+        return []
+    marks = {}
+    for engine, (out, _) in outs.items():
+        answer = answer_texts(case["command"], out)
+        texts = answer[1] if answer else []
+        marks[engine] = sorted(m for t in texts for m in READER_MARK.findall(t))
+    if len({json.dumps(v) for v in marks.values()}) > 1:
+        return [
+            f"reader {case['id']}: the engines name different rules or lines: {marks}"
+        ]
+    return []
+
+
+def run_reader_case(
+    case: dict[str, Any], engine: str, base: Path, work: Path
+) -> tuple[str, int, list[str]]:
+    """Copy `engine`'s base, apply the case's edits, run its command in `engine`; (stdout, exit,
+    paths the run changed). Exit -1 when the edits do not apply to this engine's base."""
+    case_dir = work / engine / case["id"]
+    shutil.copytree(base, case_dir)
+    target = case_dir / case["file"]
+    edited = apply_edits(
+        target.read_bytes() if target.is_file() else None, case["edits"]
+    )
+    if edited is None:
+        return f"the edits do not apply to {engine}'s {case['file']}", -1, []
+    target.write_bytes(edited)
+    before = snapshot(case_dir)
+    out, code = run_engine(engine, reader_command(case, case_dir, base))
+    return out, code, changed_paths(before, snapshot(case_dir))
+
+
+def reader_happy_paths(
+    bases: dict[str, Path], work: Path, pool: ThreadPoolExecutor
+) -> list[str]:
+    """Each engine's clean base validates 0 in all three engines, reads READY and signs (exit 0)
+    in its own engine."""
+    failures: list[str] = []
+    validate = {
+        (writer, reader): pool.submit(
+            run_engine, reader, ["report", "--validate", str(base), "--json"]
+        )
+        for writer, base in bases.items()
+        for reader in READER_ENGINES
+    }
+    readiness: dict[str, tuple[Path, Any]] = {}
+    sign: dict[str, tuple[Path, Any]] = {}
+    for engine, base in bases.items():
+        for name, store in (("readiness", readiness), ("sign", sign)):
+            copy = work / engine / f"happy-{name}"
+            shutil.copytree(base, copy)
+            case = {"command": name, "file": "assertions.json"}
+            store[engine] = (
+                copy,
+                pool.submit(run_engine, engine, reader_command(case, copy, base)),
+            )
+    for (writer, reader), job in validate.items():
+        out, code = job.result()
+        if code != 0:
+            failures.append(
+                f"reader happy path: {writer}'s report validated by {reader} exit {code} ({out.strip()[:300]!r})"
+            )
+    for engine, (copy, job) in readiness.items():
+        out, code = job.result()
+        verdict = None
+        if code == 0:
+            try:
+                verdict = json.loads(out).get("verdict")
+            except (json.JSONDecodeError, AttributeError):
+                pass
+        if code != 0 or verdict != "READY":
+            failures.append(
+                f"reader happy path: {engine} readiness exit {code}, verdict {verdict!r}, expected 0 READY"
+            )
+    for engine, (copy, job) in sign.items():
+        out, code = job.result()
+        if code != 0 or not (copy / "signatures").is_dir():
+            failures.append(
+                f"reader happy path: {engine} sign exit {code}, expected 0 and a signature ({out.strip()[:300]!r})"
+            )
+    return failures
+
+
+def run_reader_cases(tmp: Path, failures: list[str]) -> int:
+    """Every spec/report/reader-cases.json case in every engine, each on a copy of the full report
+    that engine wrote; returns the number of case runs."""
+    cases = load_reader_cases()
+    work = tmp / "reader"
+    with ThreadPoolExecutor(max_workers=max(3, min(8, os.cpu_count() or 4))) as pool:
+        python_base = build_engine_base("python", tmp)
+        built = {
+            e: pool.submit(build_engine_base, e, tmp, python_base)
+            for e in READER_ENGINES
+            if e != "python"
+        }
+        bases = {"python": python_base, **{e: job.result() for e, job in built.items()}}
+        jobs = {
+            (case["id"], engine): pool.submit(
+                run_reader_case, case, engine, bases[engine], work
+            )
+            for case in cases
+            for engine in READER_ENGINES
+        }
+        failures += reader_happy_paths(bases, work, pool)
+    for case in cases:
+        outs: dict[str, tuple[str, int]] = {}
+        for engine in READER_ENGINES:
+            out, code, changed = jobs[(case["id"], engine)].result()
+            if code == -1:
+                failures.append(f"reader {case['id']}: {out}")
+                continue
+            outs[engine] = (out, code)
+            failures += judge_reader_case(case, engine, out, code, changed)
+        if len(outs) == len(READER_ENGINES):
+            failures += compare_reader_marks(case, outs)
+    return len(jobs)
+
+
+def reader_self_test(failures: list[str]) -> None:
+    """The reader pass's comparison, over the real case table and synthetic engine answers (no
+    build): an answer that matches each case passes; the same answer judged against the case with its
+    exit flipped fails; an fake engine that always answers valid fails every refusal case; a refusal
+    that changed the folder, and engines naming different lines, fail."""
+    cases = load_reader_cases()
+
+    def ideal(case: dict[str, Any]) -> tuple[str, int]:
+        if case["exit"] == 0:
+            return json.dumps({"valid": True, "problems": []}), 0
+        if case["command"] == "report-validate":
+            line = f"{case['file']}: {case['names']}"
+            body = {"valid": False, "message_key": case["key"], "problems": [line]}
+        elif case["command"] == "readiness":  # Python's envelope field names
+            body = {"error": {"key": case["key"], "cause": f"x {case['names']} y"}}
+        else:  # TypeScript and Java's
+            body = {"error": {"message_key": case["key"], "detail": case["names"]}}
+        return json.dumps(body), 3
+
+    always_valid = (json.dumps({"valid": True, "problems": []}), 0)
+    for case in cases:
+        out, code = ideal(case)
+        got = judge_reader_case(case, "ideal", out, code, [])
+        if got:
+            failures.append(f"reader judge refused a matching answer: {got}")
+        flipped = {**case, "exit": 0 if case["exit"] == 3 else 3}
+        if not judge_reader_case(flipped, "ideal", out, code, []):
+            failures.append(
+                f"reader judge missed case {case['id']} with its exit flipped"
+            )
+        if case["exit"] == 3 and not judge_reader_case(
+            case, "always-valid", *always_valid, []
+        ):
+            failures.append(
+                f"reader judge let an always-valid engine pass {case['id']}"
+            )
+    refusals = [c for c in cases if c["exit"] == 3]
+    if not refusals:
+        failures.append("the reader case table holds no refusal case")
+        return
+    sign = next((c for c in refusals if c["command"] == "sign"), refusals[0])
+    out, code = ideal(sign)
+    if not judge_reader_case(
+        sign, "ideal", out, code, ["signatures/claimant-kms.dsse.json"]
+    ):
+        failures.append("reader judge missed a refused sign that wrote a signature")
+    csv = next(c for c in refusals if c["rule"] == "csv_bare_cr")
+    side_effect = json.dumps(
+        {
+            "valid": False,
+            "message_key": csv["key"],
+            "problems": ["report.csv: missing column 'mode'"],
+        }
+    )
+    if not judge_reader_case(csv, "side-effect", side_effect, 3, []):
+        failures.append(
+            "reader judge let a refusal for the wrong reason (a missing column) pass"
+        )
+    wrong_key = {**sign, "key": "some.other_key"}
+    if not judge_reader_case(wrong_key, "ideal", out, code, []):
+        failures.append("reader judge missed a refusal under the wrong key")
+
+    def line(n: int) -> str:
+        return json.dumps(
+            {
+                "valid": False,
+                "message_key": "report.validation_failed",
+                "problems": [
+                    f"report.csv: outside the report-file reader contract: csv_bare_cr at line {n} (SPEC 8.7)"
+                ],
+            }
+        )
+
+    probe = {"id": "probe", "command": "report-validate"}
+    same = {e: (line(2), 3) for e in READER_ENGINES}
+    if compare_reader_marks(probe, same):
+        failures.append("reader mark comparison refused three identical answers")
+    if not compare_reader_marks(probe, {**same, "java": (line(3), 3)}):
+        failures.append("reader mark comparison missed engines naming different lines")
+    edits = [
+        {"op": "prepend", "hex": "efbbbf"},
+        {"op": "replace", "find_hex": "0a", "hex": "0d0a"},
+        {"op": "append", "hex": "21"},
+    ]
+    if apply_edits(b"a\nb\n", edits) != b"\xef\xbb\xbfa\r\nb\n!":
+        failures.append("apply_edits: prepend, replace and append went wrong")
+    if (
+        apply_edits(b"a\nb\n", [{"op": "replace_all", "find_hex": "0a", "hex": "0d"}])
+        != b"a\rb\r"
+    ):
+        failures.append("apply_edits: replace_all went wrong")
+    if apply_edits(b"a", [{"op": "replace", "find_hex": "7a", "hex": ""}]) is not None:
+        failures.append("apply_edits: a replace whose text is absent was applied")
+    if apply_edits(None, [{"op": "write", "hex": "7b"}]) != b"{":
+        failures.append("apply_edits: write did not create the file")
+
+
 def self_test() -> int:
     failures: list[str] = []
 
@@ -1130,12 +1592,14 @@ def self_test() -> int:
             f"census mutations packed wrongly (two in one file must split): {packed}"
         )
 
+    reader_self_test(failures)
+
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
     if not failures:
         print(
-            "report_validate_parity_check self-test: comparator, label extraction and keyword "
-            "classifiers discriminate"
+            "report_validate_parity_check self-test: comparator, label extraction, keyword "
+            "classifiers and the reader-case judge discriminate"
         )
     return 1 if failures else 0
 
@@ -1202,6 +1666,7 @@ def run_real_check() -> int:
 
         census_count = run_census_cases(tmp, base, failures)
         read_count = run_read_cases(tmp, base, failures)
+        reader_count = run_reader_cases(tmp, failures)
 
         # Case 16: a path that is not a directory refuses before any artifact is opened. Each
         # engine's own error-envelope field name differs (`error.key` in Python, `error.message_key`
@@ -1232,7 +1697,23 @@ def run_real_check() -> int:
         return 1
     print(
         f"MATCH: {len(CASES) + 1 + read_count + census_count} invocations agree across python, typescript, java "
-        f"({census_count} cover every census (schema, keyword) pair)"
+        f"({census_count} cover every census (schema, keyword) pair); {reader_count} reader-case runs "
+        "match spec/report/reader-cases.json"
+    )
+    return 0
+
+
+def run_reader_check() -> int:
+    """The reader-case pass alone."""
+    failures: list[str] = []
+    with tempfile.TemporaryDirectory(prefix="report-reader-parity-") as raw:
+        count = run_reader_cases(Path(raw), failures)
+    for failure in failures:
+        print(f"MISMATCH: {failure}", file=sys.stderr)
+    if failures:
+        return 1
+    print(
+        f"MATCH: {count} reader-case runs match spec/report/reader-cases.json in python, typescript, java"
     )
     return 0
 
@@ -1241,10 +1722,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="report_validate_parity_check", description=__doc__.split("\n")[0]
     )
-    parser.add_argument("--self-test", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--self-test", action="store_true")
+    mode.add_argument(
+        "--reader-cases",
+        action="store_true",
+        help="run only the spec/report/reader-cases.json pass",
+    )
     args = parser.parse_args(argv)
     if args.self_test:
         return self_test()
+    if args.reader_cases:
+        return run_reader_check()
     return run_real_check()
 
 
