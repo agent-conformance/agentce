@@ -78,7 +78,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "rec03-sr-input": {
@@ -158,7 +158,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "rec03-no-inputs": {
@@ -214,7 +214,7 @@
         "failing": [
           "d1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rec03-empty-inputs": {
@@ -271,7 +271,7 @@
         "failing": [
           "d1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rec03-input-dangling": {
@@ -354,7 +354,7 @@
         "failing": [
           "d1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rec03-input-bare": {
@@ -436,7 +436,7 @@
         "failing": [
           "d1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rec03-input-quarantined": {
@@ -518,7 +518,7 @@
         "failing": [
           "d1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rec03-input-not-string": {
@@ -598,7 +598,7 @@
       "expected": {
         "outcome": "insufficient_evidence",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "rec03-no-modelcall": {
@@ -655,7 +655,7 @@
       "expected": {
         "outcome": "insufficient_evidence",
         "failing": [],
-        "exit": null
+        "exit": 1
       }
     },
     "rec03-order-reversed": {
@@ -735,7 +735,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "rec03-one-of-two": {
@@ -835,7 +835,7 @@
         "failing": [
           "d2"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rec03-not-consequential": {
@@ -889,7 +889,7 @@
       "expected": {
         "outcome": "not_applicable",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "dat01-resource-read": {
@@ -969,7 +969,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "dat01-memory-read": {
@@ -1048,7 +1048,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "dat01-held-beside-dangling": {
@@ -1129,7 +1129,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "dat01-modelcall-only": {
@@ -1188,7 +1188,7 @@
         "failing": [
           "d1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "dat01-resource-write": {
@@ -1270,7 +1270,7 @@
         "failing": [
           "d1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "dat01-unnamed-read": {
@@ -1352,7 +1352,7 @@
         "failing": [
           "d1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "dat01-no-inputs": {
@@ -1431,7 +1431,7 @@
         "failing": [
           "d1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "dat01-dangling": {
@@ -1490,7 +1490,7 @@
         "failing": [
           "d1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "dat01-bare": {
@@ -1572,7 +1572,7 @@
         "failing": [
           "d1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "dat01-read-quarantined": {
@@ -1654,7 +1654,7 @@
         "failing": [
           "d1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "dat01-no-modelcall": {
@@ -1711,7 +1711,7 @@
       "expected": {
         "outcome": "insufficient_evidence",
         "failing": [],
-        "exit": null
+        "exit": 1
       }
     },
     "dat01-order-reversed": {
@@ -1791,7 +1791,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "dat01-one-of-two": {
@@ -1894,7 +1894,7 @@
         "failing": [
           "d2"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "dat01-not-consequential": {
@@ -1948,7 +1948,7 @@
       "expected": {
         "outcome": "not_applicable",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "trn02-sole": {
@@ -1980,7 +1980,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 1
       }
     },
     "trn02-recommendation": {
@@ -2012,7 +2012,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 1
       }
     },
     "trn02-assist": {
@@ -2044,7 +2044,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 1
       }
     },
     "trn02-no-role": {
@@ -2077,7 +2077,7 @@
         "failing": [
           "d1"
         ],
-        "exit": null
+        "exit": 1
       }
     },
     "trn02-no-agent": {
@@ -2108,7 +2108,7 @@
         "failing": [
           "d1"
         ],
-        "exit": null
+        "exit": 1
       }
     },
     "trn02-role-invalid": {
@@ -2140,7 +2140,7 @@
       "expected": {
         "outcome": "insufficient_evidence",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "trn02-one-of-two": {
@@ -2192,7 +2192,7 @@
         "failing": [
           "d2"
         ],
-        "exit": null
+        "exit": 1
       }
     },
     "trn02-not-consequential": {
@@ -2223,7 +2223,7 @@
       "expected": {
         "outcome": "not_applicable",
         "failing": [],
-        "exit": null
+        "exit": 3
       }
     },
     "rec01-no-role": {
@@ -2254,7 +2254,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 1
       }
     },
     "rec01-no-agent": {
@@ -2285,7 +2285,7 @@
         "failing": [
           "d1"
         ],
-        "exit": null
+        "exit": 1
       }
     },
     "int04-anchored": {
@@ -2346,7 +2346,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "int04-signed": {
@@ -2409,7 +2409,7 @@
       "expected": {
         "outcome": "partial",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "int04-chained": {
@@ -2474,7 +2474,7 @@
         "failing": [
           "t1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "int04-no-integrity": {
@@ -2539,7 +2539,7 @@
         "failing": [
           "t1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "int04-independent-chained": {
@@ -2602,7 +2602,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "int04-independent-none": {
@@ -2667,7 +2667,7 @@
         "failing": [
           "t1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "int04-self-report": {
@@ -2730,7 +2730,7 @@
         "failing": [
           "t1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "int04-order-reversed": {
@@ -2791,7 +2791,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "int04-one-of-two": {
@@ -2886,7 +2886,7 @@
         "failing": [
           "t2"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "int04-not-consequential": {
@@ -2947,7 +2947,7 @@
       "expected": {
         "outcome": "not_applicable",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "rob01-classified": {
@@ -3008,7 +3008,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "rob01-independent": {
@@ -3069,7 +3069,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "rob01-no-effect-class": {
@@ -3131,7 +3131,7 @@
         "failing": [
           "t1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rob01-effect-invalid": {
@@ -3192,7 +3192,7 @@
       "expected": {
         "outcome": "insufficient_evidence",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "rob01-self-report": {
@@ -3255,7 +3255,7 @@
         "failing": [
           "t1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rob01-chained-classified": {
@@ -3318,7 +3318,7 @@
       "expected": {
         "outcome": "partial",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "rob01-order-reversed": {
@@ -3379,7 +3379,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "rob01-one-of-two": {
@@ -3471,7 +3471,7 @@
         "failing": [
           "t2"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rob01-not-consequential": {
@@ -3531,7 +3531,7 @@
       "expected": {
         "outcome": "not_applicable",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "rob04-in-force": {
@@ -3628,7 +3628,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "rob04-expired": {
@@ -3727,7 +3727,7 @@
         "failing": [
           "t1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rob04-expires-at-call": {
@@ -3826,7 +3826,7 @@
         "failing": [
           "t1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rob04-expires-offset-before": {
@@ -3925,7 +3925,7 @@
         "failing": [
           "t1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rob04-expires-offset-after": {
@@ -4022,7 +4022,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "rob04-no-expires": {
@@ -4120,7 +4120,7 @@
         "failing": [
           "t1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rob04-expires-unplaceable": {
@@ -4219,7 +4219,7 @@
         "failing": [
           "t1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rob04-unverified": {
@@ -4318,7 +4318,7 @@
         "failing": [
           "t1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rob04-dangling": {
@@ -4417,7 +4417,7 @@
         "failing": [
           "t1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rob04-bare": {
@@ -4516,7 +4516,7 @@
         "failing": [
           "t1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rob04-wrong-type": {
@@ -4615,7 +4615,7 @@
         "failing": [
           "t1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rob04-no-delegation": {
@@ -4713,47 +4713,12 @@
         "failing": [
           "t1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rob04-issued-after-call": {
       "control": "ROB-04",
       "events": [
-        {
-          "specversion": "1.0",
-          "id": "g1",
-          "source": "urn:src:enforcement_point",
-          "subject": "spiffe://corp/agents/eu-cluster4",
-          "type": "org.agent-conformance.evidence.DelegationIssued.v1",
-          "datacontenttype": "application/ld+json",
-          "agentcesourceclass": "enforcement_point",
-          "time": "2026-01-11T00:00:00Z",
-          "data": {
-            "@context": "https://agent-conformance.org/contexts/evidence/v1",
-            "@type": "DelegationIssued",
-            "agent": {
-              "id": "spiffe://corp/agents/eu-cluster4"
-            },
-            "token_ref": "jti-1",
-            "issuer": "idp",
-            "subject_principal": "spiffe://corp/agents/eu-cluster4",
-            "actor_principal": "spiffe://corp/agents/eu-cluster4",
-            "chain": [
-              {
-                "id": "user:alice",
-                "kind": "human"
-              }
-            ],
-            "scope_granted": [
-              "loans:write"
-            ],
-            "expires": "2026-01-12T00:00:00Z",
-            "verification": {
-              "status": "verified",
-              "method": "rfc8693"
-            }
-          }
-        },
         {
           "specversion": "1.0",
           "id": "d1",
@@ -4802,6 +4767,41 @@
               "delegation": "agentce:event/g1"
             }
           }
+        },
+        {
+          "specversion": "1.0",
+          "id": "g1",
+          "source": "urn:src:enforcement_point",
+          "subject": "spiffe://corp/agents/eu-cluster4",
+          "type": "org.agent-conformance.evidence.DelegationIssued.v1",
+          "datacontenttype": "application/ld+json",
+          "agentcesourceclass": "enforcement_point",
+          "time": "2026-01-11T00:00:00Z",
+          "data": {
+            "@context": "https://agent-conformance.org/contexts/evidence/v1",
+            "@type": "DelegationIssued",
+            "agent": {
+              "id": "spiffe://corp/agents/eu-cluster4"
+            },
+            "token_ref": "jti-1",
+            "issuer": "idp",
+            "subject_principal": "spiffe://corp/agents/eu-cluster4",
+            "actor_principal": "spiffe://corp/agents/eu-cluster4",
+            "chain": [
+              {
+                "id": "user:alice",
+                "kind": "human"
+              }
+            ],
+            "scope_granted": [
+              "loans:write"
+            ],
+            "expires": "2026-01-12T00:00:00Z",
+            "verification": {
+              "status": "verified",
+              "method": "rfc8693"
+            }
+          }
         }
       ],
       "profile": "applicability.yaml",
@@ -4812,7 +4812,7 @@
         "failing": [
           "t1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rob04-sr-delegation": {
@@ -4909,7 +4909,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "rob04-order-reversed": {
@@ -5006,7 +5006,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "rob04-one-of-two": {
@@ -5171,7 +5171,7 @@
         "failing": [
           "t2"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "rob04-not-consequential": {
@@ -5268,7 +5268,7 @@
       "expected": {
         "outcome": "not_applicable",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "ovs04-expired": {
@@ -5365,7 +5365,7 @@
       "expected": {
         "outcome": "conformant",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "ovs04-unverified": {
@@ -5464,7 +5464,7 @@
         "failing": [
           "t1"
         ],
-        "exit": null
+        "exit": 2
       }
     },
     "dat02-not-assessed": {
@@ -5544,7 +5544,7 @@
       "expected": {
         "outcome": "not_assessed",
         "failing": [],
-        "exit": null
+        "exit": 2
       }
     },
     "doc04-not-assessed": {
@@ -5576,7 +5576,7 @@
       "expected": {
         "outcome": "not_assessed",
         "failing": [],
-        "exit": null
+        "exit": 1
       }
     }
   }

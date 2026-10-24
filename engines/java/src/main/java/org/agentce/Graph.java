@@ -128,6 +128,12 @@ public final class Graph {
     /** The effect classes SPEC §7.7.4 holds to CND-02 whatever the task scope marks (ruling Q6). */
     private static final Set<String> HIGH_EFFECT =
             Set.of("irreversible", "external_communication", "spend", "physical");
+    /** Decision.ai_role, ToolCall.effect_class, and the integrity strengths an enforcement point is verified at (SPEC
+     * §6.2.3, §6.6; TRN-02, ROB-01, INT-04). */
+    private static final Set<String> AI_ROLES = Set.of("sole", "recommendation", "assist");
+    private static final Set<String> EFFECT_CLASSES = Set.of(
+            "read", "write", "irreversible", "external_communication", "spend", "physical");
+    private static final Set<String> VERIFIABLE_STRENGTHS = Set.of("source_signed", "export_anchored");
     /** The records the SPEC §10.4 human-actor rule applies to. */
     private static final Set<String> OVERSIGHT_TYPES = Set.of("ApprovalDecided", "Override", "Interrupt");
     /** The Incident members that record a response after detection (SPEC §6.2; ROB-07). */
@@ -1795,8 +1801,10 @@ public final class Graph {
         private void materialise(List<JsonNode> events) {
             Map<String, Boolean> byHuman = mapOversight(events);
             Set<String> incidentDecisions = incidentDecisions(events);
+            Map<String, JsonNode> held = new HashMap<>();
             Map<String, String> heldTypes = new HashMap<>();
             for (JsonNode event : events) {
+                held.put(Iri.eventIri(event.get("id").asText()), event);
                 heldTypes.put(Iri.eventIri(event.get("id").asText()), ptype(event));
             }
             Gates gates = new Gates(events, this::ptype);
@@ -1811,6 +1819,7 @@ public final class Graph {
                 if ("ToolCall".equals(ptype)) {
                     executesConsequential(node, refsOf(event));
                     securityRefsResolve(node, refsOf(event), heldTypes);
+                    callRecord(node, event, held);
                 }
                 if ("ToolCall".equals(ptype) || "Incident".equals(ptype)) {
                     literal(node, "agentce:linkedRecordsResolve", !unresolved.contains(node));
@@ -1823,6 +1832,7 @@ public final class Graph {
                             incidentDecisions == null || incidentDecisions.contains(node));
                     riskReviewed(node, refsOf(event), gates.policies.keySet());
                     decisionRecord(node, data, gates);
+                    decisionInputs(node, data, held);
                 }
                 if ("Override".equals(ptype) || "Interrupt".equals(ptype)) {
                     intervention(node, ptype, event, byHuman.get(node));
@@ -2234,14 +2244,68 @@ public final class Graph {
         }
 
         private void chainVerified(String node, JsonNode data) {
+            literal(node, "agentce:chainVerified", delegationVerified(data));
+        }
+
+        /** A DelegationIssued's {@code agentce:chainVerified} (SPEC §6.3): its verification status, unless it records
+         * {@code chain_verified} itself. */
+        private static boolean delegationVerified(JsonNode data) {
+            if (data.has("chain_verified")) {
+                return truthy(data.get("chain_verified"));
+            }
             JsonNode verification = data.get("verification");
-            boolean verified = verification != null
+            return verification != null
                     && verification.isObject()
                     && "verified".equals(str(verification.get("status")));
-            if (data.has("chain_verified")) {
-                verified = truthy(data.get("chain_verified"));
+        }
+
+        /** REC-03: every input is a held record, named by its graph IRI (SPEC §6.2.3 Ref); DAT-01: one of them is a
+         * data read (a ResourceAccess read or a MemoryRead); TRN-02: the AI system's role in the decision (18.37g). */
+        private void decisionInputs(String node, JsonNode data, Map<String, JsonNode> held) {
+            JsonNode inputs = data.get("inputs");
+            List<JsonNode> records = new ArrayList<>();
+            if (inputs != null && inputs.isArray()) {
+                for (JsonNode name : inputs) {
+                    records.add(name.isTextual() ? held.get(name.textValue()) : null);
+                }
             }
-            store.addLiteral(node, "agentce:chainVerified", verified ? "true" : "false", BOOL);
+            literal(node, "agentce:inputsRecorded", !records.isEmpty() && !records.contains(null));
+            literal(node, "agentce:dataConsumedRecorded",
+                    records.stream().anyMatch(r -> r != null && dataRead(r)));
+            literal(node, "agentce:aiRoleRecorded", isOneOf(data.get("ai_role"), AI_ROLES));
+        }
+
+        private boolean dataRead(JsonNode event) {
+            String ptype = ptype(event);
+            return "MemoryRead".equals(ptype)
+                    || ("ResourceAccess".equals(ptype) && "read".equals(str(dataOf(event).get("operation"))));
+        }
+
+        /** INT-04: an integrity block backs the call's class, at a strength SPEC §6.6 verifies an enforcement point at;
+         * ROB-01: the call's effect is classified; ROB-04: its delegation is held, verified, issued at or before the
+         * call and expiring after it, compared as instants (SPEC §6.7, RFC 7519 §4.1.4) (18.37g). */
+        private void callRecord(String node, JsonNode event, Map<String, JsonNode> held) {
+            JsonNode data = dataOf(event);
+            JsonNode integrity = data.get("integrity");
+            String source = str(event.get("agentcesourceclass"));
+            literal(node, "agentce:classCorroborated", integrity != null && integrity.isObject()
+                    && ("independent_system".equals(source)
+                            || ("enforcement_point".equals(source)
+                                    && isOneOf(integrity.get("strength"), VERIFIABLE_STRENGTHS))));
+            literal(node, "agentce:effectClassified", isOneOf(data.get("effect_class"), EFFECT_CLASSES));
+            String ref = str(refsOf(event).get("delegation"));
+            JsonNode grant = ref == null ? null : held.get(ref);
+            String call = Objects.requireNonNullElse(str(event.get("time")), "");
+            boolean inForce = false;
+            if (grant != null && "DelegationIssued".equals(ptype(grant)) && delegationVerified(dataOf(grant))) {
+                String expires = str(dataOf(grant).get("expires"));
+                Integer issued = Structural.compareInstants(
+                        Objects.requireNonNullElse(str(grant.get("time")), ""), call);
+                inForce = expires != null
+                        && Integer.valueOf(1).equals(Structural.compareInstants(expires, call))
+                        && issued != null && issued <= 0;
+            }
+            literal(node, "agentce:delegationInForce", inForce);
         }
 
         private void executesConsequential(String node, JsonNode refs) {

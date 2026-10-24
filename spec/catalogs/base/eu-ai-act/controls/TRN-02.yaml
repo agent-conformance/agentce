@@ -1,6 +1,6 @@
 id: TRN-02
 version: "2026.09"
-title: Every consequential decision records the agent that made it
+title: Every consequential decision records the agent that made it and its role in the decision
 crosswalk:
   - {framework: eu-ai-act, clause: "Art. 86", relation: implements, verified_against_text: false}
 applicability:
@@ -14,6 +14,7 @@ evaluation:
   shape: shapes/TRN-02.ttl
 expectations:
   - {id: S1, text: "Every consequential decision records the agent that made it."}
+  - {id: S2, text: "Every consequential decision records the role of the AI system in it: sole, recommendation or assist."}
 severity: high
 evidence_strength: strong
 tolerance: {kind: count, max: 0}

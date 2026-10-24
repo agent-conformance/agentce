@@ -138,6 +138,12 @@ _OVERSIGHT_TYPES: frozenset[str] = frozenset(
     {"ApprovalDecided", "Override", "Interrupt"}
 )
 
+#: Decision.ai_role, ToolCall.effect_class, and the integrity strengths an enforcement point is verified at (SPEC §6.2.3,
+#: §6.6; TRN-02, ROB-01, INT-04).
+_AI_ROLES: frozenset[str] = frozenset({"sole", "recommendation", "assist"})
+_EFFECT_CLASSES: frozenset[str] = _HIGH_EFFECT | {"read", "write"}
+_VERIFIABLE_STRENGTHS: frozenset[str] = frozenset({"source_signed", "export_anchored"})
+
 #: The Incident members that record a response after detection (SPEC §6.2; ROB-07).
 _INCIDENT_RESPONSES: tuple[str, ...] = (
     "causal_assessment_at",
@@ -444,6 +450,15 @@ class _Gates:
                 return None
             names.add(authorization)
         return [self.policies[n] for n in sorted(names)] or None
+
+
+def _delegation_verified(data: dict[str, Any]) -> bool:
+    """A DelegationIssued's ``agentce:chainVerified`` (SPEC §6.3): its verification status, unless it records
+    ``chain_verified`` itself."""
+    if "chain_verified" in data:
+        return bool(data["chain_verified"])
+    verification = data.get("verification")
+    return isinstance(verification, dict) and verification.get("status") == "verified"
 
 
 def _names_policy(pd: dict[str, Any]) -> bool:
@@ -1477,7 +1492,8 @@ class _Builder:
         by_human = self._map_oversight(events)
         incident_decisions = self._incident_decisions(events)
         gates = _Gates(events, self._ptype)
-        held_types = {event_iri(str(e["id"])): self._ptype(e) for e in events}
+        held = {event_iri(str(e["id"])): e for e in events}
+        held_types = {node: self._ptype(e) for node, e in held.items()}
         unresolved = self._unresolved_links(events)
         for event in events:
             node = event_iri(str(event["id"]))
@@ -1488,6 +1504,7 @@ class _Builder:
             if ptype == "ToolCall":
                 self._executes_consequential(node, _refs(event))
                 self._security_refs_resolve(node, _refs(event), held_types)
+                self._call_record(node, event, held)
             if ptype in ("ToolCall", "Incident"):
                 self._literal(
                     node, "agentce:linkedRecordsResolve", node not in unresolved
@@ -1503,6 +1520,7 @@ class _Builder:
                 )
                 self._risk_reviewed(node, _refs(event), gates.policies.keys())
                 self._decision_record(node, data, gates)
+                self._decision_inputs(node, data, held)
             if ptype in ("Override", "Interrupt"):
                 self._intervention(node, ptype, event, by_human[node])
             if ptype == "Incident":
@@ -1787,6 +1805,77 @@ class _Builder:
             ),
         )
 
+    def _decision_inputs(
+        self, node: str, data: dict[str, Any], held: dict[str, dict[str, Any]]
+    ) -> None:
+        """REC-03: every input is a held record, named by its graph IRI (SPEC §6.2.3 Ref); DAT-01: one of them is a
+        data read (a ResourceAccess read or a MemoryRead); TRN-02: the AI system's role in the decision (18.37g)."""
+        inputs = data.get("inputs")
+        records = [
+            held.get(name) if isinstance(name, str) else None
+            for name in (inputs if isinstance(inputs, list) else [])
+        ]
+        self._literal(
+            node,
+            "agentce:inputsRecorded",
+            bool(records) and all(r is not None for r in records),
+        )
+        self._literal(
+            node,
+            "agentce:dataConsumedRecorded",
+            any(r is not None and self._data_read(r) for r in records),
+        )
+        self._literal(
+            node, "agentce:aiRoleRecorded", _is_one_of(data.get("ai_role"), _AI_ROLES)
+        )
+
+    def _data_read(self, event: dict[str, Any]) -> bool:
+        ptype = self._ptype(event)
+        return ptype == "MemoryRead" or (
+            ptype == "ResourceAccess" and _data(event).get("operation") == "read"
+        )
+
+    def _call_record(
+        self, node: str, event: dict[str, Any], held: dict[str, dict[str, Any]]
+    ) -> None:
+        """INT-04: an integrity block backs the call's class, at a strength SPEC §6.6 verifies an enforcement point at;
+        ROB-01: the call's effect is classified; ROB-04: its delegation is held, verified, issued at or before the call
+        and expiring after it, compared as instants (SPEC §6.7, RFC 7519 §4.1.4) (18.37g)."""
+        data = _data(event)
+        integrity = data.get("integrity")
+        source = event.get("agentcesourceclass")
+        self._literal(
+            node,
+            "agentce:classCorroborated",
+            isinstance(integrity, dict)
+            and (
+                source == "independent_system"
+                or (
+                    source == "enforcement_point"
+                    and _is_one_of(integrity.get("strength"), _VERIFIABLE_STRENGTHS)
+                )
+            ),
+        )
+        self._literal(
+            node,
+            "agentce:effectClassified",
+            _is_one_of(data.get("effect_class"), _EFFECT_CLASSES),
+        )
+        ref = _refs(event).get("delegation")
+        grant = held.get(ref) if isinstance(ref, str) else None
+        call = str(event.get("time", ""))
+        expires = _data(grant).get("expires") if grant is not None else None
+        self._literal(
+            node,
+            "agentce:delegationInForce",
+            grant is not None
+            and self._ptype(grant) == "DelegationIssued"
+            and _delegation_verified(_data(grant))
+            and isinstance(expires, str)
+            and compare_instants(expires, call) == 1
+            and compare_instants(str(grant.get("time", "")), call) in (-1, 0),
+        )
+
     def _oversight_coverage(self, node: str, data: dict[str, Any]) -> None:
         """OVS-08 (Art. 14(5)): enough distinct human approvers -- two when the decision's observed
         or domain-declared oversight modality is ``dual_control``, otherwise one."""
@@ -1831,15 +1920,7 @@ class _Builder:
                 self.dangling_nodes.add(node)
 
     def _chain_verified(self, node: str, data: dict[str, Any]) -> None:
-        verification = data.get("verification")
-        verified = (
-            isinstance(verification, dict) and verification.get("status") == "verified"
-        )
-        if "chain_verified" in data:
-            verified = bool(data["chain_verified"])
-        self.store.add_literal(
-            node, "agentce:chainVerified", "true" if verified else "false", BOOL
-        )
+        self._literal(node, "agentce:chainVerified", _delegation_verified(data))
 
     def _executes_consequential(self, node: str, refs: dict[str, Any]) -> None:
         decision = self._held_decision(refs.get("decision"))

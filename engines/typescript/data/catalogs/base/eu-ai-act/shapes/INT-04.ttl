@@ -5,4 +5,5 @@
 agentce:INT-04-Shape a sh:NodeShape ;
   sh:targetClass agentce:ToolCall ;
   agentce:targetWhere [ agentce:executesConsequential true ] ;
-  sh:property [ sh:path agentce:sourceClass ; sh:in ( agentce:enforcement_point agentce:independent_system ) ; sh:name "S1" ] .
+  sh:property [ sh:path agentce:sourceClass ; sh:in ( agentce:enforcement_point agentce:independent_system ) ; sh:name "S1" ] ;
+  sh:property [ sh:path agentce:classCorroborated ; sh:hasValue true ; sh:name "S2" ] .

@@ -4,4 +4,4 @@
 
 agentce:REC-03-Shape a sh:NodeShape ;
   sh:targetClass agentce:ConsequentialDecision ;
-  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name "S1" ] .
+  sh:property [ sh:path agentce:inputsRecorded ; sh:hasValue true ; sh:name "S1" ] .

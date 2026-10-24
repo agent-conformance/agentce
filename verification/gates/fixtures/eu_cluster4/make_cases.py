@@ -174,8 +174,9 @@ case("rob04-dangling", "ROB-04", [dl(), dec(), delegated(g=ref("zz"))], NC, ["t1
 case("rob04-bare", "ROB-04", [dl(), dec(), delegated(g="g1")], NC, ["t1"])
 case("rob04-wrong-type", "ROB-04", [dl(), dec(), delegated(g=ref("d1"))], NC, ["t1"])
 case("rob04-no-delegation", "ROB-04", [dl(), dec(), tc()], NC, ["t1"])
-# A delegation issued after the call did not cover it (SPEC 6.2.1: the event time is the issuance).
-case("rob04-issued-after-call", "ROB-04", [dl(at=LATER, expires="2026-01-12T00:00:00Z"), dec(), delegated()], NC, ["t1"])
+# A delegation issued after the call did not cover it (SPEC 6.2.1: the event time is the issuance); it comes last so
+# its stream stays in time order.
+case("rob04-issued-after-call", "ROB-04", [dec(), delegated(), dl(at=LATER, expires="2026-01-12T00:00:00Z")], NC, ["t1"])
 case("rob04-sr-delegation", "ROB-04", [dl(cls="self_report"), dec(), delegated()], CF)
 case("rob04-order-reversed", "ROB-04", [delegated(), dec(), dl()], CF)
 case("rob04-one-of-two", "ROB-04", [dl(), dl("g2", expires=EARLIER), dec(), delegated(), delegated("t2", g=ref("g2"))], NC,

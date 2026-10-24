@@ -439,8 +439,22 @@ const INTERRUPT_STOPS = new Set(["halted", "paused"]);
 const INTERRUPT_MECHANISMS = new Set(["stop_button", "kill_switch", "circuit_breaker", "manual"]);
 /** The stream classes an identity-provider login record must come from (SPEC §6.2 ApprovalDecided.session_ref, §10.4). */
 const LOGIN_CLASSES = new Set(["independent_system", "enforcement_point"]);
+/** A DelegationIssued's `agentce:chainVerified` (SPEC §6.3): its verification status, unless it records
+ * `chain_verified` itself. */
+function delegationVerified(data: Record<string, unknown>): boolean {
+  if ("chain_verified" in data) {
+    return Boolean(data.chain_verified);
+  }
+  const verification = data.verification;
+  return isRecord(verification) && verification.status === "verified";
+}
 /** The effect classes SPEC §7.7.4 holds to CND-02 whatever the task scope marks (ruling Q6). */
 const HIGH_EFFECT = new Set(["irreversible", "external_communication", "spend", "physical"]);
+/** Decision.ai_role, ToolCall.effect_class, and the integrity strengths an enforcement point is verified at (SPEC §6.2.3,
+ * §6.6; TRN-02, ROB-01, INT-04). */
+const AI_ROLES = new Set(["sole", "recommendation", "assist"]);
+const EFFECT_CLASSES = new Set([...HIGH_EFFECT, "read", "write"]);
+const VERIFIABLE_STRENGTHS = new Set(["source_signed", "export_anchored"]);
 /** The records the SPEC §10.4 human-actor rule applies to. */
 const OVERSIGHT_TYPES = new Set(["ApprovalDecided", "Override", "Interrupt"]);
 /** The Incident members that record a response after detection (SPEC §6.2; ROB-07). */
@@ -1670,7 +1684,8 @@ class Builder {
   private materialise(events: Event[]): void {
     const byHuman = this.mapOversight(events);
     const incidentDecisions = this.incidentDecisions(events);
-    const heldTypes = new Map(events.map((e) => [eventIri(String(e.id)), this.ptype(e)]));
+    const held = new Map(events.map((e) => [eventIri(String(e.id)), e]));
+    const heldTypes = new Map([...held].map(([node, e]) => [node, this.ptype(e)]));
     const gates = new Gates(events, (e) => this.ptype(e));
     const unresolved = this.unresolvedLinks(events);
     for (const event of events) {
@@ -1683,6 +1698,7 @@ class Builder {
       if (ptype === "ToolCall") {
         this.executesConsequential(node, refsOf(event));
         this.securityRefsResolve(node, refsOf(event), heldTypes);
+        this.callRecord(node, event, held);
       }
       if (ptype === "ToolCall" || ptype === "Incident") {
         this.literal(node, "agentce:linkedRecordsResolve", !unresolved.has(node));
@@ -1698,6 +1714,7 @@ class Builder {
         );
         this.riskReviewed(node, refsOf(event), gates.policies);
         this.decisionRecord(node, data, gates);
+        this.decisionInputs(node, data, held);
       }
       if (ptype === "Override" || ptype === "Interrupt") {
         this.intervention(node, ptype, event, byHuman.get(node) === true);
@@ -2148,12 +2165,68 @@ class Builder {
   }
 
   private chainVerified(node: string, data: Record<string, unknown>): void {
-    const verification = data.verification;
-    let verified = isRecord(verification) && verification.status === "verified";
-    if ("chain_verified" in data) {
-      verified = Boolean(data.chain_verified);
-    }
-    this.store.addLiteral(node, "agentce:chainVerified", verified ? "true" : "false", BOOL);
+    this.literal(node, "agentce:chainVerified", delegationVerified(data));
+  }
+
+  /** REC-03: every input is a held record, named by its graph IRI (SPEC §6.2.3 Ref); DAT-01: one of them is a data read
+   * (a ResourceAccess read or a MemoryRead); TRN-02: the AI system's role in the decision (18.37g). */
+  private decisionInputs(
+    node: string,
+    data: Record<string, unknown>,
+    held: Map<string, Event>,
+  ): void {
+    const inputs = Array.isArray(data.inputs) ? (data.inputs as unknown[]) : [];
+    const records = inputs.map((name) => (typeof name === "string" ? held.get(name) : undefined));
+    this.literal(
+      node,
+      "agentce:inputsRecorded",
+      records.length > 0 && records.every((r) => r !== undefined),
+    );
+    this.literal(
+      node,
+      "agentce:dataConsumedRecorded",
+      records.some((r) => r !== undefined && this.dataRead(r)),
+    );
+    this.literal(node, "agentce:aiRoleRecorded", isOneOf(data.ai_role, AI_ROLES));
+  }
+
+  private dataRead(event: Event): boolean {
+    const ptype = this.ptype(event);
+    return (
+      ptype === "MemoryRead" || (ptype === "ResourceAccess" && dataOf(event).operation === "read")
+    );
+  }
+
+  /** INT-04: an integrity block backs the call's class, at a strength SPEC §6.6 verifies an enforcement point at;
+   * ROB-01: the call's effect is classified; ROB-04: its delegation is held, verified, issued at or before the call and
+   * expiring after it, compared as instants (SPEC §6.7, RFC 7519 §4.1.4) (18.37g). */
+  private callRecord(node: string, event: Event, held: Map<string, Event>): void {
+    const data = dataOf(event);
+    const integrity = data.integrity;
+    const source = event.agentcesourceclass;
+    this.literal(
+      node,
+      "agentce:classCorroborated",
+      isRecord(integrity) &&
+        (source === "independent_system" ||
+          (source === "enforcement_point" && isOneOf(integrity.strength, VERIFIABLE_STRENGTHS))),
+    );
+    this.literal(node, "agentce:effectClassified", isOneOf(data.effect_class, EFFECT_CLASSES));
+    const ref = refsOf(event).delegation;
+    const grant = typeof ref === "string" ? held.get(ref) : undefined;
+    const call = String(event.time ?? "");
+    const expires = grant === undefined ? undefined : dataOf(grant).expires;
+    const issued = grant === undefined ? null : compareInstants(String(grant.time ?? ""), call);
+    this.literal(
+      node,
+      "agentce:delegationInForce",
+      grant !== undefined &&
+        this.ptype(grant) === "DelegationIssued" &&
+        delegationVerified(dataOf(grant)) &&
+        typeof expires === "string" &&
+        compareInstants(expires, call) === 1 &&
+        (issued === -1 || issued === 0),
+    );
   }
 
   private executesConsequential(node: string, refs: Record<string, unknown>): void {

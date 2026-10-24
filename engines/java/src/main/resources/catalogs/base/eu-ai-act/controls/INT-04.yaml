@@ -15,6 +15,7 @@ evaluation:
   shape: shapes/INT-04.ttl
 expectations:
   - {id: S1, text: "Consequential tool calls carry a corroborated source class."}
+  - {id: S2, text: "An enforcement-point call carries an integrity block at a strength that can be verified (source_signed or export_anchored); an independent-system call carries an integrity block."}
 severity: high
 evidence_strength: strong
 tolerance: {kind: count, max: 0}

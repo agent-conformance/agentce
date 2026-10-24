@@ -5,4 +5,4 @@
 agentce:ROB-04-Shape a sh:NodeShape ;
   sh:targetClass agentce:ToolCall ;
   agentce:targetWhere [ agentce:executesConsequential true ] ;
-  sh:property [ sh:path ( agentce:delegatedVia agentce:chainVerified ) ; sh:hasValue true ; sh:name "S1" ] .
+  sh:property [ sh:path agentce:delegationInForce ; sh:hasValue true ; sh:name "S1" ] .

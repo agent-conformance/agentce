@@ -160,6 +160,24 @@ agentce:inDisclosureScope a owl:DatatypeProperty ; rdfs:label "in disclosure sco
 agentce:aiInteractionDisclosed a owl:DatatypeProperty ; rdfs:label "AI interaction disclosed" ;
   rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
   rdfs:comment "Whether an ai_interaction Disclosure in the decision's session was delivered at or before the decision's time, compared as instants." .
+agentce:inputsRecorded a owl:DatatypeProperty ; rdfs:label "inputs recorded" ;
+  rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether the decision lists its inputs and every one is the graph IRI of a held record." .
+agentce:dataConsumedRecorded a owl:DatatypeProperty ; rdfs:label "data consumed recorded" ;
+  rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether one of the decision's inputs is the graph IRI of a held MemoryRead or of a held ResourceAccess whose operation is read." .
+agentce:aiRoleRecorded a owl:DatatypeProperty ; rdfs:label "AI role recorded" ;
+  rdfs:domain agentce:Decision ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether the decision records the AI system's role in it: sole, recommendation or assist." .
+agentce:classCorroborated a owl:DatatypeProperty ; rdfs:label "class corroborated" ;
+  rdfs:domain agentce:ToolCall ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether an integrity block backs the call's source class: on an enforcement_point call at strength source_signed or export_anchored, on an independent_system call at any strength; false on any other class." .
+agentce:effectClassified a owl:DatatypeProperty ; rdfs:label "effect classified" ;
+  rdfs:domain agentce:ToolCall ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether the call records its effect class: read, write, irreversible, external_communication, spend or physical." .
+agentce:delegationInForce a owl:DatatypeProperty ; rdfs:label "delegation in force" ;
+  rdfs:domain agentce:ToolCall ; rdfs:range xsd:boolean ;
+  rdfs:comment "Whether the call's delegation reference is the graph IRI of a held, verified DelegationIssued whose time is at or before the call's and whose expires is after it, compared as instants." .
 agentce:securityRefsResolve a owl:DatatypeProperty ; rdfs:label "security references resolve" ;
   rdfs:domain agentce:ToolCall ; rdfs:range xsd:boolean ;
   rdfs:comment "Whether every authorization, delegation and instruction reference the call carries names a held PolicyDecision, DelegationIssued and Instruction respectively." .
