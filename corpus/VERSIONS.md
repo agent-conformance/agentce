@@ -19,7 +19,7 @@ fails the check.
 | Field | Value |
 |---|---|
 | Corpus set | v1 |
-| Manifest SHA-256 | `sha256:2d254ebe568a3413410a93c1e658d8c56f8048dee3139755d68d8b4d68bf593e` |
+| Manifest SHA-256 | `sha256:c7930fd51e26f6cd45de74398249b13e36dabfca339c1eb735c29cd154dc0579` |
 | Projects | 30 (credit domain × six implementation styles × five variants) |
 | Corpus version | 2026.09 |
 | Validated catalog | eu-ai-act@2026.09 |
