@@ -100,6 +100,14 @@ def body(argv: list[str]) -> int:
             deviations = _load_deviation_register(Path(dev_file))
         # --catalog-dir is verified as `agentce readiness` verifies it (SPEC §8.7).
         severities, limitations = _readiness_severities(ns, _effective_trust_root(ns))
+        # A report file outside the reader contract is an input refusal, not a verdict (SPEC 8.7).
+        verdict = readiness.compute_readiness(
+            Path(report),
+            severities=severities,
+            deviations=deviations,
+            gaps=gaps,
+            limitations=limitations,
+        )
     except AgentceError as exc:
         emit(
             {"status": "input_error", "message": str(exc)},
@@ -107,13 +115,6 @@ def body(argv: list[str]) -> int:
             human=f"INPUT ERROR: {exc}",
         )
         return INPUT_ERROR
-    verdict = readiness.compute_readiness(
-        Path(report),
-        severities=severities,
-        deviations=deviations,
-        gaps=gaps,
-        limitations=limitations,
-    )
     emit(
         verdict,
         want_json=want_json,

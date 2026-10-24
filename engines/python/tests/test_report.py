@@ -1654,9 +1654,8 @@ def test_validate_report_handles_a_non_object_manifest_without_crashing(
 def test_validate_report_handles_non_utf8_bytes_without_crashing(
     tmp_path: Path,
 ) -> None:
-    """A non-UTF-8 artifact must produce a tidy `cannot read` problem, never an uncaught
-    `UnicodeDecodeError` (confirmed against TypeScript's/Java's own graceful handling of the same
-    bytes)."""
+    """A non-UTF-8 artifact must produce a tidy problem naming the JSON profile rule, never an
+    uncaught `UnicodeDecodeError` or the codec's own text (SPEC 8.7, 18.60)."""
     write_report(
         tmp_path,
         [_assertion("conformant")],
@@ -1665,7 +1664,10 @@ def test_validate_report_handles_non_utf8_bytes_without_crashing(
     )
     (tmp_path / "assertions.json").write_bytes(b"\xff\xfe\x00\x01not-utf8")
     problems = validate_report(tmp_path)
-    assert any(p.startswith("assertions.json: cannot read") for p in problems), problems
+    assert (
+        "assertions.json: outside the JSON profile: invalid_utf8 at line 1 (SPEC 8.7)"
+        in problems
+    ), problems
 
 
 def test_validate_report_handles_a_non_utf8_jsonl_line_without_crashing(
@@ -1685,9 +1687,10 @@ def test_validate_report_handles_a_non_utf8_jsonl_line_without_crashing(
         b'{"subject": "x"}\n\xff\xfenot-utf8\n'
     )
     problems = validate_report(tmp_path)
-    assert any(p.startswith("runtime_drift.jsonl: cannot read") for p in problems), (
-        problems
-    )
+    assert (
+        "runtime_drift.jsonl: outside the JSON profile: invalid_utf8 at line 2 (SPEC 8.7)"
+        in problems
+    ), problems
 
 
 def test_validate_report_reads_jsonl_by_the_line_rule(tmp_path: Path) -> None:

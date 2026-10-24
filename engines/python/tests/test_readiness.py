@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from agentce import cli
+from agentce.errors import InputError
 from agentce.readiness import (
     NOT_READY,
     READY,
@@ -101,12 +102,16 @@ def _unreadable(report: Path, name: str, shape: str, tmp_path: Path) -> Path | N
     return None
 
 
-def _cannot_read(name: str, rule: str | None, line: int = 1) -> str:
-    """The NOT READY reason for an unreadable report file; one outside the JSON profile names the
-    rule and line (SPEC 8.7, 18.184x)."""
-    if rule is None:
-        return f"cannot read report file {name}"
-    return f"cannot read report file {name}: outside the JSON profile: {rule} at line {line} (SPEC 8.7)"
+def _assert_refused(report: Path, name: str, rule: str, line: int = 1) -> None:
+    """A report file outside the JSON profile is no verdict: readiness refuses it as an input error
+    naming the file, the rule and the line (SPEC 8.7, 18.60)."""
+    with pytest.raises(InputError) as caught:
+        compute_readiness(report, severities=_SEVERITIES)
+    assert caught.value.key == "report.validation_failed"
+    assert (
+        caught.value.cause
+        == f"{name}: outside the JSON profile: {rule} at line {line} (SPEC 8.7)"
+    )
 
 
 _MALFORMED = [
@@ -139,19 +144,22 @@ _MALFORMED = [
 def test_report_file_of_the_wrong_shape_is_not_ready(
     tmp_path: Path, name: str, text: str, rule: str | None
 ) -> None:
-    # Not JSON of its shape reads NOT READY, never a crash and never READY (inbox row 393, 18.184h).
+    # JSON of another shape reads NOT READY, never a crash and never READY (inbox row 393,
+    # 18.184h); text outside the JSON profile is refused, never a verdict (SPEC 8.7, 18.60).
     report = _report(tmp_path)
     (report / name).write_text(text, encoding="utf-8")
+    if rule is not None:
+        _assert_refused(report, name, rule)
+        return
     verdict = compute_readiness(report, severities=_SEVERITIES)
     assert verdict["verdict"] == NOT_READY
-    assert verdict["reasons"] == [_cannot_read(name, rule)]
+    assert verdict["reasons"] == [f"cannot read report file {name}"]
 
 
-def test_report_file_not_utf8_is_not_ready(tmp_path: Path) -> None:
+def test_report_file_not_utf8_is_refused(tmp_path: Path) -> None:
     report = _report(tmp_path)
     (report / "coverage.json").write_bytes(b'{"subjects": {}}\xff')
-    verdict = compute_readiness(report, severities=_SEVERITIES)
-    assert verdict["reasons"] == [_cannot_read("coverage.json", "invalid_utf8")]
+    _assert_refused(report, "coverage.json", "invalid_utf8")
 
 
 _JSONL_RECORD = {
@@ -208,15 +216,14 @@ _JSONL_OK: dict[str, Callable[[bytes], bytes]] = {
 
 @pytest.mark.parametrize("name", sorted(_JSONL_RECORD))
 @pytest.mark.parametrize("case", sorted(_NOT_JSONL))
-def test_jsonl_line_outside_the_line_rule_is_not_ready(
+def test_jsonl_line_outside_the_line_rule_is_refused(
     tmp_path: Path, name: str, case: str
 ) -> None:
     """LF alone ends a line; any other separator or a no-break space or byte-order mark leaves a line
-    not JSON (18.184n), in every engine alike."""
+    not JSON (18.184n), refused in every engine alike (18.60)."""
     report = _report(tmp_path)
     (report / name).write_bytes(_NOT_JSONL[case](_JSONL_RECORD[name]))
-    verdict = compute_readiness(report, severities=_SEVERITIES)
-    assert verdict["reasons"] == [_cannot_read(name, _NOT_JSONL_RULE[case])]
+    _assert_refused(report, name, _NOT_JSONL_RULE[case])
 
 
 @pytest.mark.parametrize("name", sorted(_JSONL_RECORD))
@@ -1033,13 +1040,22 @@ def rule_case_content(case: dict) -> str | None:
 @pytest.mark.parametrize("case", _RULE_CASES, ids=[c["id"] for c in _RULE_CASES])
 def test_report_file_rule(tmp_path: Path, case: dict) -> None:
     # One report-file rule in every engine (18.184q): the same table drives readiness.test.ts and
-    # ReadinessTest.java.
+    # ReadinessTest.java. A row whose reason names a JSON profile rule is refused, not a verdict
+    # (SPEC 8.7, 18.60): the refusal names the file and the same rule phrase.
     report = _report(tmp_path)
     content = rule_case_content(case)
     if content is None:
         (report / case["file"]).unlink()
     else:
         (report / case["file"]).write_text(content, encoding="utf-8")
+    prefix = f"cannot read report file {case['file']}: "
+    profile = [r[len(prefix) :] for r in case["readiness"] if r.startswith(prefix)]
+    if profile:
+        with pytest.raises(InputError) as caught:
+            compute_readiness(report, severities=_SEVERITIES)
+        assert caught.value.key == "report.validation_failed"
+        assert caught.value.cause == f"{case['file']}: {profile[0]}"
+        return
     assert (
         compute_readiness(report, severities=_SEVERITIES)["reasons"]
         == case["readiness"]

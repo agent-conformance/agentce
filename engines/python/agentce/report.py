@@ -61,7 +61,21 @@ from .catalog import Catalog, ControlSpec, catalog_provenance_digest
 from .outputs import write_file
 from .profile import Profile, Subject
 from .readiness import data_file_problem
-from .safe_json import JSONError, jsonl_lines, load_report_json, read_bundled
+from .report_reader import (
+    ReaderError,
+    check_xml,
+    decode_report_text,
+    is_blank,
+    read_csv,
+)
+from .safe_json import (
+    JSONError,
+    JsonProfileError,
+    _decode,
+    jsonl_lines,
+    load_report_json,
+    read_bundled,
+)
 from .project import (
     blind_spots_by_subject,
     compute_project_view,
@@ -3781,37 +3795,47 @@ def _read_artifact(path: Path) -> bytes | None:
     raise _CannotRead("not a regular file")
 
 
-def _read_artifact_text(path: Path) -> str | None:
-    """`_read_artifact`, decoded as UTF-8; text that is not UTF-8 raises `_CannotRead` too."""
+def _read_json_text(path: Path) -> str | None:
+    """`_read_artifact` of a JSON or JSON Lines file, decoded by the JSON profile with a byte-order
+    mark refused (SPEC 8.7): bytes that are not UTF-8 raise `JsonProfileError` ``invalid_utf8``."""
     data = _read_artifact(path)
-    if data is None:
-        return None
-    try:
-        return data.decode("utf-8")
-    except UnicodeDecodeError as exc:
-        raise _CannotRead(str(exc)) from exc
+    return None if data is None else _decode(data, bom="refuse")
+
+
+def _read_report_text(path: Path) -> str | None:
+    """`_read_artifact` of a file that is not JSON, decoded by the reader contract (SPEC 8.7): a
+    byte-order mark or bytes that are not UTF-8 raise `ReaderError`."""
+    data = _read_artifact(path)
+    return None if data is None else decode_report_text(data)
 
 
 _REPORTED = object()  # the read failed and its problem line is already recorded
 
 
 def _read_or_report(
-    out_dir: Path, filename: str, problems: list[str], read=_read_artifact_text
+    out_dir: Path,
+    filename: str,
+    problems: list[str],
+    read: Callable[[Path], str | None] = _read_json_text,
+    wrap: str = "",
 ):
-    """``read`` of one report file; an unreadable one is recorded as a problem and answers
-    `_REPORTED`, so absence (``None``) and a reported failure stay apart."""
+    """``read`` of one report file; an unreadable one, or one outside its reader contract, is recorded
+    as a problem (``wrap`` goes before the contract phrase) and answers `_REPORTED`, so absence
+    (``None``) and a reported failure stay apart."""
     try:
         return read(out_dir / filename)
     except _CannotRead as exc:
         problems.append(f"{filename}: cannot read ({exc})")
-        return _REPORTED
+    except (JsonProfileError, ReaderError) as exc:
+        problems.append(f"{filename}: {wrap}{exc}")
+    return _REPORTED
 
 
-def _validate_xml_wellformed(filename: str, data: bytes) -> list[str]:
+def _validate_xml(filename: str, text: str) -> list[str]:
     try:
-        ET.fromstring(data)
-    except ET.ParseError as exc:
-        return [f"{filename}: invalid XML ({exc})"]
+        check_xml(text)
+    except ReaderError as exc:
+        return [f"{filename}: {exc}"]
     return []
 
 
@@ -3829,14 +3853,13 @@ def _validate_jsonl(filename: str, text: str) -> list[str]:
 
 
 def _validate_csv(filename: str, text: str) -> list[str]:
-    """A ``report.csv`` is valid iff it parses as CSV, carries every column in
-    :data:`CSV_COLUMNS`, and every row has the same field count as the header -- enough to accept a
-    genuine run's output and reject garbage (a non-CSV-structured file either fails to parse, is
-    missing the required columns, or has ragged rows)."""
+    """A ``report.csv`` is valid iff it reads as RFC 4180 CSV by the reader contract
+    (:func:`report_reader.read_csv`, SPEC 8.7), carries every column in :data:`CSV_COLUMNS`, and every
+    row has the same field count as the header. A reader-contract fault is the file's one problem."""
     try:
-        rows = list(csv.reader(io.StringIO(text, newline="")))
-    except csv.Error as exc:
-        return [f"{filename}: invalid CSV ({exc})"]
+        rows = read_csv(text)
+    except ReaderError as exc:
+        return [f"{filename}: {exc}"]
     if not rows:
         return [f"{filename}: empty CSV (no header row)"]
     header = rows[0]
@@ -3880,9 +3903,9 @@ def _recorded_outputs(out_dir: Path) -> dict[str, str]:
     ``--emit`` did and did not request, independent of the directory's current contents. A manifest
     that cannot be read records nothing here; the schema check reports it."""
     try:
-        text = _read_artifact_text(out_dir / "manifest.json")
+        text = _read_json_text(out_dir / "manifest.json")
         manifest = load_report_json(text) if text is not None else None
-    except (_CannotRead, JSONError):
+    except (_CannotRead, JSONError, JsonProfileError):
         return {}
     outputs = manifest.get("outputs") if isinstance(manifest, dict) else None
     return outputs if isinstance(outputs, dict) else {}
@@ -3953,13 +3976,14 @@ def validate_report(out_dir: Path) -> list[str]:
                 for p in validate_sarif_2_1_0(instance)
             ]
     for filename in ("report.md", "report.html"):
-        text = _read_or_report(out_dir, filename, problems)
+        text = _read_or_report(out_dir, filename, problems, _read_report_text)
         if text is _REPORTED:
             continue
-        if text is not None and not text.strip():
+        if text is not None and is_blank(text):
             problems.append(f"{filename}: empty")
     for filename in (*_REPORT_DATA_FILES, "claim.json"):
-        text = _read_or_report(out_dir, filename, problems)
+        wrap = "" if filename == "claim.json" else "cannot be read: "
+        text = _read_or_report(out_dir, filename, problems, wrap=wrap)
         if text is _REPORTED:
             continue
         if text is None:
@@ -3978,13 +4002,17 @@ def validate_report(out_dir: Path) -> list[str]:
             problems.append(f"{filename}: cannot be read: {reason}")
     for filename in _OPTIONAL_ARTIFACTS:
         xml = filename.endswith(".xml")
+        json_lines = filename.endswith(".jsonl")
         content = _read_or_report(
-            out_dir, filename, problems, _read_artifact if xml else _read_artifact_text
+            out_dir,
+            filename,
+            problems,
+            _read_json_text if json_lines else _read_report_text,
         )
         if content is None or content is _REPORTED:
             continue  # optional: only present, and only validated, when `--emit` requested it
         if xml:
-            problems += _validate_xml_wellformed(filename, content)
+            problems += _validate_xml(filename, content)
         elif filename == "report.csv":
             problems += _validate_csv(filename, content)
         else:

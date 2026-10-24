@@ -3562,8 +3562,11 @@ def _read_sign_manifest(report_dir: Path) -> bytes:
     """manifest.json's bytes, which the signature covers: absent, not a regular file or unreadable
     (mode 000, behind a folder that cannot be entered) is refused, never signed without; a
     manifest.json that links outside the report directory is refused too, so the signature covers a
-    file the folder holds (by analogy with ruling R7)."""
+    file the folder holds (by analogy with ruling R7). Bytes outside the JSON profile, with a
+    byte-order mark refused, are refused naming the rule (SPEC 8.7)."""
     manifest_path = report_dir / "manifest.json"
+    fix = "produce the report again: `agentce assess … --out <report-dir>`."
+    data = None
     try:
         if signing.is_regular_file(manifest_path):
             if confine_to_root(report_dir, "manifest.json") is None:
@@ -3572,14 +3575,20 @@ def _read_sign_manifest(report_dir: Path) -> bytes:
                     "manifest.json links outside the report directory.",
                     "replace the link with the file itself, inside the report directory.",
                 )
-            return manifest_path.read_bytes()
+            data = manifest_path.read_bytes()
     except OSError:
         pass
-    raise InputError(
-        "sign.no_manifest",
-        "the report directory has no readable manifest.json, which the signature covers.",
-        "produce the report again: `agentce assess … --out <report-dir>`.",
-    )
+    if data is None:
+        raise InputError(
+            "sign.no_manifest",
+            "the report directory has no readable manifest.json, which the signature covers.",
+            fix,
+        )
+    try:
+        read_json(data, bom="refuse")
+    except JsonProfileError as exc:
+        raise InputError("sign.no_manifest", f"manifest.json: {exc}", fix) from exc
+    return data
 
 
 def _read_sign_claim(claim_path: Path) -> dict[str, Any]:
@@ -3894,7 +3903,8 @@ def _readiness_severities(
 
 def cmd_readiness(ns: argparse.Namespace) -> CommandResult:
     """Compute the report-readiness verdict (SPEC §13.3.4 stage 4). Exit 0 for READY and READY WITH
-    LIMITATIONS, 1 for NOT READY; the verdict logic lives in the engine, never in a skill."""
+    LIMITATIONS, 1 for NOT READY, 3 with no verdict file for a report file outside the reader
+    contract (SPEC 8.7); the verdict logic lives in the engine, never in a skill."""
     result = CommandResult(command="readiness")
     report_dir = _require_dir(
         _opt_str(ns, "report_dir"),

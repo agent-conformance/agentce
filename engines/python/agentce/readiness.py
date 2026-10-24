@@ -21,6 +21,8 @@ from typing import Any, TypeVar
 import jsonschema
 
 from .coverage import STATUS_UNKNOWN
+from .error_catalogue import MESSAGE_KEYS
+from .errors import InputError
 from .integrity import IntegrityStatus
 from .safe_json import (
     JSONError,
@@ -80,6 +82,11 @@ def _read_report_file(path: Path) -> str | None:
 
 class _Unreadable(ValueError):
     """A report file whose content is not JSON of the shape readiness reads."""
+
+
+#: The key readiness and sign refuse a report file outside the reader contract with, as
+#: ``report --validate`` does (SPEC 8.7).
+REPORT_INVALID = "report.validation_failed"
 
 
 def _parse_json(text: str, line: int | None = None) -> Any:
@@ -320,17 +327,21 @@ def compute_readiness(
     def report_file(name: str, parse: Callable[[str], _T]) -> _T | None:
         """A stage-4 input every report has: an absent one is a blocking reason, never an empty
         file, so deleting the record of a gap or a break cannot clear it (SPEC §13.3.4). One that
-        is not UTF-8 JSON of its shape blocks the same way, never a crash and never read as empty."""
+        is JSON of another shape, or cannot be read as a regular file, blocks the same way, never a
+        crash and never read as empty. One outside the JSON profile (a byte-order mark and bytes
+        that are not UTF-8 included) is not a verdict: it raises `InputError`
+        ``report.validation_failed`` naming the file and the rule (SPEC 8.7)."""
         try:
             text = _read_report_file(report_dir / name)
             if text is not None:
                 return parse(text)
         except (OSError, _Unreadable) as exc:
-            # The profile rule and line when the file is outside the JSON profile (SPEC 8.7).
             rule = _profile_cause(exc)
-            reasons.append(
-                f"cannot read report file {name}" + (f": {rule}" if rule else "")
-            )
+            if rule is not None:
+                raise InputError(
+                    REPORT_INVALID, f"{name}: {rule}", MESSAGE_KEYS[REPORT_INVALID].fix
+                ) from exc
+            reasons.append(f"cannot read report file {name}")
             return None
         reasons.append(f"missing report file {name}")
         return None
