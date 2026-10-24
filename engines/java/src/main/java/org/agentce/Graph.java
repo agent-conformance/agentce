@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -131,8 +132,8 @@ public final class Graph {
     /** Decision.ai_role, ToolCall.effect_class, and the integrity strengths an enforcement point is verified at (SPEC
      * §6.2.3, §6.6; TRN-02, ROB-01, INT-04). */
     private static final Set<String> AI_ROLES = Set.of("sole", "recommendation", "assist");
-    private static final Set<String> EFFECT_CLASSES = Set.of(
-            "read", "write", "irreversible", "external_communication", "spend", "physical");
+    private static final Set<String> EFFECT_CLASSES = Stream.concat(HIGH_EFFECT.stream(), Stream.of("read", "write"))
+            .collect(Collectors.toUnmodifiableSet());
     private static final Set<String> VERIFIABLE_STRENGTHS = Set.of("source_signed", "export_anchored");
     /** The records the SPEC §10.4 human-actor rule applies to. */
     private static final Set<String> OVERSIGHT_TYPES = Set.of("ApprovalDecided", "Override", "Interrupt");
