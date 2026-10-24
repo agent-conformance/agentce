@@ -1935,7 +1935,9 @@
             "refs": {
               "decision": "agentce:event/d1"
             },
-            "notice_type": "adverse_action"
+            "notice_type": "adverse_action",
+            "person_ref": "ref:person/p1",
+            "delivered_at": "2026-01-01T00:10:00Z"
           }
         }
       ],
@@ -1990,7 +1992,9 @@
             "refs": {
               "decision": "d1"
             },
-            "notice_type": "adverse_action"
+            "notice_type": "adverse_action",
+            "person_ref": "ref:person/p1",
+            "delivered_at": "2026-01-01T00:10:00Z"
           }
         }
       ],
@@ -2045,7 +2049,9 @@
             "refs": {
               "decision": " agentce:event/d1\t"
             },
-            "notice_type": "adverse_action"
+            "notice_type": "adverse_action",
+            "person_ref": "ref:person/p1",
+            "delivered_at": "2026-01-01T00:10:00Z"
           }
         }
       ],
@@ -2078,7 +2084,9 @@
             "refs": {
               "decision": "d1"
             },
-            "notice_type": "adverse_action"
+            "notice_type": "adverse_action",
+            "person_ref": "ref:person/p1",
+            "delivered_at": "2026-01-01T00:10:00Z"
           }
         },
         {
@@ -2155,7 +2163,9 @@
             "refs": {
               "decision": "nope"
             },
-            "notice_type": "adverse_action"
+            "notice_type": "adverse_action",
+            "person_ref": "ref:person/p1",
+            "delivered_at": "2026-01-01T00:10:00Z"
           }
         }
       ],
@@ -2212,7 +2222,9 @@
             "refs": {
               "decision": "agentce:event/d1"
             },
-            "notice_type": "adverse_action"
+            "notice_type": "adverse_action",
+            "person_ref": "ref:person/p1",
+            "delivered_at": "2026-01-01T00:10:00Z"
           }
         }
       ],
@@ -2267,7 +2279,9 @@
             "refs": {
               "decision": "d1"
             },
-            "notice_type": "adverse_action"
+            "notice_type": "adverse_action",
+            "person_ref": "ref:person/p1",
+            "delivered_at": "2026-01-01T00:10:00Z"
           }
         }
       ],

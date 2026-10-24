@@ -57,7 +57,14 @@ def override(name):
 
 def notice(name):
     """The affected person's Notice of the decision, naming it as `name` (TRN-01, TRN-03)."""
-    return ev("n1", "Notice", refs={"decision": name}, notice_type="adverse_action")
+    return ev(
+        "n1",
+        "Notice",
+        refs={"decision": name},
+        notice_type="adverse_action",
+        person_ref="ref:person/p1",
+        delivered_at="2026-01-01T00:10:00Z",
+    )
 
 
 def adverse(name):
