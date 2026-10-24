@@ -19,50 +19,14 @@
       "violations": [
         {
           "focus": "agentce:event/d1",
-          "path": "prov:used",
-          "constraint": "sh:minCount",
+          "path": "agentce:dataConsumedRecorded",
+          "constraint": "sh:hasValue",
           "message_key": "DAT-01.S1"
         }
       ]
     },
     "inapplicable": {
       "control": "DAT-01",
-      "outcome": "conformant",
-      "population": {
-        "applicable": 0,
-        "failed": 0
-      },
-      "violations": []
-    }
-  },
-  "DAT-02": {
-    "passed": {
-      "control": "DAT-02",
-      "outcome": "conformant",
-      "population": {
-        "applicable": 1,
-        "failed": 0
-      },
-      "violations": []
-    },
-    "failed": {
-      "control": "DAT-02",
-      "outcome": "non-conformant",
-      "population": {
-        "applicable": 1,
-        "failed": 1
-      },
-      "violations": [
-        {
-          "focus": "agentce:event/d1",
-          "path": "prov:used",
-          "constraint": "sh:minCount",
-          "message_key": "DAT-02.S1"
-        }
-      ]
-    },
-    "inapplicable": {
-      "control": "DAT-02",
       "outcome": "conformant",
       "population": {
         "applicable": 0,
@@ -171,42 +135,6 @@
     },
     "inapplicable": {
       "control": "DOC-03",
-      "outcome": "conformant",
-      "population": {
-        "applicable": 0,
-        "failed": 0
-      },
-      "violations": []
-    }
-  },
-  "DOC-04": {
-    "passed": {
-      "control": "DOC-04",
-      "outcome": "conformant",
-      "population": {
-        "applicable": 1,
-        "failed": 0
-      },
-      "violations": []
-    },
-    "failed": {
-      "control": "DOC-04",
-      "outcome": "non-conformant",
-      "population": {
-        "applicable": 1,
-        "failed": 1
-      },
-      "violations": [
-        {
-          "focus": "agentce:event/d1",
-          "path": "prov:wasAssociatedWith",
-          "constraint": "sh:minCount",
-          "message_key": "DOC-04.S1"
-        }
-      ]
-    },
-    "inapplicable": {
-      "control": "DOC-04",
       "outcome": "conformant",
       "population": {
         "applicable": 0,
@@ -499,9 +427,9 @@
       "violations": [
         {
           "focus": "agentce:event/tc1",
-          "path": "agentce:sourceClass",
-          "constraint": "sh:in",
-          "message_key": "INT-04.S1"
+          "path": "agentce:classCorroborated",
+          "constraint": "sh:hasValue",
+          "message_key": "INT-04.S2"
         }
       ]
     },
@@ -919,8 +847,8 @@
       "violations": [
         {
           "focus": "agentce:event/d1",
-          "path": "prov:used",
-          "constraint": "sh:minCount",
+          "path": "agentce:inputsRecorded",
+          "constraint": "sh:hasValue",
           "message_key": "REC-03.S1"
         }
       ]
@@ -1063,9 +991,9 @@
       "violations": [
         {
           "focus": "agentce:event/tc1",
-          "path": "agentce:sourceClass",
-          "constraint": "sh:in",
-          "message_key": "ROB-01.S1"
+          "path": "agentce:effectClassified",
+          "constraint": "sh:hasValue",
+          "message_key": "ROB-01.S2"
         }
       ]
     },
@@ -1171,7 +1099,7 @@
       "violations": [
         {
           "focus": "agentce:event/tc1",
-          "path": "(agentce:delegatedVia agentce:chainVerified)",
+          "path": "agentce:delegationInForce",
           "constraint": "sh:hasValue",
           "message_key": "ROB-04.S1"
         }
@@ -1369,9 +1297,9 @@
       "violations": [
         {
           "focus": "agentce:event/d1",
-          "path": "prov:wasAssociatedWith",
-          "constraint": "sh:minCount",
-          "message_key": "TRN-02.S1"
+          "path": "agentce:aiRoleRecorded",
+          "constraint": "sh:hasValue",
+          "message_key": "TRN-02.S2"
         }
       ]
     },

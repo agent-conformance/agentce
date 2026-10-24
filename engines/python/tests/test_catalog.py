@@ -248,8 +248,8 @@ def test_load_refuses_forbidden_predicate_nested_inside_a_property_shape(
     shape = catalog_dir / "shapes" / "DAT-01.ttl"
     shape.write_text(
         shape.read_text(encoding="utf-8").replace(
-            'sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name "S1" ] .',
-            'sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name "S1" ; sh:sparql [] ] .',
+            'sh:property [ sh:path agentce:dataConsumedRecorded ; sh:hasValue true ; sh:name "S1" ] .',
+            'sh:property [ sh:path agentce:dataConsumedRecorded ; sh:hasValue true ; sh:name "S1" ; sh:sparql [] ] .',
         ),
         encoding="utf-8",
     )

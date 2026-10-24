@@ -29,15 +29,15 @@
       "control": "DAT-02",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "2026-01-01T00:00:00Z",
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -203,28 +203,19 @@
       "control": "DOC-04",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "2026-01-01T00:00:00Z",
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
       "family": "DOC",
-      "evidence": [
-        {
-          "ref": "agentce:event/d1",
-          "digest": "sha256:d4a9f7dd9e7227f646c01d480a0fdbdf12213d627286826d3dcb8a13a8dff9d4",
-          "source_class": "self_report"
-        }
-      ],
-      "source_class_satisfied": true,
-      "evidence_strength": "strong",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -469,7 +460,7 @@
       "control": "INT-04",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
+      "outcome": "non-conformant",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -478,10 +469,18 @@
       },
       "population": {
         "applicable": 1,
-        "failed": 0
+        "failed": 1
       },
       "severity": "high",
       "family": "INT",
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:classCorroborated",
+          "constraint": "sh:hasValue",
+          "message_key": "INT-04.S2"
+        }
+      ],
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -960,7 +959,7 @@
       "control": "ROB-01",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
+      "outcome": "non-conformant",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -969,10 +968,18 @@
       },
       "population": {
         "applicable": 1,
-        "failed": 0
+        "failed": 1
       },
       "severity": "high",
       "family": "ROB",
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:effectClassified",
+          "constraint": "sh:hasValue",
+          "message_key": "ROB-01.S2"
+        }
+      ],
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -1053,7 +1060,7 @@
       "control": "ROB-04",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
+      "outcome": "non-conformant",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -1062,10 +1069,18 @@
       },
       "population": {
         "applicable": 1,
-        "failed": 0
+        "failed": 1
       },
       "severity": "high",
       "family": "ROB",
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:delegationInForce",
+          "constraint": "sh:hasValue",
+          "message_key": "ROB-04.S1"
+        }
+      ],
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -1312,7 +1327,7 @@
       "control": "TRN-02",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
+      "outcome": "non-conformant",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -1321,10 +1336,18 @@
       },
       "population": {
         "applicable": 1,
-        "failed": 0
+        "failed": 1
       },
       "severity": "high",
       "family": "TRN",
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:aiRoleRecorded",
+          "constraint": "sh:hasValue",
+          "message_key": "TRN-02.S2"
+        }
+      ],
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -1448,15 +1471,15 @@
       "control": "DAT-02",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "2026-01-01T00:00:00Z",
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -1622,28 +1645,19 @@
       "control": "DOC-04",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "2026-01-01T00:00:00Z",
         "end": "2026-01-01T00:00:02Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
       "family": "DOC",
-      "evidence": [
-        {
-          "ref": "agentce:event/d1",
-          "digest": "sha256:8b05d45f437030b6255d16bed97f9617cef382f2f72bf071811b71b0e687b4bb",
-          "source_class": "self_report"
-        }
-      ],
-      "source_class_satisfied": true,
-      "evidence_strength": "strong",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -1888,7 +1902,7 @@
       "control": "INT-04",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
+      "outcome": "non-conformant",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -1897,10 +1911,18 @@
       },
       "population": {
         "applicable": 1,
-        "failed": 0
+        "failed": 1
       },
       "severity": "high",
       "family": "INT",
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:classCorroborated",
+          "constraint": "sh:hasValue",
+          "message_key": "INT-04.S2"
+        }
+      ],
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -2395,7 +2417,7 @@
       "control": "ROB-01",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
+      "outcome": "non-conformant",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -2404,10 +2426,18 @@
       },
       "population": {
         "applicable": 1,
-        "failed": 0
+        "failed": 1
       },
       "severity": "high",
       "family": "ROB",
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:effectClassified",
+          "constraint": "sh:hasValue",
+          "message_key": "ROB-01.S2"
+        }
+      ],
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -2488,7 +2518,7 @@
       "control": "ROB-04",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
+      "outcome": "non-conformant",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -2497,10 +2527,18 @@
       },
       "population": {
         "applicable": 1,
-        "failed": 0
+        "failed": 1
       },
       "severity": "high",
       "family": "ROB",
+      "violations": [
+        {
+          "focus": "agentce:event/tc1",
+          "path": "agentce:delegationInForce",
+          "constraint": "sh:hasValue",
+          "message_key": "ROB-04.S1"
+        }
+      ],
       "evidence": [
         {
           "ref": "agentce:event/tc1",
@@ -2747,7 +2785,7 @@
       "control": "TRN-02",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
+      "outcome": "non-conformant",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -2756,10 +2794,18 @@
       },
       "population": {
         "applicable": 1,
-        "failed": 0
+        "failed": 1
       },
       "severity": "high",
       "family": "TRN",
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:aiRoleRecorded",
+          "constraint": "sh:hasValue",
+          "message_key": "TRN-02.S2"
+        }
+      ],
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -2883,15 +2929,15 @@
       "control": "DAT-02",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "insufficient_evidence",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "2026-01-01T00:00:00Z",
         "end": "2026-01-01T00:00:00Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
@@ -3050,28 +3096,19 @@
       "control": "DOC-04",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "2026-01-01T00:00:00Z",
         "end": "2026-01-01T00:00:00Z"
       },
       "population": {
-        "applicable": 1,
+        "applicable": 0,
         "failed": 0
       },
       "severity": "medium",
       "family": "DOC",
-      "evidence": [
-        {
-          "ref": "agentce:event/d1",
-          "digest": "sha256:f56466bad88f6ad62c52aed5aa73e39693224c23ff2ebf6c2585dbcf04a052e2",
-          "source_class": "self_report"
-        }
-      ],
-      "source_class_satisfied": true,
-      "evidence_strength": "strong",
       "crosswalk": [
         {
           "framework": "eu-ai-act",
@@ -4068,7 +4105,7 @@
       "control": "TRN-02",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "conformant",
+      "outcome": "non-conformant",
       "rung": 2,
       "mode": "automated",
       "window": {
@@ -4077,10 +4114,18 @@
       },
       "population": {
         "applicable": 1,
-        "failed": 0
+        "failed": 1
       },
       "severity": "high",
       "family": "TRN",
+      "violations": [
+        {
+          "focus": "agentce:event/d1",
+          "path": "agentce:aiRoleRecorded",
+          "constraint": "sh:hasValue",
+          "message_key": "TRN-02.S2"
+        }
+      ],
       "evidence": [
         {
           "ref": "agentce:event/d1",
@@ -4204,8 +4249,8 @@
       "control": "DAT-02",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "not_applicable",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "1970-01-01T00:00:00Z",
@@ -4354,8 +4399,8 @@
       "control": "DOC-04",
       "control_version": "2026.09",
       "subject": "spiffe://corp/agents/a",
-      "outcome": "not_applicable",
-      "rung": 2,
+      "outcome": "not_assessed",
+      "rung": 3,
       "mode": "semi-automated",
       "window": {
         "start": "1970-01-01T00:00:00Z",

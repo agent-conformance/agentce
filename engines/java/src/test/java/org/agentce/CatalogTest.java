@@ -259,8 +259,8 @@ class CatalogTest {
                 shape,
                 Files.readString(shape)
                         .replace(
-                                "sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .",
-                                "sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ; sh:sparql [] ] ."));
+                                "sh:property [ sh:path agentce:dataConsumedRecorded ; sh:hasValue true ; sh:name \"S1\" ] .",
+                                "sh:property [ sh:path agentce:dataConsumedRecorded ; sh:hasValue true ; sh:name \"S1\" ; sh:sparql [] ] ."));
         InputError err = assertThrows(InputError.class, () -> Catalog.load(tmp));
         assertEquals("catalog.shape.sparql_forbidden", err.key);
     }

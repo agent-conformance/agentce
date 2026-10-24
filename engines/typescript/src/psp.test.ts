@@ -144,8 +144,8 @@ test("loadCatalog refuses a forbidden predicate nested inside a property shape",
   withEditedCatalog(
     (text) =>
       text.replace(
-        'sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name "S1" ] .',
-        'sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name "S1" ; sh:sparql [] ] .',
+        'sh:property [ sh:path agentce:dataConsumedRecorded ; sh:hasValue true ; sh:name "S1" ] .',
+        'sh:property [ sh:path agentce:dataConsumedRecorded ; sh:hasValue true ; sh:name "S1" ; sh:sparql [] ] .',
       ),
     (dir) => {
       assert.throws(
