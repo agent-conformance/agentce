@@ -22,8 +22,13 @@ def ref(i):
     return f"agentce:event/{i}"
 
 
+# Every decision records its options and the one it chose, as the corpus generator's do, so DOC-02 (18.37f) reads it
+# documented and the assess exit stays the INC-03, OVS and RSK cases' own.
+CHOICE = {"options": [{"id": "approve", "label": "Approve"}, {"id": "decline", "label": "Decline"}], "chosen": "approve"}
+
+
 def dec(i, dtype="dom:CreditDecision", **k):
-    return ev(i, "Decision", decision_type=dtype, **k)
+    return ev(i, "Decision", decision_type=dtype, **{**CHOICE, **k})
 
 
 def human(pid):

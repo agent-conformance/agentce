@@ -18,7 +18,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -116,7 +127,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -134,7 +156,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -234,7 +267,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -252,7 +296,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -373,7 +428,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -391,7 +457,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -514,7 +591,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -532,7 +620,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -633,7 +732,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -651,7 +761,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -749,7 +870,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -767,7 +899,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -867,7 +1010,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -963,7 +1117,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -981,7 +1146,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -1110,7 +1286,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -1128,7 +1315,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -1281,7 +1479,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -1299,7 +1508,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -1400,7 +1620,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -1418,7 +1649,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -1543,7 +1785,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -1618,7 +1871,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -1636,7 +1900,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -1734,7 +2009,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -1809,7 +2095,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -1827,7 +2124,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -1904,7 +2212,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -2005,7 +2324,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -2078,7 +2408,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -2156,7 +2497,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -2235,7 +2587,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -2314,7 +2677,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -2371,7 +2745,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -2446,7 +2831,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -2520,7 +2916,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -2569,7 +2976,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         }
       ],
@@ -2597,7 +3015,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -2672,7 +3101,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -2723,7 +3163,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -2779,6 +3230,17 @@
               "id": "spiffe://corp/agents/eu-cluster1"
             },
             "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve",
             "oversight_modality": "dual_control"
           }
         },
@@ -2902,6 +3364,17 @@
               "id": "spiffe://corp/agents/eu-cluster1"
             },
             "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve",
             "oversight_modality": "dual_control"
           }
         },
@@ -3005,7 +3478,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:LargeLoanDecision"
+            "decision_type": "dom:LargeLoanDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -3234,7 +3718,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         }
       ],
@@ -3282,6 +3777,17 @@
               "id": "spiffe://corp/agents/eu-cluster1"
             },
             "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve",
             "refs": {
               "authorization": "agentce:event/p1"
             }
@@ -3302,7 +3808,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -3377,7 +3894,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -3395,7 +3923,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -3473,6 +4012,17 @@
               "id": "spiffe://corp/agents/eu-cluster1"
             },
             "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve",
             "refs": {
               "authorization": "agentce:event/p1"
             }
@@ -3493,7 +4043,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -3590,6 +4151,17 @@
               "id": "spiffe://corp/agents/eu-cluster1"
             },
             "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve",
             "refs": {
               "authorization": "agentce:event/p9"
             }
@@ -3610,7 +4182,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -3688,6 +4271,17 @@
               "id": "spiffe://corp/agents/eu-cluster1"
             },
             "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve",
             "refs": {
               "authorization": "agentce:event/a2"
             }
@@ -3708,7 +4302,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -3785,7 +4390,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
@@ -3834,7 +4450,18 @@
             "agent": {
               "id": "spiffe://corp/agents/eu-cluster1"
             },
-            "decision_type": "dom:CreditDecision"
+            "decision_type": "dom:CreditDecision",
+            "options": [
+              {
+                "id": "approve",
+                "label": "Approve"
+              },
+              {
+                "id": "decline",
+                "label": "Decline"
+              }
+            ],
+            "chosen": "approve"
           }
         },
         {
