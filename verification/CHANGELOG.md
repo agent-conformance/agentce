@@ -3,6 +3,14 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.130.0
+
+- `VG-INGEST-SUPPORT-MATRIX` (18.39a, changed) reads every copy of the trace-store table's header, however GFM lets
+  it be spelled: no inner spaces, no outer pipes, emphasis, code spans, entities or invisible characters in a cell.
+  Any other line with a pipe that names all four columns (a table in a block quote or on a list item, a linked cell,
+  reordered or extra columns) fails with `ingest.matrix.docs_header_unreadable` instead of being skipped. Two seeded
+  faults: a second table with a tight header, and the same table in a block quote, each naming Honeycomb Supported.
+
 ## 0.129.0
 
 - `VG-INGEST-SUPPORT-MATRIX` (18.39c, changed) refuses README and docs copy it cannot read instead of skipping it. A

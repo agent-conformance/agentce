@@ -32,6 +32,7 @@ _TIER_LINE_RE = re.compile(
 _MORE_RE = re.compile(r"^and (\d+) more$")
 _TRAILER_RE = re.compile(r"\s*—\s*(?:see the full matrix|help wanted)\s*$")
 _TABLE_HEADER = "| Backend | Tier | Reader follows | Build item |"
+_HEADER_CELLS = ("backend", "tier", "reader follows", "build item")
 _FOLLOWS_RE = re.compile(r"\[[^\]]+\]\(([^)\s]+)\),\s*(\S.*)")
 # A tier claim written any other way than a _TIER_LINE_RE line (18.39c): once emphasis, code spans, HTML tags,
 # entities, invisible characters and case are set aside, a tier word followed by a parenthesised count.
@@ -43,26 +44,54 @@ _MARKUP_RE = re.compile(r"<[^>]*>|[*_`~]")
 _INVISIBLE_RE = re.compile(r"[\u00ad\u200b-\u200f\u2060-\u2064\ufeff]")
 
 
+def _split_cells(line: str) -> list[str]:
+    """A table line's cells: split on unescaped pipes, outer pipes optional, each cell trimmed."""
+    stripped = line.strip()
+    cells = re.split(r"(?<!\\)\|", stripped)
+    if stripped.startswith("|"):
+        cells = cells[1:]
+    if stripped.endswith("|"):
+        cells = cells[:-1]
+    return [cell.strip() for cell in cells]
+
+
+def _header_key(text: str) -> str:
+    return " ".join(_plain(text).split()).casefold()
+
+
+def _is_table_header(line: str) -> bool:
+    """A copy of the trace-store table's header, however GFM lets it be spelled (18.39a): no inner
+    spaces, no outer pipes, emphasis, code spans, entities or invisible characters in a cell."""
+    return tuple(_header_key(cell) for cell in _split_cells(line)) == _HEADER_CELLS
+
+
+def _unreadable_headers(text: str) -> list[tuple[int, str]]:
+    """Piped lines that name all four header cells but are not a header copy _is_table_header reads:
+    a table in a block quote or on a list item, a linked cell, reordered or extra columns. Refused,
+    not skipped, so a header spelling nobody foresaw cannot hide a table (18.39a)."""
+    return [
+        (number, line)
+        for number, line in enumerate(text.splitlines(), start=1)
+        if "|" in line
+        and not _is_table_header(line)
+        and all(name in _header_key(line) for name in _HEADER_CELLS)
+    ]
+
+
 def _extract_table_rows(text: str) -> list[list[str]]:
-    """Every line from each table header to the next blank line (spaces and tabs only), as raw
+    """Every line from each table header copy to the next blank line (spaces and tabs only), as raw
     cells. Outer pipes are optional; a line that is not a row comes back as it is, for the caller
     to report, so the page has to end the table with a blank line."""
     rows: list[list[str]] = []
     lines = iter(text.splitlines())
     for line in lines:
-        if line.strip() != _TABLE_HEADER:
+        if not _is_table_header(line):
             continue
         next(lines, None)  # the --- separator
         for row in lines:
             if not row.strip(" \t"):
                 break
-            stripped = row.strip()
-            cells = re.split(r"(?<!\\)\|", stripped)
-            if stripped.startswith("|"):
-                cells = cells[1:]
-            if stripped.endswith("|"):
-                cells = cells[:-1]
-            rows.append([cell.strip() for cell in cells])
+            rows.append(_split_cells(row))
     return rows
 
 
@@ -176,7 +205,12 @@ def check_tier_lines(
 
 
 def check_trace_store_docs(rows_by_name: dict[str, dict], text: str) -> list[str]:
-    problems: list[str] = []
+    problems: list[str] = [
+        f"ingest.matrix.docs_header_unreadable: trace-store-connectors.md line {number} names the "
+        f"table's four columns but is not a header the gate can read: {line!r}. Write the header as "
+        f"{_TABLE_HEADER!r} at the start of its own line"
+        for number, line in _unreadable_headers(text)
+    ]
     rows_seen = 0
     for cells in _extract_table_rows(text):
         if len(cells) != 4:
@@ -680,6 +714,127 @@ def self_test() -> int:
             ),
         )
     )
+
+    # 18.39a: a second table is read under any header spelling GFM draws as this table, and any other
+    # piped line naming the four columns is refused rather than skipped.
+    def under_header(
+        header: str,
+        delimiter: str = "|---|---|---|---|",
+        row: str = "| Honeycomb | Supported | x | y |",
+    ) -> list[str]:
+        return check_trace_store_docs(
+            rows, f"{good_table}\n{header}\n{delimiter}\n{row}\n"
+        )
+
+    for label, header, delimiter, row in (
+        (
+            "no inner spaces",
+            "|Backend|Tier|Reader follows|Build item|",
+            "|---|---|---|---|",
+            "|Honeycomb|Supported|x|y|",
+        ),
+        (
+            "no outer pipes",
+            "Backend | Tier | Reader follows | Build item",
+            "--- | --- | --- | ---",
+            "Honeycomb | Supported | x | y",
+        ),
+        (
+            "bold cells, aligned",
+            "| **Backend** | **Tier** | **Reader follows** | **Build item** |",
+            "|:--|:-:|--:|---|",
+            None,
+        ),
+        ("lower case", "| backend | tier | reader follows | build item |", None, None),
+        (
+            "an entity space",
+            "| Backend | Tier | Reader&#32;follows | Build item |",
+            None,
+            None,
+        ),
+        (
+            "a no-break space",
+            "| Backend | Tier | Reader&nbsp;follows | Build item |",
+            None,
+            None,
+        ),
+        (
+            "a zero-width space",
+            "| Back​end | Tier | Reader follows | Build item |",
+            None,
+            None,
+        ),
+        (
+            "code spans",
+            "| `Backend` | `Tier` | `Reader follows` | `Build item` |",
+            None,
+            None,
+        ),
+        (
+            "indented under a list item",
+            "  | Backend | Tier | Reader follows | Build item |",
+            "  |---|---|---|---|",
+            "  | Honeycomb | Supported | x | y |",
+        ),
+    ):
+        found = under_header(
+            header,
+            delimiter or "|---|---|---|---|",
+            row or "| Honeycomb | Supported | x | y |",
+        )
+        cases.append(
+            (
+                f"a second table whose header has {label} is read",
+                has(found, "docs_unknown_source", "Honeycomb")
+                and not has(found, "docs_header_unreadable"),
+            )
+        )
+
+    for label, header, delimiter, row in (
+        (
+            "in a block quote",
+            "> " + _TABLE_HEADER,
+            "> |---|---|---|---|",
+            "> | Honeycomb | Supported | x | y |",
+        ),
+        (
+            "on a list item",
+            "- " + _TABLE_HEADER,
+            "  |---|---|---|---|",
+            "  | Honeycomb | Supported | x | y |",
+        ),
+        (
+            "with a linked cell",
+            "| [Backend](#a) | Tier | Reader follows | Build item |",
+            None,
+            None,
+        ),
+        (
+            "with reordered columns",
+            "| Tier | Backend | Reader follows | Build item |",
+            None,
+            None,
+        ),
+        (
+            "with an extra column",
+            "| Backend | Tier | Reader follows | Build item | Notes |",
+            "|---|---|---|---|---|",
+            "| Honeycomb | Supported | x | y | z |",
+        ),
+    ):
+        cases.append(
+            (
+                f"a header {label} is refused, not skipped",
+                has(
+                    under_header(
+                        header,
+                        delimiter or "|---|---|---|---|",
+                        row or "| Honeycomb | Supported | x | y |",
+                    ),
+                    "docs_header_unreadable",
+                ),
+            )
+        )
 
     # 18.39c: a tier claim the tier-line scan cannot read, and a Reader-follows cell it cannot parse, are
     # refused rather than read past.
