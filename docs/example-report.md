@@ -24,9 +24,9 @@ This is the report the vendored quickstart project renders end to end with defau
 ## Where your records can't show it yet
 
 - `ApprovalDecided (self_report)`: unlocks 4 check(s), needed by 0 more; rung 2 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: oversight.
-- `ModelCall (self_report)`: unlocks 3 check(s), needed by 0 more; rung 1 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: otel-genai.
 - `Notice (self_report)`: unlocks 3 check(s), needed by 0 more; rung 2 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: oversight.
 - `PolicyDecision (self_report)`: unlocks 3 check(s), needed by 0 more; rung 3 -- a request to platform or security. Adapters that can supply this: mcp-gateway, policy-engines.
+- `ModelCall (self_report)`: unlocks 2 check(s), needed by 0 more; rung 1 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: otel-genai.
 - `Disclosure (self_report)`: unlocks 1 check(s), needed by 0 more; rung 2 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: no adapter today.
 - `MemoryRead (enforcement_point)`: unlocks 1 check(s), needed by 0 more; rung 3 -- a request to platform or security. Adapters that can supply this: no adapter today.
 
@@ -40,19 +40,19 @@ This is the report the vendored quickstart project renders end to end with defau
 
 Top gaps:
 
-- insufficient evidence: DAT-01, DAT-02, DOC-03, INC-03, OVS-01 (+11 more gaps)
-- not assessed: DAT-03, DAT-04, DOC-05, OVS-09, ROB-05 (+4 more gaps)
+- insufficient evidence: DAT-01, DOC-03, INC-03, OVS-01, OVS-05 (+10 more gaps)
+- not assessed: DAT-02, DAT-03, DAT-04, DOC-04, DOC-05 (+6 more gaps)
 
 Next step: Supply the missing evidence, or complete the manual checks, for the controls listed under Top gaps, then run the assessment again.
 
 ## Outcome summary
 
-- `conformant`: 22
+- `conformant`: 21
 - `non-conformant`: 0
 - `partial`: 0
 - `not applicable`: 2
-- `not assessed`: 9
-- `insufficient evidence`: 16
+- `not assessed`: 11
+- `insufficient evidence`: 15
 
 ## Assertions
 
@@ -110,15 +110,15 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
   - `eu-ai-act Art. 19 (clause reference unverified)`
   - Evidence: `agentce:event/langgraph-known-pass-tc1`
   - Remediation: rec-evidence-at-source
-- **Consequential actions traverse a trusted, corroborated source** (`ROB-01` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+- **Consequential tool calls pass a trusted source that classifies their effect** (`ROB-01` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
   - `eu-ai-act Art. 15 (clause reference unverified)`
   - Evidence: `agentce:event/langgraph-known-pass-tc1`
   - Remediation: rob-evidence-at-source
-- **Consequential tool calls run over a verified delegation chain** (`ROB-04` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+- **Consequential tool calls run under a verified delegation that had not expired** (`ROB-04` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
   - `eu-ai-act Art. 15 (clause reference unverified)`
   - Evidence: `agentce:event/langgraph-known-pass-tc1`
   - Remediation: rob-evidence-at-source
-- **Every consequential decision records the agent that made it** (`TRN-02` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+- **Every consequential decision records the agent that made it and its role in the decision** (`TRN-02` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
   - `eu-ai-act Art. 86 (clause reference unverified)`
   - Evidence: `agentce:event/langgraph-known-pass-dec1`
   - Remediation: trn-evidence-at-source
@@ -128,7 +128,7 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
 - **Consequential decisions record the data they consumed** (`DAT-01` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
   - `eu-ai-act Art. 10 (clause reference unverified)`
   - Remediation: dat-evidence-at-source
-- **Input data quality and representativeness are measured** (`DAT-02` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, semi-automated; 0/1 failed)
+- **Input data quality and representativeness are measured** (`DAT-02` @ `spiffe://corp/agents/credit-langgraph`) -> **not assessed** (rung 3, semi-automated; 0/0 failed)
   - `eu-ai-act Art. 10 (clause reference unverified)`
   - Remediation: dat-evidence-at-source
 - **Outcome parity across declared groups is within thresholds** (`DAT-03` @ `spiffe://corp/agents/credit-langgraph`) -> **not assessed** (rung 3, semi-automated; 0/0 failed)
@@ -145,9 +145,8 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
   - `eu-ai-act Art. 11 / Annex IV (clause reference unverified)`
   - Evidence: `agentce:event/langgraph-known-pass-tc1`
   - Remediation: doc-evidence-at-source
-- **Configuration drift from the declared snapshot is bounded** (`DOC-04` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, semi-automated; 0/1 failed)
+- **Configuration drift from the declared snapshot is bounded** (`DOC-04` @ `spiffe://corp/agents/credit-langgraph`) -> **not assessed** (rung 3, semi-automated; 0/0 failed)
   - `eu-ai-act Art. 13 (clause reference unverified)`
-  - Evidence: `agentce:event/langgraph-known-pass-dec1`
   - Remediation: doc-evidence-at-source
 - **Technical documentation is complete and current** (`DOC-05` @ `spiffe://corp/agents/credit-langgraph`) -> **not assessed** (rung 3, manual; 0/0 failed)
   - `eu-ai-act Art. 11 / Annex IV (clause reference unverified)`
@@ -190,7 +189,7 @@ Next step: Supply the missing evidence, or complete the manual checks, for the c
 - **No untrusted content influences consequential decisions** (`ROB-02` @ `spiffe://corp/agents/credit-langgraph`) -> **insufficient evidence** (rung 2, automated; 0/1 failed)
   - `eu-ai-act Art. 15 (clause reference unverified)`
   - Remediation: rob-evidence-at-source
-- **Consequential tool calls carry no dangling references** (`ROB-03` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
+- **Consequential tool calls carry no dangling authorization, delegation or instruction references** (`ROB-03` @ `spiffe://corp/agents/credit-langgraph`) -> **conformant** (rung 2, automated; 0/1 failed)
   - `eu-ai-act Art. 15 (clause reference unverified)`
   - Evidence: `agentce:event/langgraph-known-pass-tc1`
   - Remediation: rob-evidence-at-source

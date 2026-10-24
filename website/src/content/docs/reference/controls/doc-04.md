@@ -9,7 +9,7 @@ Configuration drift from the declared snapshot is bounded.
 |---|---|
 | Severity | medium |
 | Mode | semi-automated |
-| Rung | 2 |
+| Rung | 3 |
 | Catalog | EU AI Act base catalog (base) |
 
 Crosswalked to clause(s) Art. 13. Clause numbers only are cited; standard text is never reproduced.

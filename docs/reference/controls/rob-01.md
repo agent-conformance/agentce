@@ -1,6 +1,6 @@
 # ROB-01
 
-Consequential actions traverse a trusted, corroborated source.
+Consequential tool calls pass a trusted source that classifies their effect.
 
 | Field | Value |
 |---|---|

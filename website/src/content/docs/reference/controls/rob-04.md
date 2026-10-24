@@ -1,9 +1,9 @@
 ---
 title: ROB-04
-description: Consequential tool calls run over a verified delegation chain (EU AI Act base catalog).
+description: Consequential tool calls run under a verified delegation that had not expired (EU AI Act base catalog).
 ---
 
-Consequential tool calls run over a verified delegation chain.
+Consequential tool calls run under a verified delegation that had not expired.
 
 | Field | Value |
 |---|---|

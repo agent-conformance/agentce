@@ -1,9 +1,9 @@
 ---
 title: TRN-02
-description: Every consequential decision records the agent that made it (EU AI Act base catalog).
+description: Every consequential decision records the agent that made it and its role in the decision (EU AI Act base catalog).
 ---
 
-Every consequential decision records the agent that made it.
+Every consequential decision records the agent that made it and its role in the decision.
 
 | Field | Value |
 |---|---|

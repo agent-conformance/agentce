@@ -1,9 +1,9 @@
 ---
 title: ROB-03
-description: Consequential tool calls carry no dangling references (EU AI Act base catalog).
+description: Consequential tool calls carry no dangling authorization, delegation or instruction references (EU AI Act base catalog).
 ---
 
-Consequential tool calls carry no dangling references.
+Consequential tool calls carry no dangling authorization, delegation or instruction references.
 
 | Field | Value |
 |---|---|

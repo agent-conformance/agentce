@@ -1,6 +1,6 @@
 # ROB-04
 
-Consequential tool calls run over a verified delegation chain.
+Consequential tool calls run under a verified delegation that had not expired.
 
 | Field | Value |
 |---|---|

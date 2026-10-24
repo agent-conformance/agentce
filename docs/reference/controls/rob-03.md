@@ -1,6 +1,6 @@
 # ROB-03
 
-Consequential tool calls carry no dangling references.
+Consequential tool calls carry no dangling authorization, delegation or instruction references.
 
 | Field | Value |
 |---|---|

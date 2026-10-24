@@ -1,9 +1,9 @@
 ---
 title: ROB-01
-description: Consequential actions traverse a trusted, corroborated source (EU AI Act base catalog).
+description: Consequential tool calls pass a trusted source that classifies their effect (EU AI Act base catalog).
 ---
 
-Consequential actions traverse a trusted, corroborated source.
+Consequential tool calls pass a trusted source that classifies their effect.
 
 | Field | Value |
 |---|---|

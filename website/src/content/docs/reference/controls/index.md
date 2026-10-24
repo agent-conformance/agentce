@@ -44,13 +44,13 @@ Every control across the EU AI Act base catalog and its overlays, and the NIST A
 | Control | Title | Severity | Mode | Rung |
 |---|---|---|---|---|
 | [`DAT-01`](/reference/controls/dat-01/) | Consequential decisions record the data they consumed | medium | automated | 2 |
-| [`DAT-02`](/reference/controls/dat-02/) | Input data quality and representativeness are measured | medium | semi-automated | 2 |
+| [`DAT-02`](/reference/controls/dat-02/) | Input data quality and representativeness are measured | medium | semi-automated | 3 |
 | [`DAT-03`](/reference/controls/dat-03/) | Outcome parity across declared groups is within thresholds | medium | semi-automated | 3 |
 | [`DAT-04`](/reference/controls/dat-04/) | Data-governance measures are documented and reviewed | medium | manual | 3 |
 | [`DOC-01`](/reference/controls/doc-01/) | Operating components match the declared documentation | high | automated | 2 |
 | [`DOC-02`](/reference/controls/doc-02/) | Consequential decisions are documented with a time of record | medium | automated | 2 |
 | [`DOC-03`](/reference/controls/doc-03/) | Declared egress paths match the observed enforcement point | medium | automated | 2 |
-| [`DOC-04`](/reference/controls/doc-04/) | Configuration drift from the declared snapshot is bounded | medium | semi-automated | 2 |
+| [`DOC-04`](/reference/controls/doc-04/) | Configuration drift from the declared snapshot is bounded | medium | semi-automated | 3 |
 | [`DOC-05`](/reference/controls/doc-05/) | Technical documentation is complete and current | medium | manual | 3 |
 | [`INC-01`](/reference/controls/inc-01/) | Adverse outcomes are linked to their consequential decision | medium | automated | 2 |
 | [`INC-02`](/reference/controls/inc-02/) | Serious incidents are recorded with an accountable actor (by role) | high | automated | 2 |
@@ -75,10 +75,10 @@ Every control across the EU AI Act base catalog and its overlays, and the NIST A
 | [`REC-04`](/reference/controls/rec-04/) | Consequential decisions are recorded with actor and time | medium | automated | 2 |
 | [`REC-05`](/reference/controls/rec-05/) | Every consequential decision records the authority it acted under | medium | automated | 2 |
 | [`REC-06`](/reference/controls/rec-06/) | Consequential tool calls carry no dangling evidence references | high | automated | 2 |
-| [`ROB-01`](/reference/controls/rob-01/) | Consequential actions traverse a trusted, corroborated source | high | automated | 2 |
+| [`ROB-01`](/reference/controls/rob-01/) | Consequential tool calls pass a trusted source that classifies their effect | high | automated | 2 |
 | [`ROB-02`](/reference/controls/rob-02/) | No untrusted content influences consequential decisions | medium | automated | 2 |
-| [`ROB-03`](/reference/controls/rob-03/) | Consequential tool calls carry no dangling references | medium | automated | 2 |
-| [`ROB-04`](/reference/controls/rob-04/) | Consequential tool calls run over a verified delegation chain | high | automated | 2 |
+| [`ROB-03`](/reference/controls/rob-03/) | Consequential tool calls carry no dangling authorization, delegation or instruction references | medium | automated | 2 |
+| [`ROB-04`](/reference/controls/rob-04/) | Consequential tool calls run under a verified delegation that had not expired | high | automated | 2 |
 | [`ROB-05`](/reference/controls/rob-05/) | Adversarial-probe resilience is measured within thresholds | medium | semi-automated | 3 |
 | [`ROB-06`](/reference/controls/rob-06/) | Resource-exhaustion resistance is measured within budgets | medium | semi-automated | 3 |
 | [`ROB-07`](/reference/controls/rob-07/) | Cyber-incident detection and response are exercised | medium | semi-automated | 2 |
@@ -88,7 +88,7 @@ Every control across the EU AI Act base catalog and its overlays, and the NIST A
 | [`RSK-04`](/reference/controls/rsk-04/) | A fundamental-rights impact assessment is recorded | medium | manual | 3 |
 | [`RSK-05`](/reference/controls/rsk-05/) | Registration and applicability declarations are current | medium | manual | 3 |
 | [`TRN-01`](/reference/controls/trn-01/) | Affected persons are notified for every consequential decision | medium | automated | 2 |
-| [`TRN-02`](/reference/controls/trn-02/) | Every consequential decision records the agent that made it | high | automated | 2 |
+| [`TRN-02`](/reference/controls/trn-02/) | Every consequential decision records the agent that made it and its role in the decision | high | automated | 2 |
 | [`TRN-03`](/reference/controls/trn-03/) | Affected persons informed and explanation reconstructable | medium | semi-automated | 2 |
 | [`TRN-04`](/reference/controls/trn-04/) | Consequential decisions are timestamped for explanation | medium | automated | 2 |
 | [`TRN-05`](/reference/controls/trn-05/) | AI-interaction disclosure is present where required | medium | semi-automated | 2 |

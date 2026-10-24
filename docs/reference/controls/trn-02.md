@@ -1,6 +1,6 @@
 # TRN-02
 
-Every consequential decision records the agent that made it.
+Every consequential decision records the agent that made it and its role in the decision.
 
 | Field | Value |
 |---|---|
