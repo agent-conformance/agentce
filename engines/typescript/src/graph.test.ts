@@ -84,6 +84,48 @@ test("explanation is not reconstructable when the notice itself dangles", () => 
   ]);
 });
 
+// 18.37h: a rationale_claim_ref or content_ref written as a Ref must name a held event; a Digest, URI or
+// bare id is not a Ref and is not judged.
+function withData<T extends { data: Record<string, unknown> }>(
+  event: T,
+  extra: Record<string, unknown>,
+): T {
+  return { ...event, data: { ...event.data, ...extra } };
+}
+
+function reconstructable(events: Parameters<typeof buildGraph>[0]): string[] {
+  return buildGraph(events, { domain: MINOR_DOMAIN }).literalValues(
+    "agentce:event/d1",
+    "agentce:explanationReconstructable",
+  );
+}
+
+for (const [rationale, expected] of [
+  ["agentce:event/c1", "true"],
+  ["agentce:event/missing", "false"],
+  [`sha256:${"3".repeat(64)}`, "true"],
+  ["blob://rationale/1", "true"],
+  ["c1", "true"],
+] as const) {
+  test(`explanation reconstructable reads rationale_claim_ref ${rationale}`, () => {
+    const events = [
+      withData(decisionEvent("d1"), { rationale_claim_ref: rationale }),
+      noticeEvent("c1", "d1"),
+    ];
+    assert.deepEqual(reconstructable(events), [expected]);
+    assert.deepEqual(reconstructable([...events].reverse()), [expected]);
+  });
+}
+
+test("explanation reconstructable reads the notice content_ref", () => {
+  const decision = decisionEvent("d1");
+  const bad = withData(noticeEvent("c1", "d1"), { content_ref: "agentce:event/zz" });
+  const good = withData(noticeEvent("c2", "d1"), { content_ref: "blob://n/2" });
+  assert.deepEqual(reconstructable([decision, bad]), ["false"]);
+  assert.deepEqual(reconstructable([decision, bad, good]), ["true"]);
+  assert.deepEqual(reconstructable([decision, good, bad]), ["true"]);
+});
+
 test("explanation reconstructable is independent of notice order", () => {
   // Verifier-found regression: a decision notified by more than one Notice (one clean, one with its
   // own dangling ref) used to read explanationReconstructable from whichever Notice was mapped LAST,

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from agentce.domain import DomainBinding
 from agentce.graph import UnreadableWrite, build_graph, flagged_records, unkeyed_flags
 from agentce.iri import event_iri, principal_iri
@@ -399,6 +401,51 @@ def test_explanation_reconstructable_is_independent_of_notice_order() -> None:
     assert dangling_last.literal_values(
         event_iri("d1"), "agentce:explanationReconstructable"
     ) == ["true"]
+
+
+def _reconstructable(
+    events: list[dict[str, Any]], decision_id: str = "d1"
+) -> list[str]:
+    store = build_graph(events, domain=DOMAIN)
+    return store.literal_values(
+        event_iri(decision_id), "agentce:explanationReconstructable"
+    )
+
+
+def _with(event: dict[str, Any], **data: Any) -> dict[str, Any]:
+    return {**event, "data": {**event["data"], **data}}
+
+
+@pytest.mark.parametrize(
+    ("rationale", "expected"),
+    [
+        ("agentce:event/m1", "true"),
+        ("agentce:event/missing", "false"),
+        ("sha256:" + "3" * 64, "true"),
+        ("blob://rationale/1", "true"),
+        ("m1", "true"),
+    ],
+)
+def test_explanation_reconstructable_reads_the_rationale_claim_ref(
+    rationale: str, expected: str
+) -> None:
+    """18.37h: a rationale_claim_ref written as a Ref must name a held event; a Digest, URI or bare id is
+    not a Ref and is not judged."""
+    held = _event("m1", "ModelCall", {"operation": "chat"})
+    dec = _with(decision("d1", "t"), rationale_claim_ref=rationale)
+    events = [held, dec, notice("c1", "t", "agentce:event/d1")]
+    assert _reconstructable(events) == [expected]
+    assert _reconstructable(list(reversed(events))) == [expected]
+
+
+def test_explanation_reconstructable_reads_the_notice_content_ref() -> None:
+    """18.37h: the only Notice's dangling content_ref fails; a clean second Notice passes in either order."""
+    dec = decision("d1", "t")
+    bad = _with(notice("c1", "t", "agentce:event/d1"), content_ref="agentce:event/zz")
+    good = _with(notice("c2", "t", "agentce:event/d1"), content_ref="blob://n/2")
+    assert _reconstructable([dec, bad]) == ["false"]
+    assert _reconstructable([dec, bad, good]) == ["true"]
+    assert _reconstructable([dec, good, bad]) == ["true"]
 
 
 def _event(event_id: str, ptype: str, data: dict[str, Any]) -> dict[str, Any]:

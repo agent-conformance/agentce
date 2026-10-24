@@ -89,6 +89,46 @@ class GraphTest {
      * was mapped LAST, so the same evidence gave a different verdict depending only on event order.
      * Reconstructable means at least one notifying Notice is clean -- true in both orderings.
      */
+    // 18.37h: a rationale_claim_ref or content_ref written as a Ref must name a held event; a Digest, URI or bare
+    // id is not a Ref and is not judged.
+    private static JsonNode withData(JsonNode event, String key, String value) {
+        ObjectNode copy = event.deepCopy();
+        ((ObjectNode) copy.get("data")).put(key, value);
+        return copy;
+    }
+
+    private static List<String> reconstructable(List<JsonNode> events) {
+        return Graph.buildGraph(events, DomainBinding.fromDict(CREDIT_DOMAIN))
+                .literalValues("agentce:event/d1", "agentce:explanationReconstructable");
+    }
+
+    @Test
+    void explanationReconstructableReadsTheRationaleClaimRef() {
+        Map<String, String> cases = new LinkedHashMap<>();
+        cases.put("agentce:event/c1", "true");
+        cases.put("agentce:event/missing", "false");
+        cases.put("sha256:" + "3".repeat(64), "true");
+        cases.put("blob://rationale/1", "true");
+        cases.put("c1", "true");
+        cases.forEach((rationale, expected) -> {
+            List<JsonNode> events = new ArrayList<>(List.of(
+                    withData(decisionEvent("d1"), "rationale_claim_ref", rationale), noticeEvent("c1", "d1", null)));
+            assertEquals(List.of(expected), reconstructable(events), rationale);
+            Collections.reverse(events);
+            assertEquals(List.of(expected), reconstructable(events), rationale + " reversed");
+        });
+    }
+
+    @Test
+    void explanationReconstructableReadsTheNoticeContentRef() {
+        JsonNode decision = decisionEvent("d1");
+        JsonNode bad = withData(noticeEvent("c1", "d1", null), "content_ref", "agentce:event/zz");
+        JsonNode good = withData(noticeEvent("c2", "d1", null), "content_ref", "blob://n/2");
+        assertEquals(List.of("false"), reconstructable(List.of(decision, bad)));
+        assertEquals(List.of("true"), reconstructable(List.of(decision, bad, good)));
+        assertEquals(List.of("true"), reconstructable(List.of(decision, good, bad)));
+    }
+
     @Test
     void explanationReconstructableIsIndependentOfNoticeOrder() {
         JsonNode decision = decisionEvent("d1");
