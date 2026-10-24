@@ -19,6 +19,8 @@ rejected, 2 the command line named something that does not exist. Standard libra
 from __future__ import annotations
 
 import argparse
+import importlib.machinery
+import importlib.util
 import json
 import os
 import re
@@ -42,6 +44,9 @@ DEMO_FAULT_ENV = "VERIFICATION_DEMO_FAULT"
 CLAIMS_REGISTER = Path("tools/claims/register.yaml")
 ARGV_GRAMMAR = Path("spec/cli/argv-grammar.json")
 ARGV_CASES = Path("spec/cli/argv-cases.json")
+READER_CASES = Path("spec/report/reader-cases.json")
+#: The reader census (SPEC 8.7): standard library only, loaded from this suite's own repository.
+READER_CENSUS = HERE.parent / "tools" / "report_validate_reader_census.py"
 
 
 def load_registry(path: Path) -> dict[str, Any]:
@@ -135,6 +140,7 @@ def lint_registry(registry: dict[str, Any], root: Path) -> list[str]:
         if gid not in changelog:
             problems.append(f"registry.gate_not_in_changelog: {gid}")
     problems.extend(lint_argv_cases(root))
+    problems.extend(lint_reader_cases(root))
     return problems
 
 
@@ -152,6 +158,34 @@ def lint_argv_cases(root: Path) -> list[str]:
     return [
         f"registry.argv_rule_without_case: {rule}" for rule in rules if rule not in have
     ]
+
+
+def lint_reader_cases(root: Path) -> list[str]:
+    """SPEC 8.7: every input class the reader census lists keeps a case in spec/report/reader-cases.json,
+    including one per command that reaches it (tools/report_validate_reader_census.py --check-cases). A
+    root with no case table (the self-tests' scratch roots) has nothing to cover."""
+    if not (root / READER_CASES).exists():
+        return []
+    name = "reader_census"
+    census = sys.modules.get(name)
+    if census is None:
+        loader = importlib.machinery.SourceFileLoader(name, str(READER_CENSUS))
+        census = importlib.util.module_from_spec(
+            importlib.util.spec_from_loader(name, loader)  # type: ignore[arg-type]
+        )
+        sys.modules[name] = census  # a dataclass resolves its module by name
+        # a broken census rejects the registry, never crashes the lint
+        try:
+            loader.exec_module(census)
+        except Exception as exc:
+            del sys.modules[name]
+            return [f"registry.reader_census_unreadable: {READER_CENSUS}: {exc}"]
+    try:
+        table = json.loads((root / READER_CASES).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return [f"registry.reader_table_unreadable: {exc}"]
+    problems: list[str] = census.check_cases(table)
+    return [f"registry.reader_case: {problem}" for problem in problems]
 
 
 def lint_fault(

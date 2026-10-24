@@ -59,4 +59,16 @@ an engine wrote) and the expected `canonical` value or refused `line`. `number_r
 lexeme and the bytes every engine prints for it; `compare_by_value` and `compare_across_types` rows give
 two JSON texts and whether they are equal.
 
+`reader-cases.json` is the report-file reader contract's case table (SPEC 8.7). Each case names a census
+class (`rule`, one of the classes `tools/report_validate_reader_census.py` lists), a command (`report-validate`,
+`readiness`, `sign` or `diff`), the report file it edits, the edits in hex (so a byte-order mark, a CR or an
+invalid byte survives every JSON library), and the answer every engine must give: the exit code and, for a
+refusal, the message key and the text the problem line or error message must hold. Every engine's tests read
+it, `tools/report_validate_parity_check.py` runs each case in all three engines on a report that engine wrote,
+and the registry lint (`./verification/run --lint-registry`) fails when a class or a command that reaches it
+has no case. A reader stops at the first fault in this order: a byte-order mark, then invalid UTF-8, then the
+format's own scan in text order. That is why a file with a byte-order mark and text after a closing quote is
+named `bom`, and why a JUnit file that declares an entity is named `xml_dtd`: the DTD comes before the entity,
+so it is the first fault.
+
 Nothing here opens a network connection or uses a learned component.
