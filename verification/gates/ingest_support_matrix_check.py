@@ -32,7 +32,6 @@ _TIER_LINE_RE = re.compile(
 _MORE_RE = re.compile(r"^and (\d+) more$")
 _TRAILER_RE = re.compile(r"\s*—\s*(?:see the full matrix|help wanted)\s*$")
 _TABLE_HEADER = "| Backend | Tier | Reader follows | Build item |"
-_HEADER_CELLS = ("backend", "tier", "reader follows", "build item")
 _FOLLOWS_RE = re.compile(r"\[[^\]]+\]\(([^)\s]+)\),\s*(\S.*)")
 # A tier claim written any other way than a _TIER_LINE_RE line (18.39c): once emphasis, code spans, HTML tags,
 # entities, invisible characters and case are set aside, a tier word followed by a parenthesised count.
@@ -69,13 +68,12 @@ def _unreadable_headers(text: str) -> list[tuple[int, str]]:
     """Piped lines that name all four header cells but are not a header copy _is_table_header reads:
     a table in a block quote or on a list item, a linked cell, reordered or extra columns. Refused,
     not skipped, so a header spelling nobody foresaw cannot hide a table (18.39a)."""
-    return [
-        (number, line)
-        for number, line in enumerate(text.splitlines(), start=1)
-        if "|" in line
-        and not _is_table_header(line)
-        and all(name in _header_key(line) for name in _HEADER_CELLS)
-    ]
+    found = []
+    for number, line in enumerate(text.splitlines(), start=1):
+        key = _header_key(line) if "|" in line else ""
+        if all(name in key for name in _HEADER_CELLS) and not _is_table_header(line):
+            found.append((number, line))
+    return found
 
 
 def _extract_table_rows(text: str) -> list[list[str]]:
@@ -123,6 +121,9 @@ def _plain(line: str) -> str:
     removed, so a tier claim is found however it is spelled."""
     unescaped = _ESCAPE_RE.sub(r"\1", html.unescape(line))
     return _MARKUP_RE.sub("", _INVISIBLE_RE.sub("", unescaped))
+
+
+_HEADER_CELLS = tuple(_header_key(cell) for cell in _split_cells(_TABLE_HEADER))
 
 
 def check_tier_layout(text: str, source: str) -> list[str]:
@@ -719,9 +720,11 @@ def self_test() -> int:
     # piped line naming the four columns is refused rather than skipped.
     def under_header(
         header: str,
-        delimiter: str = "|---|---|---|---|",
-        row: str = "| Honeycomb | Supported | x | y |",
+        delimiter: str | None = None,
+        row: str | None = None,
     ) -> list[str]:
+        delimiter = delimiter or "|---|---|---|---|"
+        row = row or "| Honeycomb | Supported | x | y |"
         return check_trace_store_docs(
             rows, f"{good_table}\n{header}\n{delimiter}\n{row}\n"
         )
@@ -779,8 +782,8 @@ def self_test() -> int:
     ):
         found = under_header(
             header,
-            delimiter or "|---|---|---|---|",
-            row or "| Honeycomb | Supported | x | y |",
+            delimiter,
+            row,
         )
         cases.append(
             (
@@ -828,8 +831,8 @@ def self_test() -> int:
                 has(
                     under_header(
                         header,
-                        delimiter or "|---|---|---|---|",
-                        row or "| Honeycomb | Supported | x | y |",
+                        delimiter,
+                        row,
                     ),
                     "docs_header_unreadable",
                 ),
