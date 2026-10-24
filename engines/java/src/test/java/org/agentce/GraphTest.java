@@ -83,12 +83,6 @@ class GraphTest {
         assertEquals(List.of("false"), store.literalValues("agentce:event/d1", "agentce:explanationReconstructable"));
     }
 
-    /**
-     * Verifier-found regression: a decision notified by more than one Notice (one clean, one with
-     * its own dangling ref) used to read {@code explanationReconstructable} from whichever Notice
-     * was mapped LAST, so the same evidence gave a different verdict depending only on event order.
-     * Reconstructable means at least one notifying Notice is clean -- true in both orderings.
-     */
     // 18.37h: a rationale_claim_ref or content_ref written as a Ref must name a held event; a Digest, URI or bare
     // id is not a Ref and is not judged.
     private static JsonNode withData(JsonNode event, String key, String value) {
@@ -129,6 +123,12 @@ class GraphTest {
         assertEquals(List.of("true"), reconstructable(List.of(decision, good, bad)));
     }
 
+    /**
+     * Verifier-found regression: a decision notified by more than one Notice (one clean, one with
+     * its own dangling ref) used to read {@code explanationReconstructable} from whichever Notice
+     * was mapped LAST, so the same evidence gave a different verdict depending only on event order.
+     * Reconstructable means at least one notifying Notice is clean -- true in both orderings.
+     */
     @Test
     void explanationReconstructableIsIndependentOfNoticeOrder() {
         JsonNode decision = decisionEvent("d1");

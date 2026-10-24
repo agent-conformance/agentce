@@ -403,13 +403,8 @@ def test_explanation_reconstructable_is_independent_of_notice_order() -> None:
     ) == ["true"]
 
 
-def _reconstructable(
-    events: list[dict[str, Any]], decision_id: str = "d1"
-) -> list[str]:
-    store = build_graph(events, domain=DOMAIN)
-    return store.literal_values(
-        event_iri(decision_id), "agentce:explanationReconstructable"
-    )
+def _reconstructable(events: list[dict[str, Any]]) -> list[str]:
+    return _flag(events, "d1", "explanationReconstructable")
 
 
 def _with(event: dict[str, Any], **data: Any) -> dict[str, Any]:
