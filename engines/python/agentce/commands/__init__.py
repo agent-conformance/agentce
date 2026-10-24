@@ -1524,8 +1524,14 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
     # below), not only when state.record() finally writes at the end of this function: a run refused
     # for an unwritable --state must leave nothing in --out that looks like a result either.
     state_arg = _opt_str(ns, "state")
+    # state.json is read here too, once, so a file that is not UTF-8 or not JSON is refused before
+    # any --out write (census odd-inputs lines 85, 87; 18.184s); Stage 6a reuses what was loaded.
+    state: StateDir | None = None
     if state_arg is not None:
         StateDir.ensure_writable(Path(state_arg))
+        state = StateDir.load(
+            Path(state_arg)
+        )  # incompatible state_version aborts with exit 3
     # The file arguments read later are checked here too, so a run refused for one leaves --out
     # empty (census odd-inputs line 46, 18.184c).
     domain_file = (
@@ -1547,7 +1553,12 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
             raw_catalog_dirs,
             deviations_path,
         )
-        _refuse_package_links_out(out_dir)
+    _refuse_links_out(
+        out_dir,
+        "input.package_link_outside"
+        if package_for_sharing
+        else "input.out_link_outside",
+    )
     if scanned is not None:
         scanned.write(out_dir, write_profile=derived_profile)
         limitations.append(RECORDS_LIMITATION)
@@ -1640,8 +1651,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
         raise _nothing_evaluated(profile_obj, ingested.accepted, len(evaluated))
     # Stage 6a: incremental state (SPEC §5.4 B7, HR-10). With --state the engine detects a changed
     # bundle (late-arriving evidence lands here), supersedes the prior report, and counts late events.
-    # (state_arg was already resolved, and its writability already proved, above.)
-    state: StateDir | None = None
+    # (state was already loaded, and its writability already proved, above.)
     supersedes: list[str] = []
     late_events: dict[str, int] = {}
     runtime_drift: list[dict[str, Any]] = []
@@ -1696,10 +1706,7 @@ def cmd_assess(ns: argparse.Namespace) -> CommandResult:
                     )
                 )
         deviation_register_digest = _digest_of(deviation_file)
-    if state_arg is not None:
-        state = StateDir.load(
-            Path(state_arg)
-        )  # incompatible state_version aborts with exit 3
+    if state is not None:
         supersedes, late_events = state.plan(
             loaded.digest, ingested.accepted, new_window_end
         )
@@ -2201,12 +2208,14 @@ def _check_package_path_overlap(
             )
 
 
-def _refuse_package_links_out(out_dir: Path) -> None:
-    """Refuse (``input.package_link_outside``) before anything is written when an entry under ``--out``
-    is a link leading outside it (ruling R7): the package is the folder handed over, and packaging
-    would write through the link. Links are found without following them and judged by where they
-    point, so a link to something missing outside is refused too. A link planted after this check is
-    the out-write family's (18.184), not closed here."""
+def _refuse_links_out(out_dir: Path, key: str) -> None:
+    """Refuse (``key``) before anything is written when an entry under ``--out``, file or folder, is a
+    link leading outside it: the run would write through it and change something elsewhere (ruling
+    R7; census odd-inputs line 89, 18.184s). Links are found without following them and judged by
+    where they point, so a link to something missing outside is refused too; a link inside ``--out``
+    is followed as before. ``input.package_link_outside`` under --package-for-sharing, whose package
+    would not hold the target, else ``input.out_link_outside``. A link planted after this check is
+    the residual R7 records."""
     if not signing.is_directory(out_dir):
         return
     for top, dirs, files in os.walk(out_dir, followlinks=False):
@@ -2216,11 +2225,17 @@ def _refuse_package_links_out(out_dir: Path) -> None:
                 out_dir, entry, or_root=True
             ):
                 rel = entry.relative_to(out_dir).as_posix()
-                raise InputError(
-                    "input.package_link_outside",
+                message = (
                     f"--package-for-sharing: {rel} in --out links outside the output folder, so "
-                    "the package would not hold it.",
-                    MESSAGE_KEYS["input.package_link_outside"].fix,
+                    "the package would not hold it."
+                    if key == "input.package_link_outside"
+                    else f"{rel} in --out links outside the output folder, so the run would "
+                    "write through it and change a file elsewhere."
+                )
+                raise InputError(
+                    key,
+                    message,
+                    MESSAGE_KEYS[key].fix,
                 )
 
 

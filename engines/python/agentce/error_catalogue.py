@@ -83,6 +83,7 @@ _KINDS: dict[str, str] = {
     "input.allow_unverified_requires_catalog_dir": "error",
     "input.package_path_overlap": "error",
     "input.package_link_outside": "error",
+    "input.out_link_outside": "error",
     "input.diff_field_not_string": "error",
     "input.diff_extra_argument": "error",
     "input.diff_unrecognized_flag": "error",

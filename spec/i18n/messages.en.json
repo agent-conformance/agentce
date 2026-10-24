@@ -77,6 +77,8 @@
   "errors.input.package_path_overlap.fix": "point --out somewhere outside every input path, then re-run.",
   "errors.input.package_link_outside.cause": "--package-for-sharing found a link in --out that leads outside the output folder, so the package would not hold what it points to, and writing through it would change a file elsewhere.",
   "errors.input.package_link_outside.fix": "remove the link, or choose an empty --out folder.",
+  "errors.input.out_link_outside.cause": "a run found a link in --out that leads outside the output folder, so writing the result through it would change a file elsewhere.",
+  "errors.input.out_link_outside.fix": "remove the link, or choose an empty --out folder.",
   "errors.input.diff_field_not_string.cause": "diff was given an assertion whose control, subject, or outcome field is present but is not a JSON string.",
   "errors.input.diff_field_not_string.fix": "emit control/subject/outcome as JSON strings.",
   "errors.input.diff_extra_argument.cause": "diff was given more than the two positional arguments it takes.",
