@@ -16,6 +16,8 @@ fails if a gate in `gates.json` is not named in this file.
   before it, for every decision that does not say it affects no natural person. Thirty seeded faults, ten per engine.
 - `VG-CATALOG-RULE-UNIQUE` (18.37f, changed): five eu-ai-act pairs leave the baseline (DOC-02 with REC-02 and TRN-04,
   OVS-05 with REC-05 and RSK-01, TRN-01 with TRN-05), and the eu-ai-act ceiling drops from 11 to 6.
+- The CI `demo-fault` job runs on 45 lanes (was 42): with VG-EUAIACT-CLUSTER3's thirty faults, estimated at 1982 s
+  from VG-EUAIACT-CLUSTER2's measured time, the heaviest of 42 shards was 13.5 minutes, over the 12.0 lane bound.
 
 ## 0.125.0
 
