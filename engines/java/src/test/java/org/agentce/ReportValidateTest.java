@@ -205,8 +205,9 @@ class ReportValidateTest {
         Files.writeString(out.resolve("report.junit.xml"), "<not-closed>");
         Files.writeString(out.resolve("oscal-ar.xml"), "<not-closed>");
         List<String> problems = ReportValidate.validateReport(out);
-        assertTrue(problems.stream().anyMatch(p -> p.startsWith("report.junit.xml: invalid XML")), problems.toString());
-        assertTrue(problems.stream().anyMatch(p -> p.startsWith("oscal-ar.xml: invalid XML")), problems.toString());
+        // The scanner names the rule (SPEC 8.7, 18.60): an unclosed element is xml_syntax.
+        assertTrue(problems.contains("report.junit.xml: outside the report-file reader contract: xml_syntax at line 1 (SPEC 8.7)"), problems.toString());
+        assertTrue(problems.contains("oscal-ar.xml: outside the report-file reader contract: xml_syntax at line 1 (SPEC 8.7)"), problems.toString());
     }
 
     @Test
@@ -214,7 +215,7 @@ class ReportValidateTest {
         freshFullReport(out);
         Files.writeString(out.resolve("report.junit.xml"), "<?xml version=\"1.0\"?>\n<a/><b/>\n");
         List<String> problems = ReportValidate.validateReport(out);
-        assertTrue(problems.stream().anyMatch(p -> p.startsWith("report.junit.xml: invalid XML")), problems.toString());
+        assertTrue(problems.contains("report.junit.xml: outside the report-file reader contract: xml_after_root at line 2 (SPEC 8.7)"), problems.toString());
     }
 
     @Test
@@ -222,7 +223,7 @@ class ReportValidateTest {
         freshFullReport(out);
         Files.writeString(out.resolve("oscal-ar.xml"), "<?xml version=\"1.0\"?>\n<a>&undefined;</a>\n");
         List<String> problems = ReportValidate.validateReport(out);
-        assertTrue(problems.stream().anyMatch(p -> p.startsWith("oscal-ar.xml: invalid XML")), problems.toString());
+        assertTrue(problems.contains("oscal-ar.xml: outside the report-file reader contract: xml_entity at line 2 (SPEC 8.7)"), problems.toString());
     }
 
     @Test
@@ -249,7 +250,8 @@ class ReportValidateTest {
         Files.write(out.resolve("assertions.json"), new byte[] {(byte) 0xff, (byte) 0xfe, 0, 1, 'x'});
         List<String> problems = ReportValidate.validateReport(out);
         assertTrue(
-                problems.stream().anyMatch(p -> p.startsWith("assertions.json: cannot read")), problems.toString());
+                problems.contains("assertions.json: outside the JSON profile: invalid_utf8 at line 1 (SPEC 8.7)"),
+                problems.toString());
     }
 
     @Test
@@ -309,7 +311,7 @@ class ReportValidateTest {
                 java.nio.file.StandardOpenOption.APPEND);
         List<String> problems = ReportValidate.validateReport(out);
         assertTrue(
-                problems.stream().anyMatch(p -> p.startsWith("runtime_drift.jsonl: cannot read")),
+                problems.contains("runtime_drift.jsonl: outside the JSON profile: invalid_utf8 at line 2 (SPEC 8.7)"),
                 problems.toString());
     }
 

@@ -2043,7 +2043,8 @@ global options:
     /** {@code agentce readiness} (SPEC §13.3.4 stage 4, item 18.25): the report-readiness verdict,
      * matching the Python reference's {@code cmd_readiness} byte for byte (see {@code Readiness.java}).
      * Exit 0 for READY and READY WITH LIMITATIONS, 1 for NOT READY -- the verdict logic lives in the
-     * engine, never in a skill. */
+     * engine, never in a skill. A report file outside the reader contract is refused with exit 3 ({@code
+     * report.validation_failed}, SPEC 8.7) before any readiness file is written. */
     private static CommandResult cmdReadiness(Argv.Scan parsed) {
         CommandResult result = new CommandResult("readiness");
         Path reportDir = Paths.get(requireDir(
@@ -2213,8 +2214,23 @@ global options:
     /** manifest.json's bytes, which the signature covers: absent, not a regular file or unreadable
      * (mode 000, behind a folder that cannot be entered) is refused, never signed without; a
      * manifest.json that links outside the report directory is refused too, so the signature covers a
-     * file the folder holds (by analogy with ruling R7); matches {@code _read_sign_manifest}. */
+     * file the folder holds (by analogy with ruling R7); matches {@code _read_sign_manifest}. The bytes
+     * are read by the report JSON reader (SPEC 8.7, a byte-order mark refused): outside it is refused
+     * naming the rule (18.60). */
     static byte[] readSignManifest(Path reportDir) {
+        byte[] raw = readSignManifestBytes(reportDir);
+        try {
+            Json.readJson(raw, Json.Bom.REFUSE);
+        } catch (IllegalArgumentException e) {
+            throw new InputError(
+                    "sign.no_manifest",
+                    "manifest.json: " + e.getMessage(),
+                    "produce the report again: `agentce assess … --out <report-dir>`.");
+        }
+        return raw;
+    }
+
+    private static byte[] readSignManifestBytes(Path reportDir) {
         Path manifestPath = reportDir.resolve("manifest.json");
         try {
             if (Files.isRegularFile(manifestPath)) {

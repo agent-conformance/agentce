@@ -1224,10 +1224,15 @@ public final class Readiness {
 
     // --- computeReadiness ------------------------------------------------------------------------
 
+    /** The key a report file outside the reader contract is refused with (SPEC 8.7). */
+    private static final String REPORT_INVALID = "report.validation_failed";
+
     /** A stage-4 input every report has, parsed: an absent one is a blocking reason, never an empty
-     * file, so deleting the record of a gap or a break cannot clear it (SPEC §13.3.4). One that is not
-     * UTF-8 JSON of its shape blocks the same way, never a crash and never read as empty; either way
-     * {@code empty} is returned. */
+     * file, so deleting the record of a gap or a break cannot clear it (SPEC §13.3.4). One that is JSON
+     * of another shape blocks the same way, never a crash and never read as empty; either way {@code
+     * empty} is returned. One outside the report-file reader contract (the JSON profile with a byte-order
+     * mark refused, bytes that are not UTF-8 included) is an input refusal, not a verdict: {@code
+     * report.validation_failed} naming the file and the rule (SPEC 8.7, 18.60). */
     private static <T> T reportFile(
             Path reportDir, String name, Function<String, T> parse, T empty, List<String> reasons) {
         try {
@@ -1236,9 +1241,7 @@ public final class Readiness {
                 return parse.apply(text);
             }
         } catch (Json.JsonProfileError e) {
-            // The profile rule and line when the file is outside the JSON profile (SPEC 8.7).
-            reasons.add("cannot read report file " + name + ": " + e.getMessage());
-            return empty;
+            throw new InputError(REPORT_INVALID, name + ": " + e.getMessage(), ErrorCatalogue.errorFix(REPORT_INVALID));
         } catch (IOException | Unreadable e) {
             reasons.add("cannot read report file " + name);
             return empty;

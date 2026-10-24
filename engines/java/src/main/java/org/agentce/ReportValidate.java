@@ -8,10 +8,8 @@ import com.networknt.schema.JsonNodePath;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.CharacterCodingException;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
@@ -26,9 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import javax.xml.stream.XMLInputFactory;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamReader;
 
 /**
  * {@code report --validate}: schema-validate every artifact in a report directory (SPEC §9), at
@@ -308,26 +303,45 @@ public final class ReportValidate {
         throw new CannotRead("not a regular file");
     }
 
-    /** {@link #readArtifact}, decoded as UTF-8; text that is not UTF-8 throws {@link CannotRead} too. */
-    private static String readArtifactText(Path path) throws CannotRead {
-        byte[] data = readArtifact(path);
+    /** Read one report file for {@link #validateReport}: its bytes, or {@code null} when it is absent
+     * or cannot be read, the second with its problem line added to {@code problems}. */
+    private static byte[] readOrReport(Path outDir, String filename, List<String> problems) {
+        try {
+            return readArtifact(outDir.resolve(filename));
+        } catch (CannotRead e) {
+            problems.add(filename + ": cannot read (" + e.getMessage() + ")");
+            return null;
+        }
+    }
+
+    /** A JSON or JSON Lines report file's text under the JSON profile's encoding rules, a byte-order mark
+     * refused (SPEC 8.7); {@code null} when absent, unreadable or outside them, with the problem line (after
+     * {@code wrap}) added. */
+    private static String readJsonText(Path outDir, String filename, String wrap, List<String> problems) {
+        byte[] data = readOrReport(outDir, filename, problems);
         if (data == null) {
             return null;
         }
         try {
-            return Verify.decodeStrict(data).toString();
-        } catch (CharacterCodingException e) {
-            throw new CannotRead(e.getMessage());
+            return Json.decodeProfile(data, Json.Bom.REFUSE);
+        } catch (Json.JsonProfileError e) {
+            problems.add(filename + ": " + wrap + e.getMessage());
+            return null;
         }
     }
 
-    /** Read one report file for {@link #validateReport}: its text, or {@code null} when it is absent
-     * or cannot be read, the second with its problem line added to {@code problems}. */
-    private static String readOrReport(Path outDir, String filename, List<String> problems) {
+    /** A CSV, XML, Markdown or HTML report file's text under the report-file reader contract (SPEC 8.7):
+     * no byte-order mark, strict UTF-8; {@code null} when absent, unreadable or outside it, with the problem
+     * line added. */
+    private static String readContractText(Path outDir, String filename, List<String> problems) {
+        byte[] data = readOrReport(outDir, filename, problems);
+        if (data == null) {
+            return null;
+        }
         try {
-            return readArtifactText(outDir.resolve(filename));
-        } catch (CannotRead e) {
-            problems.add(filename + ": cannot read (" + e.getMessage() + ")");
+            return ReportReader.decodeReportText(data);
+        } catch (ReportReader.ReaderException e) {
+            problems.add(filename + ": " + e.getMessage());
             return null;
         }
     }
@@ -335,11 +349,11 @@ public final class ReportValidate {
     private static Map<String, String> recordedOutputs(Path outDir) {
         JsonNode manifest;
         try {
-            String text = readArtifactText(outDir.resolve("manifest.json"));
-            if (text == null) {
+            byte[] data = readArtifact(outDir.resolve("manifest.json"));
+            if (data == null) {
                 return Map.of();
             }
-            manifest = Json.parseReport(text);
+            manifest = Json.readJson(data, Json.Bom.REFUSE);
         } catch (CannotRead | IllegalArgumentException e) {
             return Map.of(); // a manifest that cannot be read records nothing here; the schema check reports it
         }
@@ -356,17 +370,13 @@ public final class ReportValidate {
         return out;
     }
 
-    private static List<String> validateXmlWellformed(byte[] data, String filename) {
-        XMLInputFactory factory = XMLInputFactory.newInstance();
-        factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
-        try (var in = new ByteArrayInputStream(data)) {
-            XMLStreamReader reader = factory.createXMLStreamReader(in);
-            while (reader.hasNext()) {
-                reader.next();
-            }
+    /** The reader-contract problem line for an XML file that is not well-formed (SPEC 8.7), if any. */
+    private static List<String> validateXml(String text, String filename) {
+        try {
+            ReportReader.checkXml(text);
             return List.of();
-        } catch (XMLStreamException | IOException e) {
-            return List.of(filename + ": invalid XML (" + e.getMessage() + ")");
+        } catch (ReportReader.ReaderException e) {
+            return List.of(filename + ": " + e.getMessage());
         }
     }
 
@@ -389,60 +399,17 @@ public final class ReportValidate {
         return problems;
     }
 
-    /** A minimal RFC 4180 field splitter: exactly what {@code report.csv}'s own writer produces (no
-     * embedded newlines are ever written into a field), enough to accept a genuine run's output and
-     * reject garbage, matching Python's {@code csv.reader} behaviour for this bounded shape. */
-    private static List<String> splitCsvLine(String line) {
-        List<String> fields = new ArrayList<>();
-        int i = 0;
-        int n = line.length();
-        while (i <= n) {
-            StringBuilder field = new StringBuilder();
-            if (i < n && line.charAt(i) == '"') {
-                i++;
-                while (i < n) {
-                    if (line.charAt(i) == '"' && i + 1 < n && line.charAt(i + 1) == '"') {
-                        field.append('"');
-                        i += 2;
-                    } else if (line.charAt(i) == '"') {
-                        i++;
-                        break;
-                    } else {
-                        field.append(line.charAt(i));
-                        i++;
-                    }
-                }
-            } else {
-                while (i < n && line.charAt(i) != ',') {
-                    field.append(line.charAt(i));
-                    i++;
-                }
-            }
-            fields.add(field.toString());
-            if (i < n && line.charAt(i) == ',') {
-                i++;
-            } else {
-                break;
-            }
-        }
-        return fields;
-    }
-
+    /** report.csv's records by RFC 4180 ({@link ReportReader#readCsv}); a reader-contract fault is its one
+     * problem line, else the header must hold every column and each record the header's field count. */
     private static List<String> validateCsv(String text, String filename) {
-        String[] rawLines = text.split("\r?\n", -1);
-        List<String> lines = new ArrayList<>();
-        for (int i = 0; i < rawLines.length; i++) {
-            if (i == rawLines.length - 1 && rawLines[i].isEmpty()) {
-                continue; // trailing newline, not an empty final row
-            }
-            lines.add(rawLines[i]);
+        List<List<String>> rows;
+        try {
+            rows = ReportReader.readCsv(text);
+        } catch (ReportReader.ReaderException e) {
+            return List.of(filename + ": " + e.getMessage());
         }
-        if (lines.isEmpty()) {
+        if (rows.isEmpty()) {
             return List.of(filename + ": empty CSV (no header row)");
-        }
-        List<List<String>> rows = new ArrayList<>();
-        for (String line : lines) {
-            rows.add(splitCsvLine(line));
         }
         List<String> header = rows.get(0);
         List<String> problems = new ArrayList<>();
@@ -486,7 +453,7 @@ public final class ReportValidate {
         for (Map.Entry<String, String> entry : ARTIFACT_SCHEMAS.entrySet()) {
             String filename = entry.getKey();
             String schemaName = entry.getValue();
-            String text = readOrReport(outDir, filename, problems);
+            String text = readJsonText(outDir, filename, "", problems);
             if (text == null) {
                 continue; // mandatory absence was already reported above; optional absence is not a problem
             }
@@ -513,15 +480,15 @@ public final class ReportValidate {
             }
         }
         for (String filename : List.of("report.md", "report.html")) {
-            String text = readOrReport(outDir, filename, problems);
-            if (text != null && text.strip().isEmpty()) {
+            String text = readContractText(outDir, filename, problems);
+            if (text != null && ReportReader.isBlank(text)) {
                 problems.add(filename + ": empty");
             }
         }
         List<String> dataFiles = new ArrayList<>(REPORT_DATA_FILES);
         dataFiles.add("claim.json");
         for (String filename : dataFiles) {
-            String text = readOrReport(outDir, filename, problems);
+            String text = readJsonText(outDir, filename, filename.equals("claim.json") ? "" : "cannot be read: ", problems);
             if (text == null) {
                 if (filename.equals("claim.json") && hasAssertions && !hasEntry(outDir.resolve(filename))) {
                     problems.add("claim.json: missing (assertions.json holds assertions, and a run that"
@@ -543,23 +510,14 @@ public final class ReportValidate {
             }
         }
         for (String filename : OPTIONAL_ARTIFACTS) {
-            Path path = outDir.resolve(filename);
-            if (filename.endsWith(".xml")) {
-                try {
-                    byte[] data = readArtifact(path);
-                    if (data != null) {
-                        problems.addAll(validateXmlWellformed(data, filename));
-                    }
-                } catch (CannotRead e) {
-                    problems.add(filename + ": cannot read (" + e.getMessage() + ")");
-                }
-                continue;
-            }
-            String text = readOrReport(outDir, filename, problems);
+            boolean json = filename.endsWith(".jsonl");
+            String text = json ? readJsonText(outDir, filename, "", problems) : readContractText(outDir, filename, problems);
             if (text == null) {
                 continue; // optional: only present, and only validated, when a run actually produced it
             }
-            if (filename.equals("report.csv")) {
+            if (filename.endsWith(".xml")) {
+                problems.addAll(validateXml(text, filename));
+            } else if (filename.equals("report.csv")) {
                 problems.addAll(validateCsv(text, filename));
             } else {
                 problems.addAll(validateJsonl(text, filename));

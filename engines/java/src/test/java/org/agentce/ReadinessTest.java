@@ -127,19 +127,25 @@ class ReadinessTest {
             "applicability.jsonl", "{\"drift\": []}",
             "quarantine.jsonl", "{\"record\": \"r\"}");
 
-    /** The NOT READY reason for an unreadable report file; one outside the JSON profile names the rule and
-     * line (SPEC 8.7, 18.184x), as Python's {@code _cannot_read}. */
-    private static String cannotRead(String name, String rule) {
-        return rule == null
-                ? "cannot read report file " + name
-                : "cannot read report file " + name + ": outside the JSON profile: " + rule + " at line 1 (SPEC 8.7)";
+    /** The NOT READY reason for a report file of the wrong shape, as Python's {@code _cannot_read}. */
+    private static String cannotRead(String name) {
+        return "cannot read report file " + name;
+    }
+
+    /** A report file outside the reader contract (SPEC 8.7, 18.60) is an input refusal, not a verdict:
+     * {@code report.validation_failed} naming the file, the rule and its line. */
+    private static void assertRefused(Path dir, String name, String rule, int line, String what) {
+        InputError e = assertThrows(InputError.class,
+                () -> Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()), what);
+        assertEquals("report.validation_failed", e.key, what);
+        assertEquals(name + ": outside the JSON profile: " + rule + " at line " + line + " (SPEC 8.7)", e.reason, what);
     }
 
     /** LF alone ends a line; any other separator, or a no-break space or byte-order mark, leaves a
-     * line outside the JSON profile (18.184n), naming the rule as in Python and TypeScript (18.184x). */
+     * line outside the JSON profile (18.184n), refused naming the rule as in Python and TypeScript (18.60). */
     @ParameterizedTest
     @ValueSource(strings = {"integrity.jsonl", "applicability.jsonl", "quarantine.jsonl"})
-    void jsonlLineOutsideTheLineRuleIsNotReady(String name, @TempDir Path tmp) throws IOException {
+    void jsonlLineOutsideTheLineRuleIsRefused(String name, @TempDir Path tmp) throws IOException {
         String r = JSONL_RECORD.get(name);
         Map<String, String[]> cases = new LinkedHashMap<>();
         cases.put("joined VT", new String[] {r + "\u000b" + r + "\n", "extra_value"});
@@ -156,15 +162,13 @@ class ReadinessTest {
             Path dir = Files.createDirectories(tmp.resolve("c" + i++));
             writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
             Files.writeString(dir.resolve(name), c.getValue()[0]);
-            assertEquals(List.of(cannotRead(name, c.getValue()[1])),
-                    Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).reasons(), c.getKey());
+            assertRefused(dir, name, c.getValue()[1], 1, c.getKey());
         }
         Path dir = Files.createDirectories(tmp.resolve("not-utf8"));
         writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
         Files.writeString(dir.resolve(name), r.substring(0, r.length() - 1) + ", \"x\": \"");
         Files.write(dir.resolve(name), new byte[] {(byte) 0xff, '"', '}', '\n'}, java.nio.file.StandardOpenOption.APPEND);
-        assertEquals(List.of(cannotRead(name, "invalid_utf8")),
-                Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).reasons(), "not UTF-8");
+        assertRefused(dir, name, "invalid_utf8", 1, "not UTF-8");
     }
 
     @ParameterizedTest
@@ -948,23 +952,25 @@ class ReadinessTest {
         String[] parts = spec.split("\\|", 2);
         writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
         Files.writeString(dir.resolve(parts[0]), parts[1].replace("\\n", "\n"));
+        // Text that is not JSON at all is outside the JSON profile: refused, never a verdict (18.60).
+        String body = parts[1].replace("\\n", "\n");
+        if (body.isEmpty() || body.equals("{") || body.equals("not json\n")) {
+            assertRefused(dir, parts[0], "syntax", 1, spec);
+            return;
+        }
         Readiness.Verdict verdict = Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of());
         assertEquals(Readiness.NOT_READY, verdict.verdict());
-        // Text that is not JSON at all is outside the JSON profile, which the reason names (18.184x).
-        String body = parts[1].replace("\\n", "\n");
-        boolean notJson = body.isEmpty() || body.equals("{") || body.equals("not json\n");
-        assertEquals(List.of(cannotRead(parts[0], notJson ? "syntax" : null)), verdict.reasons());
+        assertEquals(List.of(cannotRead(parts[0])), verdict.reasons());
     }
 
     @Test
-    void aCoverageFileThatIsNotUtf8IsNotReady(@TempDir Path dir) throws IOException {
+    void aCoverageFileThatIsNotUtf8IsRefused(@TempDir Path dir) throws IOException {
         writeReport(dir, Json.nodes().arrayNode(), List.of(), defaultCoverage(), List.of());
         byte[] text = "{\"subjects\": {}}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
         byte[] bytes = java.util.Arrays.copyOf(text, text.length + 1);
         bytes[text.length] = (byte) 0xff;
         Files.write(dir.resolve("coverage.json"), bytes);
-        assertEquals(List.of(cannotRead("coverage.json", "invalid_utf8")),
-                Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).reasons());
+        assertRefused(dir, "coverage.json", "invalid_utf8", 1, "not UTF-8");
     }
 
     @Test
@@ -1016,6 +1022,19 @@ class ReadinessTest {
                 Files.delete(dir.resolve(ruleCase.file()));
             } else {
                 Files.writeString(dir.resolve(ruleCase.file()), ruleCase.content());
+            }
+            // A row whose reason names a JSON profile rule is, since 18.60, a refusal naming the same file,
+            // rule and line (SPEC 8.7), never a NOT READY reason.
+            String outside = ruleCase.readiness().size() == 1
+                    && ruleCase.readiness().get(0).startsWith("cannot read report file " + ruleCase.file() + ": ")
+                    ? ruleCase.readiness().get(0).substring(("cannot read report file " + ruleCase.file() + ": ").length())
+                    : null;
+            if (outside != null) {
+                InputError e = assertThrows(InputError.class,
+                        () -> Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()), ruleCase.id());
+                assertEquals("report.validation_failed", e.key, ruleCase.id());
+                assertEquals(ruleCase.file() + ": " + outside, e.reason, ruleCase.id());
+                continue;
             }
             assertEquals(ruleCase.readiness(),
                     Readiness.computeReadiness(dir, SEVERITIES, List.of(), Set.of()).reasons(), ruleCase.id());
