@@ -40,7 +40,7 @@ ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = Path(__file__).with_name("psp_profile_expected.json")
 SOURCE_CATALOG = ROOT / "spec/catalogs/base/eu-ai-act"
 QUICK = ROOT / "corpus/quickstart"
-CONTROLS = ("DAT-01", "DAT-02", "INC-02")
+CONTROLS = ("DAT-01", "REC-03", "INC-02")
 # Set at the first mismatch so scenarios still running stop between engine calls: a seeded-fault run
 # then costs the rebuild and a few scenarios, not the whole table.
 STOP = threading.Event()

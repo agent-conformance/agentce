@@ -212,7 +212,7 @@
     },
     "second-shape-file": {
       "shapes": {
-        "DAT-02": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:DAT-02-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:closed true ;\n  sh:property [ sh:path prov:used ; sh:minCount 1 ; sh:name \"S1\" ] .\n"
+        "REC-03": "@prefix sh: <http://www.w3.org/ns/shacl#> .\n@prefix prov: <http://www.w3.org/ns/prov#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix agentce: <https://agent-conformance.org/vocab/evidence/v1#> .\n\nagentce:REC-03-Shape a sh:NodeShape ;\n  sh:targetClass agentce:ConsequentialDecision ;\n  sh:closed true ;\n  sh:property [ sh:path agentce:inputsRecorded ; sh:hasValue true ; sh:name \"S1\" ] .\n"
       },
       "expect": "REFUSED sh:closed"
     },
