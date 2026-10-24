@@ -19,7 +19,10 @@ jobs:
   python:
     name: python
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # A hang guard, not the gate: the job took 8.5 to 14.6 minutes on phase/18 at e5d50e3e..70f7df56
+    # (runs 40066353223, 40071816022, 40073542849) and was cancelled at 15 minutes at bb1d2c7b with
+    # pytest at 100%, so the limit is twice the slowest measured run.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Install uv
