@@ -17,6 +17,7 @@ wording, without the hero/README structural checks. Stdlib only.
 from __future__ import annotations
 
 import argparse
+import html
 import re
 import sys
 from html.parser import HTMLParser
@@ -158,10 +159,40 @@ def check_landing(html: str) -> list[str]:
     ]
 
 
+#: Characters a reader never sees; each reading takes them both deleted and as a word break.
+_INVISIBLE = re.compile("[\u00ad\u200b-\u200d\u2060\ufeff]")
+#: Markdown emphasis and code markers, which a reader sees as the plain word.
+_EMPHASIS = re.compile(r"[*_~`]")
+#: Runs of whitespace, no-break space, hyphens and dashes: each reads as one word break.
+_BREAK = re.compile("[\\s\u00a0\\-\u2010-\u2015\u2212]+")
+_TAG = re.compile(r"<[^>]*>")
+_MD_LINK = re.compile(r"!?\[([^\]]*)\]\([^)]*\)")
+
+
+def _canonical(text: str, invisible: str = "") -> str:
+    text = _EMPHASIS.sub("", _INVISIBLE.sub(invisible, text.casefold()))
+    return _BREAK.sub(" ", text).strip()
+
+
+def _readings(text: str) -> set[str]:
+    """The text as written, and as a reader sees it with tags removed (or read as a break), entities
+    decoded and Markdown links read as their text. A union: one more reading can only add a match."""
+    rendered = {
+        _MD_LINK.sub(r"\1", html.unescape(_TAG.sub(gap, text))) for gap in ("", " ")
+    }
+    return {
+        _canonical(reading, invisible)
+        for reading in (text, *rendered)
+        for invisible in ("", " ")
+    }
+
+
 def check_retired(name: str, text: str) -> list[str]:
-    lowered = _squash(text).lower()
+    readings = _readings(text)
     return [
-        f"{name} still carries {old!r}" for old in RETIRED if old.lower() in lowered
+        f"{name} still carries {old!r}"
+        for old in RETIRED
+        if any(_canonical(old) in reading for reading in readings)
     ]
 
 
@@ -202,7 +233,7 @@ def check_readme(text: str) -> list[str]:
     return problems
 
 
-def self_test() -> list[str]:
+def self_test() -> tuple[list[str], int]:
     parts = {
         "eyebrow": '<p class="eyebrow">{t}</p>',
         "h1": "<h1>{h}</h1>",
@@ -332,6 +363,41 @@ def self_test() -> list[str]:
             check_retired("engines/README.md", "Our Conforming Engines ship today."),
             True,
         ),
+        **{
+            f"{form!r} is read as the retired phrase": (
+                check_retired("engines/README.md", f"these are {form} today"),
+                True,
+            )
+            for form in (
+                "conforming-engines",
+                "**conforming** engines",
+                "_conforming_ engine",
+                "`conforming` engine",
+                "conforming\u2011engine",
+                "conforming\u2014engine",
+                "con\u00adforming engine",
+                "conforming\u00a0engine",
+                "<strong>conforming</strong> engines",
+                "conforming&nbsp;engine",
+                "conforming&#45;engine",
+                "conforming<br>engine",
+                "[conforming](docs/terms.md) engine",
+                "conforming\u200bengine",
+                "CONFORMING ENGINES",
+                "Assess **any** AI agent against the same standard.",
+            )
+        },
+        **{
+            f"{form!r} is not the retired phrase": (
+                check_retired("engines/README.md", f"these are {form} today"),
+                False,
+            )
+            for form in (
+                "conformance engine",
+                "a conforming report from the engine",
+                "conforming. Engine",
+            )
+        },
         "the approved README passes": (check_readme(readme()), False),
         "a README without the subline fails": (
             check_readme(readme((TAGLINE, HEADLINE))),
@@ -346,11 +412,12 @@ def self_test() -> list[str]:
             True,
         ),
     }
-    return [
+    wrong = [
         name
         for name, (problems, should_fail) in cases.items()
         if bool(problems) != should_fail
     ]
+    return wrong, len(cases)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -367,11 +434,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--self-test", action="store_true")
     ns = ap.parse_args(argv)
     if ns.self_test:
-        wrong = self_test()
+        wrong, cases = self_test()
         for name in wrong:
             print(f"SELF-TEST FAIL: {name}")
         if not wrong:
-            print("locked_copy_check self-test: 24 cases discriminate")
+            print(f"locked_copy_check self-test: {cases} cases discriminate")
         return 1 if wrong else 0
     problems = check_dist(ns.dist) + check_readme(ns.readme.read_text(encoding="utf-8"))
     for extra in ns.also:
