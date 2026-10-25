@@ -330,6 +330,21 @@ if [ -f "$py_out/buyer.md" ] && ! grep -qF '`Decision` (`enforcement_point`)' "$
   status=1
 fi
 
+# check (s): M2 (verdicts/P18-18.18b-0d1b4bb.md) -- buyer.html renders the gap step's event and class
+# and the unpackaged how-to-check flag as <code>, and shows no literal backtick anywhere.
+if [ -f "$py_out/buyer.html" ]; then
+  for want in '<code>Decision</code> (<code>enforcement_point</code>)' '<code>--package-for-sharing</code>'; do
+    if ! grep -qF "$want" "$py_out/buyer.html"; then
+      echo "buyer-view: buyer.html does not render $want" >&2
+      status=1
+    fi
+  done
+  if grep -qF '`' "$py_out/buyer.html"; then
+    echo "buyer-view: buyer.html shows a literal backtick instead of a code span" >&2
+    status=1
+  fi
+fi
+
 # check (m): BUY-01's evidence ref renders in buyer.md too, not only buyer.html (verifier round-1 F2).
 if [ -f "$py_out/buyer.md" ] && ! grep -q 'Evidence: `agentce:event/buyer-view-fixture-dec1' "$py_out/buyer.md"; then
   echo "buyer-view: buyer.md is missing BUY-01's evidence ref line" >&2
@@ -358,6 +373,10 @@ elif [ ! -f "$pkg_out/buyer.md" ]; then
   status=1
 elif ! grep -q 'agentce verify --report' "$pkg_out/buyer.md"; then
   echo "buyer-view: packaged buyer.md missing the packaged how-to-check line (agentce verify --report ...)" >&2
+  status=1
+fi
+if [ "$pkg_code" -eq 2 ] && ! grep -qF "<code>agentce verify --report $pkg_out</code>" "$pkg_out/buyer.html" 2>/dev/null; then
+  echo "buyer-view: packaged buyer.html does not render the verify command, with its folder, as one code span" >&2
   status=1
 fi
 

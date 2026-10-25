@@ -19,7 +19,7 @@ import yaml
 from agentce import cli
 from agentce.assertions import Assertion, EvidencePointer, aggregate
 from agentce.buyer_view import compute_buyer_view
-from agentce.report import render_buyer_html, render_buyer_md
+from agentce.report import _code_spans_html, render_buyer_html, render_buyer_md
 
 _WINDOW = ("2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -382,3 +382,63 @@ def test_insufficient_evidence_in_coverage_unknown_gets_coverage_unknown_marker(
     }
     view = compute_buyer_view([a], blind_spots)
     assert view["answers"][0]["gap_step"] == {"kind": "coverage_unknown"}
+
+
+@pytest.mark.parametrize(
+    ("escaped", "expected"),
+    [
+        ("run `a` now", "run <code>a</code> now"),
+        ("one ` left", "one ` left"),
+        ("`a``b`", "<code>a</code><code>b</code>"),
+        ("`x &lt; y` then `", "<code>x &lt; y</code> then `"),
+    ],
+)
+def test_code_spans_html_pairs_backticks_and_leaves_an_unpaired_one(
+    escaped: str, expected: str
+) -> None:
+    assert _code_spans_html(escaped) == expected
+
+
+def _gap_view(event: str) -> dict[str, Any]:
+    a = _assertion(
+        "REC-01",
+        outcome="insufficient_evidence",
+        crosswalk=[{"framework": "caiq", "clause": "IAM-13.1", "verified": True}],
+    )
+    blind_spots = {
+        "blind_spots": [
+            {
+                "event": event,
+                "class": "enforcement_point",
+                "ladder_rung": 3,
+                "owner_key": "platform_or_security",
+                "step_kind": "request",
+                "unlocked_checks": [_check_ref(a)],
+                "needed_by_checks": [],
+            }
+        ],
+        "no_population": [],
+    }
+    return compute_buyer_view([a], blind_spots)
+
+
+def test_render_buyer_html_shows_the_gap_step_as_code_and_a_record_backtick_stays_inert() -> (
+    None
+):
+    """M2 (verdicts/P18-18.18b-0d1b4bb.md): the gap step's event and class render as <code>; a
+    backtick inside a record field is swapped for an inert look-alike first, so it never opens one."""
+    html_out = render_buyer_html(_gap_view("Decision"))
+    assert "<code>Decision</code> (<code>enforcement_point</code>)" in html_out
+    assert "<code>--package-for-sharing</code>" in html_out
+    hostile = render_buyer_html(_gap_view("x`<code>y</code>`z"))
+    assert "<code>x&#x27;‹code›y‹/code›&#x27;z</code>" in hostile
+    assert "<code>y</code>" not in hostile
+
+
+def test_render_buyer_html_keeps_a_backtick_in_the_packaged_folder_inside_its_span() -> (
+    None
+):
+    html_out = render_buyer_html(
+        _gap_view("Decision"), packaged=True, report_folder="out`dir"
+    )
+    assert "<code>agentce verify --report out`dir</code>" in html_out
