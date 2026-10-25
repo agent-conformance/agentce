@@ -19,6 +19,7 @@
 //                                                   each failure kind is caught and the fitting page passes.
 import { createServer } from 'node:http';
 import { readFileSync, readdirSync, statSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { parseArgs } from 'node:util';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, extname, relative, sep, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,6 +37,8 @@ const THEMES = ['dark', 'light'];
 // Must equal check-a11y.mjs's WCAG_TAGS; the self-test compares the two.
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'];
 const VIEWPORT = { width: 390, height: 844 };
+const CONTEXT_OPTIONS = { reducedMotion: 'reduce', viewport: VIEWPORT, deviceScaleFactor: 1 };
+const OFF_SITE = /^(?!http:\/\/127\.0\.0\.1[:/])/;
 const SNAPSHOT_PAGES = [
   '/',
   '/docs/getting-started/',
@@ -57,6 +60,7 @@ const MIME = {
   '.ttf': 'font/ttf',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
   '.ico': 'image/x-icon',
   '.xml': 'application/xml; charset=utf-8',
@@ -77,29 +81,28 @@ function resolveWithin(root, urlPath) {
 function serve(rootDir) {
   const root = resolve(rootDir);
   const server = createServer((req, res) => {
-    const file = resolveWithin(root, req.url);
-    if (file === null || !existsSync(file)) {
-      res.writeHead(file === null ? 403 : 404);
+    try {
+      const file = resolveWithin(root, req.url);
+      if (file === null || !existsSync(file)) {
+        res.writeHead(file === null ? 403 : 404);
+        res.end();
+        return;
+      }
+      res.writeHead(200, { 'content-type': MIME[extname(file)] || 'application/octet-stream' });
+      res.end(readFileSync(file));
+    } catch {
+      res.writeHead(500);
       res.end();
-      return;
     }
-    res.writeHead(200, { 'content-type': MIME[extname(file)] || 'application/octet-stream' });
-    res.end(readFileSync(file));
   });
   return new Promise((done) => server.listen(0, '127.0.0.1', () => done({ server, port: server.address().port })));
 }
 
 function htmlPages(dir) {
-  const out = [];
-  const walk = (d) => {
-    for (const name of readdirSync(d).sort()) {
-      const full = join(d, name);
-      if (statSync(full).isDirectory()) walk(full);
-      else if (name.endsWith('.html')) out.push(full);
-    }
-  };
-  walk(dir);
-  return out;
+  return readdirSync(dir, { recursive: true })
+    .filter((name) => name.endsWith('.html'))
+    .sort()
+    .map((name) => join(dir, name));
 }
 
 function urlPathFor(dir, file) {
@@ -150,12 +153,11 @@ function measureOverflow() {
   return { scroll, width, element: widest ? describe(widest) : 'html', right: Math.round(widestRight) };
 }
 
-async function newContext(browser, theme, offline) {
-  const context = await browser.newContext({ colorScheme: theme, reducedMotion: 'reduce', viewport: VIEWPORT, deviceScaleFactor: 1 });
-  await context.route('**/*', (route) => {
-    const url = new URL(route.request().url());
-    if (url.hostname === '127.0.0.1') return route.continue();
-    offline.add(url.origin);
+// A phone-sized context that refuses every request to another host and reports its origin.
+async function newContext(browser, theme, onOffSite) {
+  const context = await browser.newContext({ colorScheme: theme, ...CONTEXT_OPTIONS });
+  await context.route(OFF_SITE, (route) => {
+    onOffSite(new URL(route.request().url()).origin);
     return route.abort();
   });
   return context;
@@ -178,17 +180,13 @@ export async function checkSite({ dir, snapshotPages, outDir }) {
     // Overflow, once per page in the light theme, PARALLEL_PAGES at a time.
     const offlineByPage = new Map();
     const queue = [...pageIds];
-    const light = await browser.newContext({ colorScheme: 'light', reducedMotion: 'reduce', viewport: VIEWPORT, deviceScaleFactor: 1 });
     const worker = async () => {
-      const page = await light.newPage();
       let current = null;
-      await page.route('**/*', (route) => {
-        const url = new URL(route.request().url());
-        if (url.hostname === '127.0.0.1') return route.continue();
+      const context = await newContext(browser, 'light', (origin) => {
         if (!offlineByPage.has(current)) offlineByPage.set(current, new Set());
-        offlineByPage.get(current).add(url.origin);
-        return route.abort();
+        offlineByPage.get(current).add(origin);
       });
+      const page = await context.newPage();
       while (queue.length) {
         current = queue.shift();
         await open(page, base + current, null);
@@ -202,12 +200,12 @@ export async function checkSite({ dir, snapshotPages, outDir }) {
           });
         }
       }
-      await page.close();
+      await context.close();
     };
     await Promise.all(Array.from({ length: Math.min(PARALLEL_PAGES, pageIds.length) }, worker));
-    await light.close();
 
-    // Axe and snapshots at phone width, both themes, SNAPSHOT_PAGES only.
+    // Axe and snapshots at phone width, both themes, SNAPSHOT_PAGES only. Off-site requests were already
+    // reported by the overflow pass, which opened every page.
     for (const pageId of snapshotPages) {
       if (!pageIds.includes(pageId)) {
         findings.push({ key: 'ux.pages.snapshot_missing', page: pageId, detail: 'this snapshot page was not built; build it or update SNAPSHOT_PAGES' });
@@ -215,8 +213,7 @@ export async function checkSite({ dir, snapshotPages, outDir }) {
     }
     const present = snapshotPages.filter((p) => pageIds.includes(p));
     for (const theme of THEMES) {
-      const offline = new Set();
-      const context = await newContext(browser, theme, offline);
+      const context = await newContext(browser, theme, () => {});
       const page = await context.newPage();
       for (const pageId of present) {
         await open(page, base + pageId, theme);
@@ -231,7 +228,6 @@ export async function checkSite({ dir, snapshotPages, outDir }) {
         snapshots.push(file);
       }
       await context.close();
-      if (offline.size) offlineByPage.set(`(snapshot pages, ${theme})`, offline);
     }
     for (const [pageId, origins] of offlineByPage) {
       findings.push({ key: 'ux.pages.offline_request', page: pageId, detail: `asked for ${[...origins].sort().join(', ')}; serve every file from the site itself` });
@@ -298,15 +294,13 @@ async function selfTest() {
   return 0;
 }
 
-const argv = process.argv.slice(2);
-const KNOWN = new Set(['--self-test', '--dir', '--out']);
-for (let i = 0; i < argv.length; i++) {
-  const flag = argv[i];
-  if (!KNOWN.has(flag) || (flag !== '--self-test' && !argv[++i])) {
-    console.error(`ux.pages.usage: unknown or incomplete option ${flag}; use --self-test, --dir <path> or --out <dir>`);
-    process.exit(2);
-  }
+let args;
+try {
+  ({ values: args } = parseArgs({ options: { 'self-test': { type: 'boolean' }, dir: { type: 'string' }, out: { type: 'string' } }, strict: true }));
+  for (const name of ['dir', 'out']) if (args[name] === '') throw new Error(`Option '--${name}' is empty`);
+  if (args['self-test'] && (args.dir !== undefined || args.out !== undefined)) throw new Error('--self-test takes no other option');
+} catch (err) {
+  console.error(`ux.pages.usage: ${err.message}; use --self-test, --dir <path> or --out <dir>`);
+  process.exit(2);
 }
-const valueOf = (flag) => (argv.includes(flag) ? argv[argv.indexOf(flag) + 1] : undefined);
-const dirArg = valueOf('--dir');
-process.exit(argv.includes('--self-test') ? await selfTest() : await runGate({ dir: dirArg ? resolve(dirArg) : distDir, out: valueOf('--out') }));
+process.exit(args['self-test'] ? await selfTest() : await runGate({ dir: args.dir ? resolve(args.dir) : distDir, out: args.out }));

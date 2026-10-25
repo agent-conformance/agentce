@@ -1357,12 +1357,12 @@ def _buyer_answer_md(entry: dict[str, Any], cat: dict[str, str]) -> list[str]:
 _CODE_SPAN = re.compile(r"`([^`]+)`")
 
 
-def _code_spans_html(escaped: str) -> str:
-    """Turn each backtick pair in already-escaped text into ``<code>``. Every backtick left at this
+def _code_spans_html(text: str) -> str:
+    """Escape ``text`` and turn each backtick pair into ``<code>``. Every backtick left at this
     point came from the catalogue or the renderer: record-derived fields went through
     `_sanitize_field`, which swaps a backtick for an inert look-alike. An unpaired backtick stays
     literal."""
-    return _CODE_SPAN.sub(r"<code>\1</code>", escaped)
+    return _CODE_SPAN.sub(r"<code>\1</code>", html.escape(text))
 
 
 def _buyer_answer_html(entry: dict[str, Any], cat: dict[str, str]) -> str:
@@ -1386,7 +1386,7 @@ def _buyer_answer_html(entry: dict[str, Any], cat: dict[str, str]) -> str:
         sub_items += f"<li>{html.escape(cat['report.evidence_label'])}: {refs}</li>"
     if entry["outcome"] == "insufficient_evidence":
         for gap_line in _buyer_gap_lines(entry, cat):
-            sub_items += f"<li>{_code_spans_html(html.escape(gap_line))}</li>"
+            sub_items += f"<li>{_code_spans_html(gap_line)}</li>"
     if "manual_checklist_note" in entry:
         sub_items += f"<li>{html.escape(entry['manual_checklist_note'])}</li>"
     if sub_items:
@@ -1461,16 +1461,10 @@ def _buyer_how_to_check_html(
         # inside its span instead of splitting it.
         marker = "\x00"
         line = _code_spans_html(
-            html.escape(
-                i18n_format.format_message(
-                    cat["report.buyer_how_to_check"], folder=marker
-                )
-            )
+            i18n_format.format_message(cat["report.buyer_how_to_check"], folder=marker)
         ).replace(marker, html.escape(folder))
     else:
-        line = _code_spans_html(
-            html.escape(cat["report.buyer_how_to_check_unpackaged"])
-        )
+        line = _code_spans_html(cat["report.buyer_how_to_check_unpackaged"])
     reproduce = html.escape(_reproduce_command(argv))
     return (
         f"<p>{line}</p><p>Catalog: {_catalog_citation_html(catalogs)}</p>"

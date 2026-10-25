@@ -1382,7 +1382,7 @@
         {
           "description": "18.40c M2: _buyer_answer_html stops turning the gap step's backtick pairs into <code>, so buyer.html shows `Decision` (`enforcement_point`) with literal backticks again",
           "file": "engines/python/agentce/report.py",
-          "search": "            sub_items += f\"<li>{_code_spans_html(html.escape(gap_line))}</li>\"",
+          "search": "            sub_items += f\"<li>{_code_spans_html(gap_line)}</li>\"",
           "replace": "            sub_items += f\"<li>{html.escape(gap_line)}</li>\""
         }
       ],

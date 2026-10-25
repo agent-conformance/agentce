@@ -385,18 +385,18 @@ def test_insufficient_evidence_in_coverage_unknown_gets_coverage_unknown_marker(
 
 
 @pytest.mark.parametrize(
-    ("escaped", "expected"),
+    ("text", "expected"),
     [
         ("run `a` now", "run <code>a</code> now"),
         ("one ` left", "one ` left"),
         ("`a``b`", "<code>a</code><code>b</code>"),
-        ("`x &lt; y` then `", "<code>x &lt; y</code> then `"),
+        ("`x < y` then `", "<code>x &lt; y</code> then `"),
     ],
 )
 def test_code_spans_html_pairs_backticks_and_leaves_an_unpaired_one(
-    escaped: str, expected: str
+    text: str, expected: str
 ) -> None:
-    assert _code_spans_html(escaped) == expected
+    assert _code_spans_html(text) == expected
 
 
 def _gap_view(event: str) -> dict[str, Any]:
