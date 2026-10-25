@@ -249,7 +249,7 @@ def prose(text: str) -> list[tuple[int, str]]:
             words = " ".join(line.text for line in block.lines)
             out.append((block.start, "#" * block.level + " " + words))
         else:
-            out += [(line.number, line.text) for line in block.lines or block.source]
+            out += [(line.number, line.text) for line in block.text_lines]
     return out
 
 

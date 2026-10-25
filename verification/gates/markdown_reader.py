@@ -103,6 +103,11 @@ class Block:
     rows: tuple[tuple[Line, tuple[str, ...]], ...] = ()
     source: tuple[Line, ...] = field(default=(), repr=False)
 
+    @property
+    def text_lines(self) -> tuple[Line, ...]:
+        """``lines``, or the raw ``source`` for a block with no text of its own (a rule)."""
+        return self.lines or self.source
+
     def visible_text(self) -> str:
         return " ".join(line.text for line in self.visible)
 
@@ -167,7 +172,8 @@ def blocks(text: str) -> list[Block]:
         "markdown_reader needs markdown-it-py (uv run --project tools)"
     )
     source = split_lines(text)
-    body = [""] * len(front_matter(text)) + source[len(front_matter(text)) :]
+    fm = len(front_matter(text))
+    body = [""] * fm + source[fm:]
     tokens = _PARSER.parse("\n".join(body) + "\n")
     out: list[Block] = []
     containers: list[str] = []
@@ -333,7 +339,7 @@ SPEC_EXAMPLES: tuple[tuple[int, str, str, str], ...] = (
 )  # fmt: skip
 
 # Characters CommonMark reads as ordinary that str.splitlines() ends a line at (section 2.1).
-NOT_LINE_ENDINGS = "\x0b\x0c\x1c\x1d\x1e\x85  "
+NOT_LINE_ENDINGS = "\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029"
 _LEAVES = {"p": "paragraph", "pre": "code", "hr": "rule", "table": "table"} | {
     f"h{n}": "heading" for n in range(1, 7)
 }
@@ -450,7 +456,8 @@ def self_test() -> int:
                 f"spec example {number} ({section}): blocks() reads {_shape(markdown)!r}, "
                 f"the spec {_expected_shape(want)!r}"
             )
-    for name, text, expected in _reader_cases():
+    reader_cases = _reader_cases()
+    for name, text, expected in reader_cases:
         got = [
             (b.kind, b.start, b.end, b.containers, b.visible_text())
             for b in blocks(text)
@@ -467,21 +474,15 @@ def self_test() -> int:
         if visible.get(number) != line_text:
             failed.append(f"{name}: {visible!r}")
     rows = blocks("| a | b |\n|---|---|\n| c | d |\n")[0].rows
-    if [(line.number, cells) for line, cells in rows] != [
-        (1, ("a", "b")),
-        (3, ("c", "d")),
-    ]:
-        failed.append(f"table rows: {rows!r}")
-    split = split_lines("a\x0cb c\r\nd\re\n")
-    if split != ["a\x0cb c", "d", "e"]:
-        failed.append(f"split_lines: {split!r}")
-    if [ln.number for ln in front_matter("---\na: 1\n---\nx")] != [
-        1,
-        2,
-        3,
-    ] or front_matter("x\n---\n"):
-        failed.append("front_matter")
-    total = len(SPEC_EXAMPLES) + len(_reader_cases()) + len(line_cases) + 3
+    split = split_lines("a\x0cb\u2028c\r\nd\re\n")
+    fm_numbers = [ln.number for ln in front_matter("---\na: 1\n---\nx")]
+    unit_cases = [
+        ([(line.number, cells) for line, cells in rows] == [(1, ("a", "b")), (3, ("c", "d"))], f"table rows: {rows!r}"),
+        (split == ["a\x0cb\u2028c", "d", "e"], f"split_lines: {split!r}"),
+        (fm_numbers == [1, 2, 3] and not front_matter("x\n---\n"), "front_matter"),
+    ]  # fmt: skip
+    failed += [message for ok, message in unit_cases if not ok]
+    total = len(SPEC_EXAMPLES) + len(reader_cases) + len(line_cases) + len(unit_cases)
     for line in failed:
         print(f"self-test FAIL {line}", file=sys.stderr)
     print(f"markdown-reader self-test: {total - len(failed)}/{total} cases pass")

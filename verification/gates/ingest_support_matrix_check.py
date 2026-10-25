@@ -71,23 +71,23 @@ def _unreadable_headers(text: str) -> list[tuple[int, str]]:
     the block's letters alone, so no markup between or around them can hide one. Refused, not skipped,
     so a header spelling nobody foresaw cannot hide a table (18.39a)."""
     found = []
-    for block in blocks(text):
+    read = blocks(text)
+    tables = {table.start for table in _tables(read)}
+    for block in read:
         raw = "\n".join(line.text for line in block.source)
         letters = (
             re.sub(r"[^a-z]", "", html.unescape(raw).casefold()) if "|" in raw else ""
         )
-        if all(word in letters for word in _HEADER_WORDS) and block not in _tables(
-            text
-        ):
+        if all(word in letters for word in _HEADER_WORDS) and block.start not in tables:
             found.append((block.start, raw))
     return found
 
 
-def _tables(text: str) -> list[Block]:
+def _tables(read: list[Block]) -> list[Block]:
     """Each top-level table whose header row is a copy of the trace-store table's header."""
     return [
         block
-        for block in blocks(text)
+        for block in read
         if block.kind == "table"
         and not block.containers
         and _is_table_header(block.rows[0][0].text)
@@ -101,7 +101,7 @@ def _extract_table_rows(text: str) -> list[list[str]]:
     the page has to end the table with a blank line."""
     source = split_lines(text)
     rows = []
-    for table in _tables(text):
+    for table in _tables(blocks(text)):
         rows += [_split_cells(line.text) for line, _ in table.rows[1:]]
         for line in source[table.end :]:
             if not line.strip(" \t"):
@@ -154,7 +154,7 @@ def check_tier_layout(text: str, source: str) -> tuple[list[str], list[str]]:
     tier_lines: list[str] = []
     source_lines = split_lines(text)
     for block in blocks(text):
-        lines = block.lines or block.source
+        lines = block.text_lines
         own_lines = (
             block.kind == "paragraph"
             and not block.containers
