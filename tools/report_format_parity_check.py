@@ -203,7 +203,8 @@ def check_corpus(
 
 def write_case_dirs(root: Path) -> list[tuple[str, Path]]:
     """Each case as a report directory: assertions.json, oscal-ar.json (Python's render_oscal of the
-    assertions unless the case gives its own document) and a manifest naming the case's catalogs."""
+    assertions unless the case gives its own document) and a manifest naming the case's catalogs.
+    Keys are written in the order given, not sorted, so a renderer that stops sorting is seen."""
     cases = json.loads(CASES.read_text("utf-8"))["cases"]
     script = """
 import json, sys
@@ -244,9 +245,7 @@ print(json.dumps([render_oscal([Assertion.from_json(a) for a in c["assertions"]]
             ("oscal-ar.json", case.get("oscal", oscal)),
             ("manifest.json", {"inputs": {"catalogs": catalogs}}),
         ):
-            (d / name).write_text(
-                json.dumps(value, sort_keys=True, indent=2) + "\n", "utf-8"
-            )
+            (d / name).write_text(json.dumps(value, indent=2) + "\n", "utf-8")
         out.append((case["name"], d))
     return out
 
@@ -319,13 +318,17 @@ def _report(label: str, problems: list[str]) -> int:
 def run_check(engines: tuple[str, ...], fail_fast: bool) -> int:
     with tempfile.TemporaryDirectory(prefix="report-format-parity-") as raw:
         tmp = Path(raw)
-        # Python's own seam over its assess output must give assess's own bytes, so the seam's
-        # inputs (assertions.json, oscal-ar.json, the manifest's catalogs) are what assess renders from.
-        failures, runs = check_corpus(tmp / "corpus-run", engines, fail_fast)
+        # The case table runs first: it takes seconds, so --fail-fast stops on a renderer fault before
+        # the corpus assess. Python's own seam over its assess output must give assess's own bytes, so
+        # the seam's inputs (assertions.json, oscal-ar.json, the manifest's catalogs) are what assess
+        # renders from.
+        failures, runs = check_cases(tmp, engines, fail_fast)
         if not (failures and fail_fast):
-            case_failures, cases = check_cases(tmp, engines, fail_fast)
-            failures += case_failures
-            runs += cases
+            corpus_failures, corpus_runs = check_corpus(
+                tmp / "corpus-run", engines, fail_fast
+            )
+            failures += corpus_failures
+            runs += corpus_runs
     if failures:
         print(f"{failures} of {runs} runs differ", file=sys.stderr)
         return 1

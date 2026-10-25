@@ -1233,15 +1233,8 @@ function xmlDocument(root: XmlElement): string {
 /** Python's `_xml_tag`: a code point that is not a letter or number (`str.isalnum`) and not `-`, `_`
  * or `.` becomes `_`; a result that is empty or does not start with a letter or `_` gets a leading `_`. */
 function xmlTag(key: string): string {
-  const safe = [...key].map((c) => (/^[\p{L}\p{N}\-_.]$/u.test(c) ? c : "_")).join("");
-  return safe === "" || !/^[\p{L}_]/u.test(safe) ? `_${safe}` : safe;
-}
-
-/** Python's `str()` of a JSON scalar, the element text `_xml_from_value` writes. */
-function pyScalarText(value: unknown): string {
-  if (value === true) return "True";
-  if (value === false) return "False";
-  return String(value);
+  const tag = safe(key);
+  return tag === "" || !/^[\p{L}_]/u.test(tag) ? `_${tag}` : tag;
 }
 
 function xmlFromValue(tag: string, value: unknown): XmlElement {
@@ -1254,7 +1247,7 @@ function xmlFromValue(tag: string, value: unknown): XmlElement {
       .sort(byteCompare)
       .map((key) => xmlFromValue(xmlTag(key), record[key]));
   } else if (value !== null && value !== undefined) {
-    element.text = pyScalarText(value);
+    element.text = pyStr(value);
   }
   return element;
 }
