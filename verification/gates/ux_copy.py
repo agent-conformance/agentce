@@ -40,6 +40,8 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from markdown_reader import blocks, front_matter
+
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 from locked_copy_check import RETIRED, TAGLINE  # type: ignore[import-not-found]  # noqa: E402
@@ -71,10 +73,7 @@ COMPILED = [
     (key, re.compile(pattern, re.IGNORECASE), fix) for key, pattern, fix in RULES
 ]
 
-FENCE = re.compile(r"^\s*(```|~~~)")
-COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 CODE_SPAN = re.compile(r"(`+)(?:(?!\1).)+?\1", re.DOTALL)
-LINK_TARGET = re.compile(r"\]\([^)\s]*(?:\s+\"[^\"]*\")?\)")
 URL = re.compile(r"<?\b(?:https?|ftp|mailto):[^\s<>)\]]+>?")
 FRONT_KEY = re.compile(r"^(title|description)\s*:\s*(.*)$")
 BLOCK = {
@@ -105,38 +104,36 @@ def blank(match: re.Match[str]) -> str:
 
 
 def markdown_lines(text: str) -> list[tuple[int, str]]:
-    """(1-based line, reader-visible text) for a Markdown file; skipped lines come back blank."""
-    lines = text.split("\n")
+    """(1-based line, reader-visible text) for a Markdown file, read as CommonMark blocks
+    (markdown_reader): each title or description value in the front matter, then each block's visible
+    text (code spans, comments, link targets and fenced code left out; URLs blanked), with a blank line
+    after each block and each table row so a paragraph is scanned as one."""
     out: list[tuple[int, str]] = []
-    front = bool(lines) and lines[0].rstrip() == "---"
-    fenced = reading = False
-    for number, line in enumerate(lines, start=1):
-        if front:
-            if number > 1 and line.rstrip() == "---":
-                front = False
-                out.append((number, ""))
-            elif line[
-                :1
-            ].isspace():  # a continuation line of the key above (`description: >`)
-                out.append((number, line if reading else ""))
-            else:  # a key: each title or description value is its own paragraph
-                key = FRONT_KEY.match(line)
-                reading = bool(key)
-                value = key.group(2).strip() if key else ""
-                out += [
-                    (number, ""),
-                    (number, "" if value in BLOCK else value.strip("'\"")),
-                ]
-            continue
-        if FENCE.match(line):
-            fenced = not fenced
+    reading = False
+    for number, line in ((line.number, line.text) for line in front_matter(text)):
+        if number > 1 and line.rstrip() == "---":
             out.append((number, ""))
-        else:
-            out.append((number, "" if fenced else line))
-    body = "\n".join(text for _, text in out)
-    for pattern in (COMMENT, CODE_SPAN, LINK_TARGET, URL):
-        body = pattern.sub(blank, body)
-    return [(out[i][0], text) for i, text in enumerate(body.split("\n"))]
+        elif line[
+            :1
+        ].isspace():  # a continuation line of the key above (`description: >`)
+            out.append((number, line if reading else ""))
+        else:  # a key: each title or description value is its own paragraph
+            key = FRONT_KEY.match(line)
+            reading = bool(key)
+            value = key.group(2).strip() if key else ""
+            out += [
+                (number, ""),
+                (number, "" if value in BLOCK else value.strip("'\"")),
+            ]
+    for block in blocks(text):
+        if block.kind == "fence":
+            continue
+        for seen in block.visible:
+            out.append((seen.number, URL.sub(blank, seen.text)))
+            if block.kind == "table":
+                out.append((seen.number, ""))
+        out.append((block.end, ""))
+    return out
 
 
 def plain_lines(text: str) -> list[tuple[int, str]]:
@@ -440,7 +437,21 @@ def self_test() -> int:
         (
             markdown_lines,
             ["prove"],
-            ("records prove it", "it proves", "proven", "proving", "it proved"),
+            (
+                "records prove it",
+                "it proves",
+                "proven",
+                "proving",
+                "it proved",
+                # 18.211: read as CommonMark blocks, so a code span stops at a paragraph break, a fence
+                # closes only on a run as long as its opener, and tables, lists and quotes are read.
+                "a ` tick\n\nrecords prove it\n\nanother ` tick",
+                "````\n```\n````\nrecords prove it",
+                "| a | b |\n|---|---|\n| c | records prove it |",
+                "- records prove it",
+                "> records\nprove it",
+                "records\x0c\nprove it",
+            ),
         ),
         (
             markdown_lines,
