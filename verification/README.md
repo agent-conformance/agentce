@@ -108,8 +108,8 @@ VG-INGEST-SUPPORT-MATRIX, VG-UX-COPY and VG-UX-ONE-QUESTION read Markdown only t
 `gates/markdown_reader.py`, which reads a file into blocks the way [CommonMark 0.31.2](https://spec.commonmark.org/0.31.2/)
 does, with [GFM 0.29](https://github.github.com/gfm/) tables, and keeps each block's source line numbers. It
 uses markdown-it-py's parser. A line ends only at LF, CR or CRLF, and a table ends only at a line of
-spaces and tabs, as on the site. `markdown_reader.py --self-test` runs the spec examples for each
-construct the gates depend on through it.
+spaces and tabs, as on the site. `markdown_reader.py --self-test` passes the spec examples for each
+construct the gates depend on through the reader and checks the blocks it returns.
 
 ## Adding a gate
 
