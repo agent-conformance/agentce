@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.135.13",
+  "suite_version": "0.135.14",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -2030,6 +2030,12 @@
           "file": "skills/agentce-get-evidence/SKILL.md",
           "search": "the top gaps from the terminal output.",
           "replace": "the top gaps from the terminal output. Tell me which catalogs to use too."
+        },
+        {
+          "description": "an imperative second ask inside prepare-to-share's Question paragraph after its '?' ('Tell me which catalogs to use too.'), caught because a sentence in the Question paragraph that asks without a '?' is one more question",
+          "file": "skills/agentce-prepare-to-share/SKILL.md",
+          "search": "**Question:** \"Who will read this report: your developers, compliance, security, an auditor or a buyer?\"",
+          "replace": "**Question:** \"Who will read this report: your developers, compliance, security, an auditor or a buyer?\" Tell me which catalogs to use too."
         }
       ],
       "fix_hint": "Run verification/gates/ux_one_question.sh; each stderr line names the key, the file and line or the engine and command. Keep a skill's first minute to one **Question:** line after its first agentce command, with a **Default:** that only reads and writes into the output folder; move other asks under a Phase or Stage heading; an engine's first-run command never prompts."

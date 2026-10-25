@@ -14,7 +14,8 @@ without asking passes here whatever its exit code; other gates hold exit codes.
 The skill leg reads each SKILL.md's `## First minute` section. It must name a first command that runs
 with no question (`agentce assess` or `agentce quickstart`), and may then ask one question, written as
 a `**Question:**` line after that command and followed by a `**Default:**` line. Each is read with the
-lines that continue its paragraph, and every "?" in a Question paragraph is a question. Neither may name
+lines that continue its paragraph, and every "?" in a Question paragraph is a question, as is a sentence
+in it that asks without one. Neither may name
 an action beyond reading and writing into the output folder, in any form of the verb. An instruction
 to ask (ask, confirm with, request from, check with, prompt the person for, tell me, let me know, in
 any tense) inside the section is a question with no default, and so is a request such as "which
@@ -134,6 +135,8 @@ ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07]*\x07")
 YES_NO = re.compile(r"\[(?:y/n|yes/no)\]|\((?:y/n|yes/no)\)", re.IGNORECASE)
 ENDS_IN_QUESTION = re.compile(r"\?[\s\"'*`)]*$")
 QUESTION_MARK = re.compile(r"\?(?:\W|$)")
+# A sentence and the quote or emphasis marks that close it.
+SENTENCE = re.compile(r"[^.?!]+[.?!]*[\"'*`)\]]*")
 
 
 def is_ask(line: str) -> bool:
@@ -274,7 +277,9 @@ def prose(found: list[Block]) -> list[tuple[int, str]]:
         if block.kind == "fence":
             continue
         if block.kind == "heading":
-            out.append((block.start, atx(block)))
+            for part in MARKER_AT.split(atx(block)):
+                if part.strip():
+                    out.append((block.start, part.strip()))
             continue
         piece: list[str] = []
         for line in block.text_lines:
@@ -364,11 +369,20 @@ def read_skill(rel: str, text: str, errors: list[str]) -> int:
         )
     asks = [(n, line) for n, line in body if line.startswith(QUESTION)]
     defaults = [(n, line) for n, line in body if line.startswith(DEFAULT)]
-    # A Question paragraph asks once per "?" in it; a Default paragraph that asks or tells the
-    # assistant to ask holds a question with no default of its own.
+    # Any other paragraph that asks or tells the assistant to ask holds a question with no default of
+    # its own. A Question paragraph asks once per "?" in it, and a sentence in it that asks without a
+    # "?" ("Tell me which catalogs to use too.") is one more question with no default.
     unmarked = [
         (n, line) for n, line in body if not line.startswith(QUESTION) and is_ask(line)
     ]
+    for n, line in asks:
+        extra = [
+            (n, sentence.strip())
+            for sentence in SENTENCE.findall(line.removeprefix(QUESTION))
+            if not QUESTION_MARK.search(sentence) and is_ask(sentence)
+        ]
+        # With no "?" in the paragraph, its first asking sentence is the question itself.
+        unmarked += extra if QUESTION_MARK.search(line) else extra[1:]
     count = len(unmarked) + sum(
         max(1, len(QUESTION_MARK.findall(line))) for _, line in asks
     )
@@ -721,7 +735,7 @@ SELF_TEST += [
     (
         "a rule under the Question and Default",
         GOOD.replace(GOOD_DEFAULT, GOOD_DEFAULT + "\nThen it signs the report.\n---"),
-        {"skill_setext_heading"},
+        {"skill_setext_heading", "skill_asks_outside_later_step"},
     ),
     (
         "a heading underlined with ===",
@@ -821,6 +835,42 @@ SELF_TEST += [
         {"skill_asks_before_first_minute"},
     )
     for line in ("Tell me the repository path first.", "Let us know your catalog.")
+]
+
+# An ask written inside the Question paragraph after its "?" is a second question (verdicts/P18-18.40a-5c1244e1.md
+# F1), and a marker inside a heading is read like any other.
+SELF_TEST += [
+    (
+        f"an ask in the Question paragraph: {where}",
+        GOOD.replace(GOOD_QUESTION, GOOD_QUESTION + sep + line),
+        {"skill_too_many_questions", "skill_question_unmarked"},
+    )
+    for where, sep, line in (
+        ("same line", " ", "Tell me which catalogs to use too."),
+        (
+            "wrapped line",
+            "\n",
+            "Let me know which catalogs to assess against, as well.",
+        ),
+    )
+] + [
+    (
+        "a Question and Default in a heading in the section",
+        GOOD.replace(
+            GOOD_DEFAULT,
+            GOOD_DEFAULT
+            + "\n\n### Then **Question:** which catalogs. **Default:** sign the report.",
+        ),
+        {"skill_too_many_questions", "skill_default_unsafe"},
+    ),
+    (
+        "a Question and Default in a heading under When to use",
+        GOOD.replace(
+            "## Phases",
+            "## When to use\n\n### Then **Question:** which catalogs. **Default:** sign it.\n\n## Phases",
+        ),
+        {"skill_asks_outside_later_step"},
+    ),
 ]
 
 TERMINAL_CASES: list[tuple[str, bool]] = [

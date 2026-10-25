@@ -3,6 +3,12 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.135.14
+
+- `VG-UX-ONE-QUESTION` (changed, 18.40a): a sentence in a Question paragraph that asks without a "?" ("Tell me which
+  catalogs to use too.") counts as one more question with no default, and a Question or Default marker inside a
+  heading is read like any other. New seeded fault: an imperative second ask in prepare-to-share's Question paragraph.
+
 ## 0.135.13
 
 - `VG-UX-ONE-QUESTION` (changed, 18.40a): a `**Question:**` or `**Default:**` marker is read wherever it sits in its
