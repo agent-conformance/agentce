@@ -240,14 +240,15 @@ def test_profile_with_calendar_invalid_unquoted_date_does_not_crash(
     resolver decides a plain scalar is timestamp-shaped, and that construction can raise
     ``ValueError`` for a calendar-invalid value (``2026-02-30``) even though the shape matched --
     confirmed live, previously an uncaught ``ValueError`` reaching the CLI's top-level
-    ``internal.unexpected`` catch-all. The loader now falls back to a text rendering instead of
-    raising, so a load through any real call site succeeds rather than crashing, regardless of
-    whether the application code that follows ever reads the date-shaped field."""
+    ``internal.unexpected`` catch-all. The loader falls back to a text rendering instead of raising,
+    and an observation window bound that is not a real date is then refused as a profile problem
+    (18.87), never a crash."""
     path = tmp_path / "profile.yaml"
     path.write_text("observation_window: {start: 2026-02-30}\n", encoding="utf-8")
 
-    profile = Profile.load(path)
-    assert profile.observation_window["start"] == "2026-02-30"
+    with pytest.raises(InputError) as excinfo:
+        Profile.load(path)
+    assert excinfo.value.key == "input.profile_invalid"
 
 
 def test_domain_binding_with_calendar_invalid_unquoted_date_does_not_crash(

@@ -182,6 +182,49 @@ test("a profile with a YAML error is refused as a profile problem", () => {
   }
 });
 
+test("an observation window bound that is not an RFC 3339 date is refused (18.87)", () => {
+  for (const [text, field] of [
+    ['observation_window: {start: "2026-01-01T00:00:00Z", end: "foo"}\n', "end"],
+    ['observation_window: {start: "2026-01-01T00:00:00Z", end: 2026-02-30}\n', "end"],
+    ['observation_window: {start: "2026-01-01T00:00:00Z", end: null}\n', "end"],
+    ['observation_window: {start: "foo", end: "2026-02-01T00:00:00Z"}\n', "start"],
+  ]) {
+    withFile(text, (path) => {
+      assert.throws(
+        () => loadProfile(path),
+        (error: unknown) =>
+          error instanceof InputError &&
+          error.key === "input.profile_invalid" &&
+          error.cause.endsWith(
+            ` has an observation_window ${field} that is not an RFC 3339 date or date-time.`,
+          ),
+        text,
+      );
+    });
+  }
+});
+
+test("an observation window that is not a mapping is refused (18.87)", () => {
+  withFile('observation_window: "2026"\n', (path) => {
+    assert.throws(
+      () => loadProfile(path),
+      (error: unknown) =>
+        error instanceof InputError &&
+        error.key === "input.profile_invalid" &&
+        error.cause.endsWith(" has an observation_window that is not a mapping of start and end."),
+    );
+  });
+});
+
+test("an unquoted YAML date bound is accepted as its Python text (18.87)", () => {
+  withFile("observation_window: {start: 2026-01-01, end: 2026-02-01T10:00:00Z}\n", (path) => {
+    assert.deepEqual(loadProfile(path).observationWindow, {
+      start: "2026-01-01",
+      end: "2026-02-01 10:00:00+00:00",
+    });
+  });
+});
+
 test("a list or mapping control is named as Python prints it", () => {
   const lint = (control: unknown): string | undefined =>
     deviationLint([{ control }], {

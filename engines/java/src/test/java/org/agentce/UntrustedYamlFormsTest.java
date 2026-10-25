@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -46,6 +47,36 @@ class UntrustedYamlFormsTest {
             InputError e = assertThrows(InputError.class, () -> Profile.load(write(tmp, "p.yaml", text)), text);
             assertEquals("input.profile_invalid", e.key, text);
         }
+    }
+
+    @Test
+    void anObservationWindowBoundThatIsNotAnRfc3339DateIsRefused(@TempDir Path tmp) throws IOException {
+        // 18.87: the window end is what deviation expiries are checked against.
+        for (String[] c : List.of(
+                new String[] {"observation_window: {start: \"2026-01-01T00:00:00Z\", end: \"foo\"}\n", "end"},
+                new String[] {"observation_window: {start: \"2026-01-01T00:00:00Z\", end: 2026-02-30}\n", "end"},
+                new String[] {"observation_window: {start: \"2026-01-01T00:00:00Z\", end: null}\n", "end"},
+                new String[] {"observation_window: {start: \"foo\", end: \"2026-02-01T00:00:00Z\"}\n", "start"})) {
+            InputError e = assertThrows(InputError.class, () -> Profile.load(write(tmp, "p.yaml", c[0])), c[0]);
+            assertEquals("input.profile_invalid", e.key, c[0]);
+            assertTrue(e.reason.endsWith(
+                    " has an observation_window " + c[1] + " that is not an RFC 3339 date or date-time."), e.reason);
+        }
+    }
+
+    @Test
+    void anObservationWindowThatIsNotAMappingIsRefused(@TempDir Path tmp) throws IOException {
+        InputError e = assertThrows(
+                InputError.class, () -> Profile.load(write(tmp, "p.yaml", "observation_window: \"2026\"\n")));
+        assertEquals("input.profile_invalid", e.key);
+        assertTrue(e.reason.endsWith(" has an observation_window that is not a mapping of start and end."), e.reason);
+    }
+
+    @Test
+    void anUnquotedYamlDateBoundIsAcceptedAsItsPythonText(@TempDir Path tmp) throws IOException {
+        Profile p = Profile.load(
+                write(tmp, "p.yaml", "observation_window: {start: 2026-01-01, end: 2026-02-01T10:00:00Z}\n"));
+        assertEquals(Map.of("start", "2026-01-01", "end", "2026-02-01 10:00:00+00:00"), p.observationWindow);
     }
 
     @Test
