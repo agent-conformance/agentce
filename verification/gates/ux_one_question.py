@@ -266,7 +266,7 @@ def read_skill(rel: str, text: str, errors: list[str]) -> int:
     else:
         end = next(
             (n for n, line in lines if n > start and line.startswith("## ")),
-            len(lines) + 2,
+            len(raw) + 1,
         )
     body = [(n, line.strip()) for n, line in lines if start < n < end]
 
@@ -532,6 +532,18 @@ SELF_TEST += [
 ]
 
 # Every form of an unsafe verb in a default is refused, and every tense of an ask before the section.
+LAST_SECTION = GOOD.split("## Phases", 1)[0]
+SELF_TEST += [
+    ("first minute as the last section, one question", LAST_SECTION, set()),
+    (
+        "first minute as the last section, two questions",
+        LAST_SECTION.replace(
+            "**Default:** keep",
+            '**Question:** "Which catalog?"\n**Default:** baseline.\n**Default:** keep',
+        ),
+        {"skill_too_many_questions"},
+    ),
+]
 SELF_TEST += [
     (
         f"default {answer!r}",
@@ -598,7 +610,9 @@ def self_test() -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n", 1)[0])
+    parser = argparse.ArgumentParser(
+        description=(__doc__ or "").split("\n", 1)[0], allow_abbrev=False
+    )
     parser.add_argument(
         "--self-test",
         action="store_true",
