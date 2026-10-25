@@ -3,6 +3,14 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.135.12
+
+- `VG-LOCKED-COPY` (changed, 18.92): the retired-wording sweep reads each file the way a person does before it
+  matches: case folded, hyphen and dash runs as one word break, Markdown emphasis and code markers removed, and, in a
+  second reading, HTML tags removed or read as a break, entities decoded and Markdown links read as their text. So
+  "conforming-engines", "**conforming** engines" and "<strong>conforming</strong> engines" are caught like
+  "conforming engine". New seeded fault: engines/README.md calls the engines "**conforming** engines".
+
 ## 0.135.11
 
 - `VG-DEVIATIONS-PARITY` (changed, 18.87): a bundle whose record times are all empty (`"time": ""`), with no declared

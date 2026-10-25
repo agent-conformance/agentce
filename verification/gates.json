@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.135.11",
+  "suite_version": "0.135.12",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -885,6 +885,12 @@
           "file": "engines/go/README.md",
           "search": "shown by three engines",
           "replace": "shown by three Conforming Engines"
+        },
+        {
+          "description": "the engines README calls the engines '**conforming** engines' again, the word in Markdown emphasis (18.92; proves the match reads emphasis markers as the plain word)",
+          "file": "engines/README.md",
+          "search": "Engine implementations.",
+          "replace": "Engine implementations: three **conforming** engines."
         }
       ],
       "fix_hint": "Run the gate's command and read the FAIL lines; the approved strings are the constants in tools/locked_copy_check.py, the landing page is website/src/pages/index.astro, and --also sweeps every engines/*/README.md for the same retired wording."
