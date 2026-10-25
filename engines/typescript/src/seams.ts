@@ -3,7 +3,7 @@
  * (`node dist/seams.js <seam> <path>`, `pnpm seams <seam> <path>` in development). They ship with
  * the package so the installed-artifact check can run them, but they are not `agentce` commands.
  */
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import type { Activity } from "./activity";
 import { assertionFromJson } from "./assertions";
 import { computeAuditorView } from "./auditorView";
@@ -24,7 +24,14 @@ import {
 } from "./json";
 import { computeVectorFile } from "./numerics";
 import { OtelGenaiAdapterError, adapt as adaptOtelGenai } from "./otelGenai";
-import { catalogProvenanceDigest } from "./report";
+import {
+  appliedDeviationIds,
+  catalogProvenanceDigest,
+  renderCsv,
+  renderJunit,
+  renderOscalXml,
+  renderPublicStatement,
+} from "./report";
 import { computeSecurityView } from "./securityView";
 import { joinPath } from "./util";
 
@@ -87,6 +94,39 @@ export function main(argv: string[]): number {
     const data = readBundled(readFileSync(fixturePath));
     const assertions = (data.assertions as unknown[]).map(assertionFromJson);
     console.log(canonicalString(computeAuditorView(assertions, data.deviations ?? null)));
+    return 0;
+  }
+
+  // report-formats is the same kind of test-only seam (18.16c, VG-REPORT-FORMAT-PARITY): for each
+  // report directory, it renders report.junit.xml, report.csv, oscal-ar.xml and public-statement.md
+  // from that directory's assertions.json, oscal-ar.json and manifest catalogs, the way Python's
+  // write_report does, into <out-root>/<index>/. `assess --emit` reaches them with 18.16b.
+  if (command === "report-formats") {
+    const [outRoot, ...sources] = argv.slice(1);
+    if (outRoot === undefined || sources.length === 0) {
+      console.error("report-formats: <out-root> and at least one report directory are required");
+      return ExitCode.INPUT_ERROR;
+    }
+    sources.forEach((source, index) => {
+      const read = (name: string) => readBundled(readFileSync(joinPath(source, name)));
+      const assertions = (read("assertions.json") as unknown[]).map(assertionFromJson);
+      const manifest = read("manifest.json") as { inputs: { catalogs: Record<string, string>[] } };
+      const catalogs = manifest.inputs.catalogs.map((c) => `${c.id}@${c.version}`);
+      const out = joinPath(outRoot, String(index));
+      mkdirSync(out, { recursive: true });
+      const rendered: Array<[string, string]> = [
+        ["report.junit.xml", renderJunit(assertions)],
+        ["report.csv", renderCsv(assertions)],
+        ["oscal-ar.xml", renderOscalXml(read("oscal-ar.json") as Record<string, unknown>)],
+        [
+          "public-statement.md",
+          renderPublicStatement(assertions, catalogs, appliedDeviationIds(assertions)),
+        ],
+      ];
+      for (const [name, text] of rendered) {
+        writeFileSync(joinPath(out, name), text, "utf-8");
+      }
+    });
     return 0;
   }
 

@@ -130,6 +130,39 @@ public final class Seams {
             return 0;
         }
 
+        // report-formats is the same kind of test-only seam (18.16c, VG-REPORT-FORMAT-PARITY): for each
+        // report directory, it renders report.junit.xml, report.csv, oscal-ar.xml and public-statement.md
+        // from that directory's assertions.json, oscal-ar.json and manifest catalogs, the way Python's
+        // write_report does, into <out-root>/<index>/. `assess --emit` reaches them with 18.16b.
+        if ("report-formats".equals(command)) {
+            if (args.length < 3) {
+                System.err.println("report-formats: <out-root> and at least one report directory are required");
+                return ExitCode.INPUT_ERROR.code;
+            }
+            try {
+                for (int index = 0; index + 2 < args.length; index++) {
+                    Path source = Paths.get(args[index + 2]);
+                    List<Assertions.Assertion> assertions = new ArrayList<>();
+                    readFixture(source.resolve("assertions.json")).forEach(a -> assertions.add(Assertions.fromJson(a)));
+                    List<String> catalogs = new ArrayList<>();
+                    readFixture(source.resolve("manifest.json")).path("inputs").path("catalogs").forEach(
+                            c -> catalogs.add(c.path("id").asText() + "@" + c.path("version").asText()));
+                    Path out = Paths.get(args[1], String.valueOf(index));
+                    Files.createDirectories(out);
+                    Files.writeString(out.resolve("report.junit.xml"), Report.renderJunit(assertions));
+                    Files.writeString(out.resolve("report.csv"), Report.renderCsv(assertions));
+                    Files.writeString(out.resolve("oscal-ar.xml"),
+                            Report.renderOscalXml(readFixture(source.resolve("oscal-ar.json"))));
+                    Files.writeString(out.resolve("public-statement.md"), Report.renderPublicStatement(
+                            assertions, catalogs, Report.appliedDeviationIds(assertions)));
+                }
+            } catch (IOException e) {
+                System.err.println("report-formats: " + e.getMessage());
+                return ExitCode.INPUT_ERROR.code;
+            }
+            return 0;
+        }
+
         // fail-on-check is the same kind of test-only seam (18.73): it reads a fixture file with
         // {assertions, expressions} and, per expression in order, prints one canonical JSON line:
         // {"error": {key, cause, fix}} on refusal, else {"matched": [one boolean per assertion]} --

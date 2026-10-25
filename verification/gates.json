@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.135.14",
+  "suite_version": "0.136.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -2657,6 +2657,61 @@
         }
       ],
       "fix_hint": "run verification/gates/claim_parity.sh and read the MISMATCH lines; the reference is engines/python/agentce/report.py's _build_claim and commands/__init__.py's _read_sign_claim, ported as buildClaim in engines/typescript/src/report.ts and engines/java/src/main/java/org/agentce/Report.java and readSignClaim in cli.ts and Cli.java; the check is tools/claim_parity_check.py"
+    },
+    {
+      "id": "VG-REPORT-FORMAT-PARITY",
+      "title": "TypeScript and Java render report.junit.xml, report.csv, oscal-ar.xml and public-statement.md byte-identical to Python over the corpus and a hostile case table",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/report_format_parity.sh"
+      ],
+      "requires": [
+        "uv",
+        "pnpm",
+        "java",
+        "node"
+      ],
+      "timeout_s": 900,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "the checker's self-test catches a one-byte change, a missing file, an extra trailing newline and CRLF line endings; over corpus/quickstart, the auditor-view fixture and the 30 generated corpus projects, Python's real assess --emit junit,csv,oscal_xml,public writes the four files, each engine's own assess exits with Python's code, and each engine's report-formats seam renders the four files from that engine's own assertions.json, oscal-ar.json and manifest catalogs byte-identical to Python's (Python's own seam included); every case in tools/fixtures/report_formats/cases.json (empty, every outcome out of order, hostile characters, an odd OSCAL document, code-point order) renders the same bytes in all three engines; 32 corpus runs and every case ran",
+        "fail": "any engine writes a different byte in any of the four files, writes none, exits differently from Python, or the checker runs fewer runs than expected"
+      },
+      "faults": [
+        {
+          "description": "typescript junit no longer escapes a newline in an attribute",
+          "file": "engines/typescript/src/report.ts",
+          "search": "    .replace(/\\n/g, \"&#10;\")\n",
+          "replace": ""
+        },
+        {
+          "description": "java csv no longer doubles a quote inside a quoted field",
+          "file": "engines/java/src/main/java/org/agentce/Report.java",
+          "search": "\"\\\"\" + value.replace(\"\\\"\", \"\\\"\\\"\") + \"\\\"\"",
+          "replace": "\"\\\"\" + value + \"\\\"\""
+        },
+        {
+          "description": "typescript oscal_xml keeps the object's key order instead of sorting",
+          "file": "engines/typescript/src/report.ts",
+          "search": "    element.children = Object.keys(record)\n      .sort(byteCompare)\n",
+          "replace": "    element.children = Object.keys(record)\n"
+        },
+        {
+          "description": "java writes an empty element as <tag></tag>",
+          "file": "engines/java/src/main/java/org/agentce/Report.java",
+          "search": "            out.append(\" />\");\n            return;",
+          "replace": "            out.append(\"></\").append(e.tag()).append('>');\n            return;"
+        },
+        {
+          "description": "java public statement lists families in reverse order",
+          "file": "engines/java/src/main/java/org/agentce/Report.java",
+          "search": "Map<String, Map<String, Integer>> families = new TreeMap<>(Json::byteCompare);",
+          "replace": "Map<String, Map<String, Integer>> families = new TreeMap<>((x, y) -> Json.byteCompare(y, x));"
+        }
+      ],
+      "fix_hint": "run verification/gates/report_format_parity.sh and read the MISMATCH lines (each names the file and the first differing byte); the reference is engines/python/agentce/report.py's render_junit, render_csv, render_oscal_xml and render_public_statement, ported as renderJunit, renderCsv, renderOscalXml and renderPublicStatement in engines/typescript/src/report.ts and engines/java/src/main/java/org/agentce/Report.java; the check is tools/report_format_parity_check.py"
     },
     {
       "id": "VG-RECORDS-PROFILE-ROUND-TRIP",

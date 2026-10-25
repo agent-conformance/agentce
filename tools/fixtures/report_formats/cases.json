@@ -1,0 +1,327 @@
+{
+  "cases": [
+    {
+      "name": "empty",
+      "assertions": [],
+      "catalogs": []
+    },
+    {
+      "name": "one-conformant",
+      "assertions": [
+        {
+          "control": "OVS-03",
+          "control_version": "2026.09",
+          "family": "OVS",
+          "mode": "automated",
+          "outcome": "conformant",
+          "population": {
+            "applicable": 1,
+            "failed": 0
+          },
+          "rung": 2,
+          "severity": "medium",
+          "subject": "spiffe://corp/agents/a",
+          "window": {
+            "end": "2026-08-29T00:00:00Z",
+            "start": "2026-05-01T00:00:00Z"
+          }
+        }
+      ],
+      "catalogs": [
+        "eu-ai-act@2026.09"
+      ]
+    },
+    {
+      "name": "every-outcome-out-of-order",
+      "assertions": [
+        {
+          "control": "REC-01",
+          "control_version": "2026.09",
+          "family": "REC",
+          "mode": "semi-automated",
+          "outcome": "partial",
+          "population": {
+            "applicable": 1,
+            "failed": 0
+          },
+          "rung": 3,
+          "severity": "medium",
+          "subject": "spiffe://corp/agents/b",
+          "window": {
+            "end": "2026-08-29T00:00:00Z",
+            "start": "2026-05-01T00:00:00Z"
+          }
+        },
+        {
+          "control": "CND-02",
+          "control_version": "2026.09",
+          "family": "CND",
+          "mode": "automated",
+          "outcome": "non-conformant",
+          "population": {
+            "applicable": 1,
+            "failed": 0
+          },
+          "rung": 2,
+          "severity": "medium",
+          "subject": "spiffe://corp/agents/a",
+          "window": {
+            "end": "2026-08-29T00:00:00Z",
+            "start": "2026-05-01T00:00:00Z"
+          },
+          "deviation": "CND-02"
+        },
+        {
+          "control": "AAA-01",
+          "control_version": "2026.09",
+          "family": "AAA",
+          "mode": "manual",
+          "outcome": "not_applicable",
+          "population": {
+            "applicable": 1,
+            "failed": 0
+          },
+          "rung": 2,
+          "severity": "medium",
+          "subject": "spiffe://corp/agents/a",
+          "window": {
+            "end": "2026-08-29T00:00:00Z",
+            "start": "2026-05-01T00:00:00Z"
+          }
+        },
+        {
+          "control": "DAT-01",
+          "control_version": "2026.09",
+          "family": "DAT",
+          "mode": "automated",
+          "outcome": "insufficient_evidence",
+          "population": {
+            "applicable": 1,
+            "failed": 0
+          },
+          "rung": 2,
+          "severity": "medium",
+          "subject": "spiffe://corp/agents/b",
+          "window": {
+            "end": "2026-08-29T00:00:00Z",
+            "start": "2026-05-01T00:00:00Z"
+          }
+        },
+        {
+          "control": "ZED-09",
+          "control_version": "2026.09",
+          "family": "ZED",
+          "mode": "automated",
+          "outcome": "not_assessed",
+          "population": {
+            "applicable": 1,
+            "failed": 0
+          },
+          "rung": 4,
+          "severity": "medium",
+          "subject": "spiffe://corp/agents/a",
+          "window": {
+            "end": "2026-08-29T00:00:00Z",
+            "start": "2026-05-01T00:00:00Z"
+          }
+        },
+        {
+          "control": "BBB-01",
+          "control_version": "2026.09",
+          "family": "BBB",
+          "mode": "automated",
+          "outcome": "conformant",
+          "population": {
+            "applicable": 1,
+            "failed": 0
+          },
+          "rung": 1,
+          "severity": "medium",
+          "subject": "spiffe://corp/agents/a",
+          "window": {
+            "end": "2026-08-29T00:00:00Z",
+            "start": "2026-05-01T00:00:00Z"
+          }
+        }
+      ],
+      "catalogs": [
+        "eu-ai-act@2026.09",
+        "baseline@0.3.0"
+      ]
+    },
+    {
+      "name": "hostile-strings",
+      "assertions": [
+        {
+          "control": "X,Y\"-01",
+          "control_version": "v,\"1\"\r\n",
+          "family": "X,Y\"",
+          "mode": "automated",
+          "outcome": "non-conformant",
+          "population": {
+            "applicable": 1,
+            "failed": 0
+          },
+          "rung": 2,
+          "severity": "medium",
+          "subject": "spiffe://corp/a&b<c>d\"e'f\ng\rh\ti\u0001j\u0000k\u00e9l\ud83d\ude00m",
+          "window": {
+            "end": "2026-08-29T00:00:00Z",
+            "start": "2026-05-01T00:00:00Z"
+          }
+        },
+        {
+          "control": "plain-02",
+          "control_version": "2026.09",
+          "family": "plain",
+          "mode": "a b\tc",
+          "outcome": "conformant",
+          "population": {
+            "applicable": 1,
+            "failed": 0
+          },
+          "rung": 2,
+          "severity": "medium",
+          "subject": "spiffe://corp/a&b<c>d\"e'f\ng\rh\ti\u0001j\u0000k\u00e9l\ud83d\ude00m",
+          "window": {
+            "end": "2026-08-29T00:00:00Z",
+            "start": "2026-05-01T00:00:00Z"
+          }
+        },
+        {
+          "control": "\u00e9\ud83d\ude00-03",
+          "control_version": "2026.09",
+          "family": "\u00e9\ud83d\ude00",
+          "mode": "automated",
+          "outcome": "partial",
+          "population": {
+            "applicable": 1,
+            "failed": 0
+          },
+          "rung": 2,
+          "severity": "medium",
+          "subject": "spiffe://corp/\u00e9",
+          "window": {
+            "end": "2026-08-29T00:00:00Z",
+            "start": "2026-05-01T00:00:00Z"
+          }
+        }
+      ],
+      "catalogs": [
+        "*cat*_<b>x</b>&amp;@1|2",
+        "c\u00e9@\ud83d\ude00"
+      ]
+    },
+    {
+      "name": "oscal-odd-document",
+      "assertions": [
+        {
+          "control": "AAA-01",
+          "control_version": "2026.09",
+          "family": "AAA",
+          "mode": "automated",
+          "outcome": "conformant",
+          "population": {
+            "applicable": 1,
+            "failed": 0
+          },
+          "rung": 2,
+          "severity": "medium",
+          "subject": "s",
+          "window": {
+            "end": "2026-08-29T00:00:00Z",
+            "start": "2026-05-01T00:00:00Z"
+          }
+        }
+      ],
+      "catalogs": [],
+      "oscal": {
+        "assessment-results": {
+          "9lead": "digit",
+          "": "empty-key",
+          "-dash": "dash-lead",
+          "ok.key_x-y": "kept",
+          "n\u00e9-\u0661": "unicode-letter-and-digit",
+          "sp ace/slash": "replaced",
+          "\ud83d\ude00": "astral",
+          "empty-object": {},
+          "empty-list": [],
+          "null-value": null,
+          "empty-string": "",
+          "flag": true,
+          "off": false,
+          "count": 7,
+          "nested": [
+            {
+              "b": "2",
+              "a": "1"
+            },
+            "x&<>\"'\n\r\t\u0001"
+          ]
+        }
+      }
+    },
+    {
+      "name": "code-point-order",
+      "assertions": [
+        {
+          "control": "\ud83d\ude00-01",
+          "control_version": "2026.09",
+          "family": "\ud83d\ude00",
+          "mode": "automated",
+          "outcome": "partial",
+          "population": {
+            "applicable": 1,
+            "failed": 0
+          },
+          "rung": 2,
+          "severity": "medium",
+          "subject": "spiffe://\ud83d\ude00",
+          "window": {
+            "end": "2026-08-29T00:00:00Z",
+            "start": "2026-05-01T00:00:00Z"
+          }
+        },
+        {
+          "control": "\uff5e-01",
+          "control_version": "2026.09",
+          "family": "\uff5e",
+          "mode": "automated",
+          "outcome": "non-conformant",
+          "population": {
+            "applicable": 1,
+            "failed": 0
+          },
+          "rung": 2,
+          "severity": "medium",
+          "subject": "spiffe://\uff5e",
+          "window": {
+            "end": "2026-08-29T00:00:00Z",
+            "start": "2026-05-01T00:00:00Z"
+          }
+        },
+        {
+          "control": "\ud83d\ude00-02",
+          "control_version": "2026.09",
+          "family": "\ud83d\ude00",
+          "mode": "automated",
+          "outcome": "conformant",
+          "population": {
+            "applicable": 1,
+            "failed": 0
+          },
+          "rung": 2,
+          "severity": "medium",
+          "subject": "spiffe://\uff5e",
+          "window": {
+            "end": "2026-08-29T00:00:00Z",
+            "start": "2026-05-01T00:00:00Z"
+          }
+        }
+      ],
+      "catalogs": [
+        "eu-ai-act@2026.09"
+      ]
+    }
+  ]
+}

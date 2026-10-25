@@ -3,6 +3,15 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.136.0
+
+- `VG-REPORT-FORMAT-PARITY` (added, 18.16c): TypeScript and Java render `report.junit.xml`, `report.csv`, `oscal-ar.xml`
+  and `public-statement.md` byte-identical to Python. Over quickstart, the auditor-view fixture and the 30 generated
+  corpus projects, Python's real `assess --emit junit,csv,oscal_xml,public` writes the four files, and each engine's
+  `report-formats` seam renders them from that engine's own assess output; a hostile case table renders the same in all
+  three. Seeded faults: a TypeScript attribute newline escape dropped, a Java CSV quote no longer doubled, TypeScript
+  OSCAL XML keys left unsorted, a Java empty element written `<tag></tag>`, Java public-statement families reversed.
+
 ## 0.135.14
 
 - `VG-UX-ONE-QUESTION` (changed, 18.40a): a sentence in a Question paragraph that asks without a "?" ("Tell me which

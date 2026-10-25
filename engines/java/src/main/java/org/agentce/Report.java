@@ -23,6 +23,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Render the report artifacts from assertions (SPEC §9). {@code assertions.json} is written in RFC 8785
@@ -658,11 +659,13 @@ public final class Report {
         return lines;
     }
 
+    /** Sorted by (subject, control) in code-point order, as Python sorts strings ({@link String#compareTo}
+     * compares UTF-16 units, which puts an astral character before U+E000-U+FFFF; 18.16c). */
     private static List<Assertions.Assertion> sortedBySubjectControl(List<Assertions.Assertion> assertions) {
         List<Assertions.Assertion> sorted = new ArrayList<>(assertions);
         sorted.sort((a, b) -> {
-            int c = a.subject.compareTo(b.subject);
-            return c != 0 ? c : a.control.compareTo(b.control);
+            int c = Json.byteCompare(a.subject, b.subject);
+            return c != 0 ? c : Json.byteCompare(a.control, b.control);
         });
         return sorted;
     }
@@ -1223,6 +1226,139 @@ public final class Report {
     private static final String STATEMENT_CONDUCT_LINE =
             "Over the observation window, the named subjects acted within their declared boundaries and on "
                     + "authorised instructions as evidenced by the Conduct overlay controls listed.";
+
+    /** One XML element as Python's {@code xml.etree.ElementTree} builds it: attributes in insertion order. */
+    private record XmlElement(String tag, List<String[]> attrs, String text, List<XmlElement> children) {}
+
+    private static String xmlEscapeText(String s) {
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    private static String xmlEscapeAttr(String s) {
+        return xmlEscapeText(s).replace("\"", "&quot;").replace("\r", "&#13;").replace("\n", "&#10;")
+                .replace("\t", "&#09;");
+    }
+
+    /** {@code ElementTree.tostring(element, encoding="unicode")}: every value escaped, never concatenated
+     * into the markup raw; an element with no text and no children is written {@code <tag />}. */
+    private static void xmlWrite(XmlElement e, StringBuilder out) {
+        out.append('<').append(e.tag());
+        for (String[] attr : e.attrs()) {
+            out.append(' ').append(attr[0]).append("=\"").append(xmlEscapeAttr(attr[1])).append('"');
+        }
+        boolean hasText = e.text() != null && !e.text().isEmpty();
+        if (!hasText && e.children().isEmpty()) {
+            out.append(" />");
+            return;
+        }
+        out.append('>');
+        if (hasText) {
+            out.append(xmlEscapeText(e.text()));
+        }
+        for (XmlElement child : e.children()) {
+            xmlWrite(child, out);
+        }
+        out.append("</").append(e.tag()).append('>');
+    }
+
+    private static String xmlDocument(XmlElement root) {
+        StringBuilder out = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        xmlWrite(root, out);
+        return out.append('\n').toString();
+    }
+
+    private static boolean isLetterOrNumber(int c) {
+        return Character.isLetter(c) || switch (Character.getType(c)) {
+            case Character.DECIMAL_DIGIT_NUMBER, Character.LETTER_NUMBER, Character.OTHER_NUMBER -> true;
+            default -> false;
+        };
+    }
+
+    /** Python's {@code _xml_tag}: a code point that is not a letter or number ({@code str.isalnum}) and not
+     * {@code -}, {@code _} or {@code .} becomes {@code _}; a result that is empty or does not start with a
+     * letter or {@code _} gets a leading {@code _}. */
+    private static String xmlTag(String key) {
+        StringBuilder safe = new StringBuilder();
+        key.codePoints().forEach(c -> safe.appendCodePoint(
+                isLetterOrNumber(c) || c == '-' || c == '_' || c == '.' ? c : '_'));
+        String s = safe.toString();
+        boolean starts = !s.isEmpty() && (Character.isLetter(s.codePointAt(0)) || s.charAt(0) == '_');
+        return starts ? s : "_" + s;
+    }
+
+    private static XmlElement xmlFromValue(String tag, JsonNode value) {
+        List<XmlElement> children = new ArrayList<>();
+        String text = null;
+        if (value.isArray()) {
+            value.forEach(item -> children.add(xmlFromValue("item", item)));
+        } else if (value.isObject()) {
+            List<String> keys = new ArrayList<>();
+            value.fieldNames().forEachRemaining(keys::add);
+            keys.sort(Json::byteCompare);
+            keys.forEach(k -> children.add(xmlFromValue(xmlTag(k), value.get(k))));
+        } else if (value.isBoolean()) {
+            text = value.booleanValue() ? "True" : "False";
+        } else if (!value.isNull() && !value.isMissingNode()) {
+            text = value.asText();
+        }
+        return new XmlElement(tag, List.of(), text, children);
+    }
+
+    /** Render {@code oscal-ar.xml} (SPEC §9.4): the same OSCAL AR object {@link #renderOscal} returns, as
+     * XML, keys sorted and list order kept. Byte-identical to Python's {@code render_oscal_xml}. */
+    public static String renderOscalXml(JsonNode document) {
+        String rootTag = document.fieldNames().hasNext() ? document.fieldNames().next() : "";
+        JsonNode rootValue = document.path(rootTag);
+        return xmlDocument(xmlFromValue(xmlTag(rootTag), rootValue));
+    }
+
+    /** Render {@code report.junit.xml} (SPEC §9): one {@code <testcase>} per (subject, control) pair in that
+     * order, with a {@code <failure>} iff the outcome is not conformant. Byte-identical to Python's
+     * {@code render_junit}. */
+    public static String renderJunit(List<Assertions.Assertion> assertions) {
+        List<Assertions.Assertion> ordered = sortedBySubjectControl(assertions);
+        long failures = ordered.stream().filter(a -> !"conformant".equals(a.outcome)).count();
+        List<XmlElement> cases = new ArrayList<>();
+        for (Assertions.Assertion a : ordered) {
+            List<XmlElement> failure = "conformant".equals(a.outcome)
+                    ? List.of()
+                    : List.of(new XmlElement("failure",
+                            List.of(new String[] {"message", a.outcome}, new String[] {"type", "agentce.non_conformant"}),
+                            a.control + " on " + a.subject + ": " + a.outcome, List.of()));
+            cases.add(new XmlElement("testcase",
+                    List.of(new String[] {"classname", a.subject}, new String[] {"name", a.control}), null, failure));
+        }
+        List<String[]> attrs = List.of(
+                new String[] {"name", "agentce"},
+                new String[] {"tests", String.valueOf(ordered.size())},
+                new String[] {"failures", String.valueOf(failures)},
+                new String[] {"errors", "0"},
+                new String[] {"skipped", "0"});
+        return xmlDocument(new XmlElement("testsuite", attrs, null, cases));
+    }
+
+    /** report.csv's header row (SPEC §9). */
+    public static final List<String> CSV_COLUMNS =
+            List.of("control", "subject", "outcome", "control_version", "rung", "mode");
+
+    /** One field as Python's {@code csv.writer} (excel dialect) writes it: quoted, with {@code "} doubled,
+     * when it holds the delimiter, the quote or a line break. */
+    private static String csvField(String value) {
+        boolean quote = value.chars().anyMatch(c -> c == ',' || c == '"' || c == '\r' || c == '\n');
+        return quote ? "\"" + value.replace("\"", "\"\"") + "\"" : value;
+    }
+
+    /** Render {@code report.csv} (SPEC §9): one row per (subject, control) pair in that order, {@code \n}
+     * line endings. Byte-identical to Python's {@code render_csv}. */
+    public static String renderCsv(List<Assertions.Assertion> assertions) {
+        StringBuilder out = new StringBuilder();
+        out.append(CSV_COLUMNS.stream().map(Report::csvField).collect(Collectors.joining(","))).append('\n');
+        for (Assertions.Assertion a : sortedBySubjectControl(assertions)) {
+            out.append(Stream.of(a.control, a.subject, a.outcome, a.controlVersion, String.valueOf(a.rung), a.mode)
+                    .map(Report::csvField).collect(Collectors.joining(","))).append('\n');
+        }
+        return out.toString();
+    }
 
     /** The sorted, deduplicated ids of every control a deviation was applied to (Python's {@code
      * applied_deviation_ids}; SPEC §9.1): each assertion's non-empty {@code deviation}. */

@@ -1195,6 +1195,137 @@ export function renderEvidencePack(
   };
 }
 
+/** One XML element as Python's `xml.etree.ElementTree` builds it: attributes in insertion order. */
+interface XmlElement {
+  tag: string;
+  attrs: Array<[string, string]>;
+  text: string | null;
+  children: XmlElement[];
+}
+
+function xmlEscapeText(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function xmlEscapeAttr(s: string): string {
+  return xmlEscapeText(s)
+    .replace(/"/g, "&quot;")
+    .replace(/\r/g, "&#13;")
+    .replace(/\n/g, "&#10;")
+    .replace(/\t/g, "&#09;");
+}
+
+/** `ElementTree.tostring(element, encoding="unicode")`: every value escaped, never concatenated into
+ * the markup raw; an element with no text and no children is written `<tag />`. */
+function xmlToString(e: XmlElement): string {
+  const attrs = e.attrs.map(([k, v]) => ` ${k}="${xmlEscapeAttr(v)}"`).join("");
+  if (!e.text && e.children.length === 0) {
+    return `<${e.tag}${attrs} />`;
+  }
+  const body = (e.text ? xmlEscapeText(e.text) : "") + e.children.map(xmlToString).join("");
+  return `<${e.tag}${attrs}>${body}</${e.tag}>`;
+}
+
+function xmlDocument(root: XmlElement): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${xmlToString(root)}\n`;
+}
+
+/** Python's `_xml_tag`: a code point that is not a letter or number (`str.isalnum`) and not `-`, `_`
+ * or `.` becomes `_`; a result that is empty or does not start with a letter or `_` gets a leading `_`. */
+function xmlTag(key: string): string {
+  const safe = [...key].map((c) => (/^[\p{L}\p{N}\-_.]$/u.test(c) ? c : "_")).join("");
+  return safe === "" || !/^[\p{L}_]/u.test(safe) ? `_${safe}` : safe;
+}
+
+/** Python's `str()` of a JSON scalar, the element text `_xml_from_value` writes. */
+function pyScalarText(value: unknown): string {
+  if (value === true) return "True";
+  if (value === false) return "False";
+  return String(value);
+}
+
+function xmlFromValue(tag: string, value: unknown): XmlElement {
+  const element: XmlElement = { tag, attrs: [], text: null, children: [] };
+  if (Array.isArray(value)) {
+    element.children = value.map((item) => xmlFromValue("item", item));
+  } else if (value !== null && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    element.children = Object.keys(record)
+      .sort(byteCompare)
+      .map((key) => xmlFromValue(xmlTag(key), record[key]));
+  } else if (value !== null && value !== undefined) {
+    element.text = pyScalarText(value);
+  }
+  return element;
+}
+
+/** Render `oscal-ar.xml` (SPEC §9.4): the same OSCAL AR object `renderOscal` returns, as XML, keys
+ * sorted and list order kept. Byte-identical to Python's `render_oscal_xml`. */
+export function renderOscalXml(document: Record<string, unknown>): string {
+  const [rootTag, rootValue] = Object.entries(document)[0] ?? ["", null];
+  return xmlDocument(xmlFromValue(xmlTag(rootTag), rootValue));
+}
+
+/** Render `report.junit.xml` (SPEC §9): one `<testcase>` per `(subject, control)` pair in that order,
+ * with a `<failure>` iff the outcome is not `conformant`. Byte-identical to Python's `render_junit`. */
+export function renderJunit(assertions: readonly Assertion[]): string {
+  const ordered = [...assertions].sort(bySubjectControl);
+  const failures = ordered.filter((a) => a.outcome !== "conformant").length;
+  const suite: XmlElement = {
+    tag: "testsuite",
+    attrs: [
+      ["name", "agentce"],
+      ["tests", String(ordered.length)],
+      ["failures", String(failures)],
+      ["errors", "0"],
+      ["skipped", "0"],
+    ],
+    text: null,
+    children: ordered.map((a) => ({
+      tag: "testcase",
+      attrs: [
+        ["classname", a.subject],
+        ["name", a.control],
+      ],
+      text: null,
+      children:
+        a.outcome === "conformant"
+          ? []
+          : [
+              {
+                tag: "failure",
+                attrs: [
+                  ["message", a.outcome],
+                  ["type", "agentce.non_conformant"],
+                ],
+                text: `${a.control} on ${a.subject}: ${a.outcome}`,
+                children: [],
+              },
+            ],
+    })),
+  };
+  return xmlDocument(suite);
+}
+
+/** report.csv's header row (SPEC §9). */
+export const CSV_COLUMNS = ["control", "subject", "outcome", "control_version", "rung", "mode"];
+
+/** One field as Python's `csv.writer` (excel dialect) writes it: quoted, with `"` doubled, when it
+ * holds the delimiter, the quote or a line break. */
+function csvField(value: string): string {
+  return /[,"\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+/** Render `report.csv` (SPEC §9): one row per `(subject, control)` pair in that order, `\n` line
+ * endings. Byte-identical to Python's `render_csv`. */
+export function renderCsv(assertions: readonly Assertion[]): string {
+  const rows = [CSV_COLUMNS];
+  for (const a of [...assertions].sort(bySubjectControl)) {
+    rows.push([a.control, a.subject, a.outcome, a.controlVersion, String(a.rung), a.mode]);
+  }
+  return rows.map((row) => `${row.map(csvField).join(",")}\n`).join("");
+}
+
 const NON_DETERMINATION =
   "This statement reports conformance to the named catalog as evaluated by the Agent Conformance " +
   "Engine over the named evidence and observation window. It is not a legal compliance " +
