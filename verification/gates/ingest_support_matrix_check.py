@@ -184,13 +184,15 @@ def check_tier_layout(text: str, source: str) -> tuple[list[str], list[str]]:
             if not (own_lines and _TIER_LINE_RE.fullmatch(line.text))
         ]
         joined = " ".join(line.text for line in other)
-        # The source with markup stripped catches a claim in a code span (blanked in the visible
-        # text); the visible text catches one whose word or count is a link or sits beside an image.
+        # Each reading drops something a claim could hide behind, and any drop could hide text the
+        # page shows, so all three are searched: the source as written (code shows its '<' text as
+        # it is), the source without raw inline HTML (a tag between the word and the count), and the
+        # visible text (a linked word or count, an image beside it).
         numbers = {line.number for line in other}
         shown = " ".join(line.text for line in block.visible if line.number in numbers)
-        if other and (
-            _TIER_MENTION_RE.search(_plain(INLINE_HTML.sub("", joined)))
-            or _TIER_MENTION_RE.search(_plain(shown))
+        if other and any(
+            _TIER_MENTION_RE.search(_plain(reading))
+            for reading in (joined, INLINE_HTML.sub("", joined), shown)
         ):
             problems.append(
                 f"ingest.matrix.tier_line_unreadable: {source} line {other[0].number} holds a tier line "
@@ -1071,6 +1073,12 @@ def self_test() -> int:
         "a claim inside a span tag": '<span class="t">' + claim + "</span>",
         "a claim after an HTML comment": "<!-- note --> " + claim,
         "an escaped tag shown as text": '&lt;a title="Experimental (1): Honeycomb"&gt;',
+        "a comment in a code span": "Mark the block with `<!-- Experimental (1): Honeycomb -->`.",
+        "a tag attribute in a code span": 'Use `<a title="Experimental (1): Honeycomb">`.',
+        "a comment in a fenced code block": "```\n<!-- Experimental (1): Honeycomb -->\n```",
+        "a comment in a code span in a table cell": "| a | b |\n|---|---|\n"
+        "| `<!-- Experimental (1): Honeycomb -->` | c |",
+        "a tag whose name is followed by a no-break space": '<a\u00a0title="Experimental (1): Honeycomb">x',
     }.items():
         cases.append(
             (

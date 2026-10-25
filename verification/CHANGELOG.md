@@ -3,6 +3,13 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.135.9
+
+- `VG-INGEST-SUPPORT-MATRIX` (changed, 18.39c): README's tier-claim search also reads the source as written, so
+  HTML-shaped text in code (a comment or tag in a code span or fenced block, which the page shows as written) and a
+  tag the parser reads but the page shows as text (a no-break space after the tag name) cannot hide a claim. New
+  seeded fault: a code span holding an HTML comment that names Experimental (1): Honeycomb.
+
 ## 0.135.8
 
 - `VG-INGEST-SUPPORT-MATRIX` (changed, 18.39c): README's tier-claim search strips only CommonMark 6.6 raw HTML (a
