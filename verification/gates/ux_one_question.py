@@ -253,11 +253,25 @@ def prose(text: str) -> list[tuple[int, str]]:
     return out
 
 
+def section_headings(text: str) -> dict[int, str]:
+    """Line number -> ATX form of each top-level heading (no block quote or list item around it). Only
+    these bound a section: a heading inside a quote or a list item, or a heading-shaped line of indented
+    code, is part of the section it sits in."""
+    return {
+        block.start: "#" * block.level
+        + " "
+        + " ".join(line.text for line in block.lines)
+        for block in blocks(text)
+        if block.kind == "heading" and not block.containers
+    }
+
+
 def read_skill(rel: str, text: str, errors: list[str]) -> int:
     """Check one SKILL.md's first minute; return how many questions it asks there."""
     raw = split_lines(text)
     lines = prose(text)
-    start = next((n for n, line in lines if line.rstrip() == SECTION), None)
+    headings = section_headings(text)
+    start = next((n for n, h in headings.items() if h.rstrip() == SECTION), None)
     if start is None:  # with no first minute, every ask comes before the first findings
         errors.append(
             f"ux.one_question.skill_no_first_minute: {rel} has no '{SECTION}' section"
@@ -265,15 +279,15 @@ def read_skill(rel: str, text: str, errors: list[str]) -> int:
         start = end = len(raw) + 1
     else:
         end = next(
-            (n for n, line in lines if n > start and line.startswith("## ")),
+            (n for n, h in headings.items() if n > start and h.startswith("## ")),
             len(raw) + 1,
         )
     body = [(n, line.strip()) for n, line in lines if start < n < end]
 
     heading = ""
     for n, line in lines:
-        if line.startswith(("## ", "### ")):
-            heading = line
+        if n in headings and headings[n].startswith(("## ", "### ")):
+            heading = headings[n]
         # Before the section any question counts; after it, only an instruction to ask (a "?" there
         # is the skill quoting what a person says, as in "When to use").
         if start <= n < end or not (is_ask(line) if n < start else ASK.search(line)):
@@ -527,6 +541,31 @@ SELF_TEST += [
             '```\necho "a fenced line? not a question"\n```',
             "````\n```\n````\n\nWant the report too?",
         ),
+        {"skill_too_many_questions", "skill_question_unmarked"},
+    ),
+]
+
+# Only a top-level heading bounds the first minute: a heading in indented code, in a block quote, or an
+# indented-code copy of the section's own heading before it neither ends nor starts the section.
+EXTRA_ASKS = "Want the report too? And should I sign it?\n\n"
+SELF_TEST += [
+    (
+        "an indented-code heading inside the first minute",
+        GOOD.replace(
+            GOOD_QUESTION, "A note.\n\n    ## Phases\n\n" + EXTRA_ASKS + GOOD_QUESTION
+        ),
+        {"skill_too_many_questions", "skill_question_unmarked"},
+    ),
+    (
+        "a block-quoted heading inside the first minute",
+        GOOD.replace(GOOD_QUESTION, "> ## Note\n\n" + EXTRA_ASKS + GOOD_QUESTION),
+        {"skill_too_many_questions", "skill_question_unmarked"},
+    ),
+    (
+        "an indented-code copy of the section heading before it",
+        GOOD.replace(
+            "## First minute", "    ## First minute\n\n## First minute"
+        ).replace(GOOD_QUESTION, EXTRA_ASKS + GOOD_QUESTION),
         {"skill_too_many_questions", "skill_question_unmarked"},
     ),
 ]
