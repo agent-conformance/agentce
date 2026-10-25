@@ -3,6 +3,13 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.135.13
+
+- `VG-UX-ONE-QUESTION` (changed, 18.40a): a `**Question:**` or `**Default:**` marker is read wherever it sits in its
+  line, mid-sentence or in a table cell, not only at a line start; and "tell me", "let me know" and a request such as
+  "which catalogs to use" count as asks. New seeded faults: a mid-line Question with a sign-and-publish Default in the
+  First minute, the same pair in a table cell under When to use, and an imperative second ask in the First minute.
+
 ## 0.135.12
 
 - `VG-LOCKED-COPY` (changed, 18.92): the retired-wording sweep reads each file the way a person does before it

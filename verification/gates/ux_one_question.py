@@ -16,9 +16,11 @@ with no question (`agentce assess` or `agentce quickstart`), and may then ask on
 a `**Question:**` line after that command and followed by a `**Default:**` line. Each is read with the
 lines that continue its paragraph, and every "?" in a Question paragraph is a question. Neither may name
 an action beyond reading and writing into the output folder, in any form of the verb. An instruction
-to ask (ask, confirm with, request from, check with, prompt the person for, in any tense) inside the section is a question with no default. Outside the section it may only come
-after it, under a heading that names a later step; a Question or Default
-marker outside the section is an instruction to ask. A setext heading (underlined with --- or ===) is
+to ask (ask, confirm with, request from, check with, prompt the person for, tell me, let me know, in
+any tense) inside the section is a question with no default, and so is a request such as "which
+catalogs to use". Outside the section it may only come after it, under a heading that names a later
+step; a Question or Default marker outside the section is an instruction to ask, and a marker is read
+wherever it sits in its line (mid-sentence or in a table cell). A setext heading (underlined with --- or ===) is
 refused, so the section's bounds are the ones a reader of the raw file sees.
 
 Stdout ends with `UX-ONE-QUESTION OK` when every check holds; each failure is one stderr line led by
@@ -58,6 +60,8 @@ SECTION = "## First minute"
 QUESTION = "**Question:**"
 DEFAULT = "**Default:**"
 MARKERS = (QUESTION, DEFAULT)
+# Where a marker starts, wherever it sits in its line: mid-sentence, or in a table cell.
+MARKER_AT = re.compile(r"(?=\*\*(?:Question|Default):\*\*)")
 FIRST_COMMAND = re.compile(r"`agentce (?:assess|quickstart)\b[^`]*`")
 
 
@@ -87,9 +91,14 @@ ASK = re.compile(
         "request from",
         "check with",
         "prompt (?:the )?(?:user|person) for",
+        "tell|told (?:me|us)",
+        "let (?:me|us) know",
     ),
     re.IGNORECASE,
 )
+# A request written without a verb of asking ("Which catalogs to use, too."), counted where any "?"
+# counts: before the section and inside it.
+REQUEST = re.compile(r"\b(?:which|what)\b(?:\s+\S+){0,5}?\s+to use\b", re.IGNORECASE)
 # A heading for a step that comes after the first findings, where the assistant may ask more.
 LATER_STEP = re.compile(r"^#{2,3} .*\b(?:Phases?|Stage \d|After the first minute)\b")
 # An answer that acts beyond reading and writing into the output folder is not the safe one,
@@ -124,7 +133,7 @@ QUESTION_MARK = re.compile(r"\?(?:\W|$)")
 
 def is_ask(line: str) -> bool:
     """A skill line that asks the person something, or tells the assistant to."""
-    return bool(ASK.search(line) or QUESTION_MARK.search(line))
+    return bool(ASK.search(line) or REQUEST.search(line) or QUESTION_MARK.search(line))
 
 
 def engine_commands() -> dict[str, list[str]]:
@@ -252,8 +261,9 @@ def prose(found: list[Block]) -> list[tuple[int, str]]:
     """(1-based first line, text) for each piece of prose outside the front matter and fenced code, read
     as CommonMark blocks (markdown_reader): a heading as its ATX form, and every other block whole, its
     lines joined without their block-quote or list markers, so a phrase or a default wrapped onto a
-    second line is read in one piece. A line opening with a Question or Default marker starts a new
-    piece, so each marker is read with the lines that continue it."""
+    second line is read in one piece. A Question or Default marker starts a new piece wherever it sits
+    (at a line start, mid-sentence or in a table cell), so each marker is read with the text that
+    continues it up to the next marker or the end of its block."""
     out: list[tuple[int, str]] = []
     for block in found:
         if block.kind == "fence":
@@ -263,13 +273,17 @@ def prose(found: list[Block]) -> list[tuple[int, str]]:
             continue
         piece: list[str] = []
         for line in block.text_lines:
-            words = line.text.strip()
-            if not piece or words.startswith(MARKERS):
-                out.append((line.number, words))
-                piece = [words]
-            else:
-                piece.append(words)
-                out[-1] = (out[-1][0], " ".join(piece))
+            first, *marked = MARKER_AT.split(line.text.strip())
+            if first.strip():
+                if piece:
+                    piece.append(first.strip())
+                    out[-1] = (out[-1][0], " ".join(piece))
+                else:
+                    piece = [first.strip()]
+                    out.append((line.number, piece[0]))
+            for words in marked:
+                piece = [words.strip()]
+                out.append((line.number, piece[0]))
     return out
 
 
@@ -737,6 +751,77 @@ SELF_TEST += [
         "attest the report",
     )
 ]
+
+# A marker is read wherever it sits in its line (verdicts/P18-18.40a-6be13405.md B1), and an imperative
+# request is an ask (KD-776).
+MID_LINE_PAIR = "Then: **Question:** which catalogs to assess against. **Default:** sign the report and publish it."
+TABLE_PAIR = '| step | say |\n|---|---|\n| 1 | **Question:** "Which catalogs?" **Default:** sign the report. |'
+SELF_TEST += (
+    [
+        (
+            "a mid-line Question and Default in the section",
+            GOOD.replace(GOOD_DEFAULT, GOOD_DEFAULT + "\n\n" + MID_LINE_PAIR),
+            {"skill_too_many_questions", "skill_default_unsafe"},
+        ),
+        (
+            "a mid-line Question and Default under When to use",
+            GOOD.replace(
+                "## Phases", "## When to use\n\n" + MID_LINE_PAIR + "\n\n## Phases"
+            ),
+            {"skill_asks_outside_later_step"},
+        ),
+        (
+            "a Question and Default in a table cell in the section",
+            GOOD.replace(GOOD_DEFAULT, GOOD_DEFAULT + "\n\n" + TABLE_PAIR),
+            {"skill_too_many_questions", "skill_default_unsafe"},
+        ),
+        (
+            "a Question and Default in a table cell under When to use",
+            GOOD.replace(
+                "## Phases", "## When to use\n\n" + TABLE_PAIR + "\n\n## Phases"
+            ),
+            {"skill_asks_outside_later_step"},
+        ),
+        (
+            "a mid-line Default in a later step",
+            GOOD.replace(
+                "one question at a time.",
+                "one question at a time. **Question:** which catalogs? **Default:** baseline.",
+            ),
+            set(),
+        ),
+    ]
+    + [
+        (
+            f"imperative ask in the section: {line!r}",
+            GOOD.replace("show the verdict.", f"show the verdict.\n\n{line}"),
+            {"skill_too_many_questions", "skill_question_unmarked"},
+        )
+        for line in (
+            "Tell me which catalogs to use too.",
+            "Let me know which catalogs apply.",
+            "Then: which catalogs to use, as well.",
+        )
+    ]
+    + [
+        (
+            f"imperative ask before the section: {line!r}",
+            GOOD.replace("Intro.", line),
+            {"skill_asks_before_first_minute"},
+        )
+        for line in ("Tell me the repository path first.", "Let us know your catalog.")
+    ]
+    + [
+        (
+            "an imperative ask after the section under When to use",
+            GOOD.replace(
+                "## Phases",
+                "## When to use\n\nTell me which catalogs apply.\n\n## Phases",
+            ),
+            {"skill_asks_outside_later_step"},
+        ),
+    ]
+)
 
 TERMINAL_CASES: list[tuple[str, bool]] = [
     ("Continue? ", True),
