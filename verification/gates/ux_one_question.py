@@ -62,7 +62,8 @@ RUNS = {
     "assess": lambda out, traces: ["assess", traces, "--out", out],
 }
 
-SECTION = "## First minute"
+SECTION_NAME = "First minute"
+SECTION = "## " + SECTION_NAME
 QUESTION = "**Question:**"
 DEFAULT = "**Default:**"
 MARKERS = (QUESTION, DEFAULT)
@@ -146,25 +147,36 @@ SENTENCE = re.compile(r"[^.?!]+[.?!]*[\"'*`)\]]*")
 # Each approved skill's First minute as reviewed for a second question: its raw source between the heading and
 # the next top-level heading, whitespace collapsed (section_text). Reading prose for asks by phrase list passed
 # whatever the list did not know (six verifier FAILs on one premise), so the section fails closed: a changed
-# first minute is refused until a person has read it for a second question and added its new text here.
+# first minute is refused until a person has read it for a second question and pasted the section here as
+# written in the skill.
 REVIEWED = frozenset(
-    {
-        "Show the person their first findings before any question. In the repository you were opened in, find a "
-        "folder of trace exports (OpenTelemetry GenAI or OpenInference, OTLP/JSON in `.json` or `.jsonl` files) and "
-        "run `agentce assess <folder> --out agentce-out`. If the repository holds none, run `agentce quickstart --out "
-        "agentce-out`, which assesses the bundled sample. Show the verdict line and the top gaps from the terminal "
-        "output. After that you may put one question to the person, in the terminal, and no other until the first "
-        'minute is over: **Question:** "Is this the folder your agent exports its traces to, or should I read '
-        'another one?" **Default:** keep the folder you found, or the bundled sample. Either run only reads files, '
-        "writes only into `agentce-out` and uses no network.",
-        "Show the person where the report stands before any question. Run `agentce assess --bundle <bundle> "
-        "--profile agentce/applicability.yaml --out agentce-out` on the bundle and profile the repository already "
-        "holds (the `agentce-get-evidence` skill writes them), then `agentce readiness agentce-out`. Show the "
-        "assessment's verdict line and the readiness verdict from the terminal output. After that you may put one "
-        'question to the person, in the terminal, and no other until the first minute is over: **Question:** "Who '
-        'will read this report: your developers, compliance, security, an auditor or a buyer?" **Default:** every '
-        "format, written into `agentce-out`; nothing leaves this machine.",
-    }
+    " ".join(section.split())
+    for section in (
+        """
+Show the person their first findings before any question. In the repository you were opened
+in, find a folder of trace exports (OpenTelemetry GenAI or OpenInference, OTLP/JSON in `.json` or
+`.jsonl` files) and run `agentce assess <folder> --out agentce-out`. If the repository holds none, run
+`agentce quickstart --out agentce-out`, which assesses the bundled sample. Show the verdict line and
+the top gaps from the terminal output.
+
+After that you may put one question to the person, in the terminal, and no other until the first minute is over:
+
+**Question:** "Is this the folder your agent exports its traces to, or should I read another one?"
+**Default:** keep the folder you found, or the bundled sample. Either run only reads files, writes only into `agentce-out` and uses no network.
+""",
+        """
+Show the person where the report stands before any question. Run
+`agentce assess --bundle <bundle> --profile agentce/applicability.yaml --out agentce-out` on the
+bundle and profile the repository already holds (the `agentce-get-evidence` skill writes them), then
+`agentce readiness agentce-out`. Show the assessment's verdict line and the readiness verdict from the
+terminal output.
+
+After that you may put one question to the person, in the terminal, and no other until the first minute is over:
+
+**Question:** "Who will read this report: your developers, compliance, security, an auditor or a buyer?"
+**Default:** every format, written into `agentce-out`; nothing leaves this machine.
+""",
+    )
 )
 
 
@@ -337,6 +349,28 @@ def section_headings(found: list[Block]) -> dict[int, str]:
     }
 
 
+def first_minute_bounds(
+    headings: dict[int, str], last: int
+) -> tuple[int | None, int, list[int]]:
+    """The First minute's heading line (None if there is none), the line of the next top-level `## `
+    heading after it (or `last` + 1), and any other heading that reads "First minute" at any level or case."""
+    named = [
+        n
+        for n, h in headings.items()
+        if h.lstrip("#").strip().casefold() == SECTION_NAME.casefold()
+    ]
+    start = next((n for n in named if headings[n].rstrip() == SECTION), None)
+    end = next(
+        (
+            n
+            for n, h in headings.items()
+            if start is not None and n > start and h.startswith("## ")
+        ),
+        last + 1,
+    )
+    return start, end, [n for n in named if n != start]
+
+
 def section_text(raw: list[str], start: int, end: int) -> str:
     """The section's raw source lines after its heading and before line `end`, whitespace collapsed: every
     character a reader of the file sees, including what no parsed block carries (a link reference
@@ -377,31 +411,30 @@ def read_skill(
             )
     lines = prose(found)
     headings = section_headings(found)
-    start = next((n for n, h in headings.items() if h.rstrip() == SECTION), None)
-    if start is None:  # with no first minute, every ask comes before the first findings
+    found_start, end, repeated = first_minute_bounds(headings, len(raw))
+    for n in repeated:
+        errors.append(
+            f"ux.one_question.skill_first_minute_repeated: {rel}:{n} is a second {headings[n].strip()!r} "
+            f"heading; a skill has one '{SECTION}' section"
+        )
+    if (
+        found_start is None
+    ):  # with no first minute, every ask comes before the first findings
         errors.append(
             f"ux.one_question.skill_no_first_minute: {rel} has no '{SECTION}' section"
         )
-        start = end = len(raw) + 1
+        start = end
     else:
-        end = next(
-            (n for n, h in headings.items() if n > start and h.startswith("## ")),
-            len(raw) + 1,
-        )
+        start = found_start
     body = [(n, line) for n, line in lines if start < n < end]
-    for n, h in headings.items():
-        if n != start and h.lstrip("#").strip().casefold() == SECTION[3:].casefold():
-            errors.append(
-                f"ux.one_question.skill_first_minute_repeated: {rel}:{n} is a second {h.strip()!r} "
-                f"heading; a skill has one '{SECTION}' section"
-            )
-    if reviewed is not None and start <= len(raw):
+    if reviewed is not None and found_start is not None:
         here = section_text(raw, start, end)
         if here not in reviewed:
             errors.append(
                 f"ux.one_question.skill_unreviewed: {rel}:{start}-{end - 1} '{SECTION}' is not text the "
                 "gate has reviewed for a second question. Read the new text for any ask beyond its one "
-                f"'{QUESTION}', then add it to REVIEWED in verification/gates/ux_one_question.py: {here!r}"
+                f"'{QUESTION}', then paste the section as written into REVIEWED in "
+                f"verification/gates/ux_one_question.py; it now reads: {here!r}"
             )
 
     heading = ""
@@ -993,13 +1026,9 @@ SELF_TEST += [
     )
 ]
 
-# The First minute fails closed: its raw source must be text the gate has reviewed (REVIEWED). The fixture
-# carries its own reviewed set, so no fixture text enters the production allowlist.
-GOOD_RAW = GOOD.splitlines()
-GOOD_START = GOOD_RAW.index("## First minute") + 1
-GOOD_REVIEWED = frozenset(
-    {section_text(GOOD_RAW, GOOD_START, GOOD_RAW.index("## Phases") + 1)}
-)
+# The First minute fails closed: its raw source must be text the gate has reviewed (REVIEWED). These cases run
+# against the fixture's own section as the reviewed set (fixture_reviewed), so no fixture text enters the
+# production allowlist.
 REVIEWED_TEST: list[tuple[str, str, set[str]]] = [
     ("reviewed: the fixture as reviewed", GOOD, set()),
     (
@@ -1063,22 +1092,29 @@ TERMINAL_CASES: list[tuple[str, bool]] = [
 ]
 
 
+def fixture_reviewed() -> frozenset[str]:
+    """The fixture's own First minute, as the reviewed set for REVIEWED_TEST."""
+    raw = split_lines(GOOD)
+    start, end, _ = first_minute_bounds(section_headings(blocks(GOOD)), len(raw))
+    assert start is not None
+    return frozenset({section_text(raw, start, end)})
+
+
 def self_test() -> int:
     failed = 0
-    cases: list[tuple[str, str, set[str], frozenset[str] | None]] = [
-        (name, text, want, None) for name, text, want in SELF_TEST
-    ]
-    cases += [(name, text, want, GOOD_REVIEWED) for name, text, want in REVIEWED_TEST]
-    for name, text, want, reviewed in cases:
-        errors: list[str] = []
-        read_skill("demo/SKILL.md", text, errors, reviewed)
-        got = {e.split(":", 1)[0].removeprefix("ux.one_question.") for e in errors}
-        if got != want:
-            failed += 1
-            print(
-                f"self-test FAIL {name}: want {sorted(want)}, got {sorted(got)}: {errors}",
-                file=sys.stderr,
-            )
+    runs = 0
+    for reviewed, table in ((None, SELF_TEST), (fixture_reviewed(), REVIEWED_TEST)):
+        for name, text, want in table:
+            runs += 1
+            errors: list[str] = []
+            read_skill("demo/SKILL.md", text, errors, reviewed)
+            got = {e.split(":", 1)[0].removeprefix("ux.one_question.") for e in errors}
+            if got != want:
+                failed += 1
+                print(
+                    f"self-test FAIL {name}: want {sorted(want)}, got {sorted(got)}: {errors}",
+                    file=sys.stderr,
+                )
     for line, asks_question in TERMINAL_CASES:
         if bool(question_lines(line)) != asks_question:
             failed += 1
@@ -1088,7 +1124,7 @@ def self_test() -> int:
             )
     if failed:
         return 1
-    print(f"UX-ONE-QUESTION SELF-TEST OK ({len(cases) + len(TERMINAL_CASES)} cases)")
+    print(f"UX-ONE-QUESTION SELF-TEST OK ({runs + len(TERMINAL_CASES)} cases)")
     return 0
 
 
