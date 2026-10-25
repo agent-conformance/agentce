@@ -967,6 +967,12 @@
           "file": "website/src/content/docs/docs/trace-store-connectors.md",
           "search": "| LangSmith | Supported | [LangSmith API (OpenAPI), v2 runs](https://api.smith.langchain.com/openapi.json), 0.1.0 | 19.34 |\n",
           "replace": "| LangSmith | Supported | [LangSmith API (OpenAPI), v2 runs](https://api.smith.langchain.com/openapi.json), 0.1.0 | 19.34 |\n\f\n| Honeycomb | Supported | x | ZZ |\n"
+        },
+        {
+          "description": "the trace-store page's front matter gains a '----' line, then a second table naming Honeycomb Supported: the site ends front matter at the first line starting '---', so it draws that table, while a reader that waits for an exact '---' line reads it as front matter (verdicts/P18-18.39a-9c9aaeb8.md own-fm-4dash)",
+          "file": "website/src/content/docs/docs/trace-store-connectors.md",
+          "search": "title: Trace-Store Connectors\n",
+          "replace": "title: Trace-Store Connectors\n----\n\n| Backend | Tier | Reader follows | Build item |\n|---|---|---|---|\n| Honeycomb | Supported | x | y |\n\n"
         }
       ],
       "fix_hint": "Run verification/gates/ingest_support_matrix.sh; it names the exact message key (ingest.matrix.unknown_source, .wrong_tier, .count_mismatch, .count_arithmetic, .missing_tier_line, .docs_wrong_tier, .docs_unknown_source, .docs_malformed_row, .docs_unrecognized_tier, .docs_definition_drift, .docs_table_missing, .tier_line_unreadable, .tier_line_wrapped, .docs_follows_unreadable, .docs_definition_missing or .docs_header_unreadable) and the offending name."

@@ -9,6 +9,11 @@ fails if a gate in `gates.json` is not named in this file.
   where markdown-it-py is not installed, each gate re-runs itself in the `tools` environment through the reader's
   `need_parser` helper, as `markdown_reader.py` already did. Before, their `--self-test` stopped on an assertion there.
   If the parser is missing in `tools` as well, the gate exits 2 with `markdown_reader.no_parser`.
+- The same three gates find front matter the way the site does (Astro's rule): it ends at the first line that starts
+  with `---` or `+++`, and the rest of that line is page content. Before, the reader waited for a line that was exactly
+  `---`, so a second trace-store table after a `----` line was drawn on the site but read as front matter. A `---`
+  opener closed by `+++` leaves the whole file as content. New seeded fault for VG-INGEST-SUPPORT-MATRIX: a `----` line
+  in the page's front matter, then a table naming Honeycomb Supported.
 
 ## 0.135.0
 
