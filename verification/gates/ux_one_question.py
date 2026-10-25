@@ -53,21 +53,59 @@ SECTION = "## First minute"
 QUESTION = "**Question:**"
 DEFAULT = "**Default:**"
 FIRST_COMMAND = re.compile(r"`agentce (?:assess|quickstart)\b[^`]*`")
+
+
+def any_form(*verbs: str) -> str:
+    """A pattern for every form of each verb ("sign" also matches signs, signed, signing).
+
+    A verb may carry its irregular forms after a "|" ("send|sent"), and words after it ("ask for")."""
+    alternatives = []
+    for verb in verbs:
+        word, _, rest = verb.partition(" ")
+        base, *irregular = word.split("|")
+        stem = (
+            base[:-1] + "(?:e|es|ed|ing)"
+            if base.endswith("e")
+            else base + "(?:s|es|ed|ing)?"
+        )
+        head = "(?:" + "|".join([stem, *irregular]) + ")"
+        alternatives.append(f"{head} {rest}" if rest else head)
+    return r"\b(?:" + "|".join(alternatives) + r")\b"
+
+
 # An instruction to the assistant to ask the person something, in any tense ("asks", "asking").
 ASK = re.compile(
-    r"\b(?:ask(?:s|ed|ing)?|confirm(?:s|ed|ing)? with|request(?:s|ed|ing)? from"
-    r"|check(?:s|ed|ing)? with|prompt(?:s|ed|ing)? (?:the )?(?:user|person) for)\b",
+    any_form(
+        "ask",
+        "confirm with",
+        "request from",
+        "check with",
+        "prompt (?:the )?(?:user|person) for",
+    ),
     re.IGNORECASE,
 )
 # A heading for a step that comes after the first findings, where the assistant may ask more.
 LATER_STEP = re.compile(r"^#{2,3} .*\b(?:Phases?|Stage \d|After the first minute)\b")
-# An answer that acts beyond reading and writing into the output folder is not the safe one.
-# Every form of each verb counts: "signing the report" signs it.
+# An answer that acts beyond reading and writing into the output folder is not the safe one,
+# in any form of the verb: "signing the report" signs it.
 UNSAFE = re.compile(
-    r"\b(?:sign(?:s|ed|ing)?|publish(?:es|ed|ing)?|upload(?:s|ed|ing)?|sen(?:d|ds|ding|t)"
-    r"|push(?:es|ed|ing)?|delet(?:e|es|ed|ing)|overwr(?:ite|ites|iting|itten|ote)"
-    r"|commit(?:s|ted|ting)?|install(?:s|ed|ing)?|deploy(?:s|ed|ing)?|shar(?:e|es|ed|ing)"
-    r"|email(?:s|ed|ing)?|submit(?:s|ted|ting)?|transmit(?:s|ted|ting)?)\b|--for\b",
+    any_form(
+        "sign",
+        "publish",
+        "upload",
+        "send|sent",
+        "push",
+        "delete",
+        "overwrite|overwrote|overwritten",
+        "commit|committed|committing",
+        "install",
+        "deploy",
+        "share",
+        "email",
+        "submit|submitted|submitting",
+        "transmit|transmitted|transmitting",
+    )
+    + r"|--for\b",
     re.IGNORECASE,
 )
 ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07]*\x07")
@@ -425,33 +463,11 @@ SELF_TEST: list[tuple[str, str, set[str]]] = [
         {"skill_default_unsafe"},
     ),
     (
-        "default signs, -ing form",
-        GOOD.replace("keep the folder you found;", "signing the report;"),
-        {"skill_default_unsafe"},
-    ),
-    (
-        "default publishes, -es form",
-        GOOD.replace(
-            "keep the folder you found;", "the report publishes to your site;"
-        ),
-        {"skill_default_unsafe"},
-    ),
-    (
-        "default committing",
-        GOOD.replace("keep the folder you found;", "committing the evidence to main;"),
-        {"skill_default_unsafe"},
-    ),
-    (
         "question shares, default yes",
         GOOD.replace(
             GOOD_QUESTION.removeprefix("**Question:** "),
             '"Share the report with your auditor now?"',
         ).replace("keep the folder you found;", "yes;"),
-        {"skill_default_unsafe"},
-    ),
-    (
-        "default emails",
-        GOOD.replace("keep the folder you found;", "email the report to compliance;"),
         {"skill_default_unsafe"},
     ),
     (
@@ -470,26 +486,6 @@ SELF_TEST: list[tuple[str, str, set[str]]] = [
     (
         "ask before the section",
         GOOD.replace("Intro.", "Intro. Ask for the repository path first."),
-        {"skill_asks_before_first_minute"},
-    ),
-    (
-        "asking before the section",
-        GOOD.replace("Intro.", "Start by asking which repository to use."),
-        {"skill_asks_before_first_minute"},
-    ),
-    (
-        "asks before the section",
-        GOOD.replace("Intro.", "The assistant asks for the repository path first."),
-        {"skill_asks_before_first_minute"},
-    ),
-    (
-        "check with before the section",
-        GOOD.replace("Intro.", "Check with the person which catalog applies."),
-        {"skill_asks_before_first_minute"},
-    ),
-    (
-        "prompt the user before the section",
-        GOOD.replace("Intro.", "Prompt the user for the trace folder."),
         {"skill_asks_before_first_minute"},
     ),
     (
@@ -512,6 +508,35 @@ SELF_TEST: list[tuple[str, str, set[str]]] = [
     ),
 ]
 
+
+# Every form of an unsafe verb in a default is refused, and every tense of an ask before the section.
+SELF_TEST += [
+    (
+        f"default {answer!r}",
+        GOOD.replace("keep the folder you found;", f"{answer};"),
+        {"skill_default_unsafe"},
+    )
+    for answer in (
+        "signing the report",
+        "the report publishes to your site",
+        "committing the evidence to main",
+        "email the report to compliance",
+        "the evidence is sent to the auditor",
+        "overwrote the old report",
+    )
+] + [
+    (
+        f"ask before the section: {line!r}",
+        GOOD.replace("Intro.", line),
+        {"skill_asks_before_first_minute"},
+    )
+    for line in (
+        "Start by asking which repository to use.",
+        "The assistant asks for the repository path first.",
+        "Check with the person which catalog applies.",
+        "Prompt the user for the trace folder.",
+    )
+]
 
 TERMINAL_CASES: list[tuple[str, bool]] = [
     ("Continue? ", True),
