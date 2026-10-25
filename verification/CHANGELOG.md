@@ -3,6 +3,13 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.135.2
+
+- `VG-INGEST-SUPPORT-MATRIX` (changed, 18.39c): the self-test pins a tier claim in every CommonMark container shape
+  as refused with `ingest.matrix.tier_line_unreadable`: split over two block-quote lines, a block quote's lazy
+  continuation, a nested quote (one line or split), a list item in a quote, a quote in a list item (one line or split),
+  an indented quote, escaped emphasis in a quote, and a claim split over a list item's continuation line.
+
 ## 0.135.1
 
 - `VG-INGEST-SUPPORT-MATRIX`, `VG-UX-COPY` and `VG-UX-ONE-QUESTION` (changed, 18.39a): run with a plain `uv run python`,

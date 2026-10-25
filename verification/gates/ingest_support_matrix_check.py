@@ -1016,6 +1016,16 @@ def self_test() -> int:
         "a code span": "`Experimental` (1): Honeycomb.",
         "a claim split over a soft line break": "We also list **Experimental**\n(1): Honeycomb.",
         "backslash-escaped emphasis": "\\*\\*Experimental\\*\\* (1): Honeycomb.",
+        "a claim split over two block-quote lines": "> We also list **Experimental**\n> (1): Honeycomb.",
+        "a block quote's lazy continuation": "> We also list **Experimental**\n(1): Honeycomb.",
+        "a nested block quote": "> > **Experimental** (1): Honeycomb.",
+        "a claim split in a nested block quote": "> > We also list **Experimental**\n> > (1): Honeycomb.",
+        "a list item in a block quote": "> - **Experimental** (1): Honeycomb.",
+        "a block quote in a list item": "- > **Experimental** (1): Honeycomb.",
+        "an indented block quote": "   > **Experimental** (1): Honeycomb.",
+        "escaped emphasis in a block quote": "> \\*\\*Experimental\\*\\* (1): Honeycomb.",
+        "a claim split over a list item's continuation": "- We also list **Experimental**\n  (1): Honeycomb.",
+        "a claim split in a quote in a list item": "- > We also list **Experimental**\n  > (1): Honeycomb.",
     }.items():
         cases.append(
             (
