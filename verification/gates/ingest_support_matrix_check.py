@@ -16,19 +16,19 @@ reason is never guessed from a generic diff.
 
 from __future__ import annotations
 
+import argparse
 import html
 import re
 import sys
 from pathlib import Path
 
 import yaml
+from markdown_reader import Block, Line, blocks, split_lines
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
 _KNOWN_TIERS = ("Supported", "Experimental", "Roadmap")
-_TIER_LINE_RE = re.compile(
-    r"^\*\*(" + "|".join(_KNOWN_TIERS) + r")\*\* \((\d+)\): (.+)$", re.MULTILINE
-)
+_TIER_LINE_RE = re.compile(r"\*\*(" + "|".join(_KNOWN_TIERS) + r")\*\* \((\d+)\): (.+)")
 _MORE_RE = re.compile(r"^and (\d+) more$")
 _TRAILER_RE = re.compile(r"\s*[—;]\s*(?:see the full matrix|help wanted)\s*$")
 _TABLE_HEADER = "| Backend | Tier | Reader follows | Build item |"
@@ -65,37 +65,48 @@ def _is_table_header(line: str) -> bool:
 
 
 def _unreadable_headers(text: str) -> list[tuple[int, str]]:
-    """Piped lines that hold every word of the four header cells but are not a header copy
-    _is_table_header reads: a table in a block quote or on a list item, a linked word, a <br> in a
-    cell, reordered or extra columns. The words are matched in the line's letters alone, so no
-    markup between or around them can hide one. Refused, not skipped, so a header spelling nobody
-    foresaw cannot hide a table (18.39a)."""
+    """Blocks that hold a pipe and every word of the four header cells but are not a top-level table
+    whose header _is_table_header reads: a table in a block quote or on a list item, a linked word, a
+    <br> in a cell, reordered or extra columns, a header with no delimiter row. The words are matched in
+    the block's letters alone, so no markup between or around them can hide one. Refused, not skipped,
+    so a header spelling nobody foresaw cannot hide a table (18.39a)."""
     found = []
-    for number, line in enumerate(text.splitlines(), start=1):
+    for block in blocks(text):
+        raw = "\n".join(line.text for line in block.source)
         letters = (
-            re.sub(r"[^a-z]", "", html.unescape(line).casefold()) if "|" in line else ""
+            re.sub(r"[^a-z]", "", html.unescape(raw).casefold()) if "|" in raw else ""
         )
-        if all(word in letters for word in _HEADER_WORDS) and not _is_table_header(
-            line
+        if all(word in letters for word in _HEADER_WORDS) and block not in _tables(
+            text
         ):
-            found.append((number, line))
+            found.append((block.start, raw))
     return found
 
 
+def _tables(text: str) -> list[Block]:
+    """Each top-level table whose header row is a copy of the trace-store table's header."""
+    return [
+        block
+        for block in blocks(text)
+        if block.kind == "table"
+        and not block.containers
+        and _is_table_header(block.rows[0][0].text)
+    ]
+
+
 def _extract_table_rows(text: str) -> list[list[str]]:
-    """Every line from each table header copy to the next blank line (spaces and tabs only), as raw
-    cells. Outer pipes are optional; a line that is not a row comes back as it is, for the caller
-    to report, so the page has to end the table with a blank line."""
-    rows: list[list[str]] = []
-    lines = iter(text.splitlines())
-    for line in lines:
-        if not _is_table_header(line):
-            continue
-        next(lines, None)  # the --- separator
-        for row in lines:
-            if not row.strip(" \t"):
+    """Every body row of each trace-store table copy, then each line after it up to a blank line (spaces
+    and tabs only, CommonMark 4.9), as the raw cells of its source line, so a row with more or fewer
+    cells than the header, or a line that is not a row, comes back as it is for the caller to report;
+    the page has to end the table with a blank line."""
+    source = split_lines(text)
+    rows = []
+    for table in _tables(text):
+        rows += [_split_cells(line.text) for line, _ in table.rows[1:]]
+        for line in source[table.end :]:
+            if not line.strip(" \t"):
                 break
-            rows.append(_split_cells(row))
+            rows.append(_split_cells(line))
     return rows
 
 
@@ -133,49 +144,65 @@ _HEADER_CELLS = tuple(_header_key(cell) for cell in _split_cells(_TABLE_HEADER))
 _HEADER_WORDS = tuple(word for cell in _HEADER_CELLS for word in cell.split())
 
 
-def check_tier_layout(text: str, source: str) -> list[str]:
-    """Refuse a tier claim the tier-line scan cannot read (18.39c): a line that is not a tier line but holds
-    one (a list item, a quote, an indented line, a heading, mid-sentence, other markup), and a tier line whose
-    paragraph goes on to a line that is not itself a tier line (CommonMark 4.8: the wrapped names render in
-    the same paragraph but would never be checked)."""
+def check_tier_layout(text: str, source: str) -> tuple[list[str], list[str]]:
+    """Read README's tier lines the way the site renders them (markdown_reader), and refuse a tier claim
+    the tier-line scan cannot read (18.39c): one in a list item, a quote, a heading, a table, code or
+    HTML, an indented line, mid-sentence or under other markup, and a tier line whose paragraph goes on
+    to a line that is not itself a tier line (CommonMark 4.8: the wrapped names render in the same
+    paragraph but would never be checked). Returns the problems and the tier lines read."""
     problems: list[str] = []
-    lines = text.splitlines()
-    # The renderer reads a paragraph, not a line (CommonMark 4.8), so a claim split over a soft line break is
-    # looked for in the paragraph's other lines joined by a space.
-    paragraph: list[tuple[int, str]] = []
-    for number, line in [*enumerate(lines, 1), (len(lines) + 1, "")]:
-        if line.strip(" \t"):
-            if _TIER_LINE_RE.fullmatch(line) is None:
-                paragraph.append((number, line))
-            continue
-        joined = " ".join(text for _, text in paragraph)
-        if paragraph and _TIER_MENTION_RE.search(_plain(joined)):
+    tier_lines: list[str] = []
+    source_lines = split_lines(text)
+    for block in blocks(text):
+        lines = block.lines or block.source
+        own_lines = (
+            block.kind == "paragraph"
+            and not block.containers
+            and [line.text for line in block.lines]
+            == [line.text for line in block.source]
+        )
+        other = [
+            line
+            for line in lines
+            if not (own_lines and _TIER_LINE_RE.fullmatch(line.text))
+        ]
+        joined = " ".join(line.text for line in other)
+        if other and _TIER_MENTION_RE.search(_plain(joined)):
             problems.append(
-                f"ingest.matrix.tier_line_unreadable: {source} line {paragraph[0][0]} holds a tier line "
+                f"ingest.matrix.tier_line_unreadable: {source} line {other[0].number} holds a tier line "
                 f"the gate cannot read: {joined!r}. Write it as **<Tier>** (<count>): <names> at the "
                 "start of its own line"
             )
-        paragraph = []
-    for number, line in enumerate(lines, 1):
-        tier_line = _TIER_LINE_RE.fullmatch(line)
-        if tier_line is None:
+        if not own_lines:
             continue
-        follow = lines[number] if number < len(lines) else ""
-        if follow.strip(" \t") and not _TIER_LINE_RE.fullmatch(follow):
-            problems.append(
-                f"ingest.matrix.tier_line_wrapped: {source}'s {tier_line.group(1)} line (line {number}) "
-                f"goes on to {follow!r}, which the gate does not read. Keep the tier line on one line "
-                "and put a blank line after it"
-            )
-    return problems
+        after = source_lines[block.end] if block.end < len(source_lines) else ""
+        follows = [
+            *lines[1:],
+            Line(block.end + 1, after) if after.strip(" \t") else None,
+        ]
+        for line, follow in zip(lines, follows):
+            tier_line = _TIER_LINE_RE.fullmatch(line.text)
+            if tier_line is None:
+                continue
+            tier_lines.append(line.text)
+            if follow is not None and not _TIER_LINE_RE.fullmatch(follow.text):
+                problems.append(
+                    f"ingest.matrix.tier_line_wrapped: {source}'s {tier_line.group(1)} line (line "
+                    f"{line.number}) goes on to {follow.text!r}, which the gate does not read. Keep the "
+                    "tier line on one line and put a blank line after it"
+                )
+    return problems, tier_lines
 
 
 def check_tier_lines(
     rows_by_name: dict[str, dict], text: str, source: str
 ) -> list[str]:
-    problems = check_tier_layout(text, source)
+    problems, tier_lines = check_tier_layout(text, source)
     seen_tiers: set[str] = set()
-    for tier_label, count_s, names_text in _TIER_LINE_RE.findall(text):
+    for tier_label, count_s, names_text in (
+        _TIER_LINE_RE.fullmatch(line).groups()  # type: ignore[union-attr]
+        for line in tier_lines
+    ):
         tier = tier_label.lower()
         seen_tiers.add(tier)
         stated = int(count_s)
@@ -678,6 +705,73 @@ def self_test() -> int:
         )
     )
 
+    # Line-boundary characters (18.211, verdicts/P18-18.39a-ee1c8049.md section 4): CommonMark ends lines at
+    # LF, CR and CRLF only, and a line holding one of these is not blank, so the site keeps the table going.
+    honeycomb = "| Honeycomb | Supported | x | ZZ |\n"
+    for ch in "\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029":
+        code = f"U+{ord(ch):04X}"
+        cases += [
+            (
+                f"x-blank {code}: a line of it under the table does not end the table",
+                has(
+                    check_trace_store_docs(rows, good_table + f"{ch}\n" + honeycomb),
+                    "docs_unknown_source",
+                    "Honeycomb",
+                ),
+            ),
+            (
+                f"x-header {code}: a second table with it inside a header cell is read",
+                has(
+                    check_trace_store_docs(
+                        rows,
+                        good_table
+                        + "\n"
+                        + _TABLE_HEADER.replace("Reader follows", f"Reader{ch}follows")
+                        + "\n|---|---|---|---|\n"
+                        + honeycomb,
+                    ),
+                    "docs_unknown_source",
+                    "Honeycomb",
+                ),
+            ),
+            (
+                f"x-row-tail {code}: it right before a row on the same line does not split the row",
+                has(
+                    check_trace_store_docs(
+                        rows, good_table.rstrip("\n") + ch + honeycomb
+                    ),
+                    "docs_malformed_row",
+                ),
+            ),
+        ]
+    roadmap = "**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, Cedar; help wanted."
+    cases.append(
+        (
+            "a README tier line split by U+000C is one line, and its split name is refused",
+            has(
+                check_tier_lines(
+                    rows, roadmap.replace(", Cedar", ",\x0cCedar") + "\n", "README.md"
+                ),
+                "unknown_source",
+            ),
+        )
+    )
+    for label, wrapped in {
+        "a block quote": f"> {roadmap}\n",
+        "a list item": f"- {roadmap}\n",
+        "a heading": f"## {roadmap}\n",
+        "a table cell": f"| a |\n|---|\n| {roadmap} |\n",
+        "fenced code": f"```\n{roadmap}\n```\n",
+        "an HTML block": f"<div>\n{roadmap}\n</div>\n",
+        "an indented line": f"    {roadmap}\n",
+    }.items():
+        cases.append(
+            (
+                f"a tier line in {label} is tier_line_unreadable",
+                has(check_tier_layout(wrapped, "README.md")[0], "tier_line_unreadable"),
+            )
+        )
+
     for opener in (
         "### More",
         "> note",
@@ -875,7 +969,7 @@ def self_test() -> int:
         cases.append(
             (
                 f"{label} reports no layout problem",
-                check_tier_layout(text, "README.md") == [],
+                check_tier_layout(text, "README.md")[0] == [],
             )
         )
     experimental = "**Experimental** (3): Cursor CLI output, AuthZEN decisions, Datadog LLM Observability."
@@ -986,7 +1080,11 @@ def self_test() -> int:
 
 
 def main(argv: list[str]) -> int:
-    if "--self-test" in argv:
+    parser = argparse.ArgumentParser(
+        prog="ingest_support_matrix_check.py", allow_abbrev=False
+    )
+    parser.add_argument("--self-test", action="store_true")
+    if parser.parse_args(argv).self_test:
         return self_test()
     problems = check()
     if problems:

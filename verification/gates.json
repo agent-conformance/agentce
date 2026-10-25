@@ -961,6 +961,12 @@
           "file": "website/src/content/docs/docs/trace-store-connectors.md",
           "search": "## What works today",
           "replace": "> | Backend | Tier | Reader follows | Build item |\n> |---|---|---|---|\n> | Honeycomb | Supported | x | y |\n\n## What works today"
+        },
+        {
+          "description": "a form feed (U+000C) line under the trace-store table's LangSmith row, then a Honeycomb Supported row: CommonMark does not end the table at a form-feed line, so the site draws Honeycomb inside it (verdicts/P18-18.39a-ee1c8049.md x-ff-blank, 18.211)",
+          "file": "website/src/content/docs/docs/trace-store-connectors.md",
+          "search": "| LangSmith | Supported | [LangSmith API (OpenAPI), v2 runs](https://api.smith.langchain.com/openapi.json), 0.1.0 | 19.34 |\n",
+          "replace": "| LangSmith | Supported | [LangSmith API (OpenAPI), v2 runs](https://api.smith.langchain.com/openapi.json), 0.1.0 | 19.34 |\n\f\n| Honeycomb | Supported | x | ZZ |\n"
         }
       ],
       "fix_hint": "Run verification/gates/ingest_support_matrix.sh; it names the exact message key (ingest.matrix.unknown_source, .wrong_tier, .count_mismatch, .count_arithmetic, .missing_tier_line, .docs_wrong_tier, .docs_unknown_source, .docs_malformed_row, .docs_unrecognized_tier, .docs_definition_drift, .docs_table_missing, .tier_line_unreadable, .tier_line_wrapped, .docs_follows_unreadable, .docs_definition_missing or .docs_header_unreadable) and the offending name."
