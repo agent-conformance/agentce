@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.136.1",
+  "suite_version": "0.136.2",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -2048,6 +2048,12 @@
           "file": "skills/agentce-prepare-to-share/SKILL.md",
           "search": "nothing leaves this machine.",
           "replace": "nothing leaves this machine.\n\nHave the person pick the catalogs."
+        },
+        {
+          "description": "a second First minute section headed '## First  minute' (two spaces) before prepare-to-share's real one, holding a loose ask ('Have the person pick the catalogs.'), caught because any heading a reader takes for First minute, whatever its spacing or markup, is a second one",
+          "file": "skills/agentce-prepare-to-share/SKILL.md",
+          "search": "## First minute\n",
+          "replace": "## First  minute\n\nHave the person pick the catalogs.\n\n## First minute\n"
         }
       ],
       "fix_hint": "Run verification/gates/ux_one_question.sh; each stderr line names the key, the file and line or the engine and command. Keep a skill's first minute to one **Question:** line after its first agentce command, with a **Default:** that only reads and writes into the output folder; move other asks under a Phase or Stage heading; after reading a changed First minute for a second question, add its text (printed by skill_unreviewed) to REVIEWED in verification/gates/ux_one_question.py; an engine's first-run command never prompts."

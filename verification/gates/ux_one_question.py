@@ -46,6 +46,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import unicodedata
 from pathlib import Path
 
 from markdown_reader import Block, blocks, need_parser, split_lines
@@ -349,17 +350,23 @@ def section_headings(found: list[Block]) -> dict[int, str]:
     }
 
 
+def as_read(block: Block) -> str:
+    """A block's text as a reader sees it: markup and HTML tags gone, format characters (zero-width
+    spaces) dropped, any run of whitespace (tab, no-break space) one space, case folded."""
+    text = " ".join(line.text for line in block.visible)
+    text = "".join(c for c in text if unicodedata.category(c) != "Cf")
+    return " ".join(text.split()).casefold()
+
+
 def first_minute_bounds(
-    headings: dict[int, str], last: int
+    found: list[Block], last: int
 ) -> tuple[int | None, int, list[int]]:
     """The First minute's heading line (None if there is none), the line of the next top-level `## `
-    heading after it (or `last` + 1), and any other heading that reads "First minute" at any level or case."""
-    named = [
-        n
-        for n, h in headings.items()
-        if h.lstrip("#").strip().casefold() == SECTION_NAME.casefold()
-    ]
-    start = next((n for n in named if headings[n].rstrip() == SECTION), None)
+    heading after it (or `last` + 1), and every other block a reader takes for a First minute heading: a
+    heading or HTML block whose text names the first minute other than as "after the first minute", or a
+    paragraph that reads "first minute" and nothing else (a bold line standing in for a heading)."""
+    headings = section_headings(found)
+    start = next((n for n, h in headings.items() if h.rstrip() == SECTION), None)
     end = next(
         (
             n
@@ -368,7 +375,19 @@ def first_minute_bounds(
         ),
         last + 1,
     )
-    return start, end, [n for n in named if n != start]
+    name = SECTION_NAME.casefold()
+    named = [
+        block.start
+        for block in found
+        if block.start != start
+        and (
+            block.kind in ("heading", "html")
+            and name in as_read(block).replace("after the " + name, "")
+            or block.kind == "paragraph"
+            and as_read(block) == name
+        )
+    ]
+    return start, end, named
 
 
 def section_text(raw: list[str], start: int, end: int) -> str:
@@ -411,10 +430,10 @@ def read_skill(
             )
     lines = prose(found)
     headings = section_headings(found)
-    found_start, end, repeated = first_minute_bounds(headings, len(raw))
+    found_start, end, repeated = first_minute_bounds(found, len(raw))
     for n in repeated:
         errors.append(
-            f"ux.one_question.skill_first_minute_repeated: {rel}:{n} is a second {headings[n].strip()!r} "
+            f"ux.one_question.skill_first_minute_repeated: {rel}:{n} reads as a second First minute "
             f"heading; a skill has one '{SECTION}' section"
         )
     if (
@@ -1029,58 +1048,87 @@ SELF_TEST += [
 # The First minute fails closed: its raw source must be text the gate has reviewed (REVIEWED). These cases run
 # against the fixture's own section as the reviewed set (fixture_reviewed), so no fixture text enters the
 # production allowlist.
-REVIEWED_TEST: list[tuple[str, str, set[str]]] = [
-    ("reviewed: the fixture as reviewed", GOOD, set()),
-    (
-        "reviewed: a paragraph reflowed",
-        GOOD.replace("and show the verdict.", "and\n   show the verdict."),
-        set(),
-    ),
-    (
-        "reviewed: one word changed",
-        GOOD.replace("show the verdict.", "show the verdicts."),
-        {"skill_unreviewed"},
-    ),
-    (
-        "reviewed: a fenced line changed",
-        GOOD.replace("not a question", "ask the person which catalogs"),
-        {"skill_unreviewed"},
-    ),
-    (
-        "reviewed: a fence info string",
-        GOOD.replace('```\necho "a', '```Ask the person which catalogs apply\necho "a'),
-        {"skill_unreviewed"},
-    ),
-    (
-        "reviewed: a link reference definition",
-        GOOD.replace(
-            GOOD_DEFAULT,
-            GOOD_DEFAULT + '\n\n[q]: <#> "Ask the person which catalogs apply."',
+REVIEWED_TEST: list[tuple[str, str, set[str]]] = (
+    [
+        ("reviewed: the fixture as reviewed", GOOD, set()),
+        (
+            "reviewed: a paragraph reflowed",
+            GOOD.replace("and show the verdict.", "and\n   show the verdict."),
+            set(),
         ),
-        {"skill_unreviewed"},
-    ),
-    (
-        "reviewed: a second First minute heading",
-        GOOD.replace(
-            "## Phases",
-            "## First Minute\n\nHave the person pick the catalogs.\n\n## Phases",
+        (
+            "reviewed: one word changed",
+            GOOD.replace("show the verdict.", "show the verdicts."),
+            {"skill_unreviewed"},
         ),
-        {"skill_first_minute_repeated"},
-    ),
-] + [
-    (
-        f"reviewed: a loose ask after the Default: {line!r}",
-        GOOD.replace(GOOD_DEFAULT, f"{GOOD_DEFAULT}\n\n{line}"),
-        {"skill_unreviewed"},
-    )
-    for line in (
-        "Find out from the person which catalogs apply.",
-        "Have the person pick the catalogs.",
-        "Get the repository path from the person.",
-        "Request the repository path.",
-        "Which catalogs apply, please.",
-    )
-]
+        (
+            "reviewed: a fenced line changed",
+            GOOD.replace("not a question", "ask the person which catalogs"),
+            {"skill_unreviewed"},
+        ),
+        (
+            "reviewed: a fence info string",
+            GOOD.replace(
+                '```\necho "a', '```Ask the person which catalogs apply\necho "a'
+            ),
+            {"skill_unreviewed"},
+        ),
+        (
+            "reviewed: a link reference definition",
+            GOOD.replace(
+                GOOD_DEFAULT,
+                GOOD_DEFAULT + '\n\n[q]: <#> "Ask the person which catalogs apply."',
+            ),
+            {"skill_unreviewed"},
+        ),
+        (
+            "reviewed: a second First minute heading",
+            GOOD.replace(
+                "## Phases",
+                "## First Minute\n\nHave the person pick the catalogs.\n\n## Phases",
+            ),
+            {"skill_first_minute_repeated"},
+        ),
+    ]
+    + [
+        (
+            f"reviewed: a second First minute heading as {heading!r}",
+            GOOD.replace(
+                "## Phases",
+                f"{heading}\n\nHave the person pick the catalogs.\n\n## Phases",
+            ),
+            # A heading that is not a top-level `## ` heading does not end the section, so the section
+            # around it is unreviewed text as well.
+            {"skill_first_minute_repeated"}
+            | ({"skill_unreviewed"} if inside else set()),
+        )
+        for heading, inside in (
+            ("## First  minute", False),
+            ("## First\tminute", False),
+            ("## First\u00a0minute", False),
+            ("## First\u200b minute", False),
+            ("## *First* minute", False),
+            ("## First minute (continued)", False),
+            ("**First minute**", True),
+            ("<h2>First minute</h2>", True),
+            ("> ## First minute", True),
+        )
+    ]
+    + [
+        (
+            f"reviewed: a loose ask after the Default: {line!r}",
+            GOOD.replace(GOOD_DEFAULT, f"{GOOD_DEFAULT}\n\n{line}"),
+            {"skill_unreviewed"},
+        )
+        for line in (
+            "Find out from the person which catalogs apply.",
+            "Have the person pick the catalogs.",
+            "Get the repository path from the person.",
+            "Request the repository path.",
+            "Which catalogs apply, please.",
+        )
+    ]
+)
 
 TERMINAL_CASES: list[tuple[str, bool]] = [
     ("Continue? ", True),
@@ -1095,7 +1143,7 @@ TERMINAL_CASES: list[tuple[str, bool]] = [
 def fixture_reviewed() -> frozenset[str]:
     """The fixture's own First minute, as the reviewed set for REVIEWED_TEST."""
     raw = split_lines(GOOD)
-    start, end, _ = first_minute_bounds(section_headings(blocks(GOOD)), len(raw))
+    start, end, _ = first_minute_bounds(blocks(GOOD), len(raw))
     assert start is not None
     return frozenset({section_text(raw, start, end)})
 

@@ -3,6 +3,12 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.136.2
+
+- `VG-UX-ONE-QUESTION` (changed, 18.40a): a second First minute heading is found the way a reader sees it, whatever
+  its spacing, markup or case (`## First  minute`, `**First minute**`, `<h2>First minute</h2>`, `## First minute
+  (continued)`). New seeded fault: a two-space First minute section before prepare-to-share's real one.
+
 ## 0.136.1
 
 - `VG-UX-ONE-QUESTION` (changed, 18.40a): the First minute fails closed. Its raw source must be text the gate has
