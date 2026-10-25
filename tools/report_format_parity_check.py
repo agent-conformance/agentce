@@ -185,7 +185,7 @@ def check_corpus(
     tmp: Path, engines: tuple[str, ...], fail_fast: bool
 ) -> tuple[int, int]:
     runs = [r for r in cpc.runs(cpc.generate_corpus(tmp / "corpus")) if r[3]]
-    quickstart = runs[0]
+    quickstart = next(r for r in runs if r[0] == "quickstart")
     runs.insert(
         1,
         ("quickstart_de", [*quickstart[1], "--report-language", "de"], {}, True),

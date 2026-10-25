@@ -1329,11 +1329,7 @@ function pdfDate(startedAt: string): string {
 /** Standard-14 Helvetica uses WinAnsiEncoding (effectively Latin-1): a code point above U+00FF becomes
  * one `?`, as Python's `encode("latin-1", "replace")` does (an astral character is one `?`, not two). */
 function pdfLatin1(text: string): string {
-  let out = "";
-  for (const ch of text) {
-    out += (ch.codePointAt(0) ?? 0) > 0xff ? "?" : ch;
-  }
-  return out;
+  return text.replace(/[\u{100}-\u{10ffff}]/gu, "?");
 }
 
 /** Escape a PDF string literal's three special characters. */

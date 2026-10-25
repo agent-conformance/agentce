@@ -1373,9 +1373,7 @@ public final class Report {
      * one {@code ?}, as Python's {@code encode("latin-1", "replace")} does (an astral character is one
      * {@code ?}, not two). */
     private static String pdfLatin1(String text) {
-        StringBuilder out = new StringBuilder();
-        text.codePoints().forEach(cp -> out.appendCodePoint(cp > 0xff ? '?' : cp));
-        return out.toString();
+        return text.replaceAll("[^\\x00-\\xff]", "?");
     }
 
     /** Escape a PDF string literal's three special characters. */
@@ -1421,12 +1419,13 @@ public final class Report {
                 concat(latin1("<< /Length " + content.length + " >>\nstream\n"), content, latin1("endstream")),
                 latin1("<< /Producer (AgentCE) /Title (" + title + ") /CreationDate (" + pdfDate(startedAt) + ") >>"));
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        out.writeBytes(concat(latin1("%PDF-1.4\n%"), new byte[] {(byte) 0xe2, (byte) 0xe3, (byte) 0xcf, (byte) 0xd3},
-                latin1("\n")));
+        out.writeBytes(latin1("%PDF-1.4\n%\u00e2\u00e3\u00cf\u00d3\n"));
         StringBuilder xref = new StringBuilder("xref\n0 7\n0000000000 65535 f \n");
         for (int i = 0; i < bodies.size(); i++) {
             xref.append(String.format(Locale.ROOT, "%010d 00000 n \n", out.size()));
-            out.writeBytes(concat(latin1((i + 1) + " 0 obj\n"), bodies.get(i), latin1("\nendobj\n")));
+            out.writeBytes(latin1((i + 1) + " 0 obj\n"));
+            out.writeBytes(bodies.get(i));
+            out.writeBytes(latin1("\nendobj\n"));
         }
         int xrefOffset = out.size();
         out.writeBytes(latin1(xref + "trailer\n<< /Size 7 /Root 1 0 R /Info 6 0 R >>\nstartxref\n" + xrefOffset

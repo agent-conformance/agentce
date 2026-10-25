@@ -157,9 +157,9 @@ public final class Seams {
                             Report.renderOscalXml(readFixture(source.resolve("oscal-ar.json"))));
                     Files.writeString(out.resolve("public-statement.md"), Report.renderPublicStatement(
                             assertions, catalogs, Report.appliedDeviationIds(assertions)));
+                    JsonNode run = manifest.path("run");
                     Files.write(out.resolve("report.pdf"), Report.renderPdf(assertions, Assertions.aggregate(assertions),
-                            manifest.path("run").path("started_at").asText(),
-                            manifest.path("run").path("report_language").asText()));
+                            run.path("started_at").asText(), run.path("report_language").asText()));
                 }
             } catch (IOException e) {
                 System.err.println("report-formats: " + e.getMessage());
