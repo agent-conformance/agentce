@@ -23,14 +23,7 @@ import sys
 from pathlib import Path
 
 import yaml
-from markdown_reader import (
-    Block,
-    Line,
-    blocks,
-    front_matter,
-    need_parser,
-    split_lines,
-)
+from markdown_reader import Block, Line, blocks, front_matter, need_parser, split_lines
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
