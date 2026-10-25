@@ -147,9 +147,9 @@ class _Hero(HTMLParser):
             self.found[-1] = (role, text + data)
 
 
-def check_landing(html: str) -> list[str]:
+def check_landing(page: str) -> list[str]:
     parser = _Hero()
-    parser.feed(html)
+    parser.feed(page)
     found = [(role, _squash(text)) for role, text in parser.found]
     expected = list(HERO)
     if found == expected:
@@ -160,30 +160,34 @@ def check_landing(html: str) -> list[str]:
 
 
 #: Characters a reader never sees; each reading takes them both deleted and as a word break.
-_INVISIBLE = re.compile("[\u00ad\u200b-\u200d\u2060\ufeff]")
+_INVISIBLE = re.compile("[\u00ad\u200b-\u200f\u2060-\u2064\ufeff]")
 #: Markdown emphasis and code markers, which a reader sees as the plain word.
 _EMPHASIS = re.compile(r"[*_~`]")
-#: Runs of whitespace, no-break space, hyphens and dashes: each reads as one word break.
-_BREAK = re.compile("[\\s\u00a0\\-\u2010-\u2015\u2212]+")
+#: Hyphens and dashes; with whitespace (no-break space among it), each run reads as one word break.
+_DASH = re.compile("[\\-\u2010-\u2015\u2212]")
 _TAG = re.compile(r"<[^>]*>")
 _MD_LINK = re.compile(r"!?\[([^\]]*)\]\([^)]*\)")
 
 
 def _canonical(text: str, invisible: str = "") -> str:
     text = _EMPHASIS.sub("", _INVISIBLE.sub(invisible, text.casefold()))
-    return _BREAK.sub(" ", text).strip()
+    return " ".join(_DASH.sub(" ", text).split())
+
+
+_RETIRED_CANON = tuple((old, _canonical(old)) for old in RETIRED)
 
 
 def _readings(text: str) -> set[str]:
     """The text as written, and as a reader sees it with tags removed (or read as a break), entities
-    decoded and Markdown links read as their text. A union: one more reading can only add a match."""
-    rendered = {
-        _MD_LINK.sub(r"\1", html.unescape(_TAG.sub(gap, text))) for gap in ("", " ")
-    }
+    decoded and Markdown links read as their text. A union: one more reading can only add a match.
+    A variant that cannot differ (no tag, no invisible character) is not computed."""
+    gaps = ("", " ") if _TAG.search(text) else ("",)
+    invisibles = ("", " ") if _INVISIBLE.search(text) else ("",)
+    rendered = (_MD_LINK.sub(r"\1", html.unescape(_TAG.sub(gap, text))) for gap in gaps)
     return {
         _canonical(reading, invisible)
         for reading in (text, *rendered)
-        for invisible in ("", " ")
+        for invisible in invisibles
     }
 
 
@@ -191,8 +195,8 @@ def check_retired(name: str, text: str) -> list[str]:
     readings = _readings(text)
     return [
         f"{name} still carries {old!r}"
-        for old in RETIRED
-        if any(_canonical(old) in reading for reading in readings)
+        for old, canon in _RETIRED_CANON
+        if any(canon in reading for reading in readings)
     ]
 
 
@@ -383,6 +387,7 @@ def self_test() -> tuple[list[str], int]:
                 "conforming<br>engine",
                 "[conforming](docs/terms.md) engine",
                 "conforming\u200bengine",
+                "conforming\u200eengine",
                 "CONFORMING ENGINES",
                 "Assess **any** AI agent against the same standard.",
             )
