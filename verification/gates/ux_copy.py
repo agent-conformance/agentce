@@ -37,6 +37,7 @@ import subprocess
 import sys
 import tempfile
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -47,12 +48,12 @@ TRACE_FIXTURE = (
     ROOT / "adapters/otel-genai/fixtures/otel-genai-agent-session/input.json"
 )
 CATALOGUE = "spec/i18n/messages.en.json"
-# (source, kind, git pathspecs). New sources (reports, docs, the built site) join this table.
+# (source, kind, git pathspecs). New file sources (reports, docs, the built site) join this
+# table; the `cli` source is the engine runs in cli_leg.
 SCOPE: tuple[tuple[str, str, list[str]], ...] = (
     ("readmes", "markdown", ["README.md", "website/README.md", "engines/*/README.md"]),
     ("skills", "markdown", ["skills/**/*.md"]),
     ("catalogue", "catalogue", [CATALOGUE]),
-    ("cli", "cli", []),
 )
 # (key, pattern, what to write instead). Every pattern is case-insensitive.
 RULES = (
@@ -188,7 +189,10 @@ def tracked(pathspecs: list[str]) -> list[str]:
 
 def catalogue_lines(text: str) -> list[tuple[str, list[tuple[int, str]]]]:
     """(key, lines) per catalogue string, each line numbered where its key sits in the file."""
-    raw = text.split("\n")
+    first_line: dict[str, int] = {}
+    for number, line in enumerate(text.split("\n"), 1):
+        for key in re.findall(r'"([^"\\]*)"\s*:', line):
+            first_line.setdefault(key, number)
     out = []
 
     def walk(node: object, key: str) -> None:
@@ -199,7 +203,7 @@ def catalogue_lines(text: str) -> list[tuple[str, list[tuple[int, str]]]]:
             for v in node:
                 walk(v, key)
         elif isinstance(node, str):
-            at = next((n for n, line in enumerate(raw, 1) if f'"{key}"' in line), 1)
+            at = first_line.get(key, 1)
             out.append((key, [(at, line) for _, line in plain_lines(node)]))
 
     walk(json.loads(text), "")
@@ -268,10 +272,34 @@ def help_commands(text: str) -> list[str]:
     return re.findall(r"^    ([a-z][a-z-]*)\s{2,}", section, re.MULTILINE)
 
 
+def engine_runs(
+    engine: str, names: list[str], tmp: str, traces: Path
+) -> list[tuple[str, list[str], list[tuple[int, str]]]]:
+    """(label, args, expected outcomes) for every run the gate makes in one engine."""
+    runs: list[tuple[str, list[str], list[tuple[int, str]]]] = [
+        ("--help", ["--help"], [(0, "usage:")])
+    ]
+    for name in names:
+        expected = [(0, "usage:")]
+        if name in UNBUILT.get(engine, set()):
+            expected.append((3, UNBUILT_MARKER))
+        runs.append((f"{name} --help", [name, "--help"], expected))
+    runs.append(
+        ("quickstart", ["quickstart", "--out", f"{tmp}/{engine}-qs"], [(0, "Verdict:")])
+    )
+    assess = [(0, "Verdict:")]
+    if engine == "java":  # Java's folder reader is other items' scope
+        assess = [(3, "input.records_unsupported")]
+    runs.append(
+        ("assess", ["assess", str(traces), "--out", f"{tmp}/{engine}-as"], assess)
+    )
+    return runs
+
+
 def cli_leg(errors: list[str]) -> None:
     commands = engine_commands()
-    code, top = run(commands["python"] + ["--help"])
-    names = help_commands(top)
+    python_help = run(commands["python"] + ["--help"])
+    names = help_commands(python_help[1])
     if not names:
         errors.append(
             "ux.copy.no_commands: python agentce --help lists no commands under positional "
@@ -281,41 +309,30 @@ def cli_leg(errors: list[str]) -> None:
         traces = Path(tmp) / "traces"
         traces.mkdir()
         shutil.copy(TRACE_FIXTURE, traces / "input.json")
-        for engine, base in commands.items():
-            runs: list[tuple[str, list[str], list[tuple[int, str]]]] = [
-                ("--help", ["--help"], [(0, "usage:")])
-            ]
-            for name in names:
-                expected = [(0, "usage:")]
-                if name in UNBUILT.get(engine, set()):
-                    expected.append((3, UNBUILT_MARKER))
-                runs.append((f"{name} --help", [name, "--help"], expected))
-            runs.append(
-                (
-                    "quickstart",
-                    ["quickstart", "--out", f"{tmp}/{engine}-qs"],
-                    [(0, "Verdict:")],
-                )
-            )
-            assess = [(0, "Verdict:")]
-            if engine == "java":  # Java's folder reader is other items' scope
-                assess = [(3, "input.records_unsupported")]
-            runs.append(
-                (
-                    "assess",
-                    ["assess", str(traces), "--out", f"{tmp}/{engine}-as"],
-                    assess,
-                )
-            )
-            for label, args, expected in runs:
-                where = f"{engine} agentce {label}"
-                code, text = run(base + args)
-                failed = run_failed(where, code, text, expected)
-                if failed:
-                    errors.append(failed)
-                    continue
-                errors.extend(scan(where, plain_lines(text)))
-                print(f"ux-copy: {where}: exit {code}")
+
+        def one_engine(
+            engine: str,
+        ) -> list[tuple[str, int, str, list[tuple[int, str]]]]:
+            done = []
+            for label, args, expected in engine_runs(engine, names, tmp, traces):
+                reuse = engine == "python" and label == "--help"
+                code, text = python_help if reuse else run(commands[engine] + args)
+                done.append((label, code, text, expected))
+            return done
+
+        # The engines write to their own folders, so they run side by side; results are read
+        # back in engine order, so the output does not depend on which finished first.
+        with ThreadPoolExecutor(max_workers=len(commands)) as pool:
+            results = list(pool.map(one_engine, commands))
+    for engine, done in zip(commands, results, strict=True):
+        for label, code, text, expected in done:
+            where = f"{engine} agentce {label}"
+            failed = run_failed(where, code, text, expected)
+            if failed:
+                errors.append(failed)
+                continue
+            errors.extend(scan(where, plain_lines(text)))
+            print(f"ux-copy: {where}: exit {code}")
 
 
 def value_of(pattern: str) -> Callable[[str], str | None]:
@@ -327,7 +344,10 @@ def value_of(pattern: str) -> Callable[[str], str | None]:
 
 
 def package_description(text: str) -> str | None:
-    value = json.loads(text).get("description")
+    try:
+        value = json.loads(text).get("description")
+    except ValueError:
+        return None
     return value if isinstance(value, str) else None
 
 
@@ -365,15 +385,13 @@ def sweep_one(
     rel: str, text: str, extract: Callable[[str], str | None], whole: bool
 ) -> list[str]:
     errors = []
+    folded = " ".join(text.split()).lower()
     for retired in (PRE_LOCK, *RETIRED):
-        if retired.lower() in " ".join(text.split()).lower():
+        if retired.lower() in folded:
             errors.append(
                 f"ux.copy.sweep_retired: {rel}: still says {retired!r}; write the tagline {TAGLINE!r}"
             )
-    try:
-        value = extract(text)
-    except ValueError:
-        value = None
+    value = extract(text)
     if value is None:
         errors.append(
             f"ux.copy.sweep_unreadable: {rel}: the gate cannot find the description it holds; "
@@ -388,10 +406,6 @@ def sweep_one(
 
 def check(errors: list[str], with_cli: bool = True) -> None:
     for source, kind, pathspecs in SCOPE:
-        if kind == "cli":
-            if with_cli:
-                cli_leg(errors)
-            continue
         files = tracked(pathspecs)
         if not files:
             errors.append(
@@ -405,6 +419,8 @@ def check(errors: list[str], with_cli: bool = True) -> None:
                 for key, lines in catalogue_lines(text):
                     errors.extend(scan(f"{rel} {key}", lines))
         print(f"ux-copy: {source}: {len(files)} file(s)")
+    if with_cli:
+        cli_leg(errors)
     for rel, extract, whole in SWEEP:
         errors.extend(
             sweep_one(rel, (ROOT / rel).read_text(encoding="utf-8"), extract, whole)
@@ -417,83 +433,104 @@ def keys(lines: list[str]) -> list[str]:
 
 
 def self_test() -> int:
-    md = lambda t: keys(scan("t", markdown_lines(t)))  # noqa: E731
-    plain = lambda t: keys(scan("t", plain_lines(t)))  # noqa: E731
-    cases: list[tuple[str, list[str], list[str]]] = [
-        (w, md(w), ["prove"])
-        for w in ("records prove it", "it proves", "proven", "proving", "it proved")
+    # (reader, expected keys, texts): each text read by that reader gives exactly those keys.
+    table: tuple[
+        tuple[Callable[[str], list[tuple[int, str]]], list[str], tuple[str, ...]], ...
+    ] = (
+        (
+            markdown_lines,
+            ["prove"],
+            ("records prove it", "it proves", "proven", "proving", "it proved"),
+        ),
+        (
+            markdown_lines,
+            ["performance"],
+            ("Performance", "PERFORMANCES", "good performance"),
+        ),
+        (
+            markdown_lines,
+            ["automagically"],
+            ("automagic", "automagical", "automagically"),
+        ),
+        (
+            markdown_lines,
+            ["em_dash"],
+            (
+                "a \u2014 b",
+                "a\u2014b",
+                "a\u2015b",
+                "a\u2e3ab",
+                "a\ufe58b",
+                "a -- b",
+                "a \u2013 b",
+                "pages 10 \u2013 20",
+                "a &mdash; b",
+                "a &#8212; b",
+                "a &#x2014; b",
+                "a\n-- b",
+                "---\ndescription: a \u2014 b\n---\nbody",
+                "---\nname: x\ndescription: >\n  a fine line\n  a \u2014 b\n---\nbody",
+                "---\ndescription: |\n  records\n  \u2014 kept\n---\nbody",
+            ),
+        ),
+        (markdown_lines, ["any_format"], ("any format", "any\nformat", "ANY  formats")),
+        (
+            markdown_lines,
+            [],
+            (
+                "run with --out ./out",
+                "a--b",
+                "10\u201320 records",
+                "approve the improvement, disprove it",
+                "use `a \u2014 b` here",
+                "```\nrecords prove it\n```",
+                "~~~\nany format\n~~~",
+                "<!-- records\nprove it -->",
+                "[link](https://x.org/prove--it)",
+                "see https://x.org/performance",
+                "---\nowner: performance\ndescription: fine\n---\nbody",
+                "---\nowner: >\n  performance\ndescription: fine\n---\nbody",
+                "| a | b |\n|---|---|",
+                "---",
+            ),
+        ),
+        (plain_lines, ["em_dash"], ("Incomplete \u2014 no control failed",)),
+        (plain_lines, [], ("usage: agentce [-h] --out OUT", "`a -- b`")),
+    )
+    cases = [
+        (w, keys(scan("t", reader(w))), want)
+        for reader, want, texts in table
+        for w in texts
     ]
-    cases += [
-        (w, md(w), ["performance"])
-        for w in ("Performance", "PERFORMANCES", "good performance")
-    ]
-    cases += [
-        (w, md(w), ["automagically"])
-        for w in ("automagic", "automagical", "automagically")
-    ]
-    cases += [
-        (w, md(w), ["em_dash"])
-        for w in (
-            "a \u2014 b",
-            "a\u2014b",
-            "a\u2015b",
-            "a\u2e3ab",
-            "a\ufe58b",
-            "a -- b",
-            "a \u2013 b",
-            "pages 10 \u2013 20",
-            "a &mdash; b",
-            "a &#8212; b",
-            "a &#x2014; b",
-            "a\n-- b",
-            "---\ndescription: a \u2014 b\n---\nbody",
-            "---\nname: x\ndescription: >\n  a fine line\n  a \u2014 b\n---\nbody",
-            "---\ndescription: |\n  records\n  \u2014 kept\n---\nbody",
-        )
-    ]
-    cases += [
-        (w, md(w), ["any_format"])
-        for w in ("any format", "any\nformat", "ANY  formats")
-    ]
-    cases += [
-        (w, md(w), [])
-        for w in (
-            "run with --out ./out",
-            "a--b",
-            "10\u201320 records",
-            "approve the improvement, disprove it",
-            "use `a \u2014 b` here",
-            "```\nrecords prove it\n```",
-            "~~~\nany format\n~~~",
-            "<!-- records\nprove it -->",
-            "[link](https://x.org/prove--it)",
-            "see https://x.org/performance",
-            "---\nowner: performance\ndescription: fine\n---\nbody",
-            "---\nowner: >\n  performance\ndescription: fine\n---\nbody",
-            "| a | b |\n|---|---|",
-            "---",
-        )
-    ]
-    cases += [
-        (w, plain(w), ["em_dash"]) for w in ("Incomplete \u2014 no control failed",)
-    ]
-    cases += [(w, plain(w), []) for w in ("usage: agentce [-h] --out OUT", "`a -- b`")]
     failed = [f"{w!r}: got {got}, want {want}" for w, got, want in cases if got != want]
+    total = len(cases)
+
+    def expect(ok: bool, failure: str) -> None:
+        nonlocal total
+        total += 1
+        if not ok:
+            failed.append(failure)
 
     line = scan("f", markdown_lines("one\n\ntwo\nrecords\nprove"))
-    if not line or ":5:" not in line[0]:
-        failed.append(f"line number of a hit split over lines: {line}")
+    expect(
+        bool(line) and ":5:" in line[0],
+        f"line number of a hit split over lines: {line}",
+    )
     cat = catalogue_lines('{\n  "a": "fine",\n  "b": "no \u2014 dash"\n}')
     got = [(k, scan(k, ls)) for k, ls in cat]
-    if not (len(got) == 2 and not got[0][1] and got[1][1] and "b:3:" in got[1][1][0]):
-        failed.append(f"catalogue reader: {got}")
+    expect(
+        len(got) == 2 and not got[0][1] and bool(got[1][1]) and "b:3:" in got[1][1][0],
+        f"catalogue reader: {got}",
+    )
 
+    base_rule = SWEEP[0][1]
+    whole_of = {extract: whole for _, extract, whole in SWEEP}
     good = f"description = '{TAGLINE}',"
     sweep_cases = [
-        (BASE_SWEEP_RULE, f"  {good}\n", []),
-        (BASE_SWEEP_RULE, "  description = 'Other.',\n", ["sweep_value"]),
-        (BASE_SWEEP_RULE, "  title = 'x',\n", ["sweep_unreadable"]),
-        (BASE_SWEEP_RULE, f"  {good}\n// {PRE_LOCK}\n", ["sweep_retired"]),
+        (base_rule, f"  {good}\n", []),
+        (base_rule, "  description = 'Other.',\n", ["sweep_value"]),
+        (base_rule, "  title = 'x',\n", ["sweep_unreadable"]),
+        (base_rule, f"  {good}\n// {PRE_LOCK}\n", ["sweep_retired"]),
         (package_description, json.dumps({"description": TAGLINE}), []),
         (package_description, json.dumps({"name": "x"}), ["sweep_unreadable"]),
         (package_description, "{not json", ["sweep_unreadable"]),
@@ -504,12 +541,11 @@ def self_test() -> int:
         (front_description, "---\ntitle: x\n---\n", ["sweep_unreadable"]),
     ]
     for extract, text, want in sweep_cases:
-        whole = extract is not readme_opening
-        got_keys = keys(sweep_one("f", text, extract, whole))
-        if got_keys != want:
-            failed.append(
-                f"sweep {extract.__name__} {text!r}: got {got_keys}, want {want}"
-            )
+        got_keys = keys(sweep_one("f", text, extract, whole_of[extract]))
+        expect(
+            got_keys == want,
+            f"sweep {getattr(extract, '__name__', '?')} {text!r}: got {got_keys}, want {want}",
+        )
 
     usage = [(0, "usage:")]
     unbuilt = [(0, "usage:"), (3, UNBUILT_MARKER)]
@@ -526,21 +562,22 @@ def self_test() -> int:
         (2, "Verdict: Incomplete", [(0, "Verdict:")], False),
     ]
     for code, text, expected, ok in run_cases:
-        if (run_failed("w", code, text, expected) is None) != ok:
-            failed.append(f"run checker: exit {code} {text!r} {expected}: want ok={ok}")
-    if help_commands(
-        "x\npositional arguments:\n  <command>\n    assess   run\n    a-b  x\n\nopts:\n    no  x"
-    ) != ["assess", "a-b"]:
-        failed.append("help_commands")
+        expect(
+            (run_failed("w", code, text, expected) is None) == ok,
+            f"run checker: exit {code} {text!r} {expected}: want ok={ok}",
+        )
+    expect(
+        help_commands(
+            "x\npositional arguments:\n  <command>\n    assess   run\n    a-b  x\n\nopts:\n    no  x"
+        )
+        == ["assess", "a-b"],
+        "help_commands",
+    )
 
     for failure in failed:
         print(f"ux.copy.self_test_failed: {failure}", file=sys.stderr)
-    total = len(cases) + 2 + len(sweep_cases) + len(run_cases) + 1
     print(f"ux-copy self-test: {total - len(failed)}/{total} cases")
     return 1 if failed else 0
-
-
-BASE_SWEEP_RULE = SWEEP[0][1]
 
 
 def main() -> int:
