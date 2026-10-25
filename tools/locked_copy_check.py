@@ -182,12 +182,11 @@ def _readings(text: str) -> set[str]:
     decoded and Markdown links read as their text. A union: one more reading can only add a match.
     A variant that cannot differ (no tag, no invisible character) is not computed."""
     gaps = ("", " ") if _TAG.search(text) else ("",)
-    invisibles = ("", " ") if _INVISIBLE.search(text) else ("",)
     rendered = (_MD_LINK.sub(r"\1", html.unescape(_TAG.sub(gap, text))) for gap in gaps)
     return {
         _canonical(reading, invisible)
         for reading in (text, *rendered)
-        for invisible in invisibles
+        for invisible in (("", " ") if _INVISIBLE.search(reading) else ("",))
     }
 
 
@@ -388,6 +387,8 @@ def self_test() -> tuple[list[str], int]:
                 "[conforming](docs/terms.md) engine",
                 "conforming\u200bengine",
                 "conforming\u200eengine",
+                "conforming&#8203;engine",
+                "conforming&shy;engine",
                 "CONFORMING ENGINES",
                 "Assess **any** AI agent against the same standard.",
             )
