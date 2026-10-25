@@ -63,6 +63,16 @@ def test_window_end_falls_back_to_latest_event() -> None:
     assert window_end(_Profile(), events) == "2026-02-01T00:00:00.000Z"
 
 
+def test_window_end_counts_an_empty_event_time() -> None:
+    """18.87: skipping "" would leave the epoch, against which no deviation has expired."""
+
+    class _Profile:
+        observation_window: dict = {}
+
+    assert window_end(_Profile(), [_event("s", "x", "")]) == ""
+    assert window_end(_Profile(), []) == "1970-01-01T00:00:00Z"
+
+
 def test_first_assessment_has_no_supersedes(tmp_path: Path) -> None:
     state = StateDir.load(tmp_path / "s")
     supersedes, late = state.plan("sha256:aaa", [], "2026-03-31T00:00:00Z")

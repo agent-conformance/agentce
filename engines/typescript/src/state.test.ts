@@ -67,6 +67,9 @@ test("STATE_VERSION matches the reference and windowEnd prefers the declared end
     windowEnd({}, [{ time: "2026-02-01T00:00:00.000Z" }, { time: "2026-01-01T00:00:00.000Z" }]),
     "2026-02-01T00:00:00.000Z",
   );
+  // 18.87: an empty time counts, so the end does not parse and a deviation register is refused.
+  assert.equal(windowEnd({}, [{ time: "" }]), "");
+  assert.equal(windowEnd({}, []), "1970-01-01T00:00:00Z");
 });
 
 test("StateDir.ensureWritable raises a keyed error on an unwritable --state directory", () => {

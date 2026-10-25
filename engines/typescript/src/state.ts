@@ -86,9 +86,10 @@ export function windowEnd(observationWindow: Record<string, string>, events: Eve
   if ("end" in observationWindow) {
     return String(observationWindow.end);
   }
+  // An empty event time counts (18.87): as the end it does not parse, so a deviation register is refused.
   const times = events
-    .map((e) => String(e.time ?? ""))
-    .filter((t) => t)
+    .filter((e) => e.time !== undefined && e.time !== null)
+    .map((e) => String(e.time))
     .sort(byteCompare);
   return times.length > 0 ? (times[times.length - 1] as string) : "1970-01-01T00:00:00Z";
 }

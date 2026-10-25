@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -15,6 +16,7 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -30,6 +32,14 @@ import org.junit.jupiter.api.io.TempDir;
  * and supersede the same report.
  */
 class StateDirTest {
+    @Test
+    void windowEndCountsAnEmptyEventTime() {
+        // 18.87: skipping "" would leave the epoch, against which no deviation has expired.
+        JsonNode event = JsonNodeFactory.instance.objectNode().put("time", "");
+        assertEquals("", StateDir.windowEnd(Map.of(), List.of(event)));
+        assertEquals("1970-01-01T00:00:00Z", StateDir.windowEnd(Map.of(), List.of()));
+    }
+
     @Test
     void stateDirectoryMatchesThePythonReferenceGolden(@TempDir Path work) throws IOException {
         JsonNode golden = Json.parseFile(TestPaths.testData().resolve("state-golden.json"));

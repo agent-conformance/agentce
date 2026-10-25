@@ -49,7 +49,8 @@ public final class StateDir {
         List<String> times = new ArrayList<>();
         for (JsonNode e : events) {
             JsonNode t = e.get("time");
-            if (t != null && t.isTextual() && !t.textValue().isEmpty()) {
+            // An empty event time counts (18.87): as the end it does not parse, so a deviation register is refused.
+            if (t != null && t.isTextual()) {
                 times.add(t.textValue());
             }
         }

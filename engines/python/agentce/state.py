@@ -49,11 +49,14 @@ def _stream(event: dict[str, Any]) -> str:
 
 
 def window_end(profile: Any, events: list[dict[str, Any]]) -> str:
-    """The observation window's end: the declared end, else the latest event time, else the epoch."""
+    """The observation window's end: the declared end, else the latest event time, else the epoch.
+
+    An empty event time counts (18.87): skipping it would leave the epoch as the end, against which
+    no deviation has expired; as the end it does not parse, so a deviation register is refused."""
     window = getattr(profile, "observation_window", {}) or {}
     if isinstance(window, dict) and "end" in window:
         return str(window["end"])
-    times = sorted(str(e.get("time", "")) for e in events if e.get("time"))
+    times = sorted(str(e["time"]) for e in events if e.get("time") is not None)
     return times[-1] if times else "1970-01-01T00:00:00Z"
 
 
