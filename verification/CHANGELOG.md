@@ -3,6 +3,13 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.135.1
+
+- `VG-INGEST-SUPPORT-MATRIX`, `VG-UX-COPY` and `VG-UX-ONE-QUESTION` (changed, 18.39a): run with a plain `uv run python`,
+  where markdown-it-py is not installed, each gate re-runs itself in the `tools` environment through the reader's
+  `need_parser` helper, as `markdown_reader.py` already did. Before, their `--self-test` stopped on an assertion there.
+  If the parser is missing in `tools` as well, the gate exits 2 with `markdown_reader.no_parser`.
+
 ## 0.135.0
 
 - `VG-INGEST-SUPPORT-MATRIX`, `VG-UX-COPY` and `VG-UX-ONE-QUESTION` (changed, 18.211) read Markdown through one shared
