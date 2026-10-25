@@ -18,8 +18,9 @@ What that means for a gate, each held by a case in ``--self-test``:
 - a fenced code block closes only on a run of the same character at least as long as its opener (4.5);
 - a code span never crosses a paragraph break (6.1).
 
-YAML front matter (a first line ``---`` up to the next ``---`` line) is not CommonMark; the site strips
-it, so ``blocks`` reads it as blank lines and ``front_matter`` hands its lines to the caller.
+YAML front matter is not CommonMark; the site strips it by Astro's rule (a ``---`` line up to the first
+line starting with ``---``), so ``blocks`` reads it as blank lines, keeps the rest of the closing line
+as content, and ``front_matter`` hands its lines to the caller.
 
     markdown_reader.py --self-test   run the CommonMark 0.31.2 and GFM 0.29 table spec examples through
                                      blocks(), and the reader's own cases
@@ -122,15 +123,23 @@ def split_lines(text: str) -> list[str]:
     return lines
 
 
+# @astrojs/internal-helpers 0.11.0 dist/frontmatter.js frontmatterRE, the rule the site strips front matter by
+_ASTRO_FRONT_MATTER = re.compile(
+    r"(?:\A\ufeff?|\A[\s\ufeff]*\n)(---|\+\+\+)[\s\S]*?\n(---|\+\+\+)"
+)
+
+
 def front_matter(text: str) -> list[Line]:
-    """The YAML front matter's lines, both ``---`` fences included; empty when the file has none."""
-    lines = split_lines(text)
-    if not lines or lines[0].rstrip() != "---":
+    """The front matter's lines the way the site finds it: optional leading blank lines, a ``---`` (or
+    ``+++``) opener, up to the first line that starts with the same three characters, which is the last
+    line returned. The site keeps what follows those three characters as page content, and keeps the
+    whole file as content when the closer is the other delimiter; empty when the file has none."""
+    match = _ASTRO_FRONT_MATTER.match(text)
+    if not match or match.group(1) != match.group(2):
         return []
-    end = next(
-        (i for i in range(1, len(lines)) if lines[i].rstrip() == "---"), len(lines) - 1
-    )
-    return [Line(n, t) for n, t in enumerate(lines[: end + 1], start=1)]
+    lines = split_lines(text)
+    closer = len(split_lines(text[: match.start(2)]))
+    return [Line(n, t) for n, t in enumerate(lines[: closer + 1], start=1)]
 
 
 def _inline_visible(token: Token, first: int) -> list[Line]:
@@ -175,7 +184,8 @@ def blocks(text: str) -> list[Block]:
     )
     source = split_lines(text)
     fm = len(front_matter(text))
-    body = [""] * fm + source[fm:]
+    # the closer's first three characters end the front matter; the rest of its line is page content
+    body = [""] * (fm - 1) + [source[fm - 1][3:]] + source[fm:] if fm else source
     tokens = _PARSER.parse("\n".join(body) + "\n")
     out: list[Block] = []
     containers: list[str] = []
@@ -442,6 +452,10 @@ def _reader_cases() -> list[ReaderCase]:
         ("a code span stops at a paragraph break", "a ` tick\n\nrecords prove it\n\nanother ` tick", [("paragraph", 1, 1, (), "a ` tick"), ("paragraph", 3, 3, (), "records prove it"), ("paragraph", 5, 5, (), "another ` tick")]),
         ("code spans, HTML and autolinks blanked; link and alt text kept", "a `b` <!-- c --> [d](https://e) <https://f> &mdash; *g* ![h](i.png)", [("paragraph", 1, 1, (), "a     d   \u2014 g h")]),
         ("front matter reads as blank lines", "---\ntitle: x\n---\nbody\n", [("paragraph", 4, 4, (), "body")]),
+        ("front matter ends at the first line starting ---, the rest of it is content", "---\na: 1\n----x\n\nbody\n", [("paragraph", 3, 3, (), "-x"), ("paragraph", 5, 5, (), "body")]),
+        ("front matter after leading blank lines", "\n \n---\na: 1\n---\nbody\n", [("paragraph", 6, 6, (), "body")]),
+        ("a --- opener closed by +++ leaves the whole file as content", "---\na\n+++\nb\n", [("rule", 1, 1, (), ""), ("paragraph", 2, 4, (), "a +++ b")]),
+        ("+++ front matter", "+++\na = 1\n+++\nbody\n", [("paragraph", 4, 4, (), "body")]),
         ("heading and setext heading", "# h\n\nt\n===\n", [("heading", 1, 1, (), "h"), ("heading", 3, 4, (), "t")]),
         ("table rows keep their own lines", table, [("table", 1, 3, (), "a | b c | d")]),
         ("table cells blank code spans", "| `x` | **y** |\n|---|---|\n", [("table", 1, 2, (), "  | y")]),
@@ -481,7 +495,7 @@ def self_test() -> int:
     unit_cases = [
         ([(line.number, cells) for line, cells in rows] == [(1, ("a", "b")), (3, ("c", "d"))], f"table rows: {rows!r}"),
         (split == ["a\x0cb\u2028c", "d", "e"], f"split_lines: {split!r}"),
-        (fm_numbers == [1, 2, 3] and not front_matter("x\n---\n"), "front_matter"),
+        (fm_numbers == [1, 2, 3] and not front_matter("x\n---\n") and not front_matter("---\na\n+++\nb\n"), "front_matter"),
     ]  # fmt: skip
     failed += [message for ok, message in unit_cases if not ok]
     total = len(SPEC_EXAMPLES) + len(reader_cases) + len(line_cases) + len(unit_cases)

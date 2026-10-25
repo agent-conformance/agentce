@@ -110,8 +110,9 @@ def markdown_lines(text: str) -> list[tuple[int, str]]:
     after each block and each table row so a paragraph is scanned as one."""
     out: list[tuple[int, str]] = []
     reading = False
-    for number, line in ((line.number, line.text) for line in front_matter(text)):
-        if number > 1 and line.rstrip() == "---":
+    head = front_matter(text)
+    for number, line in ((line.number, line.text) for line in head):
+        if number > 1 and number == head[-1].number:
             out.append((number, ""))
         elif line[
             :1
