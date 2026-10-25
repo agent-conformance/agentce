@@ -3,6 +3,13 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.135.4
+
+- `VG-INGEST-SUPPORT-MATRIX` (changed, 18.39c): README.md that opens with front matter fails with
+  `ingest.matrix.readme_front_matter`. The shared reader sets front matter aside, as the site does for its own pages,
+  but README is not a site page and GitHub shows its front matter, so a tier claim hidden there went unchecked. New
+  seeded fault: README opening with YAML front matter whose note names Honeycomb Supported.
+
 ## 0.135.3
 
 - `VG-INGEST-SUPPORT-MATRIX` (changed, 18.39c): a tier claim whose tier word or count is a link, or that has an

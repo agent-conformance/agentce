@@ -23,7 +23,14 @@ import sys
 from pathlib import Path
 
 import yaml
-from markdown_reader import Block, Line, blocks, need_parser, split_lines
+from markdown_reader import (
+    Block,
+    Line,
+    blocks,
+    front_matter,
+    need_parser,
+    split_lines,
+)
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -149,8 +156,15 @@ def check_tier_layout(text: str, source: str) -> tuple[list[str], list[str]]:
     the tier-line scan cannot read (18.39c): one in a list item, a quote, a heading, a table, code or
     HTML, an indented line, mid-sentence or under other markup, and a tier line whose paragraph goes on
     to a line that is not itself a tier line (CommonMark 4.8: the wrapped names render in the same
-    paragraph but would never be checked). Returns the problems and the tier lines read."""
+    paragraph but would never be checked). README is not a site page, so front matter the reader would
+    set aside is refused: GitHub shows it. Returns the problems and the tier lines read."""
     problems: list[str] = []
+    head = front_matter(text)
+    if head:
+        problems.append(
+            f"ingest.matrix.readme_front_matter: {source} lines 1 to {head[-1].number} are front matter, "
+            "which GitHub shows on the page but the gate does not read. Remove it"
+        )
     tier_lines: list[str] = []
     source_lines = split_lines(text)
     for block in blocks(text):
@@ -1045,6 +1059,21 @@ def self_test() -> int:
                     check_tier_lines(rows, spaced_readme + line + "\n", "README.md"),
                     "tier_line_unreadable",
                     "Honeycomb",
+                ),
+            )
+        )
+    for label, head in {
+        "YAML front matter": '---\nnote: "**Supported** (1): Honeycomb"\n---\n\n',
+        "front matter after a blank line": '\n---\nnote: "**Supported** (1): Honeycomb"\n---\n\n',
+        "TOML front matter": '+++\nnote = "**Supported** (1): Honeycomb"\n+++\n\n',
+    }.items():
+        cases.append(
+            (
+                f"README opening with {label} is readme_front_matter",
+                has(
+                    check_tier_lines(rows, head + spaced_readme, "README.md"),
+                    "readme_front_matter",
+                    "README.md lines 1 to",
                 ),
             )
         )

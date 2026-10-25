@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.135.3",
+  "suite_version": "0.135.4",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -904,8 +904,8 @@
       "timeout_s": 60,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "every name in README.md's Supported/Experimental/Roadmap tier lines, and every backend named in trace-store-connectors.md's table, is a real spec/ingest/support-matrix.yaml row under the tier the matrix grades it, each tier line's stated count matches the matrix and (for a truncated line) its own \"and N more\" arithmetic, every tier claim in README.md is a one-line tier line followed by a blank line or another tier line, every Reader-follows cell is [label](url), version against a matrix definition, every copy of the trace-store table is read however its header is spelled, and the self-test proves each failure mode its own message key",
-        "fail": "a name is absent from the matrix, a name is listed under a tier the matrix disagrees with, a stated or truncated count disagrees with the real matrix, a required tier line or the docs table is missing, a tier claim is written where the tier-line scan cannot read it or goes on to a line it does not read, a Reader-follows cell cannot be parsed or has no matrix definition to check against, a line names the trace-store table's four columns but is not a header the gate can read, or the self-test does not discriminate"
+        "pass": "every name in README.md's Supported/Experimental/Roadmap tier lines, and every backend named in trace-store-connectors.md's table, is a real spec/ingest/support-matrix.yaml row under the tier the matrix grades it, each tier line's stated count matches the matrix and (for a truncated line) its own \"and N more\" arithmetic, README.md has no front matter, every tier claim in README.md is a one-line tier line followed by a blank line or another tier line, every Reader-follows cell is [label](url), version against a matrix definition, every copy of the trace-store table is read however its header is spelled, and the self-test proves each failure mode its own message key",
+        "fail": "a name is absent from the matrix, a name is listed under a tier the matrix disagrees with, a stated or truncated count disagrees with the real matrix, a required tier line or the docs table is missing, README.md opens with front matter, a tier claim is written where the tier-line scan cannot read it or goes on to a line it does not read, a Reader-follows cell cannot be parsed or has no matrix definition to check against, a line names the trace-store table's four columns but is not a header the gate can read, or the self-test does not discriminate"
       },
       "faults": [
         {
@@ -979,9 +979,15 @@
           "file": "README.md",
           "search": "**Roadmap** (4): ",
           "replace": "We also list [**Experimental**](docs/x.md) (1): Honeycomb.\n\n**Roadmap** (4): "
+        },
+        {
+          "description": "README.md opens with YAML front matter whose note names Honeycomb Supported: GitHub shows front matter on the page, while the shared reader sets it aside (inbox row 546, 18.39c)",
+          "file": "README.md",
+          "search": "# (AgentCE)\n",
+          "replace": "---\nnote: \"**Supported** (1): Honeycomb\"\n---\n\n# (AgentCE)\n"
         }
       ],
-      "fix_hint": "Run verification/gates/ingest_support_matrix.sh; it names the exact message key (ingest.matrix.unknown_source, .wrong_tier, .count_mismatch, .count_arithmetic, .missing_tier_line, .docs_wrong_tier, .docs_unknown_source, .docs_malformed_row, .docs_unrecognized_tier, .docs_definition_drift, .docs_table_missing, .tier_line_unreadable, .tier_line_wrapped, .docs_follows_unreadable, .docs_definition_missing or .docs_header_unreadable) and the offending name."
+      "fix_hint": "Run verification/gates/ingest_support_matrix.sh; it names the exact message key (ingest.matrix.unknown_source, .wrong_tier, .count_mismatch, .count_arithmetic, .missing_tier_line, .docs_wrong_tier, .docs_unknown_source, .docs_malformed_row, .docs_unrecognized_tier, .docs_definition_drift, .docs_table_missing, .tier_line_unreadable, .tier_line_wrapped, .docs_follows_unreadable, .docs_definition_missing, .docs_header_unreadable or .readme_front_matter) and the offending name."
     },
     {
       "id": "VG-DOC01-COMPONENTS",
