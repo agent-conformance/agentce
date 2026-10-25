@@ -3,6 +3,20 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.133.0
+
+- Added `VG-UX-PAGES` (18.40c, tier quick): the site works on a phone. The gate builds the site and opens every
+  built page at 390x844, served from 127.0.0.1 with every request to another host refused. No page may be wider
+  than the screen once its fonts load, and a failure names the element that sticks out. Axe (WCAG 2.2 AA) runs at
+  that width in light and dark over the landing page, Getting Started, one command reference page, the supported
+  sources page and the Russian Getting Started, and a full-page snapshot of each is written outside the working
+  tree for review. The install page's commands now wrap, and every `<table>` on the site takes keyboard focus like
+  every `<pre>` already did, so the wide supported-sources table can be scrolled from the keyboard. Four seeded
+  faults: a too-wide hero, a low-contrast dark text colour, a snapshot page that moved, and an empty site.
+  `VG-BUYER-VIEW` (changed) requires buyer.html to show the gap step's event and class, the
+  `--package-for-sharing` flag and the packaged verify command as code, with no literal backtick; one new seeded
+  fault.
+
 ## 0.132.0
 
 - Added `VG-UX-COPY` (18.40b, tier quick): the copy rules hold over what a person reads first. The gate reads the

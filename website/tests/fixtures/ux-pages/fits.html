@@ -1,0 +1,27 @@
+<!doctype html>
+<!-- check-ux-pages.mjs --self-test: a page that fits 390px in both themes. Its 600px table scrolls inside
+     a focusable container, the way a wide table should behave on a phone. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fits a phone</title>
+    <style>
+      body { margin: 0; padding: 16px; font-family: sans-serif; color: #0f172a; background: #ffffff; }
+      [data-theme='dark'] body { color: #f1f5f9; background: #0f172a; }
+      .scroll { overflow-x: auto; max-width: 100%; }
+      table { min-width: 600px; border-collapse: collapse; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Fits a phone</h1>
+      <div class="scroll" tabindex="0" role="region" aria-label="Wide table">
+        <table>
+          <thead><tr><th scope="col">Name</th><th scope="col">Value</th></tr></thead>
+          <tbody><tr><td>one</td><td>two</td></tr></tbody>
+        </table>
+      </div>
+    </main>
+  </body>
+</html>

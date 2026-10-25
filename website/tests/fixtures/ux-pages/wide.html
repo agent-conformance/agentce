@@ -1,0 +1,24 @@
+<!doctype html>
+<!-- check-ux-pages.mjs --self-test: a 600px table with no scroll container pushes the page sideways at
+     390px; the gate must fail ux.pages.horizontal_scroll and name the table. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Too wide</title>
+    <style>
+      body { margin: 0; padding: 16px; font-family: sans-serif; color: #0f172a; background: #ffffff; }
+      [data-theme='dark'] body { color: #f1f5f9; background: #0f172a; }
+      table { min-width: 600px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Too wide</h1>
+      <table id="wide-table">
+        <thead><tr><th scope="col">Name</th><th scope="col">Value</th></tr></thead>
+        <tbody><tr><td>one</td><td>two</td></tr></tbody>
+      </table>
+    </main>
+  </body>
+</html>

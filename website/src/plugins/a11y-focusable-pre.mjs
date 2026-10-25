@@ -4,7 +4,9 @@ import { fileURLToPath } from 'node:url';
 
 // Astro integration: after the static build, add tabindex="0" to every <pre> that does not already
 // declare one, so horizontally scrollable code blocks are reachable and scrollable with the keyboard
-// alone (WCAG 2.1.1 Keyboard; axe reports the gap as `scrollable-region-focusable`). It runs over the
+// alone (WCAG 2.1.1 Keyboard; axe reports the gap as `scrollable-region-focusable`). Tables get the same
+// attribute: Starlight renders a Markdown table as its own scroll box, so a wide one (the ingest support
+// matrix at phone width) needs keyboard access too. It runs over the
 // rendered HTML in astro:build:done, so it is renderer-agnostic — it covers Expressive Code, Shiki, and
 // hand-written <pre> the same way — deterministic, and needs no extra dependency. The axe gate in
 // scripts/check-a11y.mjs enforces that no such violation returns.
@@ -20,7 +22,9 @@ export default function focusablePre() {
             if (statSync(full).isDirectory()) walk(full);
             else if (name.endsWith('.html')) {
               const html = readFileSync(full, 'utf8');
-              const next = html.replace(/<pre(?![^>]*\btabindex=)/gi, '<pre tabindex="0"');
+              const next = html
+                .replace(/<pre(?![^>]*\btabindex=)/gi, '<pre tabindex="0"')
+                .replace(/<table(?=[\s>])(?![^>]*\btabindex=)/gi, '<table tabindex="0"');
               if (next !== html) writeFileSync(full, next);
             }
           }

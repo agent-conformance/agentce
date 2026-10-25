@@ -29,3 +29,11 @@ const tabs = installTabs(state);
     ))
   }
 </Tabs>
+
+<style>
+  /* A long command wraps at 390px instead of pushing the page sideways; copying it still gives one line. */
+  pre[data-install-tab] {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+</style>

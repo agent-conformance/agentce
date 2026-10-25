@@ -48,5 +48,10 @@ checkout today otherwise. The `website` workflow runs `node scripts/check-instal
 `node scripts/check-install.mjs --require-built`, which fail when a tab leaks an unpublished one-liner,
 when a published channel names no pinned artifact, or when the gate stops flipping.
 
+Every built page has to work on a phone. `node scripts/check-ux-pages.mjs` opens each page at 390px and
+fails when one scrolls sideways, naming the element that sticks out. It also runs axe in light and dark on
+one page per layout and writes a full-page snapshot of each for review. The verification suite runs it as
+`VG-UX-PAGES`; `--self-test` shows each check can fail.
+
 Deployment is a static upload of `website/dist/`; a human performs the deploy and DNS, so the site is
 built and configured here but never published from this repository.

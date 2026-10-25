@@ -1,0 +1,14 @@
+<!doctype html>
+<!-- check-ux-pages.mjs --self-test: a page that asks for a file from another host; the gate serves pages
+     from 127.0.0.1 only and must fail ux.pages.offline_request. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Offline</title>
+    <link rel="stylesheet" href="https://fonts.example.invalid/font.css" />
+  </head>
+  <body>
+    <main><h1>Offline</h1><p>Nothing here should leave the machine.</p></main>
+  </body>
+</html>

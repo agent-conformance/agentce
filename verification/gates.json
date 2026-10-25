@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.132.0",
+  "suite_version": "0.133.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -2010,6 +2010,53 @@
         }
       ],
       "fix_hint": "rewrite the line the failure names as its hint says (a comma, colon, full stop or parentheses for a dash; show, check or document for prove; behavior or speed for performance; name the formats); for a sweep line write the tagline from tools/locked_copy_check.py; for run_failed fix the command so it prints its usage or verdict"
+    },
+    {
+      "id": "VG-UX-PAGES",
+      "title": "Every built page of the site fits a 390px phone screen with no sideways scroll, the snapshot pages pass axe (WCAG 2.2 AA) at that width in light and dark, and their full-page snapshots are written for review (USER_EXPERIENCE.md R7, R10)",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/ux_pages.sh"
+      ],
+      "requires": [
+        "pnpm",
+        "node"
+      ],
+      "timeout_s": 900,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "check-ux-pages.mjs --self-test passes (a 600px table with no scroll box fails ux.pages.horizontal_scroll naming the table, a dark-only contrast failure fails ux.pages.axe in dark and not in light, a snapshot page that was not built fails ux.pages.snapshot_missing, a request to another host fails ux.pages.offline_request, an empty site fails ux.pages.none_built, a page whose wide table scrolls in its own focusable box passes, and its WCAG tags equal check-a11y.mjs's); the site builds; at 390x844, served from 127.0.0.1 only, no built page is wider than the viewport after fonts load; axe finds no violation on /, /docs/getting-started/, /reference/commands/assess/, /reference/ingest-support-matrix/ and /ru/docs/getting-started/ in either theme; and a full-page PNG of each is written in both themes outside the working tree",
+        "fail": "the self-test fails, the site does not build, any page scrolls sideways at 390px, a snapshot page has an axe violation in either theme or was not built, a page asks for a file from another host, or no page was built"
+      },
+      "faults": [
+        {
+          "description": "the landing hero gets a 600px minimum width, so the landing page scrolls sideways on a phone",
+          "file": "website/src/pages/index.astro",
+          "search": "    .hero {\n      max-width: var(--measure);\n",
+          "replace": "    .hero {\n      min-width: 600px;\n      max-width: var(--measure);\n"
+        },
+        {
+          "description": "the dark theme's text token turns low-contrast, so the landing page fails axe colour-contrast in dark only",
+          "file": "website/src/styles/tokens.css",
+          "search": ":root[data-theme='dark'] {\n  --bg: #0b1120;\n  --bg-subtle: #0f172a;\n  --bg-raised: #111a2e;\n  --border: #1e293b;\n  --border-strong: #334155;\n  --text: #e2e8f0;\n",
+          "replace": ":root[data-theme='dark'] {\n  --bg: #0b1120;\n  --bg-subtle: #0f172a;\n  --bg-raised: #111a2e;\n  --border: #1e293b;\n  --border-strong: #334155;\n  --text: #1e293b;\n"
+        },
+        {
+          "description": "the supported-sources page moves to another address, so a snapshot page is no longer built",
+          "file": "website/src/content/docs/reference/ingest-support-matrix.md",
+          "search": "title: Supported sources\n",
+          "replace": "title: Supported sources\nslug: reference/supported-sources\n"
+        },
+        {
+          "description": "the page walk is pointed at a directory that holds no built page",
+          "file": "website/scripts/check-ux-pages.mjs",
+          "search": "const distDir = resolve(websiteDir, 'dist');",
+          "replace": "const distDir = resolve(websiteDir, 'dist-empty');"
+        }
+      ],
+      "fix_hint": "Run the gate's command and read the ux.pages.* lines: each names the page, the theme where it matters, and what to change. The checks are website/scripts/check-ux-pages.mjs; a wide element should wrap or scroll inside its own focusable box (src/plugins/a11y-focusable-pre.mjs gives every <pre> and <table> keyboard focus)."
     },
     {
       "id": "VG-AUDITOR-VIEW",
