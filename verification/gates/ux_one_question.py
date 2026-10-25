@@ -276,14 +276,15 @@ def prose(found: list[Block]) -> list[tuple[int, str]]:
     for block in found:
         if block.kind == "fence":
             continue
-        if block.kind == "heading":
-            for part in MARKER_AT.split(atx(block)):
-                if part.strip():
-                    out.append((block.start, part.strip()))
-            continue
+        # A heading is read as one line, its ATX form.
+        lines = (
+            [(block.start, atx(block))]
+            if block.kind == "heading"
+            else [(line.number, line.text) for line in block.text_lines]
+        )
         piece: list[str] = []
-        for line in block.text_lines:
-            for n, part in enumerate(MARKER_AT.split(line.text.strip())):
+        for number, text in lines:
+            for n, part in enumerate(MARKER_AT.split(text.strip())):
                 words = part.strip()
                 if not words:
                     continue
@@ -292,7 +293,7 @@ def prose(found: list[Block]) -> list[tuple[int, str]]:
                     out[-1] = (out[-1][0], " ".join(piece))
                 else:
                     piece = [words]
-                    out.append((line.number, words))
+                    out.append((number, words))
     return out
 
 
@@ -375,17 +376,18 @@ def read_skill(rel: str, text: str, errors: list[str]) -> int:
     unmarked = [
         (n, line) for n, line in body if not line.startswith(QUESTION) and is_ask(line)
     ]
+    marked = 0
     for n, line in asks:
+        marks = len(QUESTION_MARK.findall(line))
+        marked += max(1, marks)
         extra = [
             (n, sentence.strip())
             for sentence in SENTENCE.findall(line.removeprefix(QUESTION))
             if not QUESTION_MARK.search(sentence) and is_ask(sentence)
         ]
         # With no "?" in the paragraph, its first asking sentence is the question itself.
-        unmarked += extra if QUESTION_MARK.search(line) else extra[1:]
-    count = len(unmarked) + sum(
-        max(1, len(QUESTION_MARK.findall(line))) for _, line in asks
-    )
+        unmarked += extra if marks else extra[1:]
+    count = len(unmarked) + marked
     if count > BUDGET:
         where = ", ".join(str(n) for n, _ in sorted(asks + unmarked))
         errors.append(
