@@ -1085,7 +1085,7 @@ def main(argv: list[str]) -> int:
     )
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args(argv)
-    need_parser(__file__, argv)
+    need_parser()
     if args.self_test:
         return self_test()
     problems = check()

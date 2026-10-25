@@ -611,7 +611,7 @@ def main() -> int:
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--no-cli", action="store_true", help="skip the engine runs")
     args = parser.parse_args()
-    need_parser(__file__, sys.argv[1:])
+    need_parser()
     if args.self_test:
         return self_test()
     errors: list[str] = []

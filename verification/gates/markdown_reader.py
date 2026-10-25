@@ -44,7 +44,9 @@ try:
 
     # the module, not the function markdown_it.rules_block re-exports under the same name
     _table_rule = importlib.import_module("markdown_it.rules_block.table")
-except ImportError:  # run directly outside the tools environment: main() re-runs in it
+except (
+    ImportError
+):  # run directly outside the tools environment: need_parser() re-runs in it
     MarkdownIt = None  # type: ignore[assignment,misc]
 
 _RERUN = "AGENTCE_MARKDOWN_READER_RERUN"
@@ -489,37 +491,38 @@ def self_test() -> int:
     return 1 if failed else 0
 
 
-def need_parser(script: str, argv: list[str]) -> None:
-    """Re-run ``script`` in the tools environment when markdown-it-py is not importable here (a plain
-    ``uv run python``); exit 2 with markdown_reader.no_parser when it is missing there too."""
+def need_parser() -> None:
+    """Re-run this process in the tools environment when markdown-it-py is not importable here (a plain
+    ``uv run python``); exit 2 with markdown_reader.no_parser when it is missing there too, or uv is."""
     if _PARSER is not None:
         return
-    if os.environ.get(_RERUN):
-        print(
-            "markdown_reader.no_parser: markdown-it-py is not installed",
-            file=sys.stderr,
-        )
-        raise SystemExit(2)
-    tools = Path(__file__).resolve().parents[2] / "tools"
-    env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"} | {_RERUN: "1"}
-    command = [
-        "uv",
-        "run",
-        "--project",
-        str(tools),
-        "--frozen",
-        "python3",
-        script,
-        *argv,
-    ]
-    os.execvpe("uv", command, env)
+    if not os.environ.get(_RERUN):
+        tools = Path(__file__).resolve().parents[2] / "tools"
+        env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"} | {
+            _RERUN: "1"
+        }
+        command = [
+            "uv",
+            "run",
+            "--project",
+            str(tools),
+            "--frozen",
+            "python3",
+            *sys.argv,
+        ]
+        try:
+            os.execvpe("uv", command, env)
+        except OSError:
+            pass
+    print("markdown_reader.no_parser: markdown-it-py is not installed", file=sys.stderr)
+    raise SystemExit(2)
 
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="markdown_reader.py", allow_abbrev=False)
     parser.add_argument("--self-test", action="store_true", required=True)
     parser.parse_args(argv)
-    need_parser(__file__, argv)
+    need_parser()
     return self_test()
 
 

@@ -660,7 +660,7 @@ def main() -> int:
         help="run the skill reader over built-in texts",
     )
     args = parser.parse_args()
-    need_parser(__file__, sys.argv[1:])
+    need_parser()
     if args.self_test:
         return self_test()
     errors: list[str] = []
