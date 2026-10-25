@@ -112,7 +112,7 @@ def markdown_lines(text: str) -> list[tuple[int, str]]:
     reading = False
     head = front_matter(text)
     for number, line in ((line.number, line.text) for line in head):
-        if number > 1 and number == head[-1].number:
+        if number == head[-1].number:
             out.append((number, ""))
         elif line[
             :1
@@ -363,9 +363,10 @@ def readme_opening(text: str) -> str | None:
 
 
 def front_description(text: str) -> str | None:
-    if not text.startswith("---\n"):
+    head = front_matter(text)
+    if not head:
         return None
-    front = text[4:].split("\n---", 1)[0]
+    front = "\n".join(line.text for line in head[:-1])
     match = re.search(r"^description:\s*(.+)$", front, re.MULTILINE)
     return match.group(1).strip().strip("'\"") if match else None
 
