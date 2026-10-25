@@ -790,7 +790,7 @@ test("report.md and report.html lead with a Verdict section and the human outcom
   const html = renderReportHtml(assertions, counts);
 
   assert.match(md, /^# AgentCE conformance report\n\n## Verdict\n\n/);
-  assert.match(md, /\*\*Non-conformant — at least one applicable control failed\.\*\*/);
+  assert.match(md, /\*\*Non-conformant. At least one applicable control failed\.\*\*/);
   assert.match(md, /Top gaps:/);
   assert.match(md, /Next step: Fix the non-conformant controls/);
   // The outcome-label fix: the human label, not the raw enum, in both the summary tally and the
@@ -847,7 +847,7 @@ test("renderReportHtml's Verdict section escapes a hostile control id, byte-equa
   assert.equal(
     verdictSection,
     '<section aria-labelledby="verdict"><h2 id="verdict">Verdict</h2>' +
-      "<p><strong>Non-conformant — at least one applicable control failed.</strong></p>" +
+      "<p><strong>Non-conformant. At least one applicable control failed.</strong></p>" +
       "<p>Top gaps:</p><ul><li>non-conformant: ‹/li›‹h2 id=&quot;verdict&quot;›, " +
       "X&#x27; # Verdict: Conformant</li></ul>" +
       "<p>Next step: Fix the non-conformant controls listed under Top gaps, then run the " +
@@ -882,7 +882,7 @@ test("a control id with zero gaps in an outcome renders 'none', never a crash or
   assert.match(md, /Top gaps: none/);
   assert.match(
     md,
-    /\*\*Conformant — every applicable control met its expectations with evidence\.\*\*/,
+    /\*\*Conformant. Every applicable control met its expectations with evidence\.\*\*/,
   );
 });
 

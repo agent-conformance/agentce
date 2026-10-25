@@ -114,7 +114,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(
         prog="agentce",
         parents=[common],
-        description="Agent Conformance Engine — deterministic conformance evidence for AI agents.",
+        description="Agent Conformance Engine: open, repeatable checks of AI agent behavior against AI rules and standards.",
     )
     parser.add_argument(
         "-V", "--version", action="version", version=f"agentce {__version__}"
@@ -340,7 +340,7 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "Turn an already-exported adapter payload (e.g. an OTLP/JSON trace export, or one an "
             "OTel Collector's file exporter wrote, SPEC 5.4) into an evidence bundle `agentce "
-            "validate` accepts -- no live collect connector needed."
+            "validate` accepts. No live collect connector is needed."
         ),
     )
     p.add_argument("--in", dest="in_path", help="the adapter export file")

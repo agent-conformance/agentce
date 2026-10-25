@@ -14,7 +14,7 @@ usage: agentce ingest [-h] [--json] [--debug] [--quiet] [--in IN_PATH]
 
 Turn an already-exported adapter payload (e.g. an OTLP/JSON trace export, or
 one an OTel Collector's file exporter wrote, SPEC 5.4) into an evidence bundle
-`agentce validate` accepts -- no live collect connector needed.
+`agentce validate` accepts. No live collect connector is needed.
 
 options:
   -h, --help            show this help message and exit

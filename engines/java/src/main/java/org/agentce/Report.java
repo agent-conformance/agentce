@@ -512,7 +512,7 @@ public final class Report {
             bs.get("supplying_adapters").forEach(n -> adapterNames.add(sanitizeField(n.asText())));
             String adapters = adapterNames.isEmpty() ? "no adapter today" : String.join(", ", adapterNames);
             String value = "unlocks " + bs.get("checks_unlocked").asInt() + " check(s), needed by "
-                    + bs.get("needed_by").asInt() + " more; rung " + bs.get("ladder_rung").asInt() + " -- " + step
+                    + bs.get("needed_by").asInt() + " more; rung " + bs.get("ladder_rung").asInt() + ": " + step
                     + ". Adapters that can supply this: " + adapters + ".";
             String label = sanitizeField(bs.get("event").asText()) + " (" + sanitizeField(bs.get("class").asText()) + ")";
             rows.add(Map.entry(label, value));
@@ -542,7 +542,7 @@ public final class Report {
 
     private static String noPopulationText(String control) {
         return "The records show every kind of evidence " + control + " asks for, but not enough of "
-                + "it in the shape the control expects -- a --domain binding may be needed to identify the "
+                + "it in the shape the control expects. A --domain binding may be needed to identify the "
                 + "relevant decisions; see the control's documentation for what it needs.";
     }
 

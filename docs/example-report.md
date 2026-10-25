@@ -23,20 +23,20 @@ This is the report the vendored quickstart project renders end to end with defau
 
 ## Where your records can't show it yet
 
-- `ApprovalDecided (self_report)`: unlocks 4 check(s), needed by 0 more; rung 2 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: oversight.
-- `Notice (self_report)`: unlocks 3 check(s), needed by 0 more; rung 2 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: oversight.
-- `PolicyDecision (self_report)`: unlocks 3 check(s), needed by 0 more; rung 3 -- a request to platform or security. Adapters that can supply this: mcp-gateway, policy-engines.
-- `ModelCall (self_report)`: unlocks 2 check(s), needed by 0 more; rung 1 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: otel-genai.
-- `Disclosure (self_report)`: unlocks 1 check(s), needed by 0 more; rung 2 -- a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: no adapter today.
-- `MemoryRead (enforcement_point)`: unlocks 1 check(s), needed by 0 more; rung 3 -- a request to platform or security. Adapters that can supply this: no adapter today.
+- `ApprovalDecided (self_report)`: unlocks 4 check(s), needed by 0 more; rung 2: a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: oversight.
+- `Notice (self_report)`: unlocks 3 check(s), needed by 0 more; rung 2: a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: oversight.
+- `PolicyDecision (self_report)`: unlocks 3 check(s), needed by 0 more; rung 3: a request to platform or security. Adapters that can supply this: mcp-gateway, policy-engines.
+- `ModelCall (self_report)`: unlocks 2 check(s), needed by 0 more; rung 1: a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: otel-genai.
+- `Disclosure (self_report)`: unlocks 1 check(s), needed by 0 more; rung 2: a code change for the agent team (see the agentce-get-evidence skill). Adapters that can supply this: no adapter today.
+- `MemoryRead (enforcement_point)`: unlocks 1 check(s), needed by 0 more; rung 3: a request to platform or security. Adapters that can supply this: no adapter today.
 
 ### Records that don't show enough, with no single fix
 
-- `DOC-03 on spiffe://corp/agents/credit-langgraph (eu-ai-act@2026.09)`: The records show every kind of evidence DOC-03 asks for, but not enough of it in the shape the control expects -- a --domain binding may be needed to identify the relevant decisions; see the control's documentation for what it needs.
+- `DOC-03 on spiffe://corp/agents/credit-langgraph (eu-ai-act@2026.09)`: The records show every kind of evidence DOC-03 asks for, but not enough of it in the shape the control expects. A --domain binding may be needed to identify the relevant decisions; see the control's documentation for what it needs.
 
 ## Verdict
 
-**Incomplete — no control failed, but not every applicable control is demonstrated.**
+**Incomplete. No control failed, but not every applicable control is demonstrated.**
 
 Top gaps:
 

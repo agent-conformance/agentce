@@ -583,7 +583,7 @@ function blindSpotRows(blindSpots: BlindSpot[]): [string, string][] {
       bs.supplying_adapters.map((a) => sanitizeField(a)).join(", ") || "no adapter today";
     const value =
       `unlocks ${bs.checks_unlocked} check(s), needed by ${bs.needed_by} more; ` +
-      `rung ${bs.ladder_rung} -- ${step}. Adapters that can supply this: ${adapters}.`;
+      `rung ${bs.ladder_rung}: ${step}. Adapters that can supply this: ${adapters}.`;
     return [`${sanitizeField(bs.event)} (${sanitizeField(bs.class)})`, value];
   });
 }
@@ -600,7 +600,7 @@ function checkRows(checks: CheckRef[], text: (control: string) => string): [stri
 }
 
 const NO_POPULATION_TEXT = (control: string): string =>
-  `The records show every kind of evidence ${control} asks for, but not enough of it in the shape the control expects -- a --domain binding may be needed to identify the relevant decisions; see the control's documentation for what it needs.`;
+  `The records show every kind of evidence ${control} asks for, but not enough of it in the shape the control expects. A --domain binding may be needed to identify the relevant decisions; see the control's documentation for what it needs.`;
 
 const COVERAGE_UNKNOWN_TEXT = (control: string): string =>
   `AgentCE can't judge ${control} yet. Nothing outside the agent and the enforcement point counts this agent's calls, so a call that went around the records would not show up. To fix it, declare a coverage denominator in the applicability profile, such as a provider usage export, an egress or firewall log, or a system-of-record export.`;

@@ -2447,7 +2447,7 @@ function notImplemented(command: string): CommandResult {
     detail: "this command is not yet implemented in the TypeScript engine",
     command: command || null,
   };
-  result.note("agentce (TypeScript engine) — command not yet implemented.");
+  result.note("agentce (TypeScript engine): command not yet implemented.");
   return result;
 }
 
@@ -2503,7 +2503,8 @@ function errorResult(command: string, error: AgentceError): CommandResult {
 /** Python's `agentce --help` (COLUMNS=80), word for word. */
 const TOP_USAGE = `usage: agentce [-h] [--json] [--debug] [--quiet] [-V] <command> ...
 
-Agent Conformance Engine — deterministic conformance evidence for AI agents.
+Agent Conformance Engine: open, repeatable checks of AI agent behavior against
+AI rules and standards.
 
 positional arguments:
   <command>

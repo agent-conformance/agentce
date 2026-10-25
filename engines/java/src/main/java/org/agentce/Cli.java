@@ -55,7 +55,8 @@ public final class Cli {
     private static final String TOP_USAGE = """
 usage: agentce [-h] [--json] [--debug] [--quiet] [-V] <command> ...
 
-Agent Conformance Engine — deterministic conformance evidence for AI agents.
+Agent Conformance Engine: open, repeatable checks of AI agent behavior against
+AI rules and standards.
 
 positional arguments:
   <command>
@@ -2652,7 +2653,7 @@ global options:
         } else {
             error.put("command", command);
         }
-        result.note("agentce (Java engine) — command not yet implemented.");
+        result.note("agentce (Java engine): command not yet implemented.");
         return result;
     }
 
