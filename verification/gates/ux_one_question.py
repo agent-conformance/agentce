@@ -61,7 +61,7 @@ QUESTION = "**Question:**"
 DEFAULT = "**Default:**"
 MARKERS = (QUESTION, DEFAULT)
 # Where a marker starts, wherever it sits in its line: mid-sentence, or in a table cell.
-MARKER_AT = re.compile(r"(?=\*\*(?:Question|Default):\*\*)")
+MARKER_AT = re.compile("(?=" + "|".join(map(re.escape, MARKERS)) + ")")
 FIRST_COMMAND = re.compile(r"`agentce (?:assess|quickstart)\b[^`]*`")
 
 
@@ -93,12 +93,17 @@ ASK = re.compile(
         "prompt (?:the )?(?:user|person) for",
         "tell|told (?:me|us)",
         "let (?:me|us) know",
+        "give|gave|given (?:me|us)",
+        "show (?:me|us)",
+        "point (?:me|us) to",
     ),
     re.IGNORECASE,
 )
-# A request written without a verb of asking ("Which catalogs to use, too."), counted where any "?"
-# counts: before the section and inside it.
-REQUEST = re.compile(r"\b(?:which|what)\b(?:\s+\S+){0,5}?\s+to use\b", re.IGNORECASE)
+# A question written without a "?" ("Which catalogs to use, too."): a wh-word, then an infinitive. It
+# counts where any "?" counts: before the section and inside it.
+REQUEST = re.compile(
+    r"\b(?:which|what|where|whether)\b(?:\s+\S+){0,5}?\s+to\s+\w+", re.IGNORECASE
+)
 # A heading for a step that comes after the first findings, where the assistant may ask more.
 LATER_STEP = re.compile(r"^#{2,3} .*\b(?:Phases?|Stage \d|After the first minute)\b")
 # An answer that acts beyond reading and writing into the output folder is not the safe one,
@@ -273,17 +278,16 @@ def prose(found: list[Block]) -> list[tuple[int, str]]:
             continue
         piece: list[str] = []
         for line in block.text_lines:
-            first, *marked = MARKER_AT.split(line.text.strip())
-            if first.strip():
-                if piece:
-                    piece.append(first.strip())
+            for n, part in enumerate(MARKER_AT.split(line.text.strip())):
+                words = part.strip()
+                if not words:
+                    continue
+                if n == 0 and piece:
+                    piece.append(words)
                     out[-1] = (out[-1][0], " ".join(piece))
                 else:
-                    piece = [first.strip()]
-                    out.append((line.number, piece[0]))
-            for words in marked:
-                piece = [words.strip()]
-                out.append((line.number, piece[0]))
+                    piece = [words]
+                    out.append((line.number, words))
     return out
 
 
@@ -756,72 +760,68 @@ SELF_TEST += [
 # request is an ask (KD-776).
 MID_LINE_PAIR = "Then: **Question:** which catalogs to assess against. **Default:** sign the report and publish it."
 TABLE_PAIR = '| step | say |\n|---|---|\n| 1 | **Question:** "Which catalogs?" **Default:** sign the report. |'
-SELF_TEST += (
-    [
-        (
-            "a mid-line Question and Default in the section",
-            GOOD.replace(GOOD_DEFAULT, GOOD_DEFAULT + "\n\n" + MID_LINE_PAIR),
-            {"skill_too_many_questions", "skill_default_unsafe"},
-        ),
-        (
-            "a mid-line Question and Default under When to use",
-            GOOD.replace(
-                "## Phases", "## When to use\n\n" + MID_LINE_PAIR + "\n\n## Phases"
-            ),
-            {"skill_asks_outside_later_step"},
-        ),
-        (
-            "a Question and Default in a table cell in the section",
-            GOOD.replace(GOOD_DEFAULT, GOOD_DEFAULT + "\n\n" + TABLE_PAIR),
-            {"skill_too_many_questions", "skill_default_unsafe"},
-        ),
-        (
-            "a Question and Default in a table cell under When to use",
-            GOOD.replace(
-                "## Phases", "## When to use\n\n" + TABLE_PAIR + "\n\n## Phases"
-            ),
-            {"skill_asks_outside_later_step"},
-        ),
-        (
-            "a mid-line Default in a later step",
-            GOOD.replace(
-                "one question at a time.",
-                "one question at a time. **Question:** which catalogs? **Default:** baseline.",
-            ),
-            set(),
-        ),
-    ]
-    + [
-        (
-            f"imperative ask in the section: {line!r}",
-            GOOD.replace("show the verdict.", f"show the verdict.\n\n{line}"),
-            {"skill_too_many_questions", "skill_question_unmarked"},
-        )
-        for line in (
-            "Tell me which catalogs to use too.",
-            "Let me know which catalogs apply.",
-            "Then: which catalogs to use, as well.",
-        )
-    ]
-    + [
-        (
-            f"imperative ask before the section: {line!r}",
-            GOOD.replace("Intro.", line),
-            {"skill_asks_before_first_minute"},
-        )
-        for line in ("Tell me the repository path first.", "Let us know your catalog.")
-    ]
-    + [
-        (
-            "an imperative ask after the section under When to use",
-            GOOD.replace(
-                "## Phases",
-                "## When to use\n\nTell me which catalogs apply.\n\n## Phases",
-            ),
-            {"skill_asks_outside_later_step"},
-        ),
-    ]
+PLACES = (
+    (
+        "in the section",
+        GOOD_DEFAULT,
+        GOOD_DEFAULT + "\n\n{}",
+        {"skill_too_many_questions", "skill_default_unsafe"},
+    ),
+    (
+        "under When to use",
+        "## Phases",
+        "## When to use\n\n{}\n\n## Phases",
+        {"skill_asks_outside_later_step"},
+    ),
 )
+SELF_TEST += [
+    (
+        f"a Question and Default {shape} {where}",
+        GOOD.replace(old, new.format(pair)),
+        want,
+    )
+    for shape, pair in (("mid-line", MID_LINE_PAIR), ("in a table cell", TABLE_PAIR))
+    for where, old, new, want in PLACES
+]
+SELF_TEST += [
+    (
+        "a mid-line Question and Default in a later step",
+        GOOD.replace(
+            "one question at a time.",
+            "one question at a time. **Question:** which catalogs? **Default:** baseline.",
+        ),
+        set(),
+    ),
+    (
+        "an imperative ask after the section under When to use",
+        GOOD.replace(
+            "## Phases", "## When to use\n\nTell me which catalogs apply.\n\n## Phases"
+        ),
+        {"skill_asks_outside_later_step"},
+    ),
+]
+SELF_TEST += [
+    (
+        f"imperative ask in the section: {line!r}",
+        GOOD.replace("show the verdict.", f"show the verdict.\n\n{line}"),
+        {"skill_too_many_questions", "skill_question_unmarked"},
+    )
+    for line in (
+        "Tell me which catalogs to use too.",
+        "Let me know which catalogs apply.",
+        "Give me the repository path.",
+        "Then: which catalogs to use, as well.",
+        "Then: which folder to scan next.",
+    )
+]
+SELF_TEST += [
+    (
+        f"imperative ask before the section: {line!r}",
+        GOOD.replace("Intro.", line),
+        {"skill_asks_before_first_minute"},
+    )
+    for line in ("Tell me the repository path first.", "Let us know your catalog.")
+]
 
 TERMINAL_CASES: list[tuple[str, bool]] = [
     ("Continue? ", True),
