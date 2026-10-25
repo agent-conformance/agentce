@@ -3,6 +3,14 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.136.1
+
+- `VG-UX-ONE-QUESTION` (changed, 18.40a): the First minute fails closed. Its raw source must be text the gate has
+  reviewed for a second question (a changed section is refused with `skill_unreviewed` until its new text is added to
+  the gate), a `**Question:**` is one sentence ending in its only "?" with no other ask in it (`skill_question_shape`),
+  and a second `## First minute` heading is refused. New seeded faults: a statement after get-evidence's "?", and a
+  loose ask in words outside every phrase list after prepare-to-share's Default.
+
 ## 0.136.0
 
 - `VG-REPORT-FORMAT-PARITY` (added, 18.16c): TypeScript and Java render `report.junit.xml`, `report.csv`, `oscal-ar.xml`

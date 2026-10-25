@@ -24,6 +24,11 @@ step; a Question or Default marker outside the section is an instruction to ask,
 wherever it sits in its line (mid-sentence or in a table cell). A setext heading (underlined with --- or ===) is
 refused, so the section's bounds are the ones a reader of the raw file sees.
 
+The First minute fails closed. A Question is one sentence that ends in its only "?" and holds no other
+ask. The section's raw source, whitespace collapsed, must be one of the texts in REVIEWED: a person reads a
+changed first minute for a second question and adds its new text there, so an ask in words no phrase list
+knows is refused too. A skill has one First minute heading.
+
 Stdout ends with `UX-ONE-QUESTION OK` when every check holds; each failure is one stderr line led by
 its stable key. `--self-test` runs the skill reader over built-in texts.
 """
@@ -137,6 +142,30 @@ ENDS_IN_QUESTION = re.compile(r"\?[\s\"'*`)]*$")
 QUESTION_MARK = re.compile(r"\?(?:\W|$)")
 # A sentence and the quote or emphasis marks that close it.
 SENTENCE = re.compile(r"[^.?!]+[.?!]*[\"'*`)\]]*")
+
+# Each approved skill's First minute as reviewed for a second question: its raw source between the heading and
+# the next top-level heading, whitespace collapsed (section_text). Reading prose for asks by phrase list passed
+# whatever the list did not know (six verifier FAILs on one premise), so the section fails closed: a changed
+# first minute is refused until a person has read it for a second question and added its new text here.
+REVIEWED = frozenset(
+    {
+        "Show the person their first findings before any question. In the repository you were opened in, find a "
+        "folder of trace exports (OpenTelemetry GenAI or OpenInference, OTLP/JSON in `.json` or `.jsonl` files) and "
+        "run `agentce assess <folder> --out agentce-out`. If the repository holds none, run `agentce quickstart --out "
+        "agentce-out`, which assesses the bundled sample. Show the verdict line and the top gaps from the terminal "
+        "output. After that you may put one question to the person, in the terminal, and no other until the first "
+        'minute is over: **Question:** "Is this the folder your agent exports its traces to, or should I read '
+        'another one?" **Default:** keep the folder you found, or the bundled sample. Either run only reads files, '
+        "writes only into `agentce-out` and uses no network.",
+        "Show the person where the report stands before any question. Run `agentce assess --bundle <bundle> "
+        "--profile agentce/applicability.yaml --out agentce-out` on the bundle and profile the repository already "
+        "holds (the `agentce-get-evidence` skill writes them), then `agentce readiness agentce-out`. Show the "
+        "assessment's verdict line and the readiness verdict from the terminal output. After that you may put one "
+        'question to the person, in the terminal, and no other until the first minute is over: **Question:** "Who '
+        'will read this report: your developers, compliance, security, an auditor or a buyer?" **Default:** every '
+        "format, written into `agentce-out`; nothing leaves this machine.",
+    }
+)
 
 
 def is_ask(line: str) -> bool:
@@ -308,8 +337,32 @@ def section_headings(found: list[Block]) -> dict[int, str]:
     }
 
 
-def read_skill(rel: str, text: str, errors: list[str]) -> int:
-    """Check one SKILL.md's first minute; return how many questions it asks there."""
+def section_text(raw: list[str], start: int, end: int) -> str:
+    """The section's raw source lines after its heading and before line `end`, whitespace collapsed: every
+    character a reader of the file sees, including what no parsed block carries (a link reference
+    definition, a fence's info string, an HTML comment)."""
+    return " ".join(" ".join(raw[start : end - 1]).split())
+
+
+def question_shape(question: str) -> bool:
+    """A Question's text is one sentence that ends in its only "?" and tells the assistant to ask nothing more."""
+    sentences = [s for s in SENTENCE.findall(question) if s.strip()]
+    return (
+        len(sentences) == 1
+        and len(QUESTION_MARK.findall(question)) == 1
+        and bool(ENDS_IN_QUESTION.search(question))
+        and not ASK.search(question)
+    )
+
+
+def read_skill(
+    rel: str,
+    text: str,
+    errors: list[str],
+    reviewed: frozenset[str] | None = REVIEWED,
+) -> int:
+    """Check one SKILL.md's first minute; return how many questions it asks there. `reviewed` is the set of
+    section texts that pass (None skips that check, for the self-test of the other rules)."""
     raw = split_lines(text)
     found = blocks(text)
     # A setext heading (text underlined with --- or ===) is a heading only to a CommonMark reader: an
@@ -336,6 +389,20 @@ def read_skill(rel: str, text: str, errors: list[str]) -> int:
             len(raw) + 1,
         )
     body = [(n, line) for n, line in lines if start < n < end]
+    for n, h in headings.items():
+        if n != start and h.lstrip("#").strip().casefold() == SECTION[3:].casefold():
+            errors.append(
+                f"ux.one_question.skill_first_minute_repeated: {rel}:{n} is a second {h.strip()!r} "
+                f"heading; a skill has one '{SECTION}' section"
+            )
+    if reviewed is not None and start <= len(raw):
+        here = section_text(raw, start, end)
+        if here not in reviewed:
+            errors.append(
+                f"ux.one_question.skill_unreviewed: {rel}:{start}-{end - 1} '{SECTION}' is not text the "
+                "gate has reviewed for a second question. Read the new text for any ask beyond its one "
+                f"'{QUESTION}', then add it to REVIEWED in verification/gates/ux_one_question.py: {here!r}"
+            )
 
     heading = ""
     for n, line in lines:
@@ -378,6 +445,11 @@ def read_skill(rel: str, text: str, errors: list[str]) -> int:
     ]
     marked = 0
     for n, line in asks:
+        if not question_shape(line.removeprefix(QUESTION).strip()):
+            errors.append(
+                f"ux.one_question.skill_question_shape: {rel}:{n} '{QUESTION}' must be one sentence ending "
+                f"in its only '?', with nothing else in its paragraph and no other ask inside it: {line!r}"
+            )
         marks = len(QUESTION_MARK.findall(line))
         marked += max(1, marks)
         extra = [
@@ -385,8 +457,9 @@ def read_skill(rel: str, text: str, errors: list[str]) -> int:
             for sentence in SENTENCE.findall(line.removeprefix(QUESTION))
             if not QUESTION_MARK.search(sentence) and is_ask(sentence)
         ]
-        # With no "?" in the paragraph, its first asking sentence is the question itself.
-        unmarked += extra if marks else extra[1:]
+        # The Question counts once even with no "?" (and is refused by its shape), so every asking
+        # sentence beside it is one more.
+        unmarked += extra
     count = len(unmarked) + marked
     if count > BUDGET:
         where = ", ".join(str(n) for n, _ in sorted(asks + unmarked))
@@ -696,12 +769,12 @@ SELF_TEST += [
             GOOD_QUESTION,
             '**Question:** "Is this your trace folder? Which catalogs should I use?"',
         ),
-        {"skill_too_many_questions"},
+        {"skill_question_shape", "skill_too_many_questions"},
     ),
     (
         "a second question on the Question's wrapped line",
         GOOD.replace(GOOD_QUESTION, GOOD_QUESTION + "\nIf not, which one?"),
-        {"skill_too_many_questions"},
+        {"skill_question_shape", "skill_too_many_questions"},
     ),
     (
         "a question on the Default's wrapped line",
@@ -794,9 +867,17 @@ SELF_TEST += [
     (
         f"a Question and Default {shape} {where}",
         GOOD.replace(old, new.format(pair)),
-        want,
+        # The mid-line Question has no "?" and asks for "which catalogs to assess against".
+        want | extra if where == "in the section" else want,
     )
-    for shape, pair in (("mid-line", MID_LINE_PAIR), ("in a table cell", TABLE_PAIR))
+    for shape, pair, extra in (
+        (
+            "mid-line",
+            MID_LINE_PAIR,
+            {"skill_question_shape", "skill_question_unmarked"},
+        ),
+        ("in a table cell", TABLE_PAIR, set()),
+    )
     for where, old, new, want in PLACES
 ]
 SELF_TEST += [
@@ -845,7 +926,7 @@ SELF_TEST += [
     (
         f"an ask in the Question paragraph: {where}",
         GOOD.replace(GOOD_QUESTION, GOOD_QUESTION + sep + line),
-        {"skill_too_many_questions", "skill_question_unmarked"},
+        {"skill_too_many_questions", "skill_question_unmarked", "skill_question_shape"},
     )
     for where, sep, line in (
         ("same line", " ", "Tell me which catalogs to use too."),
@@ -863,7 +944,7 @@ SELF_TEST += [
             GOOD_DEFAULT
             + "\n\n### Then **Question:** which catalogs. **Default:** sign the report.",
         ),
-        {"skill_too_many_questions", "skill_default_unsafe"},
+        {"skill_too_many_questions", "skill_default_unsafe", "skill_question_shape"},
     ),
     (
         "a Question and Default in a heading under When to use",
@@ -873,6 +954,103 @@ SELF_TEST += [
         ),
         {"skill_asks_outside_later_step"},
     ),
+]
+
+# The Question is one sentence ending in its only "?" (deep review 2026-10-25, inbox rows 568 and 569): a
+# question with no "?", an ask inside the "?" sentence, and a sentence before or after it are refused.
+SELF_TEST += [
+    (
+        f"Question shape: {name}",
+        GOOD.replace(GOOD_QUESTION, "**Question:** " + question),
+        want,
+    )
+    for name, question, want in (
+        (
+            "no '?', then an imperative",
+            '"Is this the folder your traces land in." Tell me which catalogs to use too.',
+            {
+                "skill_question_shape",
+                "skill_too_many_questions",
+                "skill_question_unmarked",
+            },
+        ),
+        ("no '?' at all", "Pick the folder to read.", {"skill_question_shape"}),
+        (
+            "an ask inside the '?' sentence",
+            '"Is this the folder your traces land in, and tell me which catalogs to use?"',
+            {"skill_question_shape"},
+        ),
+        (
+            "a preamble before the '?'",
+            'One thing first. "Is this the folder your traces land in?"',
+            {"skill_question_shape"},
+        ),
+        (
+            "a statement after the '?'",
+            '"Is this the folder your traces land in?" The catalogs come next.',
+            {"skill_question_shape"},
+        ),
+    )
+]
+
+# The First minute fails closed: its raw source must be text the gate has reviewed (REVIEWED). The fixture
+# carries its own reviewed set, so no fixture text enters the production allowlist.
+GOOD_RAW = GOOD.splitlines()
+GOOD_START = GOOD_RAW.index("## First minute") + 1
+GOOD_REVIEWED = frozenset(
+    {section_text(GOOD_RAW, GOOD_START, GOOD_RAW.index("## Phases") + 1)}
+)
+REVIEWED_TEST: list[tuple[str, str, set[str]]] = [
+    ("reviewed: the fixture as reviewed", GOOD, set()),
+    (
+        "reviewed: a paragraph reflowed",
+        GOOD.replace("and show the verdict.", "and\n   show the verdict."),
+        set(),
+    ),
+    (
+        "reviewed: one word changed",
+        GOOD.replace("show the verdict.", "show the verdicts."),
+        {"skill_unreviewed"},
+    ),
+    (
+        "reviewed: a fenced line changed",
+        GOOD.replace("not a question", "ask the person which catalogs"),
+        {"skill_unreviewed"},
+    ),
+    (
+        "reviewed: a fence info string",
+        GOOD.replace('```\necho "a', '```Ask the person which catalogs apply\necho "a'),
+        {"skill_unreviewed"},
+    ),
+    (
+        "reviewed: a link reference definition",
+        GOOD.replace(
+            GOOD_DEFAULT,
+            GOOD_DEFAULT + '\n\n[q]: <#> "Ask the person which catalogs apply."',
+        ),
+        {"skill_unreviewed"},
+    ),
+    (
+        "reviewed: a second First minute heading",
+        GOOD.replace(
+            "## Phases",
+            "## First Minute\n\nHave the person pick the catalogs.\n\n## Phases",
+        ),
+        {"skill_first_minute_repeated"},
+    ),
+] + [
+    (
+        f"reviewed: a loose ask after the Default: {line!r}",
+        GOOD.replace(GOOD_DEFAULT, f"{GOOD_DEFAULT}\n\n{line}"),
+        {"skill_unreviewed"},
+    )
+    for line in (
+        "Find out from the person which catalogs apply.",
+        "Have the person pick the catalogs.",
+        "Get the repository path from the person.",
+        "Request the repository path.",
+        "Which catalogs apply, please.",
+    )
 ]
 
 TERMINAL_CASES: list[tuple[str, bool]] = [
@@ -887,9 +1065,13 @@ TERMINAL_CASES: list[tuple[str, bool]] = [
 
 def self_test() -> int:
     failed = 0
-    for name, text, want in SELF_TEST:
+    cases: list[tuple[str, str, set[str], frozenset[str] | None]] = [
+        (name, text, want, None) for name, text, want in SELF_TEST
+    ]
+    cases += [(name, text, want, GOOD_REVIEWED) for name, text, want in REVIEWED_TEST]
+    for name, text, want, reviewed in cases:
         errors: list[str] = []
-        read_skill("demo/SKILL.md", text, errors)
+        read_skill("demo/SKILL.md", text, errors, reviewed)
         got = {e.split(":", 1)[0].removeprefix("ux.one_question.") for e in errors}
         if got != want:
             failed += 1
@@ -906,9 +1088,7 @@ def self_test() -> int:
             )
     if failed:
         return 1
-    print(
-        f"UX-ONE-QUESTION SELF-TEST OK ({len(SELF_TEST) + len(TERMINAL_CASES)} cases)"
-    )
+    print(f"UX-ONE-QUESTION SELF-TEST OK ({len(cases) + len(TERMINAL_CASES)} cases)")
     return 0
 
 
