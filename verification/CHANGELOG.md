@@ -3,6 +3,15 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.136.3
+
+- `VG-REPORT-FORMAT-PARITY` (changed, 18.16d): also compares `report.pdf`. Python's real assess emits it, TypeScript's
+  and Java's `report-formats` seam renders it from that engine's own assessment and manifest (`run.started_at`,
+  `run.report_language`), and every byte must match. The corpus gains a quickstart run with `--report-language de`
+  (33 runs), each engine's `started_at` must have Python's shape before it is set to Python's value, and the case
+  table gains odd `started_at` values, a German case and PDF string specials. New seeded faults: TypeScript encodes the
+  PDF with `Buffer.from(text, "latin1")`, Java stops escaping a backslash, TypeScript writes `/Length` as a UTF-8 length.
+
 ## 0.136.2
 
 - `VG-UX-ONE-QUESTION` (changed, 18.40a): a second First minute heading is found the way a reader sees it, whatever

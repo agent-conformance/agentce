@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.136.2",
+  "suite_version": "0.136.3",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -2678,7 +2678,7 @@
     },
     {
       "id": "VG-REPORT-FORMAT-PARITY",
-      "title": "TypeScript and Java render report.junit.xml, report.csv, oscal-ar.xml and public-statement.md byte-identical to Python over the corpus and a hostile case table",
+      "title": "TypeScript and Java render report.junit.xml, report.csv, oscal-ar.xml, public-statement.md and report.pdf byte-identical to Python over the corpus and a hostile case table",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -2694,8 +2694,8 @@
       "timeout_s": 900,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "the checker's self-test catches a one-byte change, a missing file, an extra trailing newline and CRLF line endings; over corpus/quickstart, the auditor-view fixture and the 30 generated corpus projects, Python's real assess --emit junit,csv,oscal_xml,public writes the four files, each engine's own assess exits with Python's code, and each engine's report-formats seam renders the four files from that engine's own assertions.json, oscal-ar.json and manifest catalogs byte-identical to Python's (Python's own seam included); every case in tools/fixtures/report_formats/cases.json (empty, every outcome out of order, hostile characters, an odd OSCAL document, code-point order) renders the same bytes in all three engines; 32 corpus runs and every case ran",
-        "fail": "any engine writes a different byte in any of the four files, writes none, exits differently from Python, or the checker runs fewer runs than expected"
+        "pass": "the checker's self-test catches a one-byte change, a missing file, an extra trailing newline, CRLF line endings, a report.pdf Latin-1 byte written as UTF-8 and a missing report.pdf, and refuses an engine started_at that is not YYYY-MM-DDTHH:MM:SSZ; over corpus/quickstart (also with --report-language de), the auditor-view fixture and the 30 generated corpus projects, Python's real assess --emit junit,csv,oscal_xml,public,pdf writes the five files, each engine's own assess exits with Python's code and writes a started_at of Python's shape (then set to Python's value, the clock being the one input that differs), and each engine's report-formats seam renders the five files from that engine's own assertions.json, oscal-ar.json and manifest byte-identical to Python's (Python's own seam included); every case in tools/fixtures/report_formats/cases.json (empty, every outcome out of order, hostile characters, an odd OSCAL document, code-point order, odd started_at values, German) renders the same bytes in all three engines; 33 corpus runs and every case ran",
+        "fail": "any engine writes a different byte in any of the five files, writes none, exits differently from Python, writes a started_at of another shape, or the checker runs fewer runs than expected"
       },
       "faults": [
         {
@@ -2727,9 +2727,27 @@
           "file": "engines/java/src/main/java/org/agentce/Report.java",
           "search": "Map<String, Map<String, Integer>> families = new TreeMap<>(Json::byteCompare);",
           "replace": "Map<String, Map<String, Integer>> families = new TreeMap<>((x, y) -> Json.byteCompare(y, x));"
+        },
+        {
+          "description": "typescript pdf encodes with Buffer.from(text, latin1) instead of one ? per code point above U+00FF",
+          "file": "engines/typescript/src/report.ts",
+          "search": "pdfEscape(pdfLatin1(line))",
+          "replace": "pdfEscape(line)"
+        },
+        {
+          "description": "java pdf no longer escapes a backslash in a string literal",
+          "file": "engines/java/src/main/java/org/agentce/Report.java",
+          "search": "return text.replace(\"\\\\\", \"\\\\\\\\\").replace(\"(\", \"\\\\(\").replace(\")\", \"\\\\)\");",
+          "replace": "return text.replace(\"(\", \"\\\\(\").replace(\")\", \"\\\\)\");"
+        },
+        {
+          "description": "typescript pdf writes /Length as the content's UTF-8 byte length instead of its Latin-1 byte length",
+          "file": "engines/typescript/src/report.ts",
+          "search": "/Length ${content.length}",
+          "replace": "/Length ${Buffer.byteLength(content.toString(\"latin1\"))}"
         }
       ],
-      "fix_hint": "run verification/gates/report_format_parity.sh and read the MISMATCH lines (each names the file and the first differing byte); the reference is engines/python/agentce/report.py's render_junit, render_csv, render_oscal_xml and render_public_statement, ported as renderJunit, renderCsv, renderOscalXml and renderPublicStatement in engines/typescript/src/report.ts and engines/java/src/main/java/org/agentce/Report.java; the check is tools/report_format_parity_check.py"
+      "fix_hint": "run verification/gates/report_format_parity.sh and read the MISMATCH lines (each names the file and the first differing byte); the reference is engines/python/agentce/report.py's render_junit, render_csv, render_oscal_xml, render_public_statement and render_pdf, ported as renderJunit, renderCsv, renderOscalXml, renderPublicStatement and renderPdf in engines/typescript/src/report.ts and engines/java/src/main/java/org/agentce/Report.java; the check is tools/report_format_parity_check.py"
     },
     {
       "id": "VG-RECORDS-PROFILE-ROUND-TRIP",

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build gate helper for VG-REPORT-FORMAT-PARITY: TypeScript and Java render report.junit.xml,
-# report.csv, oscal-ar.xml and public-statement.md byte-identical to Python over the corpus and the
-# hostile case table (18.16c). The TypeScript dist and the Java jar are rebuilt on every run, so a
+# report.csv, oscal-ar.xml, public-statement.md and report.pdf byte-identical to Python over the corpus and the
+# hostile case table (18.16c, 18.16d). The TypeScript dist and the Java jar are rebuilt on every run, so a
 # seeded fault in engine source is what the comparison sees.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../.." && pwd)"

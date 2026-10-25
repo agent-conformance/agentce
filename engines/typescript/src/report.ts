@@ -1319,6 +1319,105 @@ export function renderCsv(assertions: readonly Assertion[]): string {
   return rows.map((row) => `${row.map(csvField).join(",")}\n`).join("");
 }
 
+/** A PDF-native date (`D:YYYYMMDDHHMMSSZ`) from `startedAt`, the run's own `manifest.run.started_at`,
+ * never a clock read: its ASCII digits in order. */
+function pdfDate(startedAt: string): string {
+  const digits = startedAt.replace(/[^0-9]/g, "");
+  return digits ? `D:${digits}Z` : "D:19700101000000Z";
+}
+
+/** Standard-14 Helvetica uses WinAnsiEncoding (effectively Latin-1): a code point above U+00FF becomes
+ * one `?`, as Python's `encode("latin-1", "replace")` does (an astral character is one `?`, not two). */
+function pdfLatin1(text: string): string {
+  let out = "";
+  for (const ch of text) {
+    out += (ch.codePointAt(0) ?? 0) > 0xff ? "?" : ch;
+  }
+  return out;
+}
+
+/** Escape a PDF string literal's three special characters. */
+function pdfEscape(text: string): string {
+  return text.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+}
+
+/** report.pdf's standard-14 font object: fixed bytes, never computed from run data (ADR-0015). */
+const PDF_FONT_OBJECT =
+  "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>";
+
+/** Render `report.pdf` (SPEC §9, ADR-0015): a minimal hand-rolled PDF, one page of Helvetica text
+ * summarizing the run, labelled a derived, non-canonical rendering and dated from `startedAt`.
+ * Byte-identical to Python's `render_pdf`. */
+export function renderPdf(
+  assertions: readonly Assertion[],
+  counts: Record<string, number>,
+  startedAt: string,
+  language: string = DEFAULT_LANGUAGE,
+): Buffer {
+  const cat = catalogue(language);
+  const lines = [
+    cat["report.title"],
+    "",
+    "This PDF is a DERIVED, NON-CANONICAL rendering of the AgentCE report; report.md and " +
+      "report.html are the canonical artifacts.",
+    `Generated: ${startedAt}`,
+    "",
+    cat[`verdict.${summarizeVerdict([...assertions]).verdict}`],
+    "",
+    ...Object.entries(counts).map(([outcome, count]) => `${outcomeLabel(cat, outcome)}: ${count}`),
+    "",
+    ...[...assertions]
+      .sort(bySubjectControl)
+      .map((a) => `${a.control} @ ${a.subject}: ${outcomeLabel(cat, a.outcome)}`),
+  ];
+  const shown = lines.map((line) => `(${pdfEscape(pdfLatin1(line))}) Tj`).join("\nT*\n");
+  const content = Buffer.from(
+    `${["BT", "/F1 10 Tf", "50 740 Td", "14 TL", shown, "ET"].join("\n")}\n`,
+    "latin1",
+  );
+  const title = pdfEscape(pdfLatin1("AgentCE report (derived, non-canonical)"));
+  const bodies: Buffer[] = [
+    Buffer.from("<< /Type /Catalog /Pages 2 0 R >>"),
+    Buffer.from("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+    Buffer.from(
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] " +
+        "/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    ),
+    Buffer.from(PDF_FONT_OBJECT),
+    Buffer.concat([
+      Buffer.from(`<< /Length ${content.length} >>\nstream\n`),
+      content,
+      Buffer.from("endstream"),
+    ]),
+    Buffer.from(
+      `<< /Producer (AgentCE) /Title (${title}) /CreationDate (${pdfDate(startedAt)}) >>`,
+      "latin1",
+    ),
+  ];
+  const header = Buffer.from("%PDF-1.4\n%\xe2\xe3\xcf\xd3\n", "latin1");
+  const parts: Buffer[] = [header];
+  const offsets: number[] = [];
+  let cursor = header.length;
+  bodies.forEach((body, i) => {
+    const obj = Buffer.concat([Buffer.from(`${i + 1} 0 obj\n`), body, Buffer.from("\nendobj\n")]);
+    offsets.push(cursor);
+    parts.push(obj);
+    cursor += obj.length;
+  });
+  const xref = [
+    "xref",
+    "0 7",
+    "0000000000 65535 f ",
+    ...offsets.map((offset) => `${String(offset).padStart(10, "0")} 00000 n `),
+  ];
+  parts.push(
+    Buffer.from(
+      `${xref.join("\n")}\ntrailer\n<< /Size 7 /Root 1 0 R /Info 6 0 R >>\nstartxref\n${cursor}\n%%EOF\n`,
+    ),
+  );
+  return Buffer.concat(parts);
+}
+
 const NON_DETERMINATION =
   "This statement reports conformance to the named catalog as evaluated by the Agent Conformance " +
   "Engine over the named evidence and observation window. It is not a legal compliance " +

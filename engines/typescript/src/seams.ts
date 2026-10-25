@@ -5,7 +5,7 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import type { Activity } from "./activity";
-import { assertionFromJson } from "./assertions";
+import { aggregate, assertionFromJson } from "./assertions";
 import { computeAuditorView } from "./auditorView";
 import { CanonicalizationError, canonicalString } from "./canonical";
 import { InputError } from "./errors";
@@ -30,6 +30,7 @@ import {
   renderCsv,
   renderJunit,
   renderOscalXml,
+  renderPdf,
   renderPublicStatement,
 } from "./report";
 import { computeSecurityView } from "./securityView";
@@ -98,9 +99,10 @@ export function main(argv: string[]): number {
   }
 
   // report-formats is the same kind of test-only seam (18.16c, VG-REPORT-FORMAT-PARITY): for each
-  // report directory, it renders report.junit.xml, report.csv, oscal-ar.xml and public-statement.md
-  // from that directory's assertions.json, oscal-ar.json and manifest catalogs, the way Python's
-  // write_report does, into <out-root>/<index>/. `assess --emit` reaches them with 18.16b.
+  // report directory, it renders report.junit.xml, report.csv, oscal-ar.xml, public-statement.md and
+  // report.pdf from that directory's assertions.json, oscal-ar.json and manifest (catalogs,
+  // run.started_at, run.report_language), the way Python's write_report does, into
+  // <out-root>/<index>/. `assess --emit` reaches them with 18.16b.
   if (command === "report-formats") {
     const [outRoot, ...sources] = argv.slice(1);
     if (outRoot === undefined || sources.length === 0) {
@@ -110,7 +112,10 @@ export function main(argv: string[]): number {
     sources.forEach((source, index) => {
       const read = (name: string) => readBundled(readFileSync(joinPath(source, name)));
       const assertions = (read("assertions.json") as unknown[]).map(assertionFromJson);
-      const manifest = read("manifest.json") as { inputs: { catalogs: Record<string, string>[] } };
+      const manifest = read("manifest.json") as {
+        inputs: { catalogs: Record<string, string>[] };
+        run: { started_at: string; report_language: string };
+      };
       const catalogs = manifest.inputs.catalogs.map((c) => `${c.id}@${c.version}`);
       const out = joinPath(outRoot, String(index));
       mkdirSync(out, { recursive: true });
@@ -126,6 +131,15 @@ export function main(argv: string[]): number {
       for (const [name, text] of rendered) {
         writeFileSync(joinPath(out, name), text, "utf-8");
       }
+      writeFileSync(
+        joinPath(out, "report.pdf"),
+        renderPdf(
+          assertions,
+          aggregate(assertions),
+          manifest.run.started_at,
+          manifest.run.report_language,
+        ),
+      );
     });
     return 0;
   }

@@ -3,6 +3,7 @@ package org.agentce;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -1358,6 +1360,90 @@ public final class Report {
                     .map(Report::csvField).collect(Collectors.joining(","))).append('\n');
         }
         return out.toString();
+    }
+
+    /** A PDF-native date ({@code D:YYYYMMDDHHMMSSZ}) from {@code startedAt}, the run's own
+     * {@code manifest.run.started_at}, never a clock read: its ASCII digits in order. */
+    private static String pdfDate(String startedAt) {
+        String digits = startedAt.replaceAll("[^0-9]", "");
+        return digits.isEmpty() ? "D:19700101000000Z" : "D:" + digits + "Z";
+    }
+
+    /** Standard-14 Helvetica uses WinAnsiEncoding (effectively Latin-1): a code point above U+00FF becomes
+     * one {@code ?}, as Python's {@code encode("latin-1", "replace")} does (an astral character is one
+     * {@code ?}, not two). */
+    private static String pdfLatin1(String text) {
+        StringBuilder out = new StringBuilder();
+        text.codePoints().forEach(cp -> out.appendCodePoint(cp > 0xff ? '?' : cp));
+        return out.toString();
+    }
+
+    /** Escape a PDF string literal's three special characters. */
+    private static String pdfEscape(String text) {
+        return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)");
+    }
+
+    /** report.pdf's standard-14 font object: fixed bytes, never computed from run data (ADR-0015). */
+    private static final String PDF_FONT_OBJECT =
+            "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>";
+
+    /** Render {@code report.pdf} (SPEC §9, ADR-0015): a minimal hand-rolled PDF, one page of Helvetica text
+     * summarizing the run, labelled a derived, non-canonical rendering and dated from {@code startedAt}.
+     * Byte-identical to Python's {@code render_pdf}. */
+    public static byte[] renderPdf(
+            List<Assertions.Assertion> assertions, Map<String, Integer> counts, String startedAt, String language) {
+        Map<String, String> cat = Messages.catalogue(language);
+        List<String> lines = new ArrayList<>(List.of(
+                cat.get("report.title"),
+                "",
+                "This PDF is a DERIVED, NON-CANONICAL rendering of the AgentCE report; report.md and "
+                        + "report.html are the canonical artifacts.",
+                "Generated: " + startedAt,
+                "",
+                cat.get("verdict." + Verdict.summarize(assertions).verdict()),
+                ""));
+        counts.forEach((outcome, count) -> lines.add(outcomeLabel(cat, outcome) + ": " + count));
+        lines.add("");
+        for (Assertions.Assertion a : sortedBySubjectControl(assertions)) {
+            lines.add(a.control + " @ " + a.subject + ": " + outcomeLabel(cat, a.outcome));
+        }
+        String shown = lines.stream().map(line -> "(" + pdfEscape(pdfLatin1(line)) + ") Tj")
+                .collect(Collectors.joining("\nT*\n"));
+        byte[] content = String.join("\n", "BT", "/F1 10 Tf", "50 740 Td", "14 TL", shown, "ET\n")
+                .getBytes(StandardCharsets.ISO_8859_1);
+        String title = pdfEscape(pdfLatin1("AgentCE report (derived, non-canonical)"));
+        List<byte[]> bodies = List.of(
+                latin1("<< /Type /Catalog /Pages 2 0 R >>"),
+                latin1("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+                latin1("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+                        + "/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"),
+                latin1(PDF_FONT_OBJECT),
+                concat(latin1("<< /Length " + content.length + " >>\nstream\n"), content, latin1("endstream")),
+                latin1("<< /Producer (AgentCE) /Title (" + title + ") /CreationDate (" + pdfDate(startedAt) + ") >>"));
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.writeBytes(concat(latin1("%PDF-1.4\n%"), new byte[] {(byte) 0xe2, (byte) 0xe3, (byte) 0xcf, (byte) 0xd3},
+                latin1("\n")));
+        StringBuilder xref = new StringBuilder("xref\n0 7\n0000000000 65535 f \n");
+        for (int i = 0; i < bodies.size(); i++) {
+            xref.append(String.format(Locale.ROOT, "%010d 00000 n \n", out.size()));
+            out.writeBytes(concat(latin1((i + 1) + " 0 obj\n"), bodies.get(i), latin1("\nendobj\n")));
+        }
+        int xrefOffset = out.size();
+        out.writeBytes(latin1(xref + "trailer\n<< /Size 7 /Root 1 0 R /Info 6 0 R >>\nstartxref\n" + xrefOffset
+                + "\n%%EOF\n"));
+        return out.toByteArray();
+    }
+
+    private static byte[] latin1(String text) {
+        return text.getBytes(StandardCharsets.ISO_8859_1);
+    }
+
+    private static byte[] concat(byte[]... parts) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        for (byte[] part : parts) {
+            out.writeBytes(part);
+        }
+        return out.toByteArray();
     }
 
     /** The sorted, deduplicated ids of every control a deviation was applied to (Python's {@code

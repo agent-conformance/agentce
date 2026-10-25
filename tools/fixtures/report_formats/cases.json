@@ -322,6 +322,81 @@
       "catalogs": [
         "eu-ai-act@2026.09"
       ]
+    },
+    {
+      "name": "pdf-hostile-de",
+      "report_language": "de",
+      "started_at": "(2026)\\10-25T00:00:00Z",
+      "assertions": [
+        {
+          "control": "PDF-(01)\\",
+          "control_version": "2026.09",
+          "family": "PDF",
+          "mode": "automated",
+          "outcome": "non-conformant",
+          "population": {
+            "applicable": 1,
+            "failed": 0
+          },
+          "rung": 2,
+          "severity": "medium",
+          "subject": "spiffe://corp/(a)\\b\u00e9\u00ff\u20ac\u0100\ud83d\ude00\u0001\u0000\n\r\tz",
+          "window": {
+            "end": "2026-08-29T00:00:00Z",
+            "start": "2026-05-01T00:00:00Z"
+          }
+        },
+        {
+          "control": "PDF-02",
+          "control_version": "2026.09",
+          "family": "PDF",
+          "mode": "automated",
+          "outcome": "partial",
+          "population": {
+            "applicable": 1,
+            "failed": 0
+          },
+          "rung": 2,
+          "severity": "medium",
+          "subject": "spiffe://corp/\u00ff",
+          "window": {
+            "end": "2026-08-29T00:00:00Z",
+            "start": "2026-05-01T00:00:00Z"
+          }
+        }
+      ],
+      "catalogs": []
+    },
+    {
+      "name": "pdf-started-at-no-digits",
+      "started_at": "not a date",
+      "assertions": [
+        {
+          "control": "PDF-03",
+          "control_version": "2026.09",
+          "family": "PDF",
+          "mode": "automated",
+          "outcome": "conformant",
+          "population": {
+            "applicable": 1,
+            "failed": 0
+          },
+          "rung": 2,
+          "severity": "medium",
+          "subject": "spiffe://corp/a",
+          "window": {
+            "end": "2026-08-29T00:00:00Z",
+            "start": "2026-05-01T00:00:00Z"
+          }
+        }
+      ],
+      "catalogs": []
+    },
+    {
+      "name": "pdf-empty-started-at",
+      "started_at": "",
+      "assertions": [],
+      "catalogs": []
     }
   ]
 }

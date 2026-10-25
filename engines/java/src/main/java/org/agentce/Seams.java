@@ -131,9 +131,10 @@ public final class Seams {
         }
 
         // report-formats is the same kind of test-only seam (18.16c, VG-REPORT-FORMAT-PARITY): for each
-        // report directory, it renders report.junit.xml, report.csv, oscal-ar.xml and public-statement.md
-        // from that directory's assertions.json, oscal-ar.json and manifest catalogs, the way Python's
-        // write_report does, into <out-root>/<index>/. `assess --emit` reaches them with 18.16b.
+        // report directory, it renders report.junit.xml, report.csv, oscal-ar.xml, public-statement.md and
+        // report.pdf from that directory's assertions.json, oscal-ar.json and manifest (catalogs, run.started_at,
+        // run.report_language), the way Python's write_report does, into <out-root>/<index>/. `assess --emit`
+        // reaches them with 18.16b.
         if ("report-formats".equals(command)) {
             if (args.length < 3) {
                 System.err.println("report-formats: <out-root> and at least one report directory are required");
@@ -144,8 +145,9 @@ public final class Seams {
                     Path source = Paths.get(args[index + 2]);
                     List<Assertions.Assertion> assertions = new ArrayList<>();
                     readFixture(source.resolve("assertions.json")).forEach(a -> assertions.add(Assertions.fromJson(a)));
+                    JsonNode manifest = readFixture(source.resolve("manifest.json"));
                     List<String> catalogs = new ArrayList<>();
-                    readFixture(source.resolve("manifest.json")).path("inputs").path("catalogs").forEach(
+                    manifest.path("inputs").path("catalogs").forEach(
                             c -> catalogs.add(c.path("id").asText() + "@" + c.path("version").asText()));
                     Path out = Paths.get(args[1], String.valueOf(index));
                     Files.createDirectories(out);
@@ -155,6 +157,9 @@ public final class Seams {
                             Report.renderOscalXml(readFixture(source.resolve("oscal-ar.json"))));
                     Files.writeString(out.resolve("public-statement.md"), Report.renderPublicStatement(
                             assertions, catalogs, Report.appliedDeviationIds(assertions)));
+                    Files.write(out.resolve("report.pdf"), Report.renderPdf(assertions, Assertions.aggregate(assertions),
+                            manifest.path("run").path("started_at").asText(),
+                            manifest.path("run").path("report_language").asText()));
                 }
             } catch (IOException e) {
                 System.err.println("report-formats: " + e.getMessage());
