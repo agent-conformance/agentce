@@ -2013,6 +2013,12 @@
           "file": "engines/typescript/src/report.ts",
           "search": "`rung ${bs.ladder_rung}: ${step}.",
           "replace": "`rung ${bs.ladder_rung} — ${step}."
+        },
+        {
+          "description": "two unpaired backticks in different paragraphs of README.md around a paragraph that says 'records prove it': CommonMark ends a code span at a paragraph break, so the site shows that paragraph, and the gate must read it (verdicts/P18-18.40b-ef6c31b5.md register candidate 1, 18.211)",
+          "file": "README.md",
+          "search": "**Status:** under development, not yet ready for use.",
+          "replace": "**Status:** under development, not yet ready for use. A stray ` tick.\n\nThe records prove it.\n\nAnother ` tick."
         }
       ],
       "fix_hint": "rewrite the line the failure names as its hint says (a comma, colon, full stop or parentheses for a dash; show, check or document for prove; behavior or speed for performance; name the formats); for a sweep line write the tagline from tools/locked_copy_check.py; for run_failed fix the command so it prints its usage or verdict"
