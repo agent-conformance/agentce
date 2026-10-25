@@ -27,7 +27,9 @@ refused, so the section's bounds are the ones a reader of the raw file sees.
 The First minute fails closed. A Question is one sentence that ends in its only "?" and holds no other
 ask. The section's raw source, whitespace collapsed, must be one of the texts in REVIEWED: a person reads a
 changed first minute for a second question and adds its new text there, so an ask in words no phrase list
-knows is refused too. A skill has one First minute heading.
+knows is refused too. A skill has one First minute heading. The whole file fails closed the same way: its
+raw source, whitespace collapsed, must hash to its digest in SKILL_FILES, so a second First minute heading
+or an ask anywhere else in the file, in any spelling, is refused until a person has read the file again.
 
 Stdout ends with `UX-ONE-QUESTION OK` when every check holds; each failure is one stderr line led by
 its stable key. `--self-test` runs the skill reader over built-in texts.
@@ -36,6 +38,7 @@ its stable key. `--self-test` runs the skill reader over built-in texts.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import pty
 import re
@@ -179,6 +182,24 @@ After that you may put one question to the person, in the terminal, and no other
 """,
     )
 )
+
+# Each approved skill's whole file as reviewed for a second question: path -> file_digest. A second First
+# minute heading or an ask outside the section was found by its spelling, and every spelling the gate did not
+# know passed (eight verifier FAILs on one premise), so the file fails closed: an edit anywhere in a skill is
+# refused until a person has read the file for any ask beyond its one Question and pasted its new digest here.
+SKILL_FILES = {
+    "skills/agentce-get-evidence/SKILL.md": "618a9d6f639405534f1175bbd08b88a1ddf07ec68799a6466b4e7f937695c536",
+    "skills/agentce-prepare-to-share/SKILL.md": "8388a32b224d6353126e58862ff1a70699703932de59ab773656301e469e693e",
+}
+
+
+def collapsed(text: str) -> str:
+    return " ".join(text.split())
+
+
+def file_digest(text: str) -> str:
+    """sha256 of a skill's raw source with every run of whitespace one space, so a reflow keeps its pin."""
+    return hashlib.sha256(collapsed(text).encode("utf-8")).hexdigest()
 
 
 def is_ask(line: str) -> bool:
@@ -394,7 +415,7 @@ def section_text(raw: list[str], start: int, end: int) -> str:
     """The section's raw source lines after its heading and before line `end`, whitespace collapsed: every
     character a reader of the file sees, including what no parsed block carries (a link reference
     definition, a fence's info string, an HTML comment)."""
-    return " ".join(" ".join(raw[start : end - 1]).split())
+    return collapsed(" ".join(raw[start : end - 1]))
 
 
 def question_shape(question: str) -> bool:
@@ -413,9 +434,18 @@ def read_skill(
     text: str,
     errors: list[str],
     reviewed: frozenset[str] | None = REVIEWED,
+    files: dict[str, str] | None = SKILL_FILES,
 ) -> int:
     """Check one SKILL.md's first minute; return how many questions it asks there. `reviewed` is the set of
-    section texts that pass (None skips that check, for the self-test of the other rules)."""
+    section texts that pass, and `files` maps each skill's path to its reviewed file_digest (None skips that
+    check, for the self-test of the other rules)."""
+    if files is not None and files.get(rel) != (digest := file_digest(text)):
+        errors.append(
+            f"ux.one_question.skill_file_unreviewed: {rel} is not a file the gate has reviewed for a second "
+            f"question (pinned {files.get(rel, 'none')}, now {digest}). Read the whole file for any ask "
+            f"beyond the First minute's one '{QUESTION}', then paste the new digest into SKILL_FILES in "
+            f"verification/gates/ux_one_question.py; it now reads: {collapsed(text)!r}"
+        )
     raw = split_lines(text)
     found = blocks(text)
     # A setext heading (text underlined with --- or ===) is a heading only to a CommonMark reader: an
@@ -1130,6 +1160,38 @@ REVIEWED_TEST: list[tuple[str, str, set[str]]] = (
     ]
 )
 
+# The whole file fails closed too: any edit outside the First minute, in any spelling, is refused until the
+# file is re-pinned (SKILL_FILES). These cases pin the fixture under demo/SKILL.md (fixture_files).
+FILE_TEST: list[tuple[str, str, set[str]]] = [
+    ("file: the pinned fixture", GOOD, set()),
+    (
+        "file: the fixture reflowed",
+        GOOD.replace("Intro.", "Intro.\n\n  ").replace(" and show", "\nand show"),
+        set(),
+    ),
+    (
+        "file: an ask under a heading before the section",
+        GOOD.replace(
+            "Intro.",
+            "Intro.\n\n## When to use\n\nGet the repository path from the person.",
+        ),
+        {"skill_file_unreviewed"},
+    ),
+    (
+        "file: a code-span First minute heading before the section",
+        GOOD.replace(
+            "## First minute",
+            "## `First minute`\n\nHave the person pick the catalogs.\n\n## First minute",
+        ),
+        {"skill_file_unreviewed"},
+    ),
+    (
+        "file: one word edited after the section",
+        GOOD.replace("one question at a time", "one question at any time"),
+        {"skill_file_unreviewed"},
+    ),
+]
+
 TERMINAL_CASES: list[tuple[str, bool]] = [
     ("Continue? ", True),
     ("Overwrite the output folder [y/N] ", True),
@@ -1151,11 +1213,26 @@ def fixture_reviewed() -> frozenset[str]:
 def self_test() -> int:
     failed = 0
     runs = 0
-    for reviewed, table in ((None, SELF_TEST), (fixture_reviewed(), REVIEWED_TEST)):
+    pinned = {"demo/SKILL.md": file_digest(GOOD)}
+    unpinned = [("file: a path with no pin", GOOD, {"skill_file_unreviewed"})]
+    cases: list[
+        tuple[
+            frozenset[str] | None,
+            dict[str, str] | None,
+            str,
+            list[tuple[str, str, set[str]]],
+        ]
+    ] = [
+        (None, None, "demo/SKILL.md", SELF_TEST),
+        (fixture_reviewed(), None, "demo/SKILL.md", REVIEWED_TEST),
+        (None, pinned, "demo/SKILL.md", FILE_TEST),
+        (None, pinned, "other/SKILL.md", unpinned),
+    ]
+    for reviewed, files, rel, table in cases:
         for name, text, want in table:
             runs += 1
             errors: list[str] = []
-            read_skill("demo/SKILL.md", text, errors, reviewed)
+            read_skill(rel, text, errors, reviewed, files)
             got = {e.split(":", 1)[0].removeprefix("ux.one_question.") for e in errors}
             if got != want:
                 failed += 1

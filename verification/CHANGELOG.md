@@ -3,6 +3,13 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.136.4
+
+- `VG-UX-ONE-QUESTION` (changed, 18.40a): each approved skill's whole file is pinned as reviewed text. Its raw source,
+  whitespace collapsed, must hash to its digest in the gate, so an added heading or ask anywhere in the file, in any
+  spelling, is refused with `skill_file_unreviewed` until a person reads the file again and pastes the new digest. A
+  new skill with no pin is refused too. New seeded fault: a loose ask under get-evidence's When to use heading.
+
 ## 0.136.3
 
 - `VG-REPORT-FORMAT-PARITY` (changed, 18.16d): also compares `report.pdf`. Python's real assess emits it, TypeScript's
