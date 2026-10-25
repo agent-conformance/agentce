@@ -167,7 +167,13 @@ def check_tier_layout(text: str, source: str) -> tuple[list[str], list[str]]:
             if not (own_lines and _TIER_LINE_RE.fullmatch(line.text))
         ]
         joined = " ".join(line.text for line in other)
-        if other and _TIER_MENTION_RE.search(_plain(joined)):
+        # The source with markup stripped catches a claim in a code span (blanked in the visible
+        # text); the visible text catches one whose word or count is a link or sits beside an image.
+        numbers = {line.number for line in other}
+        shown = " ".join(line.text for line in block.visible if line.number in numbers)
+        if other and any(
+            _TIER_MENTION_RE.search(_plain(text)) for text in (joined, shown)
+        ):
             problems.append(
                 f"ingest.matrix.tier_line_unreadable: {source} line {other[0].number} holds a tier line "
                 f"the gate cannot read: {joined!r}. Write it as **<Tier>** (<count>): <names> at the "
@@ -1026,6 +1032,11 @@ def self_test() -> int:
         "escaped emphasis in a block quote": "> \\*\\*Experimental\\*\\* (1): Honeycomb.",
         "a claim split over a list item's continuation": "- We also list **Experimental**\n  (1): Honeycomb.",
         "a claim split in a quote in a list item": "- > We also list **Experimental**\n  > (1): Honeycomb.",
+        "a linked tier word": "We also list [**Experimental**](docs/x.md) (1): Honeycomb.",
+        "a reference-linked tier word": "We also list [**Experimental**][r] (1): Honeycomb.\n\n[r]: docs/x.md",
+        "a shortcut-reference tier word": "We also list [Experimental] (1): Honeycomb.\n\n[Experimental]: docs/x.md",
+        "a linked count": "We also list **Experimental** [(1)](docs/x.md): Honeycomb.",
+        "an image between the word and the count": "We also list Experimental![](x.png) (1): Honeycomb.",
     }.items():
         cases.append(
             (

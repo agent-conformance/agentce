@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.135.2",
+  "suite_version": "0.135.3",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -973,6 +973,12 @@
           "file": "website/src/content/docs/docs/trace-store-connectors.md",
           "search": "title: Trace-Store Connectors\n",
           "replace": "title: Trace-Store Connectors\n----\n\n| Backend | Tier | Reader follows | Build item |\n|---|---|---|---|\n| Honeycomb | Supported | x | y |\n\n"
+        },
+        {
+          "description": "README gains a sentence whose tier word is a link, 'We also list [**Experimental**](docs/x.md) (1): Honeycomb.'; the site shows it as an Experimental claim for a source the matrix does not list (18.39c, verdicts/P18-18.39c-88c0b0de.md)",
+          "file": "README.md",
+          "search": "**Roadmap** (4): ",
+          "replace": "We also list [**Experimental**](docs/x.md) (1): Honeycomb.\n\n**Roadmap** (4): "
         }
       ],
       "fix_hint": "Run verification/gates/ingest_support_matrix.sh; it names the exact message key (ingest.matrix.unknown_source, .wrong_tier, .count_mismatch, .count_arithmetic, .missing_tier_line, .docs_wrong_tier, .docs_unknown_source, .docs_malformed_row, .docs_unrecognized_tier, .docs_definition_drift, .docs_table_missing, .tier_line_unreadable, .tier_line_wrapped, .docs_follows_unreadable, .docs_definition_missing or .docs_header_unreadable) and the offending name."

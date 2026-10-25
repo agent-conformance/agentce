@@ -3,6 +3,13 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.135.3
+
+- `VG-INGEST-SUPPORT-MATRIX` (changed, 18.39c): a tier claim whose tier word or count is a link, or that has an
+  image between the word and the count, is refused with `ingest.matrix.tier_line_unreadable`. The gate now searches
+  the text the page shows (link syntax dropped) as well as the source with its markup stripped, which still catches a
+  claim in a code span. New seeded fault: a README sentence whose tier word links elsewhere, naming Honeycomb.
+
 ## 0.135.2
 
 - `VG-INGEST-SUPPORT-MATRIX` (changed, 18.39c): the self-test pins a tier claim in every CommonMark container shape
