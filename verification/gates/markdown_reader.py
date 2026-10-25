@@ -41,14 +41,30 @@ from pathlib import Path
 
 try:
     from markdown_it import MarkdownIt
+    from markdown_it.common import html_re
     from markdown_it.token import Token
 
     # the module, not the function markdown_it.rules_block re-exports under the same name
     _table_rule = importlib.import_module("markdown_it.rules_block.table")
+    # CommonMark 6.6 raw inline HTML, the parser's own shapes unanchored: a tag, comment, processing
+    # instruction, declaration or CDATA section; any other text between a '<' and a '>' shows on the page
+    INLINE_HTML = re.compile(
+        "|".join(
+            (
+                html_re.open_tag,
+                html_re.close_tag,
+                html_re.comment,
+                html_re.processing,
+                html_re.declaration,
+                html_re.cdata,
+            )
+        )
+    )
 except (
     ImportError
 ):  # run directly outside the tools environment: need_parser() re-runs in it
     MarkdownIt = None  # type: ignore[assignment,misc]
+    INLINE_HTML = re.compile(r"(?!)")  # matches nothing until need_parser() re-runs
 
 _RERUN = "AGENTCE_MARKDOWN_READER_RERUN"
 LINE_ENDING = re.compile(r"\r\n|\r|\n")

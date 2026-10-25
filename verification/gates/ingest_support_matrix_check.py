@@ -23,7 +23,15 @@ import sys
 from pathlib import Path
 
 import yaml
-from markdown_reader import Block, Line, blocks, front_matter, need_parser, split_lines
+from markdown_reader import (
+    INLINE_HTML,
+    Block,
+    Line,
+    blocks,
+    front_matter,
+    need_parser,
+    split_lines,
+)
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -40,21 +48,6 @@ _TIER_MENTION_RE = re.compile(
 )
 _ESCAPE_RE = re.compile(r"\\(.)")
 _MARKUP_RE = re.compile(r"[*_`~]")
-# CommonMark 0.31.2 section 6.6 raw HTML: an open or closing tag, a comment, a processing instruction, a
-# declaration or a CDATA section. Anything else between a '<' and a '>' is text the page shows (18.39c).
-_ATTRIBUTE = (
-    r"\s+[A-Za-z_:][A-Za-z0-9_.:-]*"
-    r"(?:\s*=\s*(?:[^\s\"'=<>`]+|'[^']*'|\"[^\"]*\"))?"
-)
-_INLINE_HTML_RE = re.compile(
-    rf"<[A-Za-z][A-Za-z0-9-]*(?:{_ATTRIBUTE})*\s*/?>"
-    r"|</[A-Za-z][A-Za-z0-9-]*\s*>"
-    r"|<!-->|<!--->|<!--.*?-->"
-    r"|<\?.*?\?>"
-    r"|<![A-Za-z][^>]*>"
-    r"|<!\[CDATA\[.*?\]\]>",
-    re.DOTALL,
-)
 _INVISIBLE_RE = re.compile(r"[\u00ad\u200b-\u200f\u2060-\u2064\ufeff]")
 
 
@@ -70,7 +63,7 @@ def _split_cells(line: str) -> list[str]:
 
 
 def _header_key(text: str) -> str:
-    return " ".join(_plain(text).split()).casefold()
+    return " ".join(_plain(INLINE_HTML.sub("", text)).split()).casefold()
 
 
 def _is_table_header(line: str) -> bool:
@@ -148,13 +141,11 @@ def parse_tier_line(names_text: str) -> tuple[list[str], int | None]:
     return tokens, more
 
 
-def _plain(line: str, *, tags: bool = True) -> str:
+def _plain(line: str) -> str:
     """The line with entities decoded, invisible characters dropped and emphasis and code-span markup
-    removed, so a tier claim is found however it is spelled; with ``tags``, raw inline HTML (CommonMark
-    6.6 shapes only) is removed first. Text a reader already sees is read with ``tags=False``: its inline
-    HTML is blanked, and what is left between a '<' and a '>' is on the page."""
-    if tags:
-        line = _INLINE_HTML_RE.sub("", line)
+    removed, so a tier claim is found however it is spelled. A caller reading source removes its raw
+    inline HTML first (markdown_reader.INLINE_HTML); text a reader already sees has it blanked, and what
+    is left there between a '<' and a '>' is on the page."""
     unescaped = _ESCAPE_RE.sub(r"\1", html.unescape(line))
     return _MARKUP_RE.sub("", _INVISIBLE_RE.sub("", unescaped))
 
@@ -198,8 +189,8 @@ def check_tier_layout(text: str, source: str) -> tuple[list[str], list[str]]:
         numbers = {line.number for line in other}
         shown = " ".join(line.text for line in block.visible if line.number in numbers)
         if other and (
-            _TIER_MENTION_RE.search(_plain(joined))
-            or _TIER_MENTION_RE.search(_plain(shown, tags=False))
+            _TIER_MENTION_RE.search(_plain(INLINE_HTML.sub("", joined)))
+            or _TIER_MENTION_RE.search(_plain(shown))
         ):
             problems.append(
                 f"ingest.matrix.tier_line_unreadable: {source} line {other[0].number} holds a tier line "
