@@ -3,6 +3,14 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.135.10
+
+- `VG-DEVIATIONS-PARITY` (changed, 18.87): profiles whose observation_window start or end is not an RFC 3339 date or
+  date-time, or whose window is not a mapping, are refused with input.profile_invalid in all three engines; an unquoted
+  or date-only window still reads as before; a bundle whose record time does not parse, with no declared window, refuses
+  the register with input.deviation_invalid, since no expiry can be checked. Two new seeded faults: TypeScript's
+  checkWindow never tests a bound, and Java's deviationLint accepts an unreadable window end.
+
 ## 0.135.9
 
 - `VG-INGEST-SUPPORT-MATRIX` (changed, 18.39c): README's tier-claim search also reads the source as written, so

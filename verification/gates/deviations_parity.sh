@@ -56,6 +56,30 @@ sed 's/rationale: "Accepted pending remediation./rationale: "Accepted \\ud800 pe
 
 base=(--bundle "$F/evidence" --profile "$F/applicability.yaml" --domain "$F/domain.linkml.yaml"
   --catalog-dir "$F/catalog" --allow-unverified-catalog)
+# 18.87: profiles whose observation window changes one value (W*), and bundles whose one record time does not parse
+# with no declared window (WT*): refused, never an expired deviation applied, or read as before.
+win() { # win <name> <yaml for the observation_window line(s)>
+  python3 -c 'import re,sys; print(re.sub(r"observation_window:\n  start: .*\n  end: .*\n", "observation_window:" + sys.argv[2] + "\n", open(sys.argv[1]).read()), end="")' \
+    "$F/applicability.yaml" "$2" > "$regs/$1.yaml"
+}
+win wfoo $'\n  start: "2026-01-01T00:00:00Z"\n  end: "foo"'
+win wfeb $'\n  start: "2026-01-01T00:00:00Z"\n  end: "2026-02-30"'
+win wfebu $'\n  start: "2026-01-01T00:00:00Z"\n  end: 2026-02-30'
+win wnull $'\n  start: "2026-01-01T00:00:00Z"\n  end: null'
+win w24 $'\n  start: "2026-01-01T00:00:00Z"\n  end: "2026-02-01T24:00:00Z"'
+win wstart $'\n  start: "foo"\n  end: "2026-02-01T00:00:00Z"'
+win wscalar ' "2026"'
+win wdateu $'\n  start: 2026-01-01\n  end: 2026-02-01'
+win wdtu $'\n  start: 2026-01-01T00:00:00Z\n  end: 2026-02-01T10:00:00Z'
+win wdate $'\n  start: "2026-01-01"\n  end: "2026-02-01"'
+sed '/^observation_window:/,+2d' "$F/applicability.yaml" > "$regs/wnone.yaml"
+win wempty ' {}'
+for t in zzzz 2026-02-30T00:00:00Z; do
+  mkdir -p "$regs/bt-$t/events"
+  sed "s|\"time\":\"[^\"]*\"|\"time\":\"$t\"|" "$F/evidence/events/subject.jsonl" > "$regs/bt-$t/events/subject.jsonl"
+  python3 -c 'import hashlib,sys; d=hashlib.sha256(open(sys.argv[2],"rb").read()).hexdigest(); m=open(sys.argv[1]).read(); import re; print(re.sub(r"[0-9a-f]{64}", d, m, count=1), end="")' \
+    "$F/evidence/manifest.json" "$regs/bt-$t/events/subject.jsonl" > "$regs/bt-$t/manifest.json"
+done
 two=(--bundle "$P/evidence" --profile "$P/applicability.yaml" --domain "$P/domain.linkml.yaml"
   --catalog-dir "$P/catalog" --allow-unverified-catalog)
 
@@ -116,6 +140,16 @@ scenario S26 --bundle "$H/approval/bundle" --profile "$H/approval/applicability.
 scenario S27 --bundle "$H/repeat/bundle" --profile "$H/repeat/applicability.yaml" \
   --domain "$H/approval/domain.linkml.yaml" --catalog-dir "$H/repeat/catalog" --allow-unverified-catalog \
   --deviations "$H/repeat/deviations.yaml"
+for w in wfoo wfeb wfebu wnull w24 wstart wscalar wdateu wdtu wdate; do
+  scenario "W-$w" --bundle "$F/evidence" --profile "$regs/$w.yaml" --domain "$F/domain.linkml.yaml" \
+    --catalog-dir "$F/catalog" --allow-unverified-catalog --deviations "$F/deviations.yaml"
+done
+for t in zzzz 2026-02-30T00:00:00Z; do
+  for w in wnone wempty; do
+    scenario "WT-$t-$w" --bundle "$regs/bt-$t" --profile "$regs/$w.yaml" --domain "$F/domain.linkml.yaml" \
+      --catalog-dir "$F/catalog" --allow-unverified-catalog --deviations "$F/deviations.yaml"
+  done
+done
 scenario S23 --bundle "$F/evidence" --deviations --profile "$F/applicability.yaml" \
   --domain "$F/domain.linkml.yaml" --catalog-dir "$F/catalog" --allow-unverified-catalog
 
@@ -192,7 +226,12 @@ PREFIX = {
 }
 REFUSALS = ["S2", "S2D", "S3", "S4", "S5", "S6", "S6D", "S7", "S8", "S9", "S12", "S17", "S18", "S19", "S20", "S21", "S22", "S22b",
             "S28", "R28"]
-SUCCESSES = ["S0", "S1", "S10", "S11", "S13", "S14", "S15"]
+# 18.87: a window bound that is not an RFC 3339 date or date-time, or a window that is not a mapping, is a profile refusal;
+# a window end taken from records whose time does not parse refuses the register (no expiry can be checked).
+WINDOW_REFUSALS = ["W-wfoo", "W-wfeb", "W-wfebu", "W-wnull", "W-w24", "W-wstart", "W-wscalar"]
+TIME_REFUSALS = [f"WT-{t}-{w}" for t in ("zzzz", "2026-02-30T00:00:00Z") for w in ("wnone", "wempty")]
+REFUSALS += WINDOW_REFUSALS + TIME_REFUSALS
+SUCCESSES = ["S0", "S1", "S10", "S11", "S13", "S14", "S15", "W-wdateu", "W-wdtu", "W-wdate"]
 FILES = ("assertions.json", "oscal-ar.json", "activity.json", "blind-spots.json")
 # SPEC §10.4: the register cannot waive the human-actor rule. Per scenario, the controls whose entry is not applied
 # (non-conformant, no deviation, one limitation each) and the ones it still waives (partial, the control's id).
@@ -261,6 +300,18 @@ for s in ("S28", "R28"):
     check(e["key"] == "input.deviation_invalid" and "outside the YAML profile: surrogate_escape at line 9 (SPEC 8.7)."
           in (e["cause"] or "") and e["fix"] == "write the character itself instead of escaping a surrogate.",
           f"{s}: python refused with {e}")
+
+for s in WINDOW_REFUSALS:
+    e = error("python", s)
+    check(e["key"] == "input.profile_invalid" and "has an observation_window" in (e["cause"] or ""),
+          f"{s}: python refused with {e}")
+for s in TIME_REFUSALS:
+    e = error("python", s)
+    check(e["key"] == "input.deviation_invalid" and "the observation window end is not a valid RFC 3339 date"
+          in (e["cause"] or ""), f"{s}: python refused with {e}")
+# A readable window keeps AUV-02's expired deviation unapplied: the fixture's own exit 1.
+for s in ("W-wdateu", "W-wdtu", "W-wdate"):
+    check(code("python", s) == 1, f"{s}: python exited {code('python', s)}, not 1")
 
 for s in ("S16", "S23"):
     for engine in ENGINES:
