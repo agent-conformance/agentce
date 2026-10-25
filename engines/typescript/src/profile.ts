@@ -8,8 +8,9 @@
  * carry more than one engine version reads. This is a faithful port of the Python reference.
  */
 
-import { isPyyamlTimestamp, loadPyyaml, pythonizeTimestamp } from "./readiness";
-import { pyStr } from "./util";
+import { InputError } from "./errors";
+import { isPyyamlTimestamp, loadPyyaml, parseDate, pythonizeTimestamp } from "./readiness";
+import { normalizePosixPath, pyRepr, pyStr } from "./util";
 
 export interface EvidenceSource {
   adapter: string;
@@ -135,5 +136,37 @@ export function loadProfile(path: string): Profile {
   if (!isRecord(data)) {
     return { profileVersion: 1, observationWindow: {}, subjects: [], catalogs: [] };
   }
+  checkWindow(data, path);
   return profileFromDict(data);
+}
+
+const WINDOW_FIX =
+  'write observation_window as start and end date-times, such as start: "2026-01-01T00:00:00Z" ' +
+  'and end: "2026-02-01T00:00:00Z".';
+
+/** Python's `_check_window` (18.87): refuse a declared observation window that is not a mapping, or
+ * whose `start` or `end` is not an RFC 3339 date or date-time ({@link parseDate}'s grammar), since the
+ * window end is what deviation expiries are checked against. An absent window or bound is allowed. */
+function checkWindow(data: Record<string, unknown>, path: string): void {
+  if (!("observation_window" in data)) {
+    return;
+  }
+  const window = data.observation_window;
+  const shown = `the applicability profile at ${pyRepr(normalizePosixPath(path))}`;
+  if (!isRecord(window)) {
+    throw new InputError(
+      "input.profile_invalid",
+      `${shown} has an observation_window that is not a mapping of start and end.`,
+      WINDOW_FIX,
+    );
+  }
+  for (const bound of ["start", "end"]) {
+    if (bound in window && parseDate(text(window[bound])) === null) {
+      throw new InputError(
+        "input.profile_invalid",
+        `${shown} has an observation_window ${bound} that is not an RFC 3339 date or date-time.`,
+        WINDOW_FIX,
+      );
+    }
+  }
 }

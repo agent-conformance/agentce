@@ -1195,6 +1195,12 @@ export function deviationLint(
   const problems: string[] = [];
   const seenControls = new Set<string>();
   const asOfDate = asOf !== null ? parseDate(asOf) : null;
+  if (deviations.length > 0 && asOf !== null && asOfDate === null) {
+    // Fail closed (18.87): with no readable window end, no expiry can be checked, so no entry may apply.
+    problems.push(
+      `the observation window end is not a valid RFC 3339 date (${pyRepr(asOf)}), so no expiry can be checked`,
+    );
+  }
   for (const deviation of deviations) {
     const control = pyStr(pyGet(deviation, "control", ""));
     if (seenControls.has(control)) {

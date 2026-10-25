@@ -449,6 +449,11 @@ def deviation_lint(
     problems: list[str] = []
     seen_controls: set[str] = set()
     as_of_date = parse_date(as_of) if as_of is not None else None
+    if deviations and as_of is not None and as_of_date is None:
+        # Fail closed (18.87): with no readable window end, no expiry can be checked, so no entry may apply.
+        problems.append(
+            f"the observation window end is not a valid RFC 3339 date ({as_of!r}), so no expiry can be checked"
+        )
     for deviation in deviations:
         control = str(deviation.get("control", ""))
         if control in seen_controls:

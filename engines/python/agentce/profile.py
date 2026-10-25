@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .errors import InputError
 from .safe_yaml import load_untrusted_yaml
 
 
@@ -84,7 +85,42 @@ class Profile:
         )
         if not isinstance(data, dict):
             return cls()
+        _check_window(data, path)
         return cls.from_dict(data)
+
+
+def _check_window(data: dict[str, Any], path: Path) -> None:
+    """Refuse a declared observation window that is not a mapping, or whose ``start`` or ``end`` is not
+    an RFC 3339 date or date-time (``parse_date``'s grammar, the one deviation dates use): the window end
+    is the date deviation expiries are checked against, so an unreadable one would apply an expired
+    deviation (18.87). An absent window, or an absent bound, still falls back to the records' times."""
+    from .readiness import (
+        parse_date,
+    )  # readiness imports coverage, which imports this module
+
+    if "observation_window" not in data:
+        return
+    window = data["observation_window"]
+    shown = f"the applicability profile at {str(path)!r}"
+    if not isinstance(window, dict):
+        raise InputError(
+            "input.profile_invalid",
+            f"{shown} has an observation_window that is not a mapping of start and end.",
+            _WINDOW_FIX,
+        )
+    for bound in ("start", "end"):
+        if bound in window and parse_date(str(window[bound])) is None:
+            raise InputError(
+                "input.profile_invalid",
+                f"{shown} has an observation_window {bound} that is not an RFC 3339 date or date-time.",
+                _WINDOW_FIX,
+            )
+
+
+_WINDOW_FIX = (
+    'write observation_window as start and end date-times, such as start: "2026-01-01T00:00:00Z" '
+    'and end: "2026-02-01T00:00:00Z".'
+)
 
 
 def _str_map(value: object) -> dict[str, str]:

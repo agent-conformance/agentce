@@ -1166,6 +1166,11 @@ public final class Readiness {
         List<String> problems = new ArrayList<>();
         Set<String> seenControls = new LinkedHashSet<>();
         CalendarDate asOfDate = asOf != null ? parseDate(asOf) : null;
+        if (!deviations.isEmpty() && asOf != null && asOfDate == null) {
+            // Fail closed (18.87): with no readable window end, no expiry can be checked, so no entry may apply.
+            problems.add("the observation window end is not a valid RFC 3339 date (" + pyRepr(asOf)
+                    + "), so no expiry can be checked");
+        }
         for (JsonNode deviation : deviations) {
             String control = pyStr(pyGet(deviation, "control", Json.nodes().textNode("")));
             if (seenControls.contains(control)) {

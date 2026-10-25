@@ -139,6 +139,38 @@ public final class Profile {
         if (data == null || !data.isObject()) {
             return new Profile();
         }
+        checkWindow(data, path);
         return fromDict(data);
+    }
+
+    private static final String WINDOW_FIX =
+            "write observation_window as start and end date-times, such as start: \"2026-01-01T00:00:00Z\" "
+                    + "and end: \"2026-02-01T00:00:00Z\".";
+
+    /** Python's {@code _check_window} (18.87): refuse a declared observation window that is not a mapping, or
+     * whose {@code start} or {@code end} is not an RFC 3339 date or date-time ({@link Readiness#parseDate}'s
+     * grammar), since the window end is what deviation expiries are checked against. An absent window or
+     * bound is allowed. The bound is read as {@link #strMap} reads it (an unquoted YAML date is its Python text). */
+    private static void checkWindow(JsonNode data, Path path) {
+        if (!data.has("observation_window")) {
+            return;
+        }
+        JsonNode window = data.get("observation_window");
+        String shown = "the applicability profile at " + Readiness.pyRepr(Diff.normalizePosixPath(path.toString()));
+        if (!window.isObject()) {
+            throw new InputError(
+                    "input.profile_invalid",
+                    shown + " has an observation_window that is not a mapping of start and end.",
+                    WINDOW_FIX);
+        }
+        for (String bound : new String[] {"start", "end"}) {
+            JsonNode value = window.get(bound);
+            if (value != null && Readiness.parseDate(value.asText()) == null) {
+                throw new InputError(
+                        "input.profile_invalid",
+                        shown + " has an observation_window " + bound + " that is not an RFC 3339 date or date-time.",
+                        WINDOW_FIX);
+            }
+        }
     }
 }
