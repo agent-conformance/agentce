@@ -37,7 +37,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from markdown_reader import blocks, split_lines
+from markdown_reader import Block, blocks, split_lines
 
 ROOT = Path(__file__).resolve().parents[2]
 TRACE_FIXTURE = (
@@ -237,6 +237,11 @@ def cli_leg(errors: list[str]) -> int:
     return asked
 
 
+def atx(block: Block) -> str:
+    """A heading block as its ATX form, `## words`."""
+    return "#" * block.level + " " + " ".join(line.text for line in block.lines)
+
+
 def prose(text: str) -> list[tuple[int, str]]:
     """(1-based line number, text) for every line outside the front matter and fenced code, read as
     CommonMark blocks (markdown_reader): a heading as its ATX form, a paragraph's lines without their
@@ -246,8 +251,7 @@ def prose(text: str) -> list[tuple[int, str]]:
         if block.kind == "fence":
             continue
         if block.kind == "heading":
-            words = " ".join(line.text for line in block.lines)
-            out.append((block.start, "#" * block.level + " " + words))
+            out.append((block.start, atx(block)))
         else:
             out += [(line.number, line.text) for line in block.text_lines]
     return out
@@ -258,9 +262,7 @@ def section_headings(text: str) -> dict[int, str]:
     these bound a section: a heading inside a quote or a list item, or a heading-shaped line of indented
     code, is part of the section it sits in."""
     return {
-        block.start: "#" * block.level
-        + " "
-        + " ".join(line.text for line in block.lines)
+        block.start: atx(block)
         for block in blocks(text)
         if block.kind == "heading" and not block.containers
     }
