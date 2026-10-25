@@ -18,7 +18,7 @@ metadata:
 
 Prepare an AI-agent deployment so it produces **canonical AgentCE evidence** and its bundle passes
 `agentce validate` and `agentce assess` with the minimum evidence for the target controls. This skill
-adds capture, correlation, and declarations only — it never changes what the agent decides or does
+adds capture, correlation, and declarations only. It never changes what the agent decides or does
 (S-6), and it never fabricates evidence (S-1).
 
 ## First minute
@@ -52,7 +52,7 @@ After that you may put one question to the person, in the terminal, and no other
 | S-6 | Behaviour preservation: if capture would change behaviour, stop and report. |
 | S-7 | Provenance: every run appends to `agentce/skill-log.jsonl`. |
 | S-8 | Human confirmation: Annex III classification, decision typing, oversight, and deviations are `confirmed_by` a named person. |
-| S-9 | Content minimisation: record hashes, locations, and counts — never prompt/tool content, personal data, or secrets. |
+| S-9 | Content minimisation: record hashes, locations, and counts, never prompt/tool content, personal data, or secrets. |
 | S-10 | Signed, pinned distribution: install by commit-pinned reference. |
 
 ## Quick path
@@ -60,7 +60,7 @@ After that you may put one question to the person, in the terminal, and no other
 No repository access yet, or just want a first read? `agentce assess <folder of OTel GenAI /
 OpenInference trace exports>` needs no catalog choice and no declaration: it derives an evidence
 bundle and a profile from the records alone and reports `insufficient_evidence` for every control it
-cannot yet verify (never `not_applicable` — the records-only path makes no claim about what is out of
+cannot yet verify (never `not_applicable`, because the records-only path makes no claim about what is out of
 scope). The `blind_spots.json` it writes names the one record type most worth adding next. Read
 `references/quick-path.md` before relying on this path for anything past a first look: most of
 baseline@2026.09's controls need a declared decision type, an incident record, or consequential-tagged
@@ -69,24 +69,24 @@ anything past that first read.
 
 ## Phases
 
-**A — Declare** (`references/declare.md`). After the first findings, ask for anything missing
+**A: Declare** (`references/declare.md`). After the first findings, ask for anything missing
 (repository path, environments, which enforcement points exist and where their exports land, intended
 purpose and affected parties per subject, target catalogs, content-capture policy), one question at a
 time. Never guess these. Enumerate subjects and decision types; draft the Annex III
-classification (`references/annex-iii-classification.md`, `classification_status: draft_for_legal_review`
-— a named reviewer confirms, never this skill); draft `agentce/domain.linkml.yaml` and validate it with
+classification (`references/annex-iii-classification.md`, `classification_status: draft_for_legal_review`;
+a named reviewer confirms, never this skill); draft `agentce/domain.linkml.yaml` and validate it with
 `linkml_validate`; collect reference snapshots; write `agentce/applicability.yaml` from
 `assets/applicability.template.yaml` and run `lint_profile` until clean.
 
-**B — Instrument** (`references/instrument.md`, the maintained home of the SPEC §13.1 prompt). Run
+**B: Instrument** (`references/instrument.md`, the maintained home of the SPEC §13.1 prompt). Run
 `find_chokepoints --repo . --json` and complete the inventory by reading low-confidence sites. Prefer
 enforcement-point evidence (route tool, authorization, and credential calls through a gateway/policy
 engine and record its request id) over agent-side logging. Enable the framework's OpenTelemetry GenAI
-instrumentation, propagate W3C Trace Context, add the emitter, and emit the §13.1 events — hashed
+instrumentation, propagate W3C Trace Context, add the emitter, and emit the §13.1 events: hashed
 content, deterministic ids, source timestamps, `self_report` for all agent-side emission. Record every
 un-hookable chokepoint in `docs/agentce/gaps.md` (S-1: never simulate it).
 
-**C — Validate and iterate** (`references/validate-iterate.md`). Run `bundle_preflight --bundle <b>
+**C: Validate and iterate** (`references/validate-iterate.md`). Run `bundle_preflight --bundle <b>
 --profile agentce/applicability.yaml`; run `agentce assess` (never touch its outputs);
 `explain_insufficient --assertions <report>/assertions.json --support-matrices <adapters> [--catalogs <dir>]` groups
 every `insufficient_evidence` outcome by root cause and names the adapter that could supply the missing
@@ -101,19 +101,19 @@ unchanged; `lint_profile` clean; the skill log complete.
 
 `references/trust-classes.md` is the guide. Agent-side spans and logs are `self_report`. Only a system
 that could have prevented the action is an `enforcement_point`; only records the agent's delegation
-chain cannot transition are `independent_system`. `lint_profile` rejects a known self-report pattern —
-a framework interrupt, an SDK tracing processor, an in-process approval prompt, an agent-written log —
+chain cannot transition are `independent_system`. `lint_profile` rejects a known self-report pattern
+(a framework interrupt, an SDK tracing processor, an in-process approval prompt, an agent-written log)
 declared as anything else.
 
 ## Scripts (`scripts/`, each `--json`, exit 0 ok / 1 findings / 2 input error / 3 version mismatch)
 
-- `find_chokepoints.py --repo <path>` — inventory chokepoints (incl. instruction-entry and refusal).
-- `lint_profile.py --profile <file> [--domain <binding>]` (`--self-test`) — the profile rules above; with the
+- `find_chokepoints.py --repo <path>`: inventory chokepoints (incl. instruction-entry and refusal).
+- `lint_profile.py --profile <file> [--domain <binding>]` (`--self-test`): the profile rules above; with the
   Conduct overlay selected, pass the domain binding so the lint can check its task scopes.
-- `linkml_validate.py --events <jsonl> | --profile <file>` — validate against the generated schemas.
-- `bundle_preflight.py --bundle <dir> [--profile <file>]` — quarantines, per-source counts, trust-class
+- `linkml_validate.py --events <jsonl> | --profile <file>`: validate against the generated schemas.
+- `bundle_preflight.py --bundle <dir> [--profile <file>]`: quarantines, per-source counts, trust-class
   consistency, dangling refs (read-only).
-- `explain_insufficient.py --assertions <file> --support-matrices <adapters> [--catalogs <dir>]` — explain and group.
+- `explain_insufficient.py --assertions <file> --support-matrices <adapters> [--catalogs <dir>]`: explain and group.
 
 ## Assets
 

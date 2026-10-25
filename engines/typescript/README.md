@@ -1,6 +1,6 @@
 # @agent-conformance/cli
 
-TypeScript/Node implementation of the **Agent Conformance Engine (AgentCE)** — a deterministic engine that evaluates the evidence an AI-agent deployment produces against executable control catalogs and emits a conformance report.
+TypeScript/Node implementation of the **Agent Conformance Engine (AgentCE)**, a deterministic engine that evaluates the evidence an AI-agent deployment produces against executable control catalogs and emits a conformance report.
 
 The command-line tool implements `conformance run` (the conformance suite; with `--adapters <dir>` it also runs the adapters' own conformance through `uv`, as the Python engine does), `assess`, `validate`, `report` (including `report --validate`, schema validation of the report artifacts), `quickstart`, and `--version`.
 

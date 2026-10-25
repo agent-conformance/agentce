@@ -1,6 +1,6 @@
 # AgentCE agent skills
 
-The approved skill set (SPEC §13.3). Skills sit on the two edges of the engine — inputs and outputs —
+The approved skill set (SPEC §13.3). Skills sit on the two edges of the engine (inputs and outputs)
 and are **never in the evaluation path** (§13.3.1). The engine's guarantees (HR-1/HR-2, no learned
 component) are its own; these rules keep a skill from compromising them from either side.
 
@@ -34,7 +34,7 @@ it was written against; a mismatch stops the skill.
 
 Each skill folder is **one-command installable on its own**, severed from this monorepo: copy the
 folder anywhere (a zip, an assistant's skill directory, a registry checkout) and run its self-test
-directly, with no sibling `engines/` checkout beside it —
+directly, with no sibling `engines/` checkout beside it:
 
 ```sh
 uv run --frozen python3 scripts/lint_profile.py --self-test --json   # agentce-get-evidence
@@ -51,12 +51,12 @@ each skill.
 change, and committing it every time made each one another CI run for no reason. `.gitignore` excludes
 both paths; CI runs `tools/vendor_skill_engine.py --write` itself before testing either skill, so the
 standalone self-tests above still exercise a real, freshly built wheel on every run. The sync test still
-proves each skill bundles the engine it was tested with, just without a commit recording it.
+checks that each skill bundles the engine it was tested with, just without a commit recording it.
 
 **A release commit is different, and it is cut off-branch.** As the last step of cutting a release, in a
-throwaway `git worktree` detached from `HEAD` -- never on `main` or a phase branch, so the wheel and lock
+throwaway `git worktree` detached from `HEAD` (never on `main` or a phase branch, so the wheel and lock
 never re-enter that branch's tracked history and every later phase commit on the branch stays clean under
-"`vendor/*.whl` and `uv.lock` are not committed" above -- run `vendor_skill_engine.py --release`, tag the
+"`vendor/*.whl` and `uv.lock` are not committed" above), run `vendor_skill_engine.py --release`, tag the
 worktree's commit, push the tag, then remove the worktree:
 
 ```sh
@@ -71,16 +71,16 @@ git worktree remove --force /tmp/agentce-release
 
 `--release` is the one piece of code that cuts a release commit: it runs `--write`, refuses to commit if
 that leaves any tracked file other than the gitignored wheel and lock dirty (`--write` must find each
-skill's `pyproject.toml` already in sync with the engine version being released -- it is, if every engine
+skill's `pyproject.toml` already in sync with the engine version being released; it is, if every engine
 change was committed through the normal phase-commit process; if it isn't, `--write` leaves
 `pyproject.toml` modified on disk and `--release` refuses, so a stale, uncommitted source line can never
-ship inside the release commit next to an in-sync wheel -- commit that `pyproject.toml` fix as its own
+ship inside the release commit next to an in-sync wheel; commit that `pyproject.toml` fix as its own
 normal phase commit first, then cut the release again), then force-adds and commits `uv.lock` and
 `vendor/*.whl` for both skills by name (`.gitignore` makes a plain `git add -A` silently skip them).
 
 That release commit carries `vendor/*.whl` and `uv.lock` for both skills, so a commit-pinned checkout of
 the tag it carries keeps working exactly as documented above: one command, standalone, offline.
-`tools/skill_release_shape_check.py` proves it, running this exact `--release` command rather than a
+`tools/skill_release_shape_check.py` checks it by running this exact `--release` command rather than a
 second copy of its logic, in a throwaway worktree built from the commit under test. `--release` is itself
 idempotent: on an ordinary phase commit it cuts a release commit on top; on a commit that already is a
 release commit (the ordinary case once a release has been cut) it finds nothing left to stage and

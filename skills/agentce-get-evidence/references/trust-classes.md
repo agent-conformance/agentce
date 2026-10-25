@@ -1,8 +1,8 @@
 # Trust classes, honestly
 
 The single most consequential judgement in onboarding is the **trust class** of each evidence source
-(SPEC §6.4). Getting it wrong — usually by flattering an agent's self-report into an enforcement point
-— is the failure this skill guards against hardest (rule S-2).
+(SPEC §6.4). Getting it wrong (usually by flattering an agent's self-report into an enforcement point)
+is the failure this skill guards against hardest (rule S-2).
 
 | Class | Meaning | Examples |
 |---|---|---|
@@ -16,10 +16,10 @@ The single most consequential judgement in onboarding is the **trust class** of 
   agent's own code emits it, it is a self-report.
 - A source is only an `enforcement_point` for the calls it actually sits in front of. A gateway that
   proxies tool calls is an enforcement point for `ToolCall`, not for the model's reasoning.
-- `independent_system` requires that the agent cannot change the record's state — not merely that a
+- `independent_system` requires that the agent cannot change the record's state, not merely that a
   different service wrote it. State the reason in `class_justification`; an assessor will challenge it.
 
 `lint_profile` refuses a source whose `kind` is a known self-report pattern (`framework_interrupt`,
 `sdk_tracing`, `in_process_approval`, `agent_log`) declared as anything but `self_report`. When no
-enforcement point exists, proceed with `self_report` and say so prominently — an honest `self_report`
+enforcement point exists, proceed with `self_report` and say so prominently. An honest `self_report`
 with a documented gap is conformant practice; a mislabelled one is not.

@@ -6,15 +6,15 @@
 
 Point AgentCE at the records you already keep. It shows where your agents meet the standard you follow, where they fall short, and where your records can't show. Your team gets reports written for different roles, and the AI assistant your developers use gets a skill for the fixes.
 
-**Status:** under development — not yet ready for use.
+**Status:** under development, not yet ready for use.
 
 ## Ingest sources AgentCE supports
 
-**Supported** (46): Claude Code session files, OpenTelemetry GenAI traces, MCP tools/list, A2A Agent Cards, AWS CloudTrail, CycloneDX, and 40 more — see the full matrix.
+**Supported** (46): Claude Code session files, OpenTelemetry GenAI traces, MCP tools/list, A2A Agent Cards, AWS CloudTrail, CycloneDX, and 40 more; see the full matrix.
 
 **Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, AuthZEN decisions.
 
-**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, Cedar — help wanted.
+**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, Cedar; help wanted.
 
 See the [full support matrix](https://agent-conformance.org/reference/ingest-support-matrix/) for each source's definition, version and risk.
 
@@ -30,7 +30,7 @@ Reads records from 400+ tools and 600+ cloud services, and the tool declarations
 | SPDX | 43 | 2026-09-29 | https://spdx.dev/use/spdx-tools/ |
 | OCSF | 39 | 2026-09-29 | https://docs.aws.amazon.com/security-lake/latest/userguide/integrations-third-party.html |
 | Sigstore and in-toto | 8 | 2026-09-29 | https://docs.npmjs.com/generating-provenance-statements/ |
-| Distinct products, deduplicated | 408 (348 counting only self-managed Kubernetes) | 2026-09-29 | — |
+| Distinct products, deduplicated | 408 (348 counting only self-managed Kubernetes) | 2026-09-29 | the rows above |
 | Cloud audit logs | 633 | 2026-09-29 | https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-aws-service-specific-topics.html, https://docs.cloud.google.com/logging/docs/audit/services, https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/azure-services-resource-providers |
 | MCP tool declarations | 27,992 | 2026-09-29 | https://registry.modelcontextprotocol.io/v0/servers?version=latest&limit=100 |
 

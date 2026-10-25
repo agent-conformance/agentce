@@ -28,18 +28,18 @@ Every control the records give no population for is reported `insufficient_evide
 
 Running the same derived bundle and profile back through `assess --bundle`/`--profile` (the
 hand-authored-profile path) instead declares `applicability_declared: true`, and the same empty
-population then reads as `not_applicable` — a real behaviour difference between the two paths, not a
+population then reads as `not_applicable`, a real behaviour difference between the two paths, not a
 bug in either: a records-only scan asserts nothing about what is out of scope, where a declared profile
 does.
 
 ## What it cannot show
 
 `blind_spots.json`'s `checks_unlocked` names the one missing record type that would unlock the most
-checks — but on baseline@2026.09 run against the vendored `otel-genai-agent-session` fixture, 8 of its
+checks, but on baseline@2026.09 run against the vendored `otel-genai-agent-session` fixture, 8 of its
 10 controls (`INC-01`, `INC-02`, `OVS-03`, `OVS-08`, `REC-01`, `REC-04`, `ROB-02`, `TRN-03`) land
 under `blind_spots`/`needed_by`, not `no_population`, because they need one of:
 
-- a declared decision type (`INC-01`, `OVS-08`, `REC-01`, `REC-04`, `ROB-02`, `TRN-03` — 6 controls,
+- a declared decision type (`INC-01`, `OVS-08`, `REC-01`, `REC-04`, `ROB-02`, `TRN-03`: 6 controls,
   via `ConsequentialDecision` typing),
 - an `Incident` event (`INC-02`),
 - consequential-tagged `ToolCall` provenance (`OVS-03`),
@@ -47,7 +47,7 @@ under `blind_spots`/`needed_by`, not `no_population`, because they need one of:
 and none of these is suppliable from trace records alone. Only `INT-01` lands under `no_population`
 (its `ToolCall` shape itself cannot be reached from records at all, declared or not). The `otel-genai`
 adapter maps exactly seven event types (`adapters/otel-genai/support-matrix.yaml`): `SessionStart`,
-`SessionEnd`, `ModelCall`, `ToolCall`, `ResourceAccess`, `MemoryRead`, `MemoryWrite` — never `Decision`,
+`SessionEnd`, `ModelCall`, `ToolCall`, `ResourceAccess`, `MemoryRead`, `MemoryWrite`, never `Decision`,
 `Outcome`, `Incident`, `Notice`, or `ApprovalDecided`. Closing any of the 8 gaps above needs Phases A-C:
 a declared decision type or an enforcement-point/independent-system source, not another records scan.
 

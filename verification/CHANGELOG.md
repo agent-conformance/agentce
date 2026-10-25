@@ -3,6 +3,21 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.132.0
+
+- Added `VG-UX-COPY` (18.40b, tier quick): the copy rules hold over what a person reads first. The gate reads the
+  READMEs, the approved skills, the English message catalogue, and what the three engines print for `--help`, each
+  command's `--help`, `quickstart` and `assess <trace folder>`. It refuses an em dash or a look-alike, a spaced `--`
+  or en dash used as a dash, and any form of prove, performance, automagically or "any format", with line breaks
+  folded and HTML entities decoded, outside code, links and URLs. Every engine run must exit as expected and print
+  its usage or verdict, so a crash cannot pass as clean. It also holds the site's default and Starlight
+  descriptions, the llms.txt summary, the website package description, the website README and the concepts page
+  description to the approved tagline. The verdict lines now read "Incomplete. No control failed, ..."; the
+  blind-spot rows read "rung 2: a code change ..."; `agentce --help` leads with the tagline. `VG-INGEST-SUPPORT-MATRIX`
+  (changed) also reads a README tier line's "; see the full matrix" and "; help wanted" endings, and
+  `VG-REACH-TABLE` (changed) writes "the rows above" in place of a dash for the deduplicated row's source. Ten seeded
+  faults: the catalogue, three Markdown shapes, each engine's CLI, two sweep places, and a TypeScript-only row.
+
 ## 0.131.0
 
 - Added `VG-UX-ONE-QUESTION` (18.40a, tier quick): a person gets their first findings before any question, and at

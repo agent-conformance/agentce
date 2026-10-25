@@ -831,3 +831,9 @@ allow:
     count: 20
     class: legitimate
     justification: "Genesis all-zero prev pointer at the head of each VG-STREAM-SOURCE-BOUND integrity chain case (no predecessor block)."
+
+  - path: verification/gates/ux_copy.py
+    pattern: not-implemented
+    count: 1
+    class: legitimate
+    justification: "VG-UX-COPY matches the TypeScript and Java engines' existing 'not yet implemented' --help refusal as an accepted run outcome; it adds no unbuilt code."

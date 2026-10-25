@@ -316,7 +316,7 @@ def render_good_section(matrix: dict[str, Any], numbers: dict[str, int]) -> str:
     for row in ROWS:
         checked = row.checked(matrix)
         sources = row.sources(matrix) if row.source_required else []
-        source_cell = ", ".join(sources) if sources else "—"
+        source_cell = ", ".join(sources) if sources else "the rows above"
         count_cell = f"{numbers[row.count_key]:,}"
         if row.aux_count_key:
             count_cell += f" ({numbers[row.aux_count_key]:,} counting only self-managed Kubernetes)"

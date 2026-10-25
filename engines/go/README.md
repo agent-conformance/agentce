@@ -1,4 +1,4 @@
-# agentce-go — DEFERRED
+# agentce-go (deferred)
 
 Status: **DEFERRED**. A Go engine is named in the multi-language strategy (SPEC §5.3, "engines/go
 (later)") but is not built in this cycle, and nothing in the repository depends on it. This file
@@ -7,7 +7,7 @@ records the decision so the deferral is explicit rather than an omission.
 ## Why deferred
 
 - **The cross-language contract is already demonstrated.** Determinism across implementations is
-  shown by three engines — Python (reference), TypeScript, and Java — whose outputs are
+  shown by three engines (Python as reference, TypeScript, and Java) whose outputs are
   byte-identical over the full corpus after RFC 8785 canonicalisation (SPEC §5.3, §11.5). A fourth
   engine adds maintenance surface without adding a new conformance signal at this stage.
 - **The specification schedules Go for later.** SPEC §5.3 lists the Go engine as a later engine, and
@@ -27,5 +27,5 @@ records the decision so the deferral is explicit rather than an omission.
 ## Picking it up
 
 When a Go engine is built, it implements SPEC §5.3 (identical results) and §11.5 (Engine Conformance
-Suite), joins the multi-engine byte-identity job, and publishes an implementation report — the same
+Suite), joins the multi-engine byte-identity job, and publishes an implementation report, the same
 acceptance every other engine meets. Until then, this deferral stands.

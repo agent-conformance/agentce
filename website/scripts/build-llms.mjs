@@ -19,8 +19,7 @@ const manifest = JSON.parse(readFileSync(join(websiteDir, 'iri-manifest.json'), 
 const lines = [
   '# Agent Conformance (AgentCE)',
   '',
-  '> A deterministic, model-free, vendor-neutral standard for assessing how AI agents behave, ' +
-    'with reproducible evidence.',
+  '> Open, repeatable checks of AI agent behavior against AI rules and standards.',
   '',
   '## Documentation',
   '',

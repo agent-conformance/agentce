@@ -1,23 +1,24 @@
-# website — agent-conformance.org
+# website: agent-conformance.org
 
-The public website for the Agent Conformance standard: the landing page, the documentation, and the
+Open, repeatable checks of AI agent behavior against AI rules and standards. This is the public
+website for Agent Conformance: the landing page, the documentation, and the
 canonical artifacts served at their IRIs. It is built with [Astro](https://astro.build) and
 [Starlight](https://starlight.astro.build) and deploys as a static site to `website/dist/`.
 
 This module implements the public site described in the project specification. Beyond the landing page
-and docs, it serves — byte-identical to their sources under `spec/` — the JSON-LD context, the
-vocabulary, and every JSON Schema `$id`, each at its canonical `https://agent-conformance.org` path, so
+and docs, it serves the JSON-LD context, the vocabulary, and every JSON Schema `$id`, byte-identical
+to their sources under `spec/`, each at its canonical `https://agent-conformance.org` path, so
 that every dereferenceable IRI the specification defines resolves. The mapping from canonical path to
 `spec/` source lives in `iri-manifest.json`, and `pnpm run check:iri` verifies that every referenced
 IRI is served and unchanged.
 
 ## Layout
 
-- `src/pages/` — the landing page and other custom pages, built on `src/layouts/BaseLayout.astro`.
-- `src/content/docs/` — the Starlight documentation (served under `/docs`).
-- `src/styles/tokens.css` — the single design-token file (the accent palette, light and dark).
-- `public/` — static assets copied verbatim into the build.
-- `iri-manifest.json` — canonical path → `spec/` source → content type (the resolver's source of truth).
+- `src/pages/`: the landing page and other custom pages, built on `src/layouts/BaseLayout.astro`.
+- `src/content/docs/`: the Starlight documentation (served under `/docs`).
+- `src/styles/tokens.css`: the single design-token file (the accent palette, light and dark).
+- `public/`: static assets copied verbatim into the build.
+- `iri-manifest.json`: canonical path → `spec/` source → content type (the resolver's source of truth).
 
 ## Commands
 

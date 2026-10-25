@@ -12,8 +12,7 @@ export default defineConfig({
     focusablePre(),
     starlight({
       title: 'Agent Conformance',
-      description:
-        'A deterministic, model-free, vendor-neutral standard for assessing how AI agents behave — with reproducible evidence.',
+      description: 'Open, repeatable checks of AI agent behavior against AI rules and standards.',
       customCss: ['./src/styles/tokens.css'],
       components: { SiteTitle: './src/components/SiteTitle.astro' },
       // English is the single normative language (SPEC) and the only complete content today; the other

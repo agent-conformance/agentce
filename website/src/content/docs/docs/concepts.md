@@ -1,6 +1,6 @@
 ---
 title: What is agent conformance?
-description: The mental model behind Agent Conformance — subjects, evidence, controls, and verdicts.
+description: Open, repeatable checks of AI agent behavior against AI rules and standards.
 ---
 
 Agent conformance is the practice of checking how an AI-agent deployment behaves against a shared,

@@ -19,7 +19,7 @@ metadata:
 
 Prepare an AgentCE report for review and signature. This skill checks the inputs the report inherits,
 runs the deterministic assessment, records the human-supplied manual checks and deviations, and
-computes the **readiness verdict** — `READY`, `READY WITH LIMITATIONS`, or `NOT READY`. The verdict
+computes the **readiness verdict**: `READY`, `READY WITH LIMITATIONS`, or `NOT READY`. The verdict
 logic lives in the engine (`agentce readiness`), never in this skill, so signing never depends on a
 script. The skill never modifies code, evidence, `assertions.json`, or the manifest; never relabels an
 outcome; never creates a deviation without a named approver and expiry; and never signs anything.
@@ -42,14 +42,14 @@ After that you may put one question to the person, in the terminal, and no other
 Every script verifies these pins against the installed engine before doing anything (S-5) and stops
 with exit 3 on a mismatch: spec `0.6`, CLI `>=0.1.0,<0.2`, catalog `eu-ai-act@2026.09`.
 
-## Stage 1 — Pre-run checks (`claim_check`)
+## Stage 1: Pre-run checks (`claim_check`)
 
 Before the engine runs, the observation window, scope, sources, versions, declarations, and
 third-party components are inputs the report inherits. Confirm the profile's window lies within the
 bundle's timestamps; every subject in the profile has events and vice versa; every declared source
 appears in the manifest with its trust class; catalog and engine versions satisfy the pins.
 
-## Stage 2 — Run
+## Stage 2: Run
 
 `agentce verify` then `agentce assess` with `--deviations` pointed at the deviation register from
 stage 3. assess does not read the stage-3 checklist records; keep them with the report for whoever
@@ -65,13 +65,13 @@ security team, `--for ci` for a CI pipeline gate, `--for share` for a general ha
 the clause-by-clause OSCAL plus the evidence pack, and `buyer` renders the generated questionnaire
 answers plus the evidence pack. `agentce assess --help` lists each preset's exact emitted formats.
 
-## Stage 3 — Human-supplied records
+## Stage 3: Human-supplied records
 
 - **Manual checklists** (`checklist_lint`). For every applicable control with `mode: manual` or the
   manual part of `semi-automated`, present the catalog's checklist items and the named artifact to
   inspect, and record the answer, assessor identity and organisation, independence flag, date, and
   the digests of the artifacts inspected. `checklist_lint` enforces the schema, assessor identity, and
-  digest freshness — an artifact changed since inspection invalidates the record.
+  digest freshness; an artifact changed since inspection invalidates the record.
 - **Deviations** (`deviation_lint`). A deviation is created only for a `non-conformant` outcome the
   organisation accepts with a compensating control. `deviation_lint` enforces: the control exists; the
   outcome was `non-conformant` (never `insufficient_evidence`, which is an evidence gap, not a risk
@@ -80,7 +80,7 @@ answers plus the evidence pack. `agentce assess --help` lists each preset's exac
   distinct from the owner. The skill drafts the entry from the finding and the operator's rationale; it
   never sets `approved_by`.
 
-## Stage 4 — Post-run checks (`report_readiness`)
+## Stage 4: Post-run checks (`report_readiness`)
 
 `report_readiness` is a thin wrapper over `agentce readiness`. It blocks (NOT READY) on a failed,
 gapped, or reordered integrity stream; a coverage shortfall; applicability drift; a missing manual
@@ -89,7 +89,7 @@ does not match the profile. A recorded high-severity evidence gap (owner and dat
 limitation, not a blocker. The claimant signs only on `READY` or `READY WITH LIMITATIONS`, and the
 limitations text is carried into the claim.
 
-## Stage 5 — Reading the outcomes (`read_outcomes`)
+## Stage 5: Reading the outcomes (`read_outcomes`)
 
 Explain the report in fixed language: `conformant` and `non-conformant` are deterministic and
 reproducible; `partial` is a fail with an accepted, expiring deviation; `insufficient_evidence` is a

@@ -1,8 +1,8 @@
-# Phase A — Declare
+# Phase A: Declare
 
 The procedure for the declaration phase of `agentce-get-evidence` (SPEC §13.3.3 Phase A). Produces
 `agentce/applicability.yaml`, `agentce/domain.linkml.yaml`, `agentce/reference/`, and an empty
-`agentce/deviations.yaml` (template only — never populated by this skill, S-3).
+`agentce/deviations.yaml` (template only, never populated by this skill, S-3).
 
 1. **Subjects.** One subject per deployed agent *system* (not per instance). Assign the SPIFFE ID or
    `agentce:subject/<id>` used at runtime; record `role` (`deployer`, `provider`, or `both`).

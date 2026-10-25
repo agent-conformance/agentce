@@ -8,7 +8,7 @@ subject's classification. The skill only ever produces a draft: it sets
 For each subject, work through the points and record the first that applies, with the clause quoted in
 `annex_iii_rationale`:
 
-| Annex III point | Area (paraphrase — quote the clause in the rationale) | Typical agent examples |
+| Annex III point | Area (paraphrase; quote the clause in the rationale) | Typical agent examples |
 |---|---|---|
 | 1 | Biometrics (categorisation, emotion recognition) | face/voice categorisers |
 | 2 | Critical infrastructure (safety components) | grid/traffic/water control |
@@ -27,4 +27,4 @@ Output fields:
 - `affects_natural_person` and the consequential-decision flags per decision type (Art. 86 threshold).
 
 When a subject is Annex III high-risk, it needs a registration reference or a gap entry, and its
-consequential decisions require the declared oversight modality — both are checked by `lint_profile`.
+consequential decisions require the declared oversight modality; `lint_profile` checks both.

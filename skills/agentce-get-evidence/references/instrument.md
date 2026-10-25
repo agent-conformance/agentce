@@ -1,4 +1,4 @@
-# Phase B — Instrument
+# Phase B: Instrument
 
 The maintained home of the SPEC §13.1 universal instrumentation prompt, applied to the codebase on a
 feature branch. This skill adds capture, correlation, and declarations only; it never changes what the

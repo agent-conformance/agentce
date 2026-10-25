@@ -30,7 +30,7 @@ _TIER_LINE_RE = re.compile(
     r"^\*\*(" + "|".join(_KNOWN_TIERS) + r")\*\* \((\d+)\): (.+)$", re.MULTILINE
 )
 _MORE_RE = re.compile(r"^and (\d+) more$")
-_TRAILER_RE = re.compile(r"\s*—\s*(?:see the full matrix|help wanted)\s*$")
+_TRAILER_RE = re.compile(r"\s*[—;]\s*(?:see the full matrix|help wanted)\s*$")
 _TABLE_HEADER = "| Backend | Tier | Reader follows | Build item |"
 _FOLLOWS_RE = re.compile(r"\[[^\]]+\]\(([^)\s]+)\),\s*(\S.*)")
 # A tier claim written any other way than a _TIER_LINE_RE line (18.39c): once emphasis, code spans, HTML tags,
@@ -108,7 +108,7 @@ def load_matrix_rows(path: Path) -> dict[str, dict]:
 
 
 def parse_tier_line(names_text: str) -> tuple[list[str], int | None]:
-    """``names_text`` with any trailing period, "— see the full matrix"/"— help wanted" clause and
+    """``names_text`` with any trailing period, "; see the full matrix"/"; help wanted" clause (or one led by "—") and
     "and N more" tail removed; returns the explicit names and that tail's N (None if absent)."""
     text = names_text.rstrip(".")
     text = _TRAILER_RE.sub("", text).rstrip(".")

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.131.0",
+  "suite_version": "0.132.0",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -917,8 +917,8 @@
         {
           "description": "README swaps one Experimental name for one Roadmap name between the two tier lines (AuthZEN decisions <-> Cedar); both lines keep their real stated count, so only the per-name tier check can catch it",
           "file": "README.md",
-          "search": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, AuthZEN decisions.\n\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, Cedar — help wanted.\n",
-          "replace": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, Cedar.\n\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, AuthZEN decisions — help wanted.\n"
+          "search": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, AuthZEN decisions.\n\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, Cedar; help wanted.\n",
+          "replace": "**Experimental** (4): Cursor CLI output, OpenAI Agents API session traces, Datadog LLM Observability, Cedar.\n\n**Roadmap** (4): Cursor, LangGraph dev server checkpoints, OpenAI Agents SDK hosted traces, AuthZEN decisions; help wanted.\n"
         },
         {
           "description": "the trace-store connectors page's table claims Datadog LLM Observability is Supported, reviving the old overstated claim the matrix (Experimental) disagrees with",
@@ -1777,7 +1777,7 @@
         {
           "description": "README's \"Distinct products, deduplicated\" row is hand-edited to a number the matrix disagrees with, caught by the count-mismatch check",
           "file": "README.md",
-          "search": "| Distinct products, deduplicated | 408 (348 counting only self-managed Kubernetes) | 2026-09-29 | — |",
+          "search": "| Distinct products, deduplicated | 408 (348 counting only self-managed Kubernetes) | 2026-09-29 | the rows above |",
           "replace": "| Distinct products, deduplicated | 409 (348 counting only self-managed Kubernetes) | 2026-09-29 | — |"
         }
       ],
@@ -1921,6 +1921,91 @@
       "fix_hint": "Run verification/gates/ux_one_question.sh; each stderr line names the key, the file and line or the engine and command. Keep a skill's first minute to one **Question:** line after its first agentce command, with a **Default:** that only reads and writes into the output folder; move other asks under a Phase or Stage heading; an engine's first-run command never prompts."
     },
     {
+      "id": "VG-UX-COPY",
+      "title": "The copy rules (USER_EXPERIENCE.md R6) hold over the READMEs, the approved skills, the English message catalogue and what the three engines print; the site's short descriptions, llms.txt and the website package text carry the approved tagline",
+      "tier": "quick",
+      "cwd": ".",
+      "cmd": [
+        "bash",
+        "verification/gates/ux_copy.sh"
+      ],
+      "requires": [
+        "uv",
+        "node",
+        "pnpm",
+        "java"
+      ],
+      "timeout_s": 600,
+      "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
+      "rubric": {
+        "pass": "the reader's self-test passes; no README.md, website/README.md, engines/*/README.md or tracked skills/**/*.md (reader-visible text: outside fences, code spans, comments, link targets and URLs; front matter title and description read), no string of spec/i18n/messages.en.json and no output of agentce --help, each listed command's --help, quickstart or assess <trace folder> in Python, TypeScript or Java carries an em dash or a look-alike, a spaced -- or en dash, or any form of prove, performance, automagically or 'any format', with whitespace folded and entities decoded; every engine run exits as expected and prints its marker; the six sweep places read the tagline and none says the pre-lock or a retired line",
+        "fail": "any rule hit in scope, an engine run that crashes, prints nothing or misses its marker (ux.copy.run_failed), no commands found in Python's --help, a sweep place whose description is not the tagline, unreadable or still the pre-lock or a retired line"
+      },
+      "faults": [
+        {
+          "description": "(a) the verdict.incomplete catalogue string gets its em dash back, caught by the catalogue scan",
+          "file": "spec/i18n/messages.en.json",
+          "search": "\"verdict.incomplete\": \"Incomplete. No control failed,",
+          "replace": "\"verdict.incomplete\": \"Incomplete — no control failed,"
+        },
+        {
+          "description": "(b) a README.md sentence says the records prove it, caught by the Markdown scan's word list",
+          "file": "README.md",
+          "search": "**Status:** under development, not yet ready for use.",
+          "replace": "**Status:** under development, not yet ready for use. Your records prove it."
+        },
+        {
+          "description": "(c) an approved skill uses ' -- ' as a dash in prose, caught as a spaced stand-in for an em dash",
+          "file": "skills/agentce-get-evidence/SKILL.md",
+          "search": "adds capture, correlation, and declarations only. It never changes",
+          "replace": "adds capture, correlation, and declarations only -- it never changes"
+        },
+        {
+          "description": "(d) Python's --help description says performance, caught in the Python --help run",
+          "file": "engines/python/agentce/cli.py",
+          "search": "description=\"Agent Conformance Engine: open, repeatable checks of AI agent behavior against AI rules and standards.\",",
+          "replace": "description=\"Agent Conformance Engine: open, repeatable checks of AI agent performance against AI rules and standards.\","
+        },
+        {
+          "description": "(e) TypeScript's --help text gains an em dash, caught in the TypeScript --help run on a rebuilt dist",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "\nAgent Conformance Engine: open, repeatable checks of AI agent behavior against\nAI rules and standards.\n",
+          "replace": "\nAgent Conformance Engine — open, repeatable checks of AI agent behavior against\nAI rules and standards.\n"
+        },
+        {
+          "description": "(f) Java's --help text says 'any format' split over a line break, caught in the Java --help run on a rebuilt jar because whitespace is folded",
+          "file": "engines/java/src/main/java/org/agentce/Cli.java",
+          "search": "\nAgent Conformance Engine: open, repeatable checks of AI agent behavior against\nAI rules and standards.\n",
+          "replace": "\nAgent Conformance Engine: open, repeatable checks of AI agent behavior in any\nformat against AI rules and standards.\n"
+        },
+        {
+          "description": "(g) the site's default description goes back to the pre-lock line, caught as a retired line and a wrong value",
+          "file": "website/src/layouts/BaseLayout.astro",
+          "search": "description = 'Open, repeatable checks of AI agent behavior against AI rules and standards.',",
+          "replace": "description = 'A deterministic, model-free, vendor-neutral standard for assessing how AI agents behave, with reproducible evidence.',"
+        },
+        {
+          "description": "(h) website/package.json's description drops the tagline, caught by the sweep value check",
+          "file": "website/package.json",
+          "search": "\"description\": \"Open, repeatable checks of AI agent behavior against AI rules and standards.\",",
+          "replace": "\"description\": \"The public website for Agent Conformance.\","
+        },
+        {
+          "description": "(i) a skill's folded front matter description gains &mdash;, caught because entities are decoded and block-scalar descriptions are read",
+          "file": "skills/agentce-prepare-to-share/SKILL.md",
+          "search": "  Verify an Agent Conformance Engine report before it is signed:",
+          "replace": "  Verify an Agent Conformance Engine report &mdash; before it is signed:"
+        },
+        {
+          "description": "(j) TypeScript's own blind-spot row text (a literal in report.ts, not read from the catalogue) gets an em dash, which only the TypeScript quickstart and assess runs can show",
+          "file": "engines/typescript/src/report.ts",
+          "search": "`rung ${bs.ladder_rung}: ${step}.",
+          "replace": "`rung ${bs.ladder_rung} — ${step}."
+        }
+      ],
+      "fix_hint": "rewrite the line the failure names as its hint says (a comma, colon, full stop or parentheses for a dash; show, check or document for prove; behavior or speed for performance; name the formats); for a sweep line write the tagline from tools/locked_copy_check.py; for run_failed fix the command so it prints its usage or verdict"
+    },
+    {
       "id": "VG-AUDITOR-VIEW",
       "title": "The auditor view (18.17, Hill 8) renders clause-by-clause results with the evidence trail, by-clause index, accepted and expired deviations, a manual-mode control's disclosed note, and a deviation's OSCAL risk entry, matching a committed golden with hostile text always escaped",
       "tier": "quick",
@@ -1954,7 +2039,7 @@
         {
           "description": "report.auditor_oscal_text reverts to its pre-18.17c wording (drops the \"a deviated finding's entry there carries a matching risk\" clause), so the OSCAL-section text no longer mentions a deviated finding's risk entry",
           "file": "engines/python/agentce/data/i18n/messages.en.json",
-          "search": "\"report.auditor_oscal_text\": \"The same findings are also available as an OSCAL 1.1.2 Assessment Results document (`oscal-ar.json`/`oscal-ar.xml` -- a deviated finding's entry there carries a matching `risk`) and as one evidence pack per subject (`packs/<subject>/pack.json`).\",",
+          "search": "\"report.auditor_oscal_text\": \"The same findings are also available as an OSCAL 1.1.2 Assessment Results document (`oscal-ar.json`/`oscal-ar.xml`; a deviated finding's entry there carries a matching `risk`) and as one evidence pack per subject (`packs/<subject>/pack.json`).\",",
           "replace": "\"report.auditor_oscal_text\": \"The same findings are also available as an OSCAL 1.1.2 Assessment Results document (`oscal-ar.json`/`oscal-ar.xml`) and as one evidence pack per subject (`packs/<subject>/pack.json`).\","
         }
       ],

@@ -1,7 +1,7 @@
 {
   "name": "@agent-conformance/website",
   "version": "0.0.1",
-  "description": "The public website for the Agent Conformance standard (agent-conformance.org): landing page, documentation, and the canonical context, vocabulary, and JSON Schemas served at their IRIs.",
+  "description": "Open, repeatable checks of AI agent behavior against AI rules and standards.",
   "type": "module",
   "private": true,
   "license": "Apache-2.0",
