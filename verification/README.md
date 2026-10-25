@@ -102,6 +102,15 @@ into k chunks over n faults ran k restores instead of one, so its seconds are th
 by (n + 1) / (n + k). Write the longest over the runs under `gates` and list each run, attempt and commit under
 `source`.
 
+## Gates that read Markdown
+
+VG-INGEST-SUPPORT-MATRIX, VG-UX-COPY and VG-UX-ONE-QUESTION read Markdown only through
+`gates/markdown_reader.py`, which reads a file into blocks the way [CommonMark 0.31.2](https://spec.commonmark.org/0.31.2/)
+does, with [GFM 0.29](https://github.github.com/gfm/) tables, and keeps each block's source line numbers. It
+uses markdown-it-py's parser. A line ends only at LF, CR or CRLF, and a table ends only at a line of
+spaces and tabs, as on the site. `markdown_reader.py --self-test` runs the spec examples for each
+construct the gates depend on through it.
+
 ## Adding a gate
 
 A new feature, adapter or catalog adds or extends a gate in the same change: an entry in `gates.json` with a
