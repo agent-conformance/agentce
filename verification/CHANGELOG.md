@@ -9,11 +9,12 @@ fails if a gate in `gates.json` is not named in this file.
   most one question in the first minute, asked at the terminal, with the safe answer as its default. Each approved
   skill now has a `## First minute` section: an `agentce assess` or `agentce quickstart` command, then at most one
   `**Question:**` line with a `**Default:**` line. The gate refuses a question before that command, a second
-  question, a question or default that would sign, publish, send or delete, and an instruction to ask that comes
-  before the section or outside a Phase or Stage. It also runs `agentce quickstart` and `agentce assess <trace
+  question, a question or default that would sign, publish, send, share or delete (in any form of the verb, so
+  "signing the report" counts), and an instruction to ask (in any tense, so "asking" counts) that comes before the
+  section or outside a Phase or Stage. It also runs `agentce quickstart` and `agentce assess <trace
   folder>` in all three engines at a terminal with nothing typed: a command that waits for an answer or prints a
   question counts against the same one-question budget. `agentce-get-evidence` moves its "ask for anything missing"
-  line into Phase A. Nine seeded faults: six in the skill text, and one prompt in each engine's quickstart.
+  line into Phase A. Twelve seeded faults: nine in the skill text, and one prompt in each engine's quickstart.
 
 ## 0.130.0
 

@@ -14,8 +14,8 @@ without asking passes here whatever its exit code; other gates hold exit codes.
 The skill leg reads each SKILL.md's `## First minute` section. It must name a first command that runs
 with no question (`agentce assess` or `agentce quickstart`), and may then ask one question, written as
 a `**Question:**` line after that command and followed by a `**Default:**` line. Neither line may name
-an action beyond reading and writing into the output folder. An instruction to ask (ask, confirm with,
-request from) inside the section is a question with no default. Outside the section it may only come
+an action beyond reading and writing into the output folder, in any form of the verb. An instruction
+to ask (ask, confirm with, request from, check with, prompt the person for, in any tense) inside the section is a question with no default. Outside the section it may only come
 after it, under a heading that names a later step.
 
 Stdout ends with `UX-ONE-QUESTION OK` when every check holds; each failure is one stderr line led by
@@ -53,13 +53,21 @@ SECTION = "## First minute"
 QUESTION = "**Question:**"
 DEFAULT = "**Default:**"
 FIRST_COMMAND = re.compile(r"`agentce (?:assess|quickstart)\b[^`]*`")
-# An instruction to the assistant to ask the person something.
-ASK = re.compile(r"\b(?:ask|confirm with|request from)\b", re.IGNORECASE)
+# An instruction to the assistant to ask the person something, in any tense ("asks", "asking").
+ASK = re.compile(
+    r"\b(?:ask(?:s|ed|ing)?|confirm(?:s|ed|ing)? with|request(?:s|ed|ing)? from"
+    r"|check(?:s|ed|ing)? with|prompt(?:s|ed|ing)? (?:the )?(?:user|person) for)\b",
+    re.IGNORECASE,
+)
 # A heading for a step that comes after the first findings, where the assistant may ask more.
 LATER_STEP = re.compile(r"^#{2,3} .*\b(?:Phases?|Stage \d|After the first minute)\b")
 # An answer that acts beyond reading and writing into the output folder is not the safe one.
+# Every form of each verb counts: "signing the report" signs it.
 UNSAFE = re.compile(
-    r"\b(?:sign|publish|upload|send|push|delete|overwrite|commit|install|deploy)\b|--for\b",
+    r"\b(?:sign(?:s|ed|ing)?|publish(?:es|ed|ing)?|upload(?:s|ed|ing)?|sen(?:d|ds|ding|t)"
+    r"|push(?:es|ed|ing)?|delet(?:e|es|ed|ing)|overwr(?:ite|ites|iting|itten|ote)"
+    r"|commit(?:s|ted|ting)?|install(?:s|ed|ing)?|deploy(?:s|ed|ing)?|shar(?:e|es|ed|ing)"
+    r"|email(?:s|ed|ing)?|submit(?:s|ted|ting)?|transmit(?:s|ted|ting)?)\b|--for\b",
     re.IGNORECASE,
 )
 ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07]*\x07")
@@ -417,6 +425,36 @@ SELF_TEST: list[tuple[str, str, set[str]]] = [
         {"skill_default_unsafe"},
     ),
     (
+        "default signs, -ing form",
+        GOOD.replace("keep the folder you found;", "signing the report;"),
+        {"skill_default_unsafe"},
+    ),
+    (
+        "default publishes, -es form",
+        GOOD.replace(
+            "keep the folder you found;", "the report publishes to your site;"
+        ),
+        {"skill_default_unsafe"},
+    ),
+    (
+        "default committing",
+        GOOD.replace("keep the folder you found;", "committing the evidence to main;"),
+        {"skill_default_unsafe"},
+    ),
+    (
+        "question shares, default yes",
+        GOOD.replace(
+            GOOD_QUESTION.removeprefix("**Question:** "),
+            '"Share the report with your auditor now?"',
+        ).replace("keep the folder you found;", "yes;"),
+        {"skill_default_unsafe"},
+    ),
+    (
+        "default emails",
+        GOOD.replace("keep the folder you found;", "email the report to compliance;"),
+        {"skill_default_unsafe"},
+    ),
+    (
         "default narrows",
         GOOD.replace("keep the folder you found;", "use `--for share`;"),
         {"skill_default_unsafe"},
@@ -433,6 +471,34 @@ SELF_TEST: list[tuple[str, str, set[str]]] = [
         "ask before the section",
         GOOD.replace("Intro.", "Intro. Ask for the repository path first."),
         {"skill_asks_before_first_minute"},
+    ),
+    (
+        "asking before the section",
+        GOOD.replace("Intro.", "Start by asking which repository to use."),
+        {"skill_asks_before_first_minute"},
+    ),
+    (
+        "asks before the section",
+        GOOD.replace("Intro.", "The assistant asks for the repository path first."),
+        {"skill_asks_before_first_minute"},
+    ),
+    (
+        "check with before the section",
+        GOOD.replace("Intro.", "Check with the person which catalog applies."),
+        {"skill_asks_before_first_minute"},
+    ),
+    (
+        "prompt the user before the section",
+        GOOD.replace("Intro.", "Prompt the user for the trace folder."),
+        {"skill_asks_before_first_minute"},
+    ),
+    (
+        "asked in the section",
+        GOOD.replace(
+            "show the verdict.",
+            "show the verdict.\n\nOnce asked, wait for the repository path.",
+        ),
+        {"skill_too_many_questions", "skill_question_unmarked"},
     ),
     (
         "question before the section",

@@ -1841,7 +1841,7 @@
       "timeout_s": 600,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "the reader's self-test passes; every skills/*/SKILL.md has a '## First minute' section that names an `agentce assess` or `agentce quickstart` command before its one **Question:** line, each question has a **Default:** line, neither names an action beyond reading and writing into the output folder, and no ask instruction sits before the section or after it outside a Phase or Stage heading; agentce quickstart and agentce assess <trace folder> in Python, TypeScript and Java each finish inside 60 s at a pseudo-terminal with nothing typed and print no question; the skills' most questions plus the engines' questions is at most 1",
+        "pass": "the reader's self-test passes; every skills/*/SKILL.md has a '## First minute' section that names an `agentce assess` or `agentce quickstart` command before its one **Question:** line, each question has a **Default:** line, neither names an action beyond reading and writing into the output folder in any form of the verb, and no ask instruction sits before the section or after it outside a Phase or Stage heading; agentce quickstart and agentce assess <trace folder> in Python, TypeScript and Java each finish inside 60 s at a pseudo-terminal with nothing typed and print no question; the skills' most questions plus the engines' questions is at most 1",
         "fail": "a skill has no First minute section, no first command, a question before it, more than one question, a question with no default, an unsafe question or default, or an ask instruction outside its place; or an engine's first-run command waits at the terminal or prints a question; or the shared budget is over 1"
       },
       "faults": [
@@ -1880,6 +1880,24 @@
           "file": "skills/agentce-get-evidence/SKILL.md",
           "search": "**Question:** \"Is this the folder your agent exports its traces to, or should I read another one?\"\n**Default:** keep the folder you found, or the bundled sample.",
           "replace": "**Question:** \"Sign and publish the report now?\"\n**Default:** yes."
+        },
+        {
+          "description": "get-evidence's default answer is signing the report, caught because the deny list reads every form of the verb",
+          "file": "skills/agentce-get-evidence/SKILL.md",
+          "search": "**Default:** keep the folder you found, or the bundled sample.",
+          "replace": "**Default:** signing the report and keeping the folder you found."
+        },
+        {
+          "description": "a line before the First minute starts by asking which repository to use, caught because the ask check reads every tense",
+          "file": "skills/agentce-get-evidence/SKILL.md",
+          "search": "(S-6), and it never fabricates evidence (S-1).\n\n## First minute",
+          "replace": "(S-6), and it never fabricates evidence (S-1). Start by asking which repository to use.\n\n## First minute"
+        },
+        {
+          "description": "get-evidence's question shares the report with the auditor, default yes, caught because sharing sends the report out",
+          "file": "skills/agentce-get-evidence/SKILL.md",
+          "search": "**Question:** \"Is this the folder your agent exports its traces to, or should I read another one?\"\n**Default:** keep the folder you found, or the bundled sample.",
+          "replace": "**Question:** \"Share the report with your auditor now?\"\n**Default:** yes."
         },
         {
           "description": "Python quickstart prompts and waits at the terminal, caught by the 60 s deadline",
