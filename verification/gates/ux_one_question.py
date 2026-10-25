@@ -37,6 +37,8 @@ import tempfile
 import time
 from pathlib import Path
 
+from markdown_reader import blocks, split_lines
+
 ROOT = Path(__file__).resolve().parents[2]
 TRACE_FIXTURE = (
     ROOT / "adapters/otel-genai/fixtures/otel-genai-agent-session/input.json"
@@ -235,26 +237,26 @@ def cli_leg(errors: list[str]) -> int:
     return asked
 
 
-def prose(lines: list[str]) -> list[tuple[int, str]]:
-    """(1-based line number, text) for every line outside the front matter and fenced code."""
+def prose(text: str) -> list[tuple[int, str]]:
+    """(1-based line number, text) for every line outside the front matter and fenced code, read as
+    CommonMark blocks (markdown_reader): a heading as its ATX form, a paragraph's lines without their
+    block-quote or list markers, any other block's own lines."""
     out: list[tuple[int, str]] = []
-    fenced = False
-    front = bool(lines) and lines[0].rstrip() == "---"
-    for number, line in enumerate(lines, start=1):
-        if front:
-            front = number == 1 or line.rstrip() != "---"
+    for block in blocks(text):
+        if block.kind == "fence":
             continue
-        if line.lstrip().startswith("```"):
-            fenced = not fenced
-        elif not fenced:
-            out.append((number, line))
+        if block.kind == "heading":
+            words = " ".join(line.text for line in block.lines)
+            out.append((block.start, "#" * block.level + " " + words))
+        else:
+            out += [(line.number, line.text) for line in block.lines or block.source]
     return out
 
 
 def read_skill(rel: str, text: str, errors: list[str]) -> int:
     """Check one SKILL.md's first minute; return how many questions it asks there."""
-    raw = text.split("\n")
-    lines = prose(raw)
+    raw = split_lines(text)
+    lines = prose(text)
     start = next((n for n, line in lines if line.rstrip() == SECTION), None)
     if start is None:  # with no first minute, every ask comes before the first findings
         errors.append(
@@ -508,6 +510,26 @@ SELF_TEST: list[tuple[str, str, set[str]]] = [
     ),
 ]
 
+
+# Read as CommonMark blocks (18.211): a question on a list item still counts, and a fence closes only on a
+# run as long as its opener, so a question after a ```` block holding ``` is in the prose.
+SELF_TEST += [
+    (
+        "a second question on a list item",
+        GOOD.replace(
+            GOOD_DEFAULT + "\n", GOOD_DEFAULT + '\n\n- **Question:** "Which catalog?"\n'
+        ),
+        {"skill_too_many_questions", "skill_no_default"},
+    ),
+    (
+        "a question after a long fence holding a short one",
+        GOOD.replace(
+            '```\necho "a fenced line? not a question"\n```',
+            "````\n```\n````\n\nWant the report too?",
+        ),
+        {"skill_too_many_questions", "skill_question_unmarked"},
+    ),
+]
 
 # Every form of an unsafe verb in a default is refused, and every tense of an ask before the section.
 SELF_TEST += [
