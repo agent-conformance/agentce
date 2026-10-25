@@ -59,6 +59,21 @@ base=(--bundle "$F/evidence" --profile "$F/applicability.yaml" --domain "$F/doma
 two=(--bundle "$P/evidence" --profile "$P/applicability.yaml" --domain "$P/domain.linkml.yaml"
   --catalog-dir "$P/catalog" --allow-unverified-catalog)
 
+run_engine() { # run_engine <engine> <name> <agentce args...>: stdout to <engine>/<name>.json, stderr to .err, exit code to .code
+  local engine="$1" out="$work/$1/$2" code=0
+  shift 2
+  mkdir -p "$work/$engine"
+  case "$engine" in
+    python)
+      (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce "$@") ;;
+    typescript)
+      (cd "$root/engines/typescript" && pnpm --silent agentce "$@") ;;
+    java)
+      (cd "$root/engines/java" && ./build/install/agentce/bin/agentce "$@") ;;
+  esac > "$out.json" 2> "$out.err" || code=$?
+  echo "$code" > "$out.code"
+}
+
 scenario() {
   # scenario <name> <assess args...>: each engine's envelope in <engine>/<name>.json, its stderr in
   # .err, its exit code in .code and its output directory at <engine>/<name>/. --out and --json go
@@ -68,20 +83,7 @@ scenario() {
   local name="$1" engine
   shift
   for engine in python typescript java; do
-    mkdir -p "$work/$engine"
-    (
-      out="$work/$engine/$name"
-      code=0
-      case "$engine" in
-        python)
-          (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce assess --out "$out" --json "$@") ;;
-        typescript)
-          (cd "$root/engines/typescript" && pnpm --silent agentce assess --out "$out" --json "$@") ;;
-        java)
-          (cd "$root/engines/java" && ./build/install/agentce/bin/agentce assess --out "$out" --json "$@") ;;
-      esac > "$out.json" 2> "$out.err" || code=$?
-      echo "$code" > "$out.code"
-    ) &
+    run_engine "$engine" "$name" assess --out "$work/$engine/$name" --json "$@" &
   done
   wait
 }
@@ -119,18 +121,9 @@ scenario S23 --bundle "$F/evidence" --deviations --profile "$F/applicability.yam
 
 # readiness --deviations reads the register through the same profile (R28): each engine over its own S0 report.
 for engine in python typescript java; do
-  out="$work/$engine/R28"
-  code=0
-  case "$engine" in
-    python)
-      (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce readiness "$work/$engine/S0" --json --deviations "$regs/s28.yaml") ;;
-    typescript)
-      (cd "$root/engines/typescript" && pnpm --silent agentce readiness "$work/$engine/S0" --json --deviations "$regs/s28.yaml") ;;
-    java)
-      (cd "$root/engines/java" && ./build/install/agentce/bin/agentce readiness "$work/$engine/S0" --json --deviations "$regs/s28.yaml") ;;
-  esac > "$out.json" 2> "$out.err" || code=$?
-  echo "$code" > "$out.code"
+  run_engine "$engine" R28 readiness "$work/$engine/S0" --json --deviations "$regs/s28.yaml" &
 done
+wait
 
 # Python's own auditor.json for S1, the reference the seam's bytes must also equal.
 (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce assess --out "$work/auditor" \
