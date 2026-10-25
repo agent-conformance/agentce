@@ -17,7 +17,9 @@ a `**Question:**` line after that command and followed by a `**Default:**` line.
 lines that continue its paragraph, and every "?" in a Question paragraph is a question. Neither may name
 an action beyond reading and writing into the output folder, in any form of the verb. An instruction
 to ask (ask, confirm with, request from, check with, prompt the person for, in any tense) inside the section is a question with no default. Outside the section it may only come
-after it, under a heading that names a later step.
+after it, under a heading that names a later step; a Question or Default
+marker outside the section is an instruction to ask. A setext heading (underlined with --- or ===) is
+refused, so the section's bounds are the ones a reader of the raw file sees.
 
 Stdout ends with `UX-ONE-QUESTION OK` when every check holds; each failure is one stderr line led by
 its stable key. `--self-test` runs the skill reader over built-in texts.
@@ -285,6 +287,16 @@ def read_skill(rel: str, text: str, errors: list[str]) -> int:
     """Check one SKILL.md's first minute; return how many questions it asks there."""
     raw = split_lines(text)
     found = blocks(text)
+    # A setext heading (text underlined with --- or ===) is a heading only to a CommonMark reader: an
+    # assistant reading the file sees a paragraph and a rule, so it could carry a question out of the
+    # section the gate reads. Headings in a skill are written in ATX form.
+    for block in found:
+        if block.kind == "heading" and block.end > block.start:
+            errors.append(
+                f"ux.one_question.skill_setext_heading: {rel}:{block.start} is a heading underlined "
+                f"at line {block.end}; write it as '{'#' * block.level} ...' so the sections the "
+                "gate reads are the ones the assistant sees"
+            )
     lines = prose(found)
     headings = section_headings(found)
     start = next((n for n, h in headings.items() if h.rstrip() == SECTION), None)
@@ -305,8 +317,12 @@ def read_skill(rel: str, text: str, errors: list[str]) -> int:
         if n in headings and headings[n].startswith(("## ", "### ")):
             heading = headings[n]
         # Before the section any question counts; after it, only an instruction to ask (a "?" there
-        # is the skill quoting what a person says, as in "When to use").
-        if start <= n < end or not (is_ask(line) if n < start else ASK.search(line)):
+        # is the skill quoting what a person says, as in "When to use"). A Question or Default
+        # marker is an instruction to ask wherever it sits.
+        marked = line.startswith((QUESTION, DEFAULT))
+        if start <= n < end or not (
+            marked or (is_ask(line) if n < start else ASK.search(line))
+        ):
             continue
         if n < start:
             errors.append(
@@ -677,6 +693,34 @@ SELF_TEST += [
         "an ask wrapped across two lines before the section",
         GOOD.replace(
             "Intro.", "Intro. Check\nwith the person which repository to use."
+        ),
+        {"skill_asks_before_first_minute"},
+    ),
+    # A rule under the Question and Default turns them into a setext heading that ends the section
+    # (verdicts/P18-18.40a-2af99f74.md B1), and a marked question after the section under no later
+    # step is still asked before the first minute is over (B2).
+    (
+        "a rule under the Question and Default",
+        GOOD.replace(GOOD_DEFAULT, GOOD_DEFAULT + "\nThen it signs the report.\n---"),
+        {"skill_setext_heading"},
+    ),
+    (
+        "a heading underlined with ===",
+        GOOD.replace("# demo\n", "demo\n===\n"),
+        {"skill_setext_heading"},
+    ),
+    (
+        "a Question and Default under When to use",
+        GOOD.replace(
+            "## Phases",
+            '## When to use\n\n**Question:** "Which catalogs?"\n**Default:** sign it.\n\n## Phases',
+        ),
+        {"skill_asks_outside_later_step"},
+    ),
+    (
+        "a Question and Default before the section",
+        GOOD.replace(
+            "Intro.", '**Question:** "Which catalogs"\n**Default:** baseline.'
         ),
         {"skill_asks_before_first_minute"},
     ),

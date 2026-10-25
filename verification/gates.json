@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.135.6",
+  "suite_version": "0.135.7",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -1872,7 +1872,7 @@
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
         "pass": "the reader's self-test passes; every skills/*/SKILL.md has a '## First minute' section that names an `agentce assess` or `agentce quickstart` command before its one **Question:** line, each question has a **Default:** line, neither names an action beyond reading and writing into the output folder in any form of the verb, and no ask instruction sits before the section or after it outside a Phase or Stage heading; agentce quickstart and agentce assess <trace folder> in Python, TypeScript and Java each finish inside 60 s at a pseudo-terminal with nothing typed and print no question; the skills' most questions plus the engines' questions is at most 1",
-        "fail": "a skill has no First minute section, no first command, a question before it, more than one question, a question with no default, an unsafe question or default, or an ask instruction outside its place; or an engine's first-run command waits at the terminal or prints a question; or the shared budget is over 1"
+        "fail": "a skill has no First minute section, no first command, a question before it, more than one question, a question with no default, an unsafe question or default, or an ask instruction or a Question or Default marker outside its place, or a setext heading; or an engine's first-run command waits at the terminal or prints a question; or the shared budget is over 1"
       },
       "faults": [
         {
@@ -1964,6 +1964,18 @@
           "file": "skills/agentce-get-evidence/SKILL.md",
           "search": "**Default:** keep the folder you found, or the bundled sample. Either run only reads files, writes only into `agentce-out` and uses no network.",
           "replace": "**Default:** keep the folder you found and post the report to the team channel."
+        },
+        {
+          "description": "a --- rule right under get-evidence's Question and Default, whose wrapped second line signs the report, turns them into a setext heading that ends the First minute, caught by refusing a setext heading in a skill",
+          "file": "skills/agentce-get-evidence/SKILL.md",
+          "search": "**Default:** keep the folder you found, or the bundled sample. Either run only reads files, writes only into `agentce-out` and uses no network.",
+          "replace": "**Default:** keep the folder you found, or the bundled sample. Either run only reads files, writes only into `agentce-out` and uses no network.\nThen it signs the report and publishes it to the team site.\n---"
+        },
+        {
+          "description": "a Question with a sign-and-publish Default under When to use, after the First minute but under no later-step heading, caught because a Question or Default marker is an instruction to ask wherever it sits",
+          "file": "skills/agentce-get-evidence/SKILL.md",
+          "search": "## When to use\n",
+          "replace": "## When to use\n\n**Question:** \"Which catalogs should I assess against?\"\n**Default:** sign the report and publish it.\n"
         }
       ],
       "fix_hint": "Run verification/gates/ux_one_question.sh; each stderr line names the key, the file and line or the engine and command. Keep a skill's first minute to one **Question:** line after its first agentce command, with a **Default:** that only reads and writes into the output folder; move other asks under a Phase or Stage heading; an engine's first-run command never prompts."

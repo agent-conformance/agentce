@@ -3,6 +3,14 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.135.7
+
+- `VG-UX-ONE-QUESTION` (changed, 18.40a): a skill heading underlined with `---` or `===` (a setext heading) fails with
+  `ux.one_question.skill_setext_heading`, since a rule under the Question and Default made them a heading that ended
+  the First minute; and a `**Question:**` or `**Default:**` line outside the First minute counts as an instruction to
+  ask, refused before the section and after it outside a later-step heading. New seeded faults: a rule under the
+  Question and Default, and a Question with a sign-and-publish default under When to use.
+
 ## 0.135.6
 
 - `VG-UX-ONE-QUESTION` (changed, 18.40a): every paragraph of a skill is read whole, not only a Question or Default,
