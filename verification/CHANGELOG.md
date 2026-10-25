@@ -3,6 +3,15 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.135.5
+
+- `VG-UX-ONE-QUESTION` (changed, 18.40a): a `**Question:**` or `**Default:**` line is read with the lines that
+  continue its paragraph, so an unsafe verb on a default's second line is refused, a question wrapped before its "?"
+  is still one question, and a question or ask on a default's second line counts as a question with no default. Every
+  "?" in a Question paragraph after the first is another question. Post and attest join the deny list. New seeded
+  faults: a default wrapped onto a line that signs and publishes the report, two questions on one Question line, and a
+  default that posts the report to the team channel.
+
 ## 0.135.4
 
 - `VG-INGEST-SUPPORT-MATRIX` (changed, 18.39c): README.md that opens with front matter fails with

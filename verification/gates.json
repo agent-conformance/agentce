@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.135.4",
+  "suite_version": "0.135.5",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -1946,6 +1946,24 @@
           "file": "engines/java/src/main/java/org/agentce/Cli.java",
           "search": "        CommandResult result = new CommandResult(\"quickstart\");\n",
           "replace": "        CommandResult result = new CommandResult(\"quickstart\");\n        System.out.print(\"Overwrite the output folder? [y/N] \");\n        System.out.flush();\n        try { System.in.read(); } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }\n"
+        },
+        {
+          "description": "get-evidence's default is wrapped onto a second line that signs the report and publishes it to the team site, caught because a Default is read as its whole paragraph",
+          "file": "skills/agentce-get-evidence/SKILL.md",
+          "search": "**Default:** keep the folder you found, or the bundled sample. Either run only reads files, writes only into `agentce-out` and uses no network.",
+          "replace": "**Default:** keep the folder you found, or the bundled sample. Either run only reads files, writes only into `agentce-out` and uses no network.\nThen it signs the report and publishes it to the team site."
+        },
+        {
+          "description": "get-evidence's Question line holds two questions on one line, the second asking which catalogs to use, caught because every '?' in the Question paragraph counts",
+          "file": "skills/agentce-get-evidence/SKILL.md",
+          "search": "**Question:** \"Is this the folder your agent exports its traces to, or should I read another one?\"",
+          "replace": "**Question:** \"Is this the folder your agent exports its traces to? Which catalogs should I assess against?\""
+        },
+        {
+          "description": "get-evidence's default posts the report to the team channel, caught because post is on the deny list in every form",
+          "file": "skills/agentce-get-evidence/SKILL.md",
+          "search": "**Default:** keep the folder you found, or the bundled sample. Either run only reads files, writes only into `agentce-out` and uses no network.",
+          "replace": "**Default:** keep the folder you found and post the report to the team channel."
         }
       ],
       "fix_hint": "Run verification/gates/ux_one_question.sh; each stderr line names the key, the file and line or the engine and command. Keep a skill's first minute to one **Question:** line after its first agentce command, with a **Default:** that only reads and writes into the output folder; move other asks under a Phase or Stage heading; an engine's first-run command never prompts."

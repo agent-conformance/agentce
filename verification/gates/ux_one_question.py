@@ -13,7 +13,8 @@ without asking passes here whatever its exit code; other gates hold exit codes.
 
 The skill leg reads each SKILL.md's `## First minute` section. It must name a first command that runs
 with no question (`agentce assess` or `agentce quickstart`), and may then ask one question, written as
-a `**Question:**` line after that command and followed by a `**Default:**` line. Neither line may name
+a `**Question:**` line after that command and followed by a `**Default:**` line. Each is read with the
+lines that continue its paragraph, and every "?" in a Question paragraph is a question. Neither may name
 an action beyond reading and writing into the output folder, in any form of the verb. An instruction
 to ask (ask, confirm with, request from, check with, prompt the person for, in any tense) inside the section is a question with no default. Outside the section it may only come
 after it, under a heading that names a later step.
@@ -106,6 +107,8 @@ UNSAFE = re.compile(
         "email",
         "submit|submitted|submitting",
         "transmit|transmitted|transmitting",
+        "post",
+        "attest",
     )
     + r"|--for\b",
     re.IGNORECASE,
@@ -268,6 +271,29 @@ def section_headings(text: str) -> dict[int, str]:
     }
 
 
+def units(text: str, start: int, end: int) -> list[tuple[int, str]]:
+    """(1-based line number, text) for the section between lines `start` and `end`: a line that opens
+    with a Question or Default marker joined with the lines that continue its paragraph up to the next
+    marker, so a default wrapped onto a second line is read whole; every other prose line alone."""
+    out: list[tuple[int, str]] = []
+    for block in blocks(text):
+        if block.kind == "fence" or not start < block.start < end:
+            continue
+        if block.kind == "heading":
+            out.append((block.start, atx(block)))
+            continue
+        marked = False
+        for line in block.text_lines:
+            words = line.text.strip()
+            if marked and not words.startswith((QUESTION, DEFAULT)):
+                n, joined = out[-1]
+                out[-1] = (n, f"{joined} {words}")
+                continue
+            marked = words.startswith((QUESTION, DEFAULT))
+            out.append((line.number, words))
+    return out
+
+
 def read_skill(rel: str, text: str, errors: list[str]) -> int:
     """Check one SKILL.md's first minute; return how many questions it asks there."""
     raw = split_lines(text)
@@ -284,7 +310,7 @@ def read_skill(rel: str, text: str, errors: list[str]) -> int:
             (n for n, h in headings.items() if n > start and h.startswith("## ")),
             len(raw) + 1,
         )
-    body = [(n, line.strip()) for n, line in lines if start < n < end]
+    body = units(text, start, end)
 
     heading = ""
     for n, line in lines:
@@ -315,14 +341,15 @@ def read_skill(rel: str, text: str, errors: list[str]) -> int:
         )
     asks = [(n, line) for n, line in body if line.startswith(QUESTION)]
     defaults = [(n, line) for n, line in body if line.startswith(DEFAULT)]
+    # A Question paragraph asks once per "?" in it; a Default paragraph that asks or tells the
+    # assistant to ask holds a question with no default of its own.
     unmarked = [
-        (n, line)
-        for n, line in body
-        if not line.startswith((QUESTION, DEFAULT)) and is_ask(line)
+        (n, line) for n, line in body if not line.startswith(QUESTION) and is_ask(line)
     ]
-    count = len(asks) + len(unmarked)
+    extra = [(n, line) for n, line in asks for _ in QUESTION_MARK.findall(line)[1:]]
+    count = len(asks) + len(extra) + len(unmarked)
     if count > BUDGET:
-        where = ", ".join(str(n) for n, _ in sorted(asks + unmarked))
+        where = ", ".join(str(n) for n, _ in sorted(asks + extra + unmarked))
         errors.append(
             f"ux.one_question.skill_too_many_questions: {rel} '{SECTION}' asks {count} questions "
             f"(lines {where}); R2 allows {BUDGET}"
@@ -610,6 +637,55 @@ SELF_TEST += [
         "The assistant asks for the repository path first.",
         "Check with the person which catalog applies.",
         "Prompt the user for the trace folder.",
+    )
+]
+
+# A Question or Default is its whole paragraph (verdicts/P18-18.40a-69e939da.md F1, F2): an unsafe verb or
+# a second "?" on a wrapped line still counts, and a question wrapped before its "?" is still one question.
+SELF_TEST += [
+    (
+        "default wrapped, unsafe verb on its second line",
+        GOOD.replace(
+            GOOD_DEFAULT, GOOD_DEFAULT + "\nThen it signs the report for you."
+        ),
+        {"skill_default_unsafe"},
+    ),
+    (
+        "two questions on one Question line",
+        GOOD.replace(
+            GOOD_QUESTION,
+            '**Question:** "Is this your trace folder? Which catalogs should I use?"',
+        ),
+        {"skill_too_many_questions"},
+    ),
+    (
+        "a second question on the Question's wrapped line",
+        GOOD.replace(GOOD_QUESTION, GOOD_QUESTION + "\nIf not, which one?"),
+        {"skill_too_many_questions"},
+    ),
+    (
+        "a question on the Default's wrapped line",
+        GOOD.replace(GOOD_DEFAULT, GOOD_DEFAULT + "\nShould I also read the logs?"),
+        {"skill_too_many_questions", "skill_question_unmarked"},
+    ),
+    (
+        "a question wrapped before its question mark",
+        GOOD.replace(
+            GOOD_QUESTION,
+            '**Question:** "Is this the folder your traces land in,\nor should I read another one?"',
+        ),
+        set(),
+    ),
+] + [
+    (
+        f"default {answer!r}",
+        GOOD.replace("keep the folder you found;", f"{answer};"),
+        {"skill_default_unsafe"},
+    )
+    for answer in (
+        "post the report to the team channel",
+        "the report is posted to the team channel",
+        "attest the report",
     )
 ]
 
