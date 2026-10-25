@@ -74,9 +74,9 @@ win wdtu $'\n  start: 2026-01-01T00:00:00Z\n  end: 2026-02-01T10:00:00Z'
 win wdate $'\n  start: "2026-01-01"\n  end: "2026-02-01"'
 sed '/^observation_window:/,+2d' "$F/applicability.yaml" > "$regs/wnone.yaml"
 win wempty ' {}'
-for t in zzzz 2026-02-30T00:00:00Z; do
+for t in zzzz 2026-02-30T00:00:00Z empty; do # empty: "time": ""
   mkdir -p "$regs/bt-$t/events"
-  sed "s|\"time\":\"[^\"]*\"|\"time\":\"$t\"|" "$F/evidence/events/subject.jsonl" > "$regs/bt-$t/events/subject.jsonl"
+  sed "s|\"time\":\"[^\"]*\"|\"time\":\"${t#empty}\"|" "$F/evidence/events/subject.jsonl" > "$regs/bt-$t/events/subject.jsonl"
   python3 -c 'import hashlib,sys; d=hashlib.sha256(open(sys.argv[2],"rb").read()).hexdigest(); m=open(sys.argv[1]).read(); import re; print(re.sub(r"[0-9a-f]{64}", d, m, count=1), end="")' \
     "$F/evidence/manifest.json" "$regs/bt-$t/events/subject.jsonl" > "$regs/bt-$t/manifest.json"
 done
@@ -144,7 +144,7 @@ for w in wfoo wfeb wfebu wnull w24 wstart wscalar wdateu wdtu wdate; do
   scenario "W-$w" --bundle "$F/evidence" --profile "$regs/$w.yaml" --domain "$F/domain.linkml.yaml" \
     --catalog-dir "$F/catalog" --allow-unverified-catalog --deviations "$F/deviations.yaml"
 done
-for t in zzzz 2026-02-30T00:00:00Z; do
+for t in zzzz 2026-02-30T00:00:00Z empty; do
   for w in wnone wempty; do
     scenario "WT-$t-$w" --bundle "$regs/bt-$t" --profile "$regs/$w.yaml" --domain "$F/domain.linkml.yaml" \
       --catalog-dir "$F/catalog" --allow-unverified-catalog --deviations "$F/deviations.yaml"
@@ -229,7 +229,7 @@ REFUSALS = ["S2", "S2D", "S3", "S4", "S5", "S6", "S6D", "S7", "S8", "S9", "S12",
 # 18.87: a window bound that is not an RFC 3339 date or date-time, or a window that is not a mapping, is a profile refusal;
 # a window end taken from records whose time does not parse refuses the register (no expiry can be checked).
 WINDOW_REFUSALS = ["W-wfoo", "W-wfeb", "W-wfebu", "W-wnull", "W-w24", "W-wstart", "W-wscalar"]
-TIME_REFUSALS = [f"WT-{t}-{w}" for t in ("zzzz", "2026-02-30T00:00:00Z") for w in ("wnone", "wempty")]
+TIME_REFUSALS = [f"WT-{t}-{w}" for t in ("zzzz", "2026-02-30T00:00:00Z", "empty") for w in ("wnone", "wempty")]
 REFUSALS += WINDOW_REFUSALS + TIME_REFUSALS
 SUCCESSES = ["S0", "S1", "S10", "S11", "S13", "S14", "S15", "W-wdateu", "W-wdtu", "W-wdate"]
 FILES = ("assertions.json", "oscal-ar.json", "activity.json", "blind-spots.json")

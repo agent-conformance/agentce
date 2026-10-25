@@ -3,6 +3,12 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.135.11
+
+- `VG-DEVIATIONS-PARITY` (changed, 18.87): a bundle whose record times are all empty (`"time": ""`), with no declared
+  window, refuses the register with input.deviation_invalid in all three engines instead of checking expiry against
+  the epoch. New seeded fault: Python's window_end skips an empty record time.
+
 ## 0.135.10
 
 - `VG-DEVIATIONS-PARITY` (changed, 18.87): profiles whose observation_window start or end is not an RFC 3339 date or
