@@ -172,7 +172,7 @@ def check_tier_layout(text: str, source: str) -> tuple[list[str], list[str]]:
         numbers = {line.number for line in other}
         shown = " ".join(line.text for line in block.visible if line.number in numbers)
         if other and any(
-            _TIER_MENTION_RE.search(_plain(text)) for text in (joined, shown)
+            _TIER_MENTION_RE.search(_plain(candidate)) for candidate in (joined, shown)
         ):
             problems.append(
                 f"ingest.matrix.tier_line_unreadable: {source} line {other[0].number} holds a tier line "
