@@ -42,6 +42,7 @@ deviation register, manual evaluation records and `.agentce.yaml`.
 | `flow_scalar_indicator_start` | `tools: [?x, :y]` | `tools: ["?x", ":y"]` |
 | `flow_line_not_indented` | a `[...]` or `{...}` continued onto a line at or left of its key | indent the continuation past the key, or keep the list on one line |
 | `depth_over_100` | mappings or lists nested 101 deep | at most 100 levels |
+| `surrogate_escape` | `rationale: "\ud800"`, `"\ud83d\ude00"`, any `\u` or `\U` escape of D800 to DFFF in double quotes | the character itself, such as `"😀"`. UTF-8 cannot carry a lone surrogate |
 
 The YAML 1.1 forms in the table (`yes`, `on`, `1_000`, `1:30`, `0755`, `08`, `1e3`, `1.0e3`) are the ones YAML 1.1
 and YAML 1.2 libraries read differently: one engine would read `yes` as true and another as the text

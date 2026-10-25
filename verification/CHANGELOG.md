@@ -3,6 +3,18 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.134.0
+
+- `VG-YAML-PROFILE` (changed, 18.86): the shared case table gains the `surrogate_escape` rule. A double-quoted scalar
+  may not hold a `\u` or `\U` escape of a UTF-16 surrogate, D800 to DFFF, whether lone or in a pair. Eight refuse cases
+  put the escape in a value, a key, a flow list item and a continuation line. Six accept controls hold the same text
+  single-quoted, plain, in a block scalar, after an escaped backslash and in a comment, plus non-surrogate escapes. One
+  new seeded fault: Java skips the rule.
+- `VG-DEVIATIONS-PARITY` (changed, 18.86): `assess --deviations` (S28) and `readiness --deviations` (R28) refuse a
+  rationale holding a `\ud800` escape with `input.deviation_invalid`, naming `surrogate_escape` at its line, with the
+  same cause and fix in all three engines. Before, Python crashed with `internal.unexpected`, and TypeScript and Java
+  wrote U+FFFD or `?` into the OSCAL report.
+
 ## 0.133.0
 
 - Added `VG-UX-PAGES` (18.40c, tier quick): the site works on a phone. The gate builds the site and opens every

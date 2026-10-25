@@ -38,8 +38,14 @@ HINTS: dict[str, str] = {
     "flow_scalar_indicator_start": "quote the value to keep it as text",
     "flow_line_not_indented": "indent the line further than the key the list or mapping belongs to",
     "depth_over_100": "flatten the nesting to at most 100 levels",
+    "surrogate_escape": "write the character itself instead of escaping a surrogate",
 }
 
+# A double-quoted escape of a UTF-16 surrogate (D800-DFFF), lone or in a pair: UTF-8 cannot carry one, and the engines'
+# YAML libraries keep, replace or join them differently.
+_SURROGATE_ESCAPE = re.compile(
+    r"\\(u[dD][89a-fA-F][0-9a-fA-F]{2}|U0000[dD][89a-fA-F][0-9a-fA-F]{2})"
+)
 _YAML11_BOOL = re.compile(r"(?i)y|n|yes|no|on|off")
 _UNDERSCORE_NUMBER = re.compile(
     r"[-+]?(0b[01_]+|0x[0-9a-fA-F_]+|0[0-7_]+|[0-9][0-9_]*(\.[0-9_]*)?([eE][-+][0-9]+)?|\.[0-9_]+([eE][-+][0-9]+)?)"
@@ -260,6 +266,8 @@ class _Scanner:
         while i < len(line):
             ch = line[i]
             if quote == '"' and ch == "\\":
+                if _SURROGATE_ESCAPE.match(line, i):
+                    raise self.fail("surrogate_escape")
                 i += 2
                 continue
             if ch == quote:

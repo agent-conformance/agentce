@@ -34,7 +34,12 @@ export const HINTS: Readonly<Record<string, string>> = {
   flow_scalar_indicator_start: "quote the value to keep it as text",
   flow_line_not_indented: "indent the line further than the key the list or mapping belongs to",
   depth_over_100: "flatten the nesting to at most 100 levels",
+  surrogate_escape: "write the character itself instead of escaping a surrogate",
 };
+
+// A double-quoted escape of a UTF-16 surrogate (D800-DFFF), lone or in a pair: UTF-8 cannot carry one, and the engines'
+// YAML libraries keep, replace or join them differently.
+const SURROGATE_ESCAPE = /^\\(?:u[dD][89a-fA-F][0-9a-fA-F]{2}|U0000[dD][89a-fA-F][0-9a-fA-F]{2})/;
 
 const YAML11_BOOL = /^(?:y|n|yes|no|on|off)$/i;
 const UNDERSCORE_NUMBER =
@@ -334,6 +339,9 @@ class Scanner {
     while (i < line.length) {
       const ch = line[i];
       if (quote === '"' && ch === "\\") {
+        if (SURROGATE_ESCAPE.test(text(line, i, i + 10))) {
+          throw this.fail("surrogate_escape");
+        }
         i += 2;
         continue;
       }

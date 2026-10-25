@@ -4,7 +4,7 @@
 # register (S0), the auditor-view fixture's register (S1), lint and shape refusals (S2-S9, S12),
 # unquoted dates (S10), an empty register (S11), only an expired entry (S13), two subjects (S14), the
 # `--deviations=<path>` spelling (S15), a missing value (S16, S23), hostile and mistaken register bytes
-# (S17-S21), a `.` segment in the register path (S2D, S6D), the flag given twice, refused (S22, S22b) and an entry on a
+# (S17-S21), a double-quoted surrogate escape in a rationale, refused by assess (S28) and readiness (R28), a `.` segment in the register path (S2D, S6D), the flag given twice, refused (S22, S22b) and an entry on a
 # control that fails the SPEC §10.4 human-actor rule, which the register cannot waive (S24, S25, S26 through a
 # third-party catalog whose sequence paths reach the failing decision from the action, and S27 through paths that
 # repeat a predicate) -- and must give Python's exit code, error key, cause
@@ -51,6 +51,8 @@ printf 'deviations:\n  - !!python/object:os.system {control: AUV-01}\n' > "$regs
   printf '  - *e\n'; } > "$regs/s19.yaml"
 python3 -c 'import sys; sys.stdout.write("deviations: " + "["*5000 + "]"*5000 + "\n")' > "$regs/s20.yaml"
 printf 'deviations: 3\n' > "$regs/o'brien/reg.yaml"
+# A double-quoted \ud800 escape in a rationale: outside the YAML profile (surrogate_escape, SPEC 8.7), not a crash.
+sed 's/rationale: "Accepted pending remediation./rationale: "Accepted \\ud800 pending./' "$F/deviations.yaml" > "$regs/s28.yaml"
 
 base=(--bundle "$F/evidence" --profile "$F/applicability.yaml" --domain "$F/domain.linkml.yaml"
   --catalog-dir "$F/catalog" --allow-unverified-catalog)
@@ -86,7 +88,7 @@ scenario() {
 
 scenario S0 "${base[@]}"
 scenario S1 "${base[@]}" --deviations "$F/deviations.yaml"
-for s in s2 s3 s4 s5 s6 s7 s9 s10 s11 s13 s17 s18 s19 s20; do
+for s in s2 s3 s4 s5 s6 s7 s9 s10 s11 s13 s17 s18 s19 s20 s28; do
   scenario "$(printf %s "$s" | tr s S)" "${base[@]}" --deviations "$regs/$s.yaml"
 done
 scenario S8 "${base[@]}" --deviations "$regs/nope.yaml"
@@ -114,6 +116,21 @@ scenario S27 --bundle "$H/repeat/bundle" --profile "$H/repeat/applicability.yaml
   --deviations "$H/repeat/deviations.yaml"
 scenario S23 --bundle "$F/evidence" --deviations --profile "$F/applicability.yaml" \
   --domain "$F/domain.linkml.yaml" --catalog-dir "$F/catalog" --allow-unverified-catalog
+
+# readiness --deviations reads the register through the same profile (R28): each engine over its own S0 report.
+for engine in python typescript java; do
+  out="$work/$engine/R28"
+  code=0
+  case "$engine" in
+    python)
+      (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce readiness "$work/$engine/S0" --json --deviations "$regs/s28.yaml") ;;
+    typescript)
+      (cd "$root/engines/typescript" && pnpm --silent agentce readiness "$work/$engine/S0" --json --deviations "$regs/s28.yaml") ;;
+    java)
+      (cd "$root/engines/java" && ./build/install/agentce/bin/agentce readiness "$work/$engine/S0" --json --deviations "$regs/s28.yaml") ;;
+  esac > "$out.json" 2> "$out.err" || code=$?
+  echo "$code" > "$out.code"
+done
 
 # Python's own auditor.json for S1, the reference the seam's bytes must also equal.
 (cd "$root/engines/python" && env -u VIRTUAL_ENV uv run --frozen agentce assess --out "$work/auditor" \
@@ -180,7 +197,8 @@ PREFIX = {
     "S17": "is not valid UTF-8",
     "S18": "carries a YAML construct the engine refuses to load",
 }
-REFUSALS = ["S2", "S2D", "S3", "S4", "S5", "S6", "S6D", "S7", "S8", "S9", "S12", "S17", "S18", "S19", "S20", "S21", "S22", "S22b"]
+REFUSALS = ["S2", "S2D", "S3", "S4", "S5", "S6", "S6D", "S7", "S8", "S9", "S12", "S17", "S18", "S19", "S20", "S21", "S22", "S22b",
+            "S28", "R28"]
 SUCCESSES = ["S0", "S1", "S10", "S11", "S13", "S14", "S15"]
 FILES = ("assertions.json", "oscal-ar.json", "activity.json", "blind-spots.json")
 # SPEC §10.4: the register cannot waive the human-actor rule. Per scenario, the controls whose entry is not applied
@@ -243,6 +261,13 @@ for s in REFUSALS:
         got = (code(engine, s), error(engine, s))
         check(got == ref, f"{s}: {engine} {got} != python {ref}")
         check(not os.path.exists(f"{work}/{engine}/{s}/assertions.json"), f"{s}: {engine} wrote assertions.json")
+
+# S28 and R28: the surrogate escape is refused by the YAML profile at the rationale's line, in assess and readiness.
+for s in ("S28", "R28"):
+    e = error("python", s)
+    check(e["key"] == "input.deviation_invalid" and "outside the YAML profile: surrogate_escape at line 9 (SPEC 8.7)."
+          in (e["cause"] or "") and e["fix"] == "write the character itself instead of escaping a surrogate.",
+          f"{s}: python refused with {e}")
 
 for s in ("S16", "S23"):
     for engine in ENGINES:

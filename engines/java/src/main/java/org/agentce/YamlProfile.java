@@ -55,9 +55,14 @@ public final class YamlProfile {
         h.put("flow_scalar_indicator_start", "quote the value to keep it as text");
         h.put("flow_line_not_indented", "indent the line further than the key the list or mapping belongs to");
         h.put("depth_over_100", "flatten the nesting to at most 100 levels");
+        h.put("surrogate_escape", "write the character itself instead of escaping a surrogate");
         HINTS = java.util.Collections.unmodifiableMap(h);
     }
 
+    // A double-quoted escape of a UTF-16 surrogate (D800-DFFF), lone or in a pair: UTF-8 cannot carry one, and the engines'
+    // YAML libraries keep, replace or join them differently.
+    private static final Pattern SURROGATE_ESCAPE =
+            Pattern.compile("\\\\(u[dD][89a-fA-F][0-9a-fA-F]{2}|U0000[dD][89a-fA-F][0-9a-fA-F]{2})");
     private static final Pattern YAML11_BOOL = Pattern.compile("(?i)y|n|yes|no|on|off");
     private static final Pattern UNDERSCORE_NUMBER = Pattern.compile(
             "[-+]?(0b[01_]+|0x[0-9a-fA-F_]+|0[0-7_]+|[0-9][0-9_]*(\\.[0-9_]*)?([eE][-+][0-9]+)?|\\.[0-9_]+([eE][-+][0-9]+)?)");
@@ -449,6 +454,10 @@ public final class YamlProfile {
             while (i < line.length) {
                 int ch = line[i];
                 if (quote == '"' && ch == '\\') {
+                    String escape = new String(line, i, Math.min(10, line.length - i));
+                    if (SURROGATE_ESCAPE.matcher(escape).lookingAt()) {
+                        throw fail("surrogate_escape");
+                    }
                     i += 2;
                     continue;
                 }
