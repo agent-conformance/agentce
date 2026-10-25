@@ -3,6 +3,17 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.135.0
+
+- `VG-INGEST-SUPPORT-MATRIX`, `VG-UX-COPY` and `VG-UX-ONE-QUESTION` (changed, 18.211) read Markdown through one shared
+  reader, `verification/gates/markdown_reader.py`, which turns a file into CommonMark 0.31.2 blocks with their source
+  lines. A line ends only at LF, CR or CRLF, so a form feed or U+2028 no longer splits a table row. A code span ends at
+  a paragraph break, and a fence closes only on a run at least as long as its opener. The reader's self-test runs the
+  CommonMark and GFM table examples for each construct through it. VG-UX-ONE-QUESTION bounds the First minute section
+  by top-level headings only, so a heading in indented code or a block quote no longer ends the section early. Two new
+  seeded faults: a form-feed line inside the trace-store table, and two unpaired backticks in README.md around a
+  banned phrase. VG-INGEST-SUPPORT-MATRIX now refuses an unknown option.
+
 ## 0.134.0
 
 - `VG-YAML-PROFILE` (changed, 18.86): the shared case table gains the `surrogate_escape` rule. A double-quoted scalar
