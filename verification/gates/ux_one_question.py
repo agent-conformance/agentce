@@ -57,6 +57,7 @@ RUNS = {
 SECTION = "## First minute"
 QUESTION = "**Question:**"
 DEFAULT = "**Default:**"
+MARKERS = (QUESTION, DEFAULT)
 FIRST_COMMAND = re.compile(r"`agentce (?:assess|quickstart)\b[^`]*`")
 
 
@@ -263,7 +264,7 @@ def prose(found: list[Block]) -> list[tuple[int, str]]:
         piece: list[str] = []
         for line in block.text_lines:
             words = line.text.strip()
-            if not piece or words.startswith((QUESTION, DEFAULT)):
+            if not piece or words.startswith(MARKERS):
                 out.append((line.number, words))
                 piece = [words]
             else:
@@ -294,7 +295,7 @@ def read_skill(rel: str, text: str, errors: list[str]) -> int:
         if block.kind == "heading" and block.end > block.start:
             errors.append(
                 f"ux.one_question.skill_setext_heading: {rel}:{block.start} is a heading underlined "
-                f"at line {block.end}; write it as '{'#' * block.level} ...' so the sections the "
+                f"at line {block.end}; write it as {atx(block)!r} so the sections the "
                 "gate reads are the ones the assistant sees"
             )
     lines = prose(found)
@@ -319,10 +320,10 @@ def read_skill(rel: str, text: str, errors: list[str]) -> int:
         # Before the section any question counts; after it, only an instruction to ask (a "?" there
         # is the skill quoting what a person says, as in "When to use"). A Question or Default
         # marker is an instruction to ask wherever it sits.
-        marked = line.startswith((QUESTION, DEFAULT))
-        if start <= n < end or not (
-            marked or (is_ask(line) if n < start else ASK.search(line))
-        ):
+        asks_here = line.startswith(MARKERS) or (
+            is_ask(line) if n < start else ASK.search(line)
+        )
+        if start <= n < end or not asks_here:
             continue
         if n < start:
             errors.append(
