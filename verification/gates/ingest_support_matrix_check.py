@@ -143,9 +143,8 @@ def parse_tier_line(names_text: str) -> tuple[list[str], int | None]:
 
 def _plain(line: str) -> str:
     """The line with entities decoded, invisible characters dropped and emphasis and code-span markup
-    removed, so a tier claim is found however it is spelled. A caller reading source removes its raw
-    inline HTML first (markdown_reader.INLINE_HTML); text a reader already sees has it blanked, and what
-    is left there between a '<' and a '>' is on the page."""
+    removed, so a tier claim is found however it is spelled. Raw inline HTML is kept: a caller that
+    wants it gone removes it first (markdown_reader.INLINE_HTML)."""
     unescaped = _ESCAPE_RE.sub(r"\1", html.unescape(line))
     return _MARKUP_RE.sub("", _INVISIBLE_RE.sub("", unescaped))
 
