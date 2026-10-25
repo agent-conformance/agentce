@@ -245,60 +245,48 @@ def atx(block: Block) -> str:
     return "#" * block.level + " " + " ".join(line.text for line in block.lines)
 
 
-def prose(text: str) -> list[tuple[int, str]]:
-    """(1-based line number, text) for every line outside the front matter and fenced code, read as
-    CommonMark blocks (markdown_reader): a heading as its ATX form, a paragraph's lines without their
-    block-quote or list markers, any other block's own lines."""
+def prose(found: list[Block]) -> list[tuple[int, str]]:
+    """(1-based first line, text) for each piece of prose outside the front matter and fenced code, read
+    as CommonMark blocks (markdown_reader): a heading as its ATX form, and every other block whole, its
+    lines joined without their block-quote or list markers, so a phrase or a default wrapped onto a
+    second line is read in one piece. A line opening with a Question or Default marker starts a new
+    piece, so each marker is read with the lines that continue it."""
     out: list[tuple[int, str]] = []
-    for block in blocks(text):
+    for block in found:
         if block.kind == "fence":
             continue
         if block.kind == "heading":
             out.append((block.start, atx(block)))
-        else:
-            out += [(line.number, line.text) for line in block.text_lines]
+            continue
+        piece: list[str] = []
+        for line in block.text_lines:
+            words = line.text.strip()
+            if not piece or words.startswith((QUESTION, DEFAULT)):
+                out.append((line.number, words))
+                piece = [words]
+            else:
+                piece.append(words)
+                out[-1] = (out[-1][0], " ".join(piece))
     return out
 
 
-def section_headings(text: str) -> dict[int, str]:
+def section_headings(found: list[Block]) -> dict[int, str]:
     """Line number -> ATX form of each top-level heading (no block quote or list item around it). Only
     these bound a section: a heading inside a quote or a list item, or a heading-shaped line of indented
     code, is part of the section it sits in."""
     return {
         block.start: atx(block)
-        for block in blocks(text)
+        for block in found
         if block.kind == "heading" and not block.containers
     }
-
-
-def units(text: str, start: int, end: int) -> list[tuple[int, str]]:
-    """(1-based line number, text) for the section between lines `start` and `end`: a line that opens
-    with a Question or Default marker joined with the lines that continue its paragraph up to the next
-    marker, so a default wrapped onto a second line is read whole; every other prose line alone."""
-    out: list[tuple[int, str]] = []
-    for block in blocks(text):
-        if block.kind == "fence" or not start < block.start < end:
-            continue
-        if block.kind == "heading":
-            out.append((block.start, atx(block)))
-            continue
-        marked = False
-        for line in block.text_lines:
-            words = line.text.strip()
-            if marked and not words.startswith((QUESTION, DEFAULT)):
-                n, joined = out[-1]
-                out[-1] = (n, f"{joined} {words}")
-                continue
-            marked = words.startswith((QUESTION, DEFAULT))
-            out.append((line.number, words))
-    return out
 
 
 def read_skill(rel: str, text: str, errors: list[str]) -> int:
     """Check one SKILL.md's first minute; return how many questions it asks there."""
     raw = split_lines(text)
-    lines = prose(text)
-    headings = section_headings(text)
+    found = blocks(text)
+    lines = prose(found)
+    headings = section_headings(found)
     start = next((n for n, h in headings.items() if h.rstrip() == SECTION), None)
     if start is None:  # with no first minute, every ask comes before the first findings
         errors.append(
@@ -310,7 +298,7 @@ def read_skill(rel: str, text: str, errors: list[str]) -> int:
             (n for n, h in headings.items() if n > start and h.startswith("## ")),
             len(raw) + 1,
         )
-    body = units(text, start, end)
+    body = [(n, line) for n, line in lines if start < n < end]
 
     heading = ""
     for n, line in lines:
@@ -346,10 +334,11 @@ def read_skill(rel: str, text: str, errors: list[str]) -> int:
     unmarked = [
         (n, line) for n, line in body if not line.startswith(QUESTION) and is_ask(line)
     ]
-    extra = [(n, line) for n, line in asks for _ in QUESTION_MARK.findall(line)[1:]]
-    count = len(asks) + len(extra) + len(unmarked)
+    count = len(unmarked) + sum(
+        max(1, len(QUESTION_MARK.findall(line))) for _, line in asks
+    )
     if count > BUDGET:
-        where = ", ".join(str(n) for n, _ in sorted(asks + extra + unmarked))
+        where = ", ".join(str(n) for n, _ in sorted(asks + unmarked))
         errors.append(
             f"ux.one_question.skill_too_many_questions: {rel} '{SECTION}' asks {count} questions "
             f"(lines {where}); R2 allows {BUDGET}"
@@ -675,6 +664,21 @@ SELF_TEST += [
             '**Question:** "Is this the folder your traces land in,\nor should I read another one?"',
         ),
         set(),
+    ),
+    (
+        "an ask wrapped across two lines in the section",
+        GOOD.replace(
+            "show the verdict.",
+            "show the verdict.\n\nThen confirm\nwith the person which catalogs to use.",
+        ),
+        {"skill_too_many_questions", "skill_question_unmarked"},
+    ),
+    (
+        "an ask wrapped across two lines before the section",
+        GOOD.replace(
+            "Intro.", "Intro. Check\nwith the person which repository to use."
+        ),
+        {"skill_asks_before_first_minute"},
     ),
 ] + [
     (

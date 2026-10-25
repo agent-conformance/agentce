@@ -3,6 +3,12 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.135.6
+
+- `VG-UX-ONE-QUESTION` (changed, 18.40a): every paragraph of a skill is read whole, not only a Question or Default,
+  so an ask phrase wrapped across two lines ("confirm" / "with the person") counts inside, before and after the First
+  minute. The skill is parsed once per run.
+
 ## 0.135.5
 
 - `VG-UX-ONE-QUESTION` (changed, 18.40a): a `**Question:**` or `**Default:**` line is read with the lines that
