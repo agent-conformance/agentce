@@ -349,10 +349,16 @@ def package_description(text: str) -> str | None:
 
 
 def readme_opening(text: str) -> str | None:
-    """The first paragraph after the H1, folded to one line."""
-    body = text.split("\n# ", 1)[-1] if not text.startswith("# ") else text[2:]
-    parts = body.split("\n\n")
-    return " ".join(parts[1].split()) if len(parts) > 1 else None
+    """The visible text of the paragraph right after the first top-level H1, folded to one line; None
+    when the next block is not a paragraph (a fence or a comment is not what the site shows there)."""
+    found = blocks(text)
+    for i, block in enumerate(found):
+        if block.kind == "heading" and block.level == 1 and not block.containers:
+            after = found[i + 1] if i + 1 < len(found) else None
+            if after is None or after.kind != "paragraph" or after.containers:
+                return None
+            return " ".join(" ".join(line.text for line in after.text_lines).split())
+    return None
 
 
 def front_description(text: str) -> str | None:
@@ -548,6 +554,13 @@ def self_test() -> int:
         (readme_opening, f"# t\n\nIntro. {TAGLINE} More.\n", []),
         (readme_opening, "# t\n\nIntro.\n", ["sweep_value"]),
         (readme_opening, "# t\n", ["sweep_unreadable"]),
+        (readme_opening, f"# t\n\n```\n{TAGLINE}\n```\n", ["sweep_unreadable"]),
+        (
+            readme_opening,
+            f"# t\n\n<!-- {TAGLINE} -->\n\nIntro.\n",
+            ["sweep_unreadable"],
+        ),
+        (readme_opening, f"Intro.\n# t\n\n> {TAGLINE}\n", ["sweep_unreadable"]),
         (front_description, f"---\ndescription: {TAGLINE}\n---\n", []),
         (front_description, "---\ntitle: x\n---\n", ["sweep_unreadable"]),
     ]
