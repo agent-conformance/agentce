@@ -489,32 +489,37 @@ def self_test() -> int:
     return 1 if failed else 0
 
 
+def need_parser(script: str, argv: list[str]) -> None:
+    """Re-run ``script`` in the tools environment when markdown-it-py is not importable here (a plain
+    ``uv run python``); exit 2 with markdown_reader.no_parser when it is missing there too."""
+    if _PARSER is not None:
+        return
+    if os.environ.get(_RERUN):
+        print(
+            "markdown_reader.no_parser: markdown-it-py is not installed",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    tools = Path(__file__).resolve().parents[2] / "tools"
+    env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"} | {_RERUN: "1"}
+    command = [
+        "uv",
+        "run",
+        "--project",
+        str(tools),
+        "--frozen",
+        "python3",
+        script,
+        *argv,
+    ]
+    os.execvpe("uv", command, env)
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="markdown_reader.py", allow_abbrev=False)
     parser.add_argument("--self-test", action="store_true", required=True)
     parser.parse_args(argv)
-    if _PARSER is None:
-        if os.environ.get(_RERUN):
-            print(
-                "markdown_reader.no_parser: markdown-it-py is not installed",
-                file=sys.stderr,
-            )
-            return 2
-        tools = Path(__file__).resolve().parents[2] / "tools"
-        env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"} | {
-            _RERUN: "1"
-        }
-        command = [
-            "uv",
-            "run",
-            "--project",
-            str(tools),
-            "--frozen",
-            "python3",
-            __file__,
-            *argv,
-        ]
-        os.execvpe("uv", command, env)
+    need_parser(__file__, argv)
     return self_test()
 
 

@@ -40,7 +40,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from markdown_reader import blocks, front_matter
+from markdown_reader import blocks, front_matter, need_parser
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -611,6 +611,7 @@ def main() -> int:
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--no-cli", action="store_true", help="skip the engine runs")
     args = parser.parse_args()
+    need_parser(__file__, sys.argv[1:])
     if args.self_test:
         return self_test()
     errors: list[str] = []

@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 import yaml
-from markdown_reader import Block, Line, blocks, split_lines
+from markdown_reader import Block, Line, blocks, need_parser, split_lines
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -1084,7 +1084,9 @@ def main(argv: list[str]) -> int:
         prog="ingest_support_matrix_check.py", allow_abbrev=False
     )
     parser.add_argument("--self-test", action="store_true")
-    if parser.parse_args(argv).self_test:
+    args = parser.parse_args(argv)
+    need_parser(__file__, argv)
+    if args.self_test:
         return self_test()
     problems = check()
     if problems:

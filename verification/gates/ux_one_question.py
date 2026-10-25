@@ -37,7 +37,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from markdown_reader import Block, blocks, split_lines
+from markdown_reader import Block, blocks, need_parser, split_lines
 
 ROOT = Path(__file__).resolve().parents[2]
 TRACE_FIXTURE = (
@@ -659,7 +659,9 @@ def main() -> int:
         action="store_true",
         help="run the skill reader over built-in texts",
     )
-    if parser.parse_args().self_test:
+    args = parser.parse_args()
+    need_parser(__file__, sys.argv[1:])
+    if args.self_test:
         return self_test()
     errors: list[str] = []
     skill_questions = skill_leg(errors)
