@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.135.7",
+  "suite_version": "0.135.8",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -979,6 +979,12 @@
           "file": "README.md",
           "search": "**Roadmap** (4): ",
           "replace": "We also list [**Experimental**](docs/x.md) (1): Honeycomb.\n\n**Roadmap** (4): "
+        },
+        {
+          "description": "README gains a paragraph whose middle line claims Experimental (1): Honeycomb between a '< 3.12' on the line above and a '> 0' on the line below; the site shows the claim, since neither is an HTML tag (18.39c, verdicts/P18-18.39c-2c530daf.md)",
+          "file": "README.md",
+          "search": "**Roadmap** (4): ",
+          "replace": "Readers need Python 3.12 or later (not < 3.12).\nWe also list **Experimental** (1): Honeycomb.\nAn exit code > 0 means a refusal.\n\n**Roadmap** (4): "
         },
         {
           "description": "README.md opens with YAML front matter whose note names Honeycomb Supported: GitHub shows front matter on the page, while the shared reader sets it aside (inbox row 546, 18.39c)",

@@ -39,7 +39,22 @@ _TIER_MENTION_RE = re.compile(
     r"\b(?:" + "|".join(_KNOWN_TIERS) + r")\s*\(\s*\d", re.IGNORECASE
 )
 _ESCAPE_RE = re.compile(r"\\(.)")
-_MARKUP_RE = re.compile(r"<[^>]*>|[*_`~]")
+_MARKUP_RE = re.compile(r"[*_`~]")
+# CommonMark 0.31.2 section 6.6 raw HTML: an open or closing tag, a comment, a processing instruction, a
+# declaration or a CDATA section. Anything else between a '<' and a '>' is text the page shows (18.39c).
+_ATTRIBUTE = (
+    r"\s+[A-Za-z_:][A-Za-z0-9_.:-]*"
+    r"(?:\s*=\s*(?:[^\s\"'=<>`]+|'[^']*'|\"[^\"]*\"))?"
+)
+_INLINE_HTML_RE = re.compile(
+    rf"<[A-Za-z][A-Za-z0-9-]*(?:{_ATTRIBUTE})*\s*/?>"
+    r"|</[A-Za-z][A-Za-z0-9-]*\s*>"
+    r"|<!-->|<!--->|<!--.*?-->"
+    r"|<\?.*?\?>"
+    r"|<![A-Za-z][^>]*>"
+    r"|<!\[CDATA\[.*?\]\]>",
+    re.DOTALL,
+)
 _INVISIBLE_RE = re.compile(r"[\u00ad\u200b-\u200f\u2060-\u2064\ufeff]")
 
 
@@ -133,9 +148,13 @@ def parse_tier_line(names_text: str) -> tuple[list[str], int | None]:
     return tokens, more
 
 
-def _plain(line: str) -> str:
-    """The line with entities decoded, invisible characters dropped and emphasis, code-span and HTML markup
-    removed, so a tier claim is found however it is spelled."""
+def _plain(line: str, *, tags: bool = True) -> str:
+    """The line with entities decoded, invisible characters dropped and emphasis and code-span markup
+    removed, so a tier claim is found however it is spelled; with ``tags``, raw inline HTML (CommonMark
+    6.6 shapes only) is removed first. Text a reader already sees is read with ``tags=False``: its inline
+    HTML is blanked, and what is left between a '<' and a '>' is on the page."""
+    if tags:
+        line = _INLINE_HTML_RE.sub("", line)
     unescaped = _ESCAPE_RE.sub(r"\1", html.unescape(line))
     return _MARKUP_RE.sub("", _INVISIBLE_RE.sub("", unescaped))
 
@@ -178,8 +197,9 @@ def check_tier_layout(text: str, source: str) -> tuple[list[str], list[str]]:
         # text); the visible text catches one whose word or count is a link or sits beside an image.
         numbers = {line.number for line in other}
         shown = " ".join(line.text for line in block.visible if line.number in numbers)
-        if other and any(
-            _TIER_MENTION_RE.search(_plain(candidate)) for candidate in (joined, shown)
+        if other and (
+            _TIER_MENTION_RE.search(_plain(joined))
+            or _TIER_MENTION_RE.search(_plain(shown, tags=False))
         ):
             problems.append(
                 f"ingest.matrix.tier_line_unreadable: {source} line {other[0].number} holds a tier line "
@@ -1044,6 +1064,22 @@ def self_test() -> int:
         "a shortcut-reference tier word": "We also list [Experimental] (1): Honeycomb.\n\n[Experimental]: docs/x.md",
         "a linked count": "We also list **Experimental** [(1)](docs/x.md): Honeycomb.",
         "an image between the word and the count": "We also list Experimental![](x.png) (1): Honeycomb.",
+        "a claim between a '<' and a '>' on other lines": "Python 3.12 or later (not < 3.12).\n"
+        "We also list " + claim + "\nAn exit code > 0 means a refusal.",
+        "a claim between arrows": "OTel <- we also list "
+        + claim
+        + " -> see the matrix.",
+        "a claim between a '<' and a '>' in a block quote": "> Python < 3.12. "
+        + claim
+        + " Exit > 0.",
+        "a claim between a '<' and a '>' in a list item": "- Python < 3.12. "
+        + claim
+        + " Exit > 0.",
+        "a claim between a '<' and a '>' in a heading": "## a < b " + claim + " c > d",
+        "a claim inside a '<' and '>' that is not a tag": "<Experimental (1): Honeycomb.>",
+        "a claim inside a span tag": '<span class="t">' + claim + "</span>",
+        "a claim after an HTML comment": "<!-- note --> " + claim,
+        "an escaped tag shown as text": '&lt;a title="Experimental (1): Honeycomb"&gt;',
     }.items():
         cases.append(
             (

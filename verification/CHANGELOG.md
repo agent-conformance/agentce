@@ -3,6 +3,13 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.135.8
+
+- `VG-INGEST-SUPPORT-MATRIX` (changed, 18.39c): README's tier-claim search strips only CommonMark 6.6 raw HTML (a
+  tag, comment, processing instruction, declaration or CDATA) from the source, and no HTML from the text a reader
+  sees, so a claim between a literal `<` and `>` (`(not < 3.12)` ... `exit code > 0`, arrows, a `<` and `>` that
+  are not a tag) is refused. New seeded fault: a claim on the middle line of a paragraph between `< 3.12` and `> 0`.
+
 ## 0.135.7
 
 - `VG-UX-ONE-QUESTION` (changed, 18.40a): a skill heading underlined with `---` or `===` (a setext heading) fails with
