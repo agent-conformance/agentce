@@ -18,6 +18,7 @@ import { DENIED_KINDS, RECORDER_CLASSES, summarizeActivity } from "./activity";
 import { type Assertion, OUTCOMES, aggregate, assertionToJson, checkDc5 } from "./assertions";
 import { deviationsByControl, indexBySubject } from "./assess";
 import type { BlindSpot, BlindSpots, CheckRef } from "./blindSpots";
+import { DEFAULT_LENS, baseLenses } from "./bundled";
 import {
   BUYER_FRAMEWORKS,
   BUYER_QUESTIONNAIRE_TITLES,
@@ -38,6 +39,7 @@ import {
   checksBySubject,
   computeProjectView,
 } from "./project";
+import { pyTruthy } from "./readiness";
 import { renderRemediationMd, renderRemediationPackage } from "./remediation";
 import {
   FRAMEWORK_DISPLAY_NAMES,
@@ -700,7 +702,7 @@ function blindSpotsHtml(blindSpots: BlindSpots): string {
       body += `<h3>${escapeHtml(heading)}</h3><ul>${items(sectionRows)}</ul>`;
     }
   }
-  return `<section aria-labelledby="blind-spots"><h2 id="blind-spots">Where your records can't show it yet</h2>${body}</section>`;
+  return `<section aria-labelledby="blind-spots"><h2 id="blind-spots">${escapeHtml("Where your records can't show it yet")}</h2>${body}</section>`;
 }
 
 /** The lines a command prints for `blindSpots`: the same dictionary `blindSpotsMd`/`blindSpotsHtml`
@@ -767,14 +769,131 @@ function verdictHtml(summary: VerdictSummary, cat: Record<string, string>): stri
   );
 }
 
+/** The control's technique pointers, the catalog's only machine-readable remediation hint (SPEC
+ * §7.3), each stripped of any `techniques/` path prefix (report.py's `_remediation_hints`). */
+function remediationHints(spec: ControlSpec | undefined): string[] {
+  const refs: unknown[] = spec && Array.isArray(spec.raw.techniques) ? spec.raw.techniques : [];
+  return refs.map((ref) => pyStr(ref).split("/").pop() as string);
+}
+
+const SEVERITY_LEVELS = ["high", "medium", "low"];
+
+/** report.py's `_severity_heading`: a rated level's heading, else the Unrated one. */
+function severityHeading(level: string, cat: Record<string, string>): string {
+  return (
+    (SEVERITY_LEVELS.includes(level) ? cat[`report.severity_${level}`] : undefined) ??
+    (cat["report.severity_unrated"] as string)
+  );
+}
+
+/** Findings grouped by control severity, highest first, then `unrated` for a control with no
+ * catalog entry or a severity outside the three; each group in (subject, control) order
+ * (report.py's `_grouped_by_severity`). */
+function groupedBySeverity(
+  assertions: Assertion[],
+  byControl: Map<string, ControlSpec>,
+): [string, Assertion[]][] {
+  const groups = new Map<string, Assertion[]>();
+  for (const a of assertions) {
+    const severity = byControl.get(a.control)?.severity ?? "";
+    const level = SEVERITY_LEVELS.includes(severity) ? severity : "unrated";
+    groups.set(level, [...(groups.get(level) ?? []), a]);
+  }
+  return [...SEVERITY_LEVELS, "unrated"]
+    .filter((level) => groups.has(level))
+    .map((level) => [level, (groups.get(level) as Assertion[]).sort(bySubjectControl)]);
+}
+
+function findingTitle(a: Assertion, spec: ControlSpec | undefined): string {
+  return spec?.title ? spec.title : a.control;
+}
+
+/** The offending nodes a finding's violations name (report.py's `str(v.get("focus"))` for each truthy focus). */
+function offendingNodes(a: Assertion): string[] {
+  return a.violations
+    .map((v) => (v as Record<string, unknown>).focus)
+    .filter((focus) => pyTruthy(focus))
+    .map((focus) => pyStr(focus));
+}
+
+/** The lenses a run can choose, the default marked (report.py's `_lenses_text`). */
+function lensesText(): string {
+  const lenses = baseLenses().map((lens) => (lens === DEFAULT_LENS ? `${lens} (default)` : lens));
+  return `${lenses.join(", ")}; choose one with --catalog <id@version>`;
+}
+
+function catalogLabels(catalogs: Catalog[]): string[] {
+  return catalogs.map((c) => `${c.id}@${c.version}`);
+}
+
+function catalogCitationMd(catalogs: string[]): string {
+  return catalogs.length > 0 ? catalogs.map((c) => sanitizeForMarkdown(c)).join(", ") : "(none)";
+}
+
+function catalogCitationHtml(catalogs: string[]): string {
+  return catalogs.length > 0 ? catalogs.map((c) => sanitizeForHtml(c)).join(", ") : "(none)";
+}
+
+/** The provenance every report body carries (SPEC §9.1; report.py's `_provenance_md`). */
+function provenanceMd(catalogs: string[], invocation: string[]): string[] {
+  return [
+    "## Provenance",
+    "",
+    `- Engine: ${ENGINE_NAME} ${engineVersion()}`,
+    `- Catalog: ${catalogCitationMd(catalogs)}`,
+    `- Lenses available: ${lensesText()}`,
+    `- Reproduce: \`${reproduceCommand(invocation)}\``,
+    "",
+  ];
+}
+
+function provenanceHtml(catalogs: string[], invocation: string[]): string {
+  return `<section aria-labelledby="provenance"><h2 id="provenance">Provenance</h2><ul><li>Engine: ${escapeHtml(ENGINE_NAME)} ${escapeHtml(engineVersion())}</li><li>Catalog: ${catalogCitationHtml(catalogs)}</li><li>Lenses available: ${escapeHtml(lensesText())}</li><li>Reproduce: <code>${escapeHtml(reproduceCommand(invocation))}</code></li></ul></section>`;
+}
+
+/** One finding: title, outcome, clause citations, evidence, offending nodes and remediation
+ * technique, every record- or catalog-derived field sanitised (report.py's `_finding_md`; the
+ * technique labels are joined as Python joins them). */
+function findingMd(
+  a: Assertion,
+  spec: ControlSpec | undefined,
+  cat: Record<string, string>,
+): string[] {
+  const lines = [
+    `- **${sanitizeForMarkdown(findingTitle(a, spec))}** (\`${sanitizeForMarkdown(a.control)}\` @ ` +
+      `\`${sanitizeForMarkdown(a.subject)}\`) -> **${sanitizeForMarkdown(outcomeLabel(cat, a.outcome))}** ` +
+      `(rung ${a.rung}, ${sanitizeForMarkdown(a.mode)}; ${a.population[1]}/${a.population[0]} failed)`,
+  ];
+  for (const entry of a.crosswalk) {
+    lines.push(`  - \`${sanitizeForMarkdown(crosswalkText(entry, cat))}\``);
+  }
+  if (a.evidence.length > 0) {
+    const refs = a.evidence.map((e) => `\`${sanitizeField(e.ref)}\``).join(", ");
+    lines.push(`  - ${cat["report.evidence_label"]}: ${refs}`);
+  }
+  const offending = offendingNodes(a);
+  if (offending.length > 0) {
+    const nodes = offending.map((node) => `\`${sanitizeField(node)}\``).join(", ");
+    lines.push(`  - ${cat["report.violations_label"]}: ${nodes}`);
+  }
+  const hints = remediationHints(spec);
+  if (hints.length > 0) {
+    lines.push(`  - ${cat["report.remediation_label"]}: ${hints.join(", ")}`);
+  }
+  return lines;
+}
+
 export function renderReportMd(
   assertions: Assertion[],
   counts: Record<string, number>,
   language: string = DEFAULT_LANGUAGE,
   activity?: Activity,
   blindSpots?: BlindSpots,
+  catalogs: Catalog[] = [],
+  invocation: string[] = [],
 ): string {
   const cat = catalogue(language);
+  const byControl = controlIndex(catalogs);
   const lines = [`# ${cat["report.title"]}`, ""];
   // The records lead the report (SPEC's evidence-first framing, 18.4): what happened, before how it
   // measures up. What the records can't show yet (18.5) comes right after.
@@ -795,47 +914,78 @@ export function renderReportMd(
   if (assertions.length === 0) {
     lines.push(`_${cat["report.no_controls"]}_`);
   }
-  for (const a of [...assertions].sort(bySubjectControl)) {
-    const control = sanitizeForMarkdown(a.control);
-    const subject = sanitizeForMarkdown(a.subject);
-    lines.push(
-      `- \`${control}\` @ \`${subject}\` -> **${sanitizeForMarkdown(outcomeLabel(cat, a.outcome))}** ` +
-        `(rung ${a.rung}, ${sanitizeForMarkdown(a.mode)}; ` +
-        `${a.population[1]}/${a.population[0]} failed)`,
-    );
+  for (const [level, items] of groupedBySeverity(assertions, byControl)) {
+    lines.push(`### ${severityHeading(level, cat)}`, "");
+    for (const a of items) {
+      lines.push(...findingMd(a, byControl.get(a.control), cat));
+    }
+    lines.push("");
   }
+  lines.push("", ...provenanceMd(catalogLabels(catalogs), invocation));
   return `${lines.join("\n")}\n`;
 }
 
+/** One finding row; the Details cell joins evidence, offending nodes and remediation technique
+ * (report.py's `_row_html`). */
+function rowHtml(a: Assertion, spec: ControlSpec | undefined, cat: Record<string, string>): string {
+  const details: string[] = [];
+  if (a.evidence.length > 0) {
+    const refs = a.evidence
+      .map((e) => sanitizeForHtml(e.ref, SANITIZE_EMPTY_FIELD_PLACEHOLDER))
+      .join(", ");
+    details.push(`${escapeHtml(cat["report.evidence_label"] as string)}: ${refs}`);
+  }
+  const offending = offendingNodes(a);
+  if (offending.length > 0) {
+    const nodes = offending
+      .map((node) => sanitizeForHtml(node, SANITIZE_EMPTY_FIELD_PLACEHOLDER))
+      .join(", ");
+    details.push(`${escapeHtml(cat["report.violations_label"] as string)}: ${nodes}`);
+  }
+  const hints = remediationHints(spec);
+  if (hints.length > 0) {
+    details.push(
+      `${escapeHtml(cat["report.remediation_label"] as string)}: ${escapeHtml(hints.join(", "))}`,
+    );
+  }
+  const clauses = a.crosswalk.map((e) => sanitizeForHtml(crosswalkText(e, cat))).join("; ");
+  return (
+    `<tr><td>${sanitizeForHtml(findingTitle(a, spec))}</td>` +
+    `<td>${sanitizeForHtml(a.control)}</td><td>${sanitizeForHtml(a.subject)}</td>` +
+    `<td>${sanitizeForHtml(spec ? spec.severity : "")}</td>` +
+    `<td>${sanitizeForHtml(outcomeLabel(cat, a.outcome))}</td>` +
+    `<td>${clauses}</td><td>${details.join("<br>")}</td></tr>`
+  );
+}
+
 /** Render a self-contained, escaped, WCAG 2.2 AA report page (SPEC §9.3): a strict CSP meta tag, no
- * external references, one `h1`, a `main` landmark, and every catalog- or evidence-derived string
- * rendered as escaped text, never as markup. */
+ * external references, one `h1`, a `main` landmark, a print stylesheet, and every catalog- or
+ * evidence-derived string rendered as escaped text, never as markup (report.py's `render_report_html`). */
 export function renderReportHtml(
   assertions: Assertion[],
   counts: Record<string, number>,
   language: string = DEFAULT_LANGUAGE,
   activity?: Activity,
   blindSpots?: BlindSpots,
+  catalogs: Catalog[] = [],
+  invocation: string[] = [],
 ): string {
   const cat = catalogue(language);
+  const byControl = controlIndex(catalogs);
   const title = escapeHtml(cat["report.title"] as string);
+  const h = (key: string): string => escapeHtml(cat[key] as string);
   const summary = Object.entries(counts)
     .map(([o, c]) => `<li>${sanitizeForHtml(outcomeLabel(cat, o))}: ${c}</li>`)
     .join("");
-  const rows = [...assertions]
-    .sort(bySubjectControl)
-    .map(
-      (a) =>
-        `<tr><td>${sanitizeForHtml(a.control)}</td><td>${sanitizeForHtml(a.subject)}</td>` +
-        `<td>${sanitizeForHtml(outcomeLabel(cat, a.outcome))}</td></tr>`,
-    )
+  const rows = groupedBySeverity(assertions, byControl)
+    .flatMap(([, items]) => items)
+    .map((a) => rowHtml(a, byControl.get(a.control), cat))
     .join("");
-  const bodyRows =
-    rows || `<tr><td colspan="3">${escapeHtml(cat["report.no_controls"] as string)}</td></tr>`;
+  const bodyRows = rows || `<tr><td colspan="7">${h("report.no_controls")}</td></tr>`;
   const activitySection = activity !== undefined ? activityHtml(activity, cat) : "";
   const blindSpotsSection = blindSpots !== undefined ? blindSpotsHtml(blindSpots) : "";
   const verdictSection = verdictHtml(summarizeVerdict(assertions), cat);
-  return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${HTML_CSP}"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1>${activitySection}${blindSpotsSection}${verdictSection}<section aria-labelledby="summary"><h2 id="summary">${escapeHtml(cat["report.summary_heading"] as string)}</h2><ul>${summary}</ul></section><section aria-labelledby="assertions"><h2 id="assertions">${escapeHtml(cat["report.assertions_heading"] as string)}</h2><table><tr><th>Control</th><th>Subject</th><th>Outcome</th></tr>${bodyRows}</table></section></main></body></html>\n`;
+  return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${HTML_CSP}"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1>${activitySection}${blindSpotsSection}${verdictSection}<section aria-labelledby="summary"><h2 id="summary">${h("report.summary_heading")}</h2><ul>${summary}</ul></section><section aria-labelledby="assertions"><h2 id="assertions">${h("report.assertions_heading")}</h2><table><caption>${h("report.assertions_heading")}</caption><thead><tr><th scope="col">Title</th><th scope="col">Control</th><th scope="col">Subject</th><th scope="col">Severity</th><th scope="col">Outcome</th><th scope="col">Clause</th><th scope="col">Details</th></tr></thead><tbody>${bodyRows}</tbody></table></section>${provenanceHtml(catalogLabels(catalogs), invocation)}<footer><p>${h("report.affected_persons")}</p></footer></main></body></html>\n`;
 }
 
 /** The traversal-proof, collision-resistant directory name `writeReport` writes a subject's own
@@ -1309,9 +1459,7 @@ function buyerHowToCheckMd(cat: Record<string, string>, o: Required<BuyerRenderO
       ? formatTemplate(cat["report.buyer_how_to_check"] as string, { folder: o.reportFolder })
       : (cat["report.buyer_how_to_check_unpackaged"] as string),
   );
-  const catalogs =
-    o.catalogs.length > 0 ? o.catalogs.map((c) => sanitizeForMarkdown(c)).join(", ") : "(none)";
-  lines.push(`- Catalog: ${catalogs}`);
+  lines.push(`- Catalog: ${catalogCitationMd(o.catalogs)}`);
   lines.push(`- Reproduce: \`${reproduceCommand(o.argv)}\``);
   return lines;
 }
@@ -1325,9 +1473,7 @@ function buyerHowToCheckHtml(cat: Record<string, string>, o: Required<BuyerRende
         .split(marker)
         .join(escapeHtml(o.reportFolder))
     : codeSpansHtml(cat["report.buyer_how_to_check_unpackaged"] as string);
-  const catalogs =
-    o.catalogs.length > 0 ? o.catalogs.map((c) => sanitizeForHtml(c)).join(", ") : "(none)";
-  return `<p>${line}</p><p>Catalog: ${catalogs}</p><p>Reproduce: <code>${escapeHtml(reproduceCommand(o.argv))}</code></p>`;
+  return `<p>${line}</p><p>Catalog: ${catalogCitationHtml(o.catalogs)}</p><p>Reproduce: <code>${escapeHtml(reproduceCommand(o.argv))}</code></p>`;
 }
 
 function buyerOptions(options: BuyerRenderOptions): Required<BuyerRenderOptions> {
@@ -2271,6 +2417,8 @@ export function writeReport(
           language,
           subjectActivity,
           subjectBlindSpots,
+          options.catalogObjects,
+          options.invocation,
         ),
       );
       writeTextFile(
@@ -2281,6 +2429,8 @@ export function writeReport(
           language,
           subjectActivity,
           subjectBlindSpots,
+          options.catalogObjects,
+          options.invocation,
         ),
       );
     }
@@ -2294,10 +2444,29 @@ export function writeReport(
     writeTextFile("project.html", projectHtml);
     writeTextFile("report.html", projectHtml);
   } else {
-    writeTextFile("report.md", renderReportMd(assertions, counts, language, activity, blindSpots));
+    writeTextFile(
+      "report.md",
+      renderReportMd(
+        assertions,
+        counts,
+        language,
+        activity,
+        blindSpots,
+        options.catalogObjects,
+        options.invocation,
+      ),
+    );
     writeTextFile(
       "report.html",
-      renderReportHtml(assertions, counts, language, activity, blindSpots),
+      renderReportHtml(
+        assertions,
+        counts,
+        language,
+        activity,
+        blindSpots,
+        options.catalogObjects,
+        options.invocation,
+      ),
     );
   }
   // The rerun argv (write_report's rerun_argv): the reverify command when given, else the invocation.

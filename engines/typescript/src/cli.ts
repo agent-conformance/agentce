@@ -41,7 +41,12 @@ import {
 } from "./assess";
 import { computeBlindSpots } from "./blindSpots";
 import { confineToRoot, loadBundle, resolveLoose } from "./bundle";
-import { DEFAULT_LENS, catalogsDir as bundledCatalogsDir, quickstartDir } from "./bundled";
+import {
+  DEFAULT_LENS,
+  catalogsDir as bundledCatalogsDir,
+  quickstartDir,
+  vendoredCatalogs,
+} from "./bundled";
 import { CanonicalizationError, canonicalString } from "./canonical";
 import { type Catalog, loadCatalog } from "./catalog";
 import { runEcs } from "./conformance";
@@ -356,36 +361,6 @@ function scrubPath(raw: string): string {
     return rel === "" ? "." : rel.split(sep).join("/");
   }
   return basename(abs);
-}
-
-/** Every catalog the engine ships (base and sector overlays), keyed `id@version`. */
-function vendoredCatalogs(): Map<string, string> {
-  const found = new Map<string, string>();
-  const root = bundledCatalogsDir();
-  for (const kind of ["base", "overlays"]) {
-    const dir = joinPath(root, kind);
-    let names: string[] = [];
-    try {
-      names = readdirSync(dir).sort(byteCompare);
-    } catch {
-      names = [];
-    }
-    for (const name of names) {
-      const catalogYaml = joinPath(dir, name, "catalog.yaml");
-      if (!existsSync(catalogYaml)) {
-        continue;
-      }
-      try {
-        const meta = load(readFileSync(catalogYaml, "utf-8")) as Record<string, unknown> | null;
-        if (meta && typeof meta.id === "string" && typeof meta.version === "string") {
-          found.set(`${meta.id}@${meta.version}`, joinPath(dir, name));
-        }
-      } catch {
-        // a malformed vendored catalog is skipped, never fatal to discovery
-      }
-    }
-  }
-  return found;
 }
 
 /** The trust root catalog verification consults: `--trust-root`, else `AGENTCE_TRUST_ROOT`, else the

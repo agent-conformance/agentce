@@ -244,9 +244,9 @@ allow:
 
   - path: engines/typescript/src/report.ts
     pattern: placeholder
-    count: 17
+    count: 19
     class: legitimate
-    justification: "sanitizeForMarkdown/sanitizeForHtml's placeholder parameter and the SANITIZE_EMPTY_NAME_PLACEHOLDER/SANITIZE_EMPTY_FIELD_PLACEHOLDER fallback strings ('(unnamed)'/'(empty)'), mirroring the Python reference's report.py entry above; not an unfinished stub. Newly counted in item 18.24: a raw NUL byte at this file's own (control, subject) diff-key-joining site (fixed, MAINTAINER-NOTES 2026-09-29 'Report.java NUL bytes') made this scanner's own binary-content heuristic (tools/placeholder_sweep.py's `_read_text`, which returns None on any b'\\x00' byte) skip the whole file silently until the byte was removed, so this entry was never possible to add before now. 18.16h's buyer-view evidence refs cite SANITIZE_EMPTY_FIELD_PLACEHOLDER once, +1."
+    justification: "sanitizeForMarkdown/sanitizeForHtml's placeholder parameter and the SANITIZE_EMPTY_NAME_PLACEHOLDER/SANITIZE_EMPTY_FIELD_PLACEHOLDER fallback strings ('(unnamed)'/'(empty)'), mirroring the Python reference's report.py entry above; not an unfinished stub. Newly counted in item 18.24: a raw NUL byte at this file's own (control, subject) diff-key-joining site (fixed, MAINTAINER-NOTES 2026-09-29 'Report.java NUL bytes') made this scanner's own binary-content heuristic (tools/placeholder_sweep.py's `_read_text`, which returns None on any b'\\x00' byte) skip the whole file silently until the byte was removed, so this entry was never possible to add before now. 18.16h's buyer-view evidence refs cite SANITIZE_EMPTY_FIELD_PLACEHOLDER once, +1. 18.16i's report.html Details cell cites it twice (evidence refs and offending nodes), +2."
 
   - path: engines/java/src/main/java/org/agentce/Report.java
     pattern: placeholder
