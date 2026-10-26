@@ -7,6 +7,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import type { Activity } from "./activity";
 import { aggregate, assertionFromJson } from "./assertions";
 import { computeAuditorView } from "./auditorView";
+import type { BuyerView } from "./buyerView";
 import { CanonicalizationError, canonicalString } from "./canonical";
 import { main as cliMain } from "./cli";
 import { InputError } from "./errors";
@@ -33,6 +34,8 @@ import {
   SEAM_FOR,
   appliedDeviationIds,
   catalogProvenanceDigest,
+  renderBuyerHtml,
+  renderBuyerMd,
   renderCsv,
   renderJunit,
   renderOscalXml,
@@ -309,6 +312,44 @@ export function main(argv: string[]): number {
     for (const c of cases) {
       rendered[`${c.name}.md`] = renderSecurityMd(c.view, c.language);
       rendered[`${c.name}.html`] = renderSecurityHtml(c.view, c.language);
+    }
+    writeFileSync(outPath, JSON.stringify(rendered), "utf-8");
+    return 0;
+  }
+
+  // buyer-cases renders every case of a case file ({cases: [{name, language, view, packaged, folder,
+  // argv, catalogs: [[id, version]]}]}) with the buyer view's renderers and writes {"<name>.md": text,
+  // "<name>.html": text} as JSON (18.16h).
+  if (command === "buyer-cases") {
+    const [casefile, outPath] = argv.slice(1);
+    if (casefile === undefined || outPath === undefined) {
+      console.error("buyer-cases: a case file and an output path are required");
+      return ExitCode.INPUT_ERROR;
+    }
+    const cases = (
+      readBundled(readFileSync(casefile)) as {
+        cases: {
+          name: string;
+          language: string;
+          view: BuyerView;
+          packaged: boolean;
+          folder: string;
+          argv: string[];
+          catalogs: [string, string][];
+        }[];
+      }
+    ).cases;
+    const rendered: Record<string, string> = {};
+    for (const c of cases) {
+      const options = {
+        language: c.language,
+        argv: c.argv,
+        packaged: c.packaged,
+        reportFolder: c.folder,
+        catalogs: c.catalogs.map(([id, version]) => `${id}@${version}`),
+      };
+      rendered[`${c.name}.md`] = renderBuyerMd(c.view, options);
+      rendered[`${c.name}.html`] = renderBuyerHtml(c.view, options);
     }
     writeFileSync(outPath, JSON.stringify(rendered), "utf-8");
     return 0;

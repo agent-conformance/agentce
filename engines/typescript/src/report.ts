@@ -18,6 +18,14 @@ import { DENIED_KINDS, RECORDER_CLASSES, summarizeActivity } from "./activity";
 import { type Assertion, OUTCOMES, aggregate, assertionToJson, checkDc5 } from "./assertions";
 import { deviationsByControl, indexBySubject } from "./assess";
 import type { BlindSpot, BlindSpots, CheckRef } from "./blindSpots";
+import {
+  BUYER_FRAMEWORKS,
+  BUYER_QUESTIONNAIRE_TITLES,
+  BUYER_QUESTIONNAIRE_VERSIONS,
+  type BuyerAnswer,
+  type BuyerView,
+  computeBuyerView,
+} from "./buyerView";
 import { canonicalize, sha256Hex } from "./canonical";
 import type { Catalog, ControlSpec } from "./catalog";
 import type { Event } from "./graph";
@@ -1178,6 +1186,249 @@ export function renderSecurityHtml(
   return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${HTML_CSP}"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1><p>${h("report.security_intro")}</p><section aria-labelledby="security-tool-access"><h2 id="security-tool-access">${h("report.security_tool_access_heading")}</h2><ul>${toolItems}</ul></section><section aria-labelledby="security-effect-class"><h2 id="security-effect-class">${h("report.security_effect_class_heading")}</h2><p>${escapeHtml(securityEffectClassText(security.actions_by_effect_class))}</p></section><section aria-labelledby="security-enforcement"><h2 id="security-enforcement">${h("report.security_enforcement_heading")}</h2><p>${h("report.security_enforcement_scope_note")}</p>${enforcementItems}</section><section aria-labelledby="security-drift"><h2 id="security-drift">${h("report.security_drift_heading")}</h2><ul>${driftItems}</ul></section><section aria-labelledby="security-citations"><h2 id="security-citations">${h("report.security_citations_heading")}</h2>${citationsHtml}</section></main></body></html>\n`;
 }
 
+/** The six outcomes in the order the buyer summary's counts table lists them (report.py's
+ * `_STATEMENT_OUTCOMES`). */
+const STATEMENT_OUTCOMES = [
+  "conformant",
+  "non-conformant",
+  "partial",
+  "not_applicable",
+  "not_assessed",
+  "insufficient_evidence",
+] as const;
+
+/** report.py's `_reproduce_command`. */
+function reproduceCommand(invocation: string[]): string {
+  return invocation.length > 0 ? `agentce ${invocation.join(" ")}` : "agentce quickstart";
+}
+
+/** The fixed per-outcome answer sentence, the sanitised control id filled into `{control}`
+ * (report.py's `_buyer_answer_text`). */
+function buyerAnswerText(entry: BuyerAnswer, cat: Record<string, string>): string {
+  return formatTemplate(cat[`report.buyer_answer_${entry.outcome}`] as string, {
+    control: sanitizeField(entry.control),
+  });
+}
+
+/** The "not enough evidence" step for one `insufficient_evidence` answer (report.py's
+ * `_buyer_gap_lines`): a blind-spot step per missing requirement, the fixed no-population or
+ * coverage-unknown sentence, or the disclosed fallback when neither bucket matched. */
+function buyerGapLines(entry: BuyerAnswer, cat: Record<string, string>): string[] {
+  const gapStep = entry.gap_step;
+  if (gapStep === null) {
+    return [cat["report.buyer_gap_step_unavailable"] as string];
+  }
+  if (gapStep.kind === "no_population" || gapStep.kind === "coverage_unknown") {
+    return [
+      formatTemplate(cat[`report.blind_spots_${gapStep.kind}_text`] as string, {
+        control: sanitizeField(entry.control),
+      }),
+    ];
+  }
+  return gapStep.missing.map((missing) => {
+    const ownerLabel = cat[`report.blind_spots_owner_${missing.owner_key}`] as string;
+    const step = formatTemplate(cat[`report.blind_spots_step_${missing.step_kind}`] as string, {
+      owner: ownerLabel,
+    });
+    return `\`${sanitizeField(missing.event)}\` (\`${sanitizeField(missing.class)}\`): ${step}`;
+  });
+}
+
+/** The unverified-clause label (SPEC §7.3), per row (report.py's `_buyer_unverified_suffix`). */
+function buyerUnverifiedSuffix(entry: BuyerAnswer, cat: Record<string, string>): string {
+  return crosswalkText({ ...entry, framework: "", clause: "" }, cat);
+}
+
+/** One answer as Markdown lines (report.py's `_buyer_answer_md`). The answer sentence is sanitised,
+ * the catalogue suffix and note are appended as written, and the gap lines keep their backticks. */
+function buyerAnswerMd(entry: BuyerAnswer, cat: Record<string, string>): string[] {
+  const text = sanitizeForMarkdown(buyerAnswerText(entry, cat)) + buyerUnverifiedSuffix(entry, cat);
+  const lines = [
+    `- **${sanitizeField(entry.control)}** @ \`${sanitizeField(entry.control_version)}\` (\`${sanitizeField(entry.subject)}\`): ${text}`,
+  ];
+  if (entry.evidence.length > 0) {
+    const refs = entry.evidence.map((e) => `\`${sanitizeField(pyStr(e.ref))}\``).join(", ");
+    lines.push(`  - ${cat["report.evidence_label"]}: ${refs}`);
+  }
+  if (entry.outcome === "insufficient_evidence") {
+    lines.push(...buyerGapLines(entry, cat).map((g) => `  - ${g}`));
+  }
+  if (entry.manual_checklist_note !== undefined) {
+    lines.push(`  - ${entry.manual_checklist_note}`);
+  }
+  return lines;
+}
+
+/** Escape `text` and turn each backtick pair into `<code>` (report.py's `_code_spans_html`); every
+ * backtick left here came from the catalogue or the renderer, and an unpaired one stays literal. */
+function codeSpansHtml(text: string): string {
+  return escapeHtml(text).replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+
+/** As `buyerAnswerMd`, one `<li>` with a nested `<ul>` (report.py's `_buyer_answer_html`). */
+function buyerAnswerHtml(entry: BuyerAnswer, cat: Record<string, string>): string {
+  const text = escapeHtml(buyerAnswerText(entry, cat) + buyerUnverifiedSuffix(entry, cat));
+  const header = `<strong>${sanitizeForHtml(entry.control)}</strong> @ <code>${sanitizeForHtml(entry.control_version)}</code> (${sanitizeForHtml(entry.subject)}): ${text}`;
+  let subItems = "";
+  if (entry.evidence.length > 0) {
+    const refs = entry.evidence
+      .map((e) => sanitizeForHtml(pyStr(e.ref), SANITIZE_EMPTY_FIELD_PLACEHOLDER))
+      .join(", ");
+    subItems += `<li>${escapeHtml(cat["report.evidence_label"] as string)}: ${refs}</li>`;
+  }
+  if (entry.outcome === "insufficient_evidence") {
+    for (const gapLine of buyerGapLines(entry, cat)) {
+      subItems += `<li>${codeSpansHtml(gapLine)}</li>`;
+    }
+  }
+  if (entry.manual_checklist_note !== undefined) {
+    subItems += `<li>${escapeHtml(entry.manual_checklist_note)}</li>`;
+  }
+  return subItems ? `<li>${header}<ul>${subItems}</ul></li>` : `<li>${header}</li>`;
+}
+
+function buyerCountsTableMd(counts: Record<string, number>, cat: Record<string, string>): string[] {
+  return [
+    `| ${STATEMENT_OUTCOMES.map((o) => outcomeLabel(cat, o)).join(" | ")} |`,
+    `|${STATEMENT_OUTCOMES.map(() => "---").join("|")}|`,
+    `| ${STATEMENT_OUTCOMES.map((o) => String(counts[o] ?? 0)).join(" | ")} |`,
+  ];
+}
+
+function buyerCountsTableHtml(counts: Record<string, number>, cat: Record<string, string>): string {
+  const head = STATEMENT_OUTCOMES.map(
+    (o) => `<th scope="col">${escapeHtml(outcomeLabel(cat, o))}</th>`,
+  ).join("");
+  const row = STATEMENT_OUTCOMES.map((o) => `<td>${counts[o] ?? 0}</td>`).join("");
+  return `<table><thead><tr>${head}</tr></thead><tbody><tr>${row}</tr></tbody></table>`;
+}
+
+/** What the buyer renderers read besides the view (render_buyer_md's keyword arguments): the rerun
+ * argv already chosen (reverify command, else invocation), and the catalogs as `id@version` labels. */
+export interface BuyerRenderOptions {
+  language?: string;
+  argv?: string[];
+  packaged?: boolean;
+  reportFolder?: string;
+  catalogs?: string[];
+}
+
+function buyerHowToCheckMd(cat: Record<string, string>, o: Required<BuyerRenderOptions>): string[] {
+  const lines = [`## ${cat["report.buyer_how_to_check_heading"]}`, ""];
+  lines.push(
+    o.packaged
+      ? formatTemplate(cat["report.buyer_how_to_check"] as string, { folder: o.reportFolder })
+      : (cat["report.buyer_how_to_check_unpackaged"] as string),
+  );
+  const catalogs =
+    o.catalogs.length > 0 ? o.catalogs.map((c) => sanitizeForMarkdown(c)).join(", ") : "(none)";
+  lines.push(`- Catalog: ${catalogs}`);
+  lines.push(`- Reproduce: \`${reproduceCommand(o.argv)}\``);
+  return lines;
+}
+
+function buyerHowToCheckHtml(cat: Record<string, string>, o: Required<BuyerRenderOptions>): string {
+  // The folder is filled in after the code-span pass, so a backtick in the --out path stays inside
+  // its span instead of splitting it.
+  const marker = "\x00";
+  const line = o.packaged
+    ? codeSpansHtml(formatTemplate(cat["report.buyer_how_to_check"] as string, { folder: marker }))
+        .split(marker)
+        .join(escapeHtml(o.reportFolder))
+    : codeSpansHtml(cat["report.buyer_how_to_check_unpackaged"] as string);
+  const catalogs =
+    o.catalogs.length > 0 ? o.catalogs.map((c) => sanitizeForHtml(c)).join(", ") : "(none)";
+  return `<p>${line}</p><p>Catalog: ${catalogs}</p><p>Reproduce: <code>${escapeHtml(reproduceCommand(o.argv))}</code></p>`;
+}
+
+function buyerOptions(options: BuyerRenderOptions): Required<BuyerRenderOptions> {
+  return {
+    language: options.language ?? DEFAULT_LANGUAGE,
+    argv: options.argv ?? [],
+    packaged: options.packaged ?? false,
+    reportFolder: options.reportFolder ?? ".",
+    catalogs: options.catalogs ?? [],
+  };
+}
+
+/** The questionnaire heading and the "none" sentence for one framework. */
+function buyerFrameworkTexts(framework: string, cat: Record<string, string>): [string, string] {
+  const vars = {
+    framework: BUYER_QUESTIONNAIRE_TITLES[framework] ?? framework,
+    version: BUYER_QUESTIONNAIRE_VERSIONS[framework] ?? "",
+  };
+  return [
+    formatTemplate(cat["report.buyer_not_a_certification"] as string, vars),
+    formatTemplate(cat["report.buyer_framework_none"] as string, vars),
+  ];
+}
+
+/** The buyer view (18.18): how to check this report, a summary, then the generated answers grouped
+ * by question; report.py's `render_buyer_md`. Adds no outcome and no rollup (SPEC §9.2). */
+export function renderBuyerMd(buyer: BuyerView, options: BuyerRenderOptions = {}): string {
+  const o = buyerOptions(options);
+  const cat = catalogue(o.language) as Record<string, string>;
+  const lines = [`# ${cat["report.buyer_title"]}`, "", cat["report.buyer_intro"] as string, ""];
+  lines.push(...buyerHowToCheckMd(cat, o));
+  lines.push("", `## ${cat["report.buyer_summary_heading"]}`, "");
+  lines.push(...buyerCountsTableMd(buyer.counts, cat));
+  for (const framework of BUYER_FRAMEWORKS) {
+    const [heading, noneText] = buyerFrameworkTexts(framework, cat);
+    lines.push("", `## ${sanitizeForMarkdown(heading)}`, "");
+    const questions = buyer.by_question[framework] ?? {};
+    const keys = Object.keys(questions).sort(byteCompare);
+    if (keys.length === 0) {
+      lines.push(`_${sanitizeForMarkdown(noneText)}_`);
+      continue;
+    }
+    for (const question of keys) {
+      lines.push(`### ${sanitizeField(question)}`, "");
+      for (const index of questions[question] as number[]) {
+        lines.push(...buyerAnswerMd(buyer.answers[index] as BuyerAnswer, cat));
+      }
+      lines.push("");
+    }
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+/** As `renderBuyerMd`, the same self-contained, escaped page shape as `renderReportHtml`; report.py's
+ * `render_buyer_html`. */
+export function renderBuyerHtml(buyer: BuyerView, options: BuyerRenderOptions = {}): string {
+  const o = buyerOptions(options);
+  const cat = catalogue(o.language) as Record<string, string>;
+  const h = (key: string): string => escapeHtml(cat[key] as string);
+  const title = h("report.buyer_title");
+  const sections = [
+    `<section aria-labelledby="buyer-rerun"><h2 id="buyer-rerun">${h("report.buyer_how_to_check_heading")}</h2>${buyerHowToCheckHtml(cat, o)}</section>`,
+    `<section aria-labelledby="buyer-summary"><h2 id="buyer-summary">${h("report.buyer_summary_heading")}</h2>${buyerCountsTableHtml(buyer.counts, cat)}</section>`,
+  ];
+  for (const framework of BUYER_FRAMEWORKS) {
+    const [heading, noneText] = buyerFrameworkTexts(framework, cat);
+    const sectionId = `buyer-${escapeHtml(framework)}`;
+    const questions = buyer.by_question[framework] ?? {};
+    const keys = Object.keys(questions).sort(byteCompare);
+    let body: string;
+    if (keys.length === 0) {
+      body = `<p>${escapeHtml(noneText)}</p>`;
+    } else {
+      const questionItems = keys
+        .map((question) => {
+          const answerItems = (questions[question] as number[])
+            .map((i) => buyerAnswerHtml(buyer.answers[i] as BuyerAnswer, cat))
+            .join("");
+          return `<li>${sanitizeForHtml(question)}<ul>${answerItems}</ul></li>`;
+        })
+        .join("");
+      body = `<ul>${questionItems}</ul>`;
+    }
+    sections.push(
+      `<section aria-labelledby="${sectionId}"><h2 id="${sectionId}">${escapeHtml(heading)}</h2>${body}</section>`,
+    );
+  }
+  return `<!doctype html><html lang="${escapeHtml(o.language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${HTML_CSP}"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1><p>${h("report.buyer_intro")}</p>${sections.join("")}</main></body></html>\n`;
+}
+
 /** What an audience view's `compute`/`renderMd`/`renderHtml` read, built once per `writeReport` call
  * (report.py's `ReportViewContext`, 18.49). The security view reads these three; the auditor (18.17e)
  * and buyer (18.16h) views add their own fields. */
@@ -1185,6 +1436,17 @@ export interface ReportViewContext {
   activity: Activity;
   assertions: Assertion[];
   language: string;
+  /** `aggregate`'s result for the run. */
+  counts: Record<string, number>;
+  blindSpots: BlindSpots;
+  /** The rerun argv: the reverify command when one is set, else the invocation. */
+  reverifyCommand: string[];
+  /** Always false here: this engine refuses `--package-for-sharing` (input.package_unsupported). */
+  packaged: boolean;
+  /** `String(outDir)`, rendered only when packaged. */
+  reportFolder: string;
+  /** The evaluated catalogs as `id@version` labels. */
+  catalogs: string[];
 }
 
 /** One registered audience-view preset (report.py's `AudienceViewSpec`): `<preset>.json` is always
@@ -1204,7 +1466,23 @@ export const AUDIENCE_VIEWS: Record<string, AudienceViewSpec> = {
     renderHtml: (view: SecurityView, ctx) => renderSecurityHtml(view, ctx.language),
     alwaysWrite: new Set(),
   },
+  buyer: {
+    compute: (ctx) => computeBuyerView(ctx.assertions, ctx.blindSpots, ctx.counts),
+    renderMd: (view: BuyerView, ctx) => renderBuyerMd(view, buyerRenderOptions(ctx)),
+    renderHtml: (view: BuyerView, ctx) => renderBuyerHtml(view, buyerRenderOptions(ctx)),
+    alwaysWrite: new Set(["md", "html"]),
+  },
 };
+
+function buyerRenderOptions(ctx: ReportViewContext): BuyerRenderOptions {
+  return {
+    language: ctx.language,
+    argv: ctx.reverifyCommand,
+    packaged: ctx.packaged,
+    reportFolder: ctx.reportFolder,
+    catalogs: ctx.catalogs,
+  };
+}
 
 /** write_report's view dispatch: an unregistered or absent preset writes nothing; a registered one
  * writes `<preset>.json`, then `.md` and `.html` each when its renderer exists and the extension is
@@ -2037,7 +2315,19 @@ export function writeReport(
   // as wanted, as Python's `--for security` (sarif, md, html) asks.
   writeAudienceView(
     SEAM_FOR.preset,
-    { activity, assertions, language },
+    {
+      activity,
+      assertions,
+      language,
+      counts,
+      blindSpots,
+      reverifyCommand: options.reverifyCommand?.length
+        ? options.reverifyCommand
+        : (options.invocation ?? []),
+      packaged: false,
+      reportFolder: outDir,
+      catalogs: options.catalogs,
+    },
     (ext) => ext === "md" || ext === "html",
     writeJson,
     writeTextFile,
