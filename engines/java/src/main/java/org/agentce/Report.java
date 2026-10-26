@@ -115,13 +115,24 @@ public final class Report {
         return "sha256:" + Canonical.sha256Hex((Version.ENGINE_NAME + ":" + Version.ENGINE_VERSION).getBytes(StandardCharsets.UTF_8));
     }
 
+    /** Python's {@code _safe}: a code point Python's {@code str.isalnum} keeps (a letter or a Nd, Nl or No number)
+     * or one of {@code -._} stays, anything else becomes {@code _}. */
     static String safe(String name) {
         StringBuilder out = new StringBuilder();
-        for (int i = 0; i < name.length(); i++) {
-            char c = name.charAt(i);
-            out.append(Character.isLetterOrDigit(c) || c == '-' || c == '.' || c == '_' ? c : '_');
-        }
+        name.codePoints().forEach(c -> {
+            if (isAlnum(c) || c == '-' || c == '.' || c == '_') {
+                out.appendCodePoint(c);
+            } else {
+                out.append('_');
+            }
+        });
         return out.toString();
+    }
+
+    private static boolean isAlnum(int c) {
+        int type = Character.getType(c);
+        return Character.isLetter(c) || type == Character.DECIMAL_DIGIT_NUMBER
+                || type == Character.LETTER_NUMBER || type == Character.OTHER_NUMBER;
     }
 
     /** Every control, keyed by id, across every resolved catalog -- so a finding can carry its
@@ -1886,9 +1897,16 @@ public final class Report {
                 outputs.put(rel, digestBytes(data));
             }
 
-            if (SEAM_EMIT.contains("remediation")) {
+            if (SEAM_EMIT.contains("remediation") || SEAM_EMIT.contains("skill")) {
                 Map<String, List<JsonNode>> eventsBySubject = Assess.indexBySubject(events != null ? events : List.of());
                 List<String> argv = reverifyCommand != null && !reverifyCommand.isEmpty() ? reverifyCommand : invocation;
+                List<Catalog> catalogList = catalogObjects != null ? catalogObjects : List.of();
+                String assertionsDigest = outputs.get("assertions.json");
+                List<String> versions = new ArrayList<>();
+                for (Catalog c : catalogList) {
+                    versions.add(c.id + "@" + c.version);
+                }
+                String catalogVersion = String.join(", ", versions);
                 for (String subject : subjects) {
                     List<Assertions.Assertion> forSubject = new ArrayList<>();
                     for (Assertions.Assertion a : assertions) {
@@ -1896,15 +1914,37 @@ public final class Report {
                             forSubject.add(a);
                         }
                     }
+                    List<JsonNode> subjectEvents = eventsBySubject.getOrDefault(subject, List.of());
                     ObjectNode pkg = Remediation.renderRemediationPackage(
-                            subject, forSubject, catalogObjects != null ? catalogObjects : List.of(),
-                            outputs.get("assertions.json"), eventsBySubject.getOrDefault(subject, List.of()), argv);
-                    String relDir = "remediation/" + safe(subject);
-                    Files.createDirectories(outDir.resolve(relDir));
-                    outputs.put(relDir + "/remediation-package.json",
-                            writeBytes(outDir, relDir + "/remediation-package.json", Canonical.canonicalize(pkg)));
-                    outputs.put(relDir + "/remediation.md",
-                            writeText(outDir, relDir + "/remediation.md", Remediation.renderRemediationMd(pkg)));
+                            subject, forSubject, catalogList, assertionsDigest, subjectEvents, argv);
+                    byte[] pkgBytes = Canonical.canonicalize(pkg);
+                    if (SEAM_EMIT.contains("remediation")) {
+                        String relDir = "remediation/" + safe(subject);
+                        Files.createDirectories(outDir.resolve(relDir));
+                        outputs.put(relDir + "/remediation-package.json",
+                                writeBytes(outDir, relDir + "/remediation-package.json", pkgBytes));
+                        outputs.put(relDir + "/remediation.md",
+                                writeText(outDir, relDir + "/remediation.md", Remediation.renderRemediationMd(pkg)));
+                    }
+                    if (SEAM_EMIT.contains("skill")) {
+                        String relDir = "skill/" + safe(subject);
+                        Files.createDirectories(outDir.resolve(relDir + "/findings"));
+                        outputs.put(relDir + "/remediation-package.json",
+                                writeBytes(outDir, relDir + "/remediation-package.json", pkgBytes));
+                        outputs.put(relDir + "/SKILL.md", writeText(outDir, relDir + "/SKILL.md", Skill.renderSkillMd(
+                                Version.SPEC_VERSION, Version.ENGINE_VERSION, catalogVersion, assertionsDigest)));
+                        List<String> toolCalls = Skill.toolNamesForSubject(subjectEvents);
+                        int i = 0;
+                        for (JsonNode finding : pkg.get("findings")) {
+                            String rel = relDir + "/findings/"
+                                    + Skill.skillFindingFilename(Readiness.pyStr(finding.get("control")), ++i);
+                            outputs.put(rel, writeText(outDir, rel, Skill.renderSkillFindingMd(finding, toolCalls)));
+                        }
+                        List<String> command = new ArrayList<>(List.of("agentce"));
+                        command.addAll(argv);
+                        outputs.put(relDir + "/REVERIFY.md",
+                                writeText(outDir, relDir + "/REVERIFY.md", Skill.renderReverifyMd(command)));
+                    }
                 }
             }
 

@@ -28,6 +28,23 @@ public final class Bundled {
     private Bundled() {}
 
     private static volatile Path cachedRoot;
+    private static final Map<String, String> TEMPLATES = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** A vendored report template's text, read once (Python's {@code bundled.*_template()}; each original is
+     * {@code spec/report/templates/<name>}, vendored under {@code resources/templates/}). */
+    static String template(String name) {
+        return TEMPLATES.computeIfAbsent(name, n -> {
+            String resource = "/templates/" + n;
+            try (java.io.InputStream in = Bundled.class.getResourceAsStream(resource)) {
+                if (in == null) {
+                    throw new IllegalStateException("the engine's bundled " + resource + " is missing");
+                }
+                return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+        });
+    }
 
     private static Path dataRoot() {
         if (cachedRoot != null) {

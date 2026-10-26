@@ -273,8 +273,8 @@ public final class Seams {
         // `assess --emit` here, report_format_parity_check.py compares the remediation output through it.
         if ("assess-emit".equals(command)) {
             List<String> names = args.length < 2 ? List.of() : List.of(args[1].split(",", -1));
-            if (names.isEmpty() || !names.stream().allMatch("remediation"::equals)) {
-                System.err.println("assess-emit: the only format is remediation");
+            if (names.isEmpty() || !names.stream().allMatch(n -> n.equals("remediation") || n.equals("skill"))) {
+                System.err.println("assess-emit: the formats are remediation and skill");
                 return ExitCode.INPUT_ERROR.code;
             }
             Report.SEAM_EMIT.addAll(names);
@@ -305,8 +305,56 @@ public final class Seams {
             return 0;
         }
 
+        // skill-cases renders every case of a case file ({cases: [{name, kind, ...}]}: skill, finding, reverify,
+        // tool_names, filename) with the skill folder's functions and writes {name: text} as JSON (18.16f).
+        if ("skill-cases".equals(command)) {
+            if (args.length < 3) {
+                System.err.println("skill-cases: a case file and an output path are required");
+                return ExitCode.INPUT_ERROR.code;
+            }
+            ObjectNode rendered = Json.nodes().objectNode();
+            for (JsonNode c : Json.readBundled(readAll(Paths.get(args[1]))).get("cases")) {
+                rendered.put(c.get("name").asText(), skillCase(c));
+            }
+            try {
+                Files.writeString(Paths.get(args[2]), Json.compact(rendered), StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                System.err.println("skill-cases: " + e.getMessage());
+                return 70;
+            }
+            return 0;
+        }
+
         System.err.println("seams: unknown seam '" + (command == null ? "" : command) + "'");
         return ExitCode.INPUT_ERROR.code;
+    }
+
+    /** One skill_cases.json case through the skill folder function its kind names. */
+    static String skillCase(JsonNode c) {
+        switch (c.get("kind").asText()) {
+            case "skill":
+                return Skill.renderSkillMd(c.get("spec_version").asText(), c.get("cli_version").asText(),
+                        c.get("catalog_version").asText(), c.get("assertions_digest").asText());
+            case "finding":
+                return Skill.renderSkillFindingMd(c.get("finding"), texts(c.get("tool_calls")));
+            case "reverify":
+                return Skill.renderReverifyMd(texts(c.get("argv")));
+            case "tool_names": {
+                List<JsonNode> events = new java.util.ArrayList<>();
+                c.get("events").forEach(events::add);
+                return String.join("\n", Skill.toolNamesForSubject(events));
+            }
+            case "filename":
+                return Skill.skillFindingFilename(c.get("control").asText(), c.get("index").asInt());
+            default:
+                throw new IllegalArgumentException("skill-cases: unknown kind " + c.get("kind"));
+        }
+    }
+
+    private static List<String> texts(JsonNode array) {
+        List<String> out = new java.util.ArrayList<>();
+        array.forEach(n -> out.add(n.asText()));
+        return out;
     }
 
     private static byte[] readAll(Path path) {

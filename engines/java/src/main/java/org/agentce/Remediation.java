@@ -3,8 +3,6 @@ package org.agentce;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,23 +29,9 @@ final class Remediation {
     private static final String GUARDRAILS_REF = "remediation.guardrails.v1";
     private static final Set<String> SEVERITY_LEVELS = Set.of("high", "medium", "low");
     private static final String SCHEMA_URL = "https://agent-conformance.org/spec/report/remediation-package.schema.json";
-    private static final String TEMPLATE_RESOURCE = "/templates/remediation.md.tmpl";
-
-    private static volatile String template;
-
     /** The remediation prompt template's text (Python's {@code bundled.remediation_template()}). */
     static String remediationTemplate() {
-        if (template == null) {
-            try (InputStream in = Remediation.class.getResourceAsStream(TEMPLATE_RESOURCE)) {
-                if (in == null) {
-                    throw new IllegalStateException("the engine's bundled " + TEMPLATE_RESOURCE + " is missing");
-                }
-                template = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            } catch (IOException e) {
-                throw new java.io.UncheckedIOException(e);
-            }
-        }
-        return template;
+        return Bundled.template("remediation.md.tmpl");
     }
 
     /** Python's {@code str(d.get(key, fallback))}: an absent key gives {@code fallback}, a present one its {@code str()}. */
@@ -301,7 +285,7 @@ final class Remediation {
 
     /** A render-only, rebuilt view of one finding: every catalog- or evidence-derived string the
      * template interpolates is sanitised; the canonical package is untouched. */
-    private static ObjectNode sanitizeFinding(JsonNode f) {
+    static ObjectNode sanitizeFinding(JsonNode f) {
         ObjectNode out = sanitizeKeys(f, "control", "title", "mode");
         out.set("window", sanitizeKeys(asObject(f.get("window")), "start", "end"));
         out.set("clauses", sanitizeEach(f.get("clauses"), "framework", "clause", "relation"));
