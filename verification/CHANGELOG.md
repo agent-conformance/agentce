@@ -3,6 +3,20 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.136.8
+
+- `VG-REPORT-FORMAT-PARITY` (changed, 18.16h): also compares the buyer view. Over six inputs (the buyer-view fixture in
+  English and German, quickstart, the auditor-view fixture, the hostile remediation fixture and no-assertions) Python's
+  real `assess --for buyer` runs against TypeScript's and Java's real assess through the `assess-emit for=buyer` seam
+  until 18.16b wires `--for`: the same exit code, the same buyer files (none for no-assertions), `buyer.json`,
+  `buyer.md` and `buyer.html` byte-identical to Python's and listed in the manifest with Python's digest. A
+  `buyer-cases` seam renders a 56-view table (en and de) to Python's 112 texts. The self-test also catches buyer file
+  tampers and both seams refuse `for=buyer,for=buyer`. New seeded faults: TypeScript drops the unverified-clause
+  suffix, Java drops it from `buyer.md`, TypeScript fills the packaged folder before the code-span pass, Java renders an
+  unmatched gap step as no_population, TypeScript drops the evidence label from `buyer.html`, Java orders the
+  counts table alphabetically, TypeScript writes `buyer.md` outside `manifest.outputs`. The Java security-registration
+  fault follows the registry's new static block.
+
 ## 0.136.7
 
 - `VG-REPORT-FORMAT-PARITY` (changed, 18.16g): also compares the security view. Python's real assess runs a second

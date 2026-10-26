@@ -33,6 +33,14 @@ remediation-package.json gets the remediation package's checks. Then every case 
 `fixtures/report_formats/skill_cases.json` is rendered by each engine's `skill-cases` seam and must equal Python's,
 which must equal the committed `skill_expected.json`.
 
+The security view (18.16g) and the buyer view (18.16h) are compared the same way. Python writes security.json,
+security.md and security.html on a second run of each input with `--for security`; the other engines through their
+`assess-emit remediation,skill,for=security` seam. The buyer view runs over its own six inputs (the buyer-view fixture
+in English and German, quickstart, the auditor-view fixture, the hostile remediation fixture and no-assertions): Python's
+`assess --for buyer` against each engine's `assess-emit for=buyer`, the same exit code and buyer.json, buyer.md and
+buyer.html byte for byte, each listed in manifest.outputs with Python's digest. `security_cases.json` and
+`buyer_cases.json` are rendered by each engine's `security-cases` and `buyer-cases` seams against the committed goldens.
+
 Modes:
     report_format_parity_check.py                  # three engines (needs `pnpm build` and `:assemble` first)
     report_format_parity_check.py --fail-fast      # the same, stopping at the first mismatching run
@@ -87,6 +95,12 @@ SECURITY_CASES = CASES.with_name("security_cases.json")
 #: Python's security.md and security.html for each view of SECURITY_CASES, the golden the engines'
 #: unit tests read.
 SECURITY_EXPECTED = CASES.with_name("security_expected.json")
+BUYER_CASES = CASES.with_name("buyer_cases.json")
+#: Python's buyer.md and buyer.html for each view of BUYER_CASES (en and de), the golden the engines' unit
+#: tests read.
+BUYER_EXPECTED = CASES.with_name("buyer_expected.json")
+#: The buyer-view gate's fixture: every outcome, a hostile clause and evidence ref, a gap step.
+BUYER = ROOT / "verification" / "gates" / "fixtures" / "buyer_view"
 HOSTILE = CASES.with_name("remediation_hostile")
 #: A records folder for the folder-form runs (`assess <folder>`), copied into the work tree.
 RECORDS = ROOT / "adapters" / "otel-genai" / "fixtures" / "otel-genai-agent-session"
@@ -98,6 +112,12 @@ EMITTED = ("remediation", "skill")
 #: The security view's files (18.16g): Python writes them on a second run with `--for security` (which
 #: refuses --emit), the other engines through the seam's `for=security` token.
 SECURITY_FILES = ("security.json", "security.md", "security.html")
+#: The buyer view's files (18.16h): Python writes them with `--for buyer`, the other engines through
+#: the seam's `for=buyer` token.
+BUYER_FILES = ("buyer.json", "buyer.md", "buyer.html")
+#: The buyer pass's inputs (buyer_runs); quickstart and the generated projects carry no questionnaire
+#: answers, so the pass runs over these alone.
+BUYER_RUNS = 6
 #: Java reads no records folder yet (input.records_unsupported; docs/quickstart-java.md): on the
 #: folder-form runs it must refuse at exit 3 and write no remediation output.
 JAVA_REFUSES = {"records_folder", "records_folder_profile"}
@@ -345,22 +365,26 @@ def emitted_problems(
     return problems
 
 
-def security_problems(engine: str, reference: Path, candidate: Path) -> list[str]:
-    """`candidate`'s security files against Python's `--for security` run in `reference`: the same
-    files, byte for byte, each listed in manifest.outputs with Python's digest."""
-    want = [n for n in SECURITY_FILES if (reference / n).is_file()]
-    got = [n for n in SECURITY_FILES if (candidate / n).is_file()]
+def view_problems(
+    engine: str,
+    reference: Path,
+    candidate: Path,
+    files: tuple[str, ...] = SECURITY_FILES,
+) -> list[str]:
+    """`candidate`'s audience-view `files` against Python's `--for <preset>` run in `reference`: the
+    same files, byte for byte, each listed in manifest.outputs with Python's digest."""
+    view = files[0].split(".")[0]
+    want = [n for n in files if (reference / n).is_file()]
+    got = [n for n in files if (candidate / n).is_file()]
     if want != got:
-        return [f"{engine} wrote security files {got}, python {want}"]
+        return [f"{engine} wrote {view} files {got}, python {want}"]
     if not want:
         return []
     ref_out = json.loads((reference / "manifest.json").read_text("utf-8"))["outputs"]
     out = json.loads((candidate / "manifest.json").read_text("utf-8"))["outputs"]
-    listed = [n for n in SECURITY_FILES if n in out]
+    listed = [n for n in files if n in out]
     if listed != want:
-        return [
-            f"{engine} manifest.outputs lists security files {listed}, python {want}"
-        ]
+        return [f"{engine} manifest.outputs lists {view} files {listed}, python {want}"]
     problems = []
     for name in want:
         a, b = (reference / name).read_bytes(), (candidate / name).read_bytes()
@@ -369,6 +393,89 @@ def security_problems(engine: str, reference: Path, candidate: Path) -> list[str
         elif out[name] != ref_out.get(name):
             problems.append(f"{engine} manifest.outputs[{name}] is not python's digest")
     return problems
+
+
+def buyer_runs() -> list[tuple[str, list[str], dict[str, str]]]:
+    """The buyer pass's inputs: (label, assess argv, extra env)."""
+    fixture = [
+        *cpc._project_args(BUYER),
+        "--catalog-dir",
+        str(BUYER / "catalog"),
+        "--allow-unverified-catalog",
+    ]
+    auditor = [
+        *cpc._project_args(cpc.AUDITOR),
+        "--catalog-dir",
+        str(cpc.AUDITOR / "catalog"),
+        "--allow-unverified-catalog",
+        "--deviations",
+        str(cpc.AUDITOR / "deviations.yaml"),
+    ]
+    hostile = [
+        *cpc._project_args(HOSTILE),
+        "--catalog-dir",
+        str(HOSTILE / "catalog"),
+        "--allow-unverified-catalog",
+    ]
+    return [
+        ("buyer_fixture", fixture, {}),
+        ("buyer_fixture_de", [*fixture, "--report-language", "de"], {}),
+        ("buyer_quickstart", cpc._project_args(cpc.QUICKSTART), {}),
+        ("buyer_auditor_view", auditor, {"AGENTCE_OPERATOR": "Zo\u00eb Corp"}),
+        ("buyer_remediation_hostile", hostile, {}),
+        (
+            "buyer_no-assertions",
+            cpc._project_args(cpc.QUICKSTART, cpc.NO_ASSERTIONS),
+            {},
+        ),
+    ]
+
+
+def _assess_buyer(engine: str, args: list[str], env: dict[str, str], out: Path) -> int:
+    """Python's real `assess --for buyer`, or another engine's through its `assess-emit for=buyer` seam."""
+    argv = ["assess", *args, "--out", str(out)]
+    if engine == "python":
+        _, code = cpc.run_engine("python", [*argv, "--for", "buyer"], env)
+        return code
+    proc = subprocess.run(
+        [*_seam(engine), "assess-emit", "for=buyer", *argv],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+        env={**_env(), **env},
+    )
+    return proc.returncode
+
+
+def check_buyer(
+    tmp: Path, engines: tuple[str, ...], fail_fast: bool
+) -> tuple[int, int]:
+    """Each buyer run: every engine's exit code is Python's, and its buyer files are Python's."""
+    runs = buyer_runs()
+    jobs = [
+        (e, args, env, tmp / e / label) for label, args, env in runs for e in engines
+    ]
+    with ThreadPoolExecutor(max_workers=min(8, os.cpu_count() or 2)) as pool:
+        codes = list(pool.map(lambda job: _assess_buyer(*job), jobs))
+    exits = {(job[0], job[3]): code for job, code in zip(jobs, codes, strict=True)}
+    failures = 0
+    for label, _, _ in runs:
+        problems: list[str] = []
+        reference = tmp / "python" / label
+        py_exit = exits[("python", reference)]
+        if py_exit not in ((3,) if label == "buyer_no-assertions" else (0, 1, 2)):
+            problems.append(f"python assess --for buyer exited {py_exit}")
+        for engine in engines[1:]:
+            candidate = tmp / engine / label
+            code = exits[(engine, candidate)]
+            if code != py_exit:
+                problems.append(f"{engine} assess exited {code}, python {py_exit}")
+            else:
+                problems += view_problems(engine, reference, candidate, BUYER_FILES)
+        failures += _report(label, problems)
+        if problems and fail_fast:
+            break
+    return failures, len(runs)
 
 
 def canonical_digest_table(packages: list[Path]):
@@ -470,7 +577,7 @@ def check_corpus(
                     problems += emitted_problems(
                         engine, dirs["python"][i], dirs[engine][i], digest_of
                     )
-                    problems += security_problems(
+                    problems += view_problems(
                         engine, dirs["python-security"][i], dirs[engine][i]
                     )
         failures += _report(label, problems)
@@ -650,6 +757,21 @@ json.dump(out, open(sys.argv[2], "w", encoding="utf-8"))
 """
 
 
+PYTHON_BUYER = """
+import json, sys
+from types import SimpleNamespace
+from agentce.report import render_buyer_html, render_buyer_md
+cases = json.load(open(sys.argv[1], encoding="utf-8"))["cases"]
+out = {}
+for c in cases:
+    kw = dict(language=c["language"], reverify_command=c["argv"], packaged=c["packaged"],
+              report_folder=c["folder"], catalogs=[SimpleNamespace(id=i, version=v) for i, v in c["catalogs"]])
+    out[c["name"] + ".md"] = render_buyer_md(c["view"], **kw)
+    out[c["name"] + ".html"] = render_buyer_html(c["view"], **kw)
+json.dump(out, open(sys.argv[2], "w", encoding="utf-8"))
+"""
+
+
 class CaseTable(NamedTuple):
     """A fixed case table each engine renders through a seam verb, with Python's golden and renderer."""
 
@@ -670,6 +792,7 @@ CASE_TABLES = (
         SECURITY_EXPECTED,
         PYTHON_SECURITY,
     ),
+    CaseTable("buyer case", "buyer-cases", BUYER_CASES, BUYER_EXPECTED, PYTHON_BUYER),
 )
 
 
@@ -771,12 +894,19 @@ def run_check(engines: tuple[str, ...], fail_fast: bool) -> int:
             )
             failures += corpus_failures
             runs += corpus_runs
+        if not (failures and fail_fast):
+            buyer_failures, buyer_count = check_buyer(
+                tmp / "buyer-run", engines, fail_fast
+            )
+            failures += buyer_failures
+            runs += buyer_count
     if failures:
         print(f"{failures} of {runs} runs differ", file=sys.stderr)
         return 1
     expected = (
         CORPUS_RUNS
         + REMEDIATION_ONLY_RUNS
+        + BUYER_RUNS
         + len(json.loads(CASES.read_text("utf-8"))["cases"])
         + sum(
             len(json.loads(table.expected.read_text("utf-8"))) for table in CASE_TABLES
@@ -841,7 +971,8 @@ def self_test() -> int:
                 failures.append(f"tamper not caught: {name}")
         failures += _clock_self_test(tmp / "clock")
         failures += _emitted_self_test(tmp / "emitted")
-        failures += _security_self_test(tmp / "security")
+        failures += _view_self_test(tmp / "security", SECURITY_FILES)
+        failures += _view_self_test(tmp / "buyer", BUYER_FILES)
         failures += _seam_for_self_test(tmp / "seam-for")
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
@@ -1006,12 +1137,13 @@ def _emitted_self_test(tmp: Path) -> list[str]:
     return failures
 
 
-def _security_self_test(tmp: Path) -> list[str]:
-    """security_problems passes a correct copy and catches each security tamper class."""
+def _view_self_test(tmp: Path, files: tuple[str, ...]) -> list[str]:
+    """view_problems passes a correct copy of `files` and catches each tamper class."""
+    view = files[0].split(".")[0]
     good = {
-        "security.json": b'{"drift":{"models":[],"tools":[]}}',
-        "security.md": b"# Security view\n",
-        "security.html": b"<!doctype html><title>Security view</title>\n",
+        files[0]: b'{"drift":{"models":[],"tools":[]}}',
+        files[1]: b"# A view\n",
+        files[2]: b"<!doctype html><title>A view</title>\n",
     }
 
     def report(
@@ -1029,16 +1161,16 @@ def _security_self_test(tmp: Path) -> list[str]:
 
     reference = report(tmp / "reference", good)
     tampers: dict[str, tuple[dict[str, bytes], dict[str, bytes] | None]] = {
-        "a security file missing": (
-            {k: v for k, v in good.items() if k != "security.md"},
+        f"a {view} file missing": (
+            {k: v for k, v in good.items() if k != files[1]},
             None,
         ),
-        "an extra security file": (good, None),
-        "a security file missing from manifest.outputs": (
+        f"an extra {view} file": (good, None),
+        f"a {view} file missing from manifest.outputs": (
             good,
-            {k: v for k, v in good.items() if k != "security.html"},
+            {k: v for k, v in good.items() if k != files[2]},
         ),
-        "a security digest not python's": (good, {**good, "security.json": b"x"}),
+        f"a {view} digest not python's": (good, {**good, files[0]: b"x"}),
         **{
             f"{name} one byte changed": (
                 {**good, name: data[:-1] + bytes([data[-1] ^ 1])},
@@ -1048,15 +1180,15 @@ def _security_self_test(tmp: Path) -> list[str]:
         },
     }
     failures = []
-    if security_problems("typescript", reference, report(tmp / "same", good)):
-        failures.append("a correct security copy was flagged")
-    for i, (name, (files, outputs)) in enumerate(tampers.items()):
+    if view_problems("typescript", reference, report(tmp / "same", good), files):
+        failures.append(f"a correct {view} copy was flagged")
+    for i, (name, (written, outputs)) in enumerate(tampers.items()):
         ref = reference
-        if name == "an extra security file":
+        if name == f"an extra {view} file":
             ref = report(
-                tmp / f"r{i}", {k: v for k, v in good.items() if k != "security.html"}
+                tmp / f"r{i}", {k: v for k, v in good.items() if k != files[2]}
             )
-        if security_problems("java", ref, report(tmp / f"t{i}", files, outputs)):
+        if view_problems("java", ref, report(tmp / f"t{i}", written, outputs), files):
             print(f"caught: {name}")
         else:
             failures.append(f"tamper not caught: {name}")
@@ -1067,7 +1199,12 @@ def _seam_for_self_test(tmp: Path) -> list[str]:
     """Each engine's assess-emit seam refuses for= with an unknown, empty or repeated preset (exit 3)."""
     failures = []
     for engine in ENGINES[1:]:
-        for token in ("for=nonsense", "for=", "for=security,for=security"):
+        for token in (
+            "for=nonsense",
+            "for=",
+            "for=security,for=security",
+            "for=buyer,for=buyer",
+        ):
             proc = subprocess.run(
                 [
                     *_seam(engine),

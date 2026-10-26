@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.136.7",
+  "suite_version": "0.136.8",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -2684,7 +2684,7 @@
     },
     {
       "id": "VG-REPORT-FORMAT-PARITY",
-      "title": "TypeScript and Java render report.junit.xml, report.csv, oscal-ar.xml, public-statement.md, report.pdf, the remediation package, remediation.md, the fix-list skill folder and the security view as Python does over the corpus and hostile case tables",
+      "title": "TypeScript and Java render report.junit.xml, report.csv, oscal-ar.xml, public-statement.md, report.pdf, the remediation package, remediation.md, the fix-list skill folder the security view and the buyer view as Python does over the corpus and hostile case tables",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -2700,7 +2700,7 @@
       "timeout_s": 900,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "the checker's self-test catches a one-byte change, a missing file, an extra trailing newline, CRLF line endings, a report.pdf Latin-1 byte written as UTF-8 and a missing report.pdf, and refuses an engine started_at that is not YYYY-MM-DDTHH:MM:SSZ; over corpus/quickstart (also with --report-language de), the auditor-view fixture and the 30 generated corpus projects, Python's real assess --emit junit,csv,oscal_xml,public,pdf writes the five files, each engine's own assess exits with Python's code and writes a started_at of Python's shape (then set to Python's value, the clock being the one input that differs), and each engine's report-formats seam renders the five files from that engine's own assertions.json, oscal-ar.json and manifest byte-identical to Python's (Python's own seam included); every case in tools/fixtures/report_formats/cases.json (empty, every outcome out of order, hostile characters, an odd OSCAL document, code-point order, odd started_at values, German) renders the same bytes in all three engines; 33 corpus runs and every case ran; the remediation package and remediation.md (Python's assess --emit remediation, the other engines' assess-emit remediation seam) over those 33 runs, the hostile remediation fixture, a records folder without and with --profile (Java refuses both at exit 3, input.records_unsupported) and the no-assertions run: the same remediation files, each remediation.md byte-identical, each package its engine's canonical bytes, equal to Python's but for generated_from.engine (the engine's manifest block) and its recomputed $id, listed in manifest.outputs with its digest; the self-test catches each remediation tamper class; every package in remediation_md_cases.json renders Python's bytes in all three engines and Python's equals remediation_md_expected.json; the skill folder (Python's assess --emit skill, the other engines' assess-emit remediation,skill seam) over the same runs: the same files under skill/<subject>/, each SKILL.md, findings/*.md and REVERIFY.md byte-identical and listed in manifest.outputs with Python's digest, each skill remediation-package.json held to the remediation package's checks, Java's refused folder runs writing no skill folder; the self-test catches a missing or extra skill file, one missing from manifest.outputs, a one-byte change in SKILL.md, a finding note or REVERIFY.md and a skill package key changed outside engine and $id; every case in skill_cases.json (catalog_version escapes, finding notes, re-verify argv, tool names, file names) renders Python's text in all three engines and Python's equals skill_expected.json The security view (18.16g): over the same runs Python's real assess --for security (a second Python run, exiting as the --emit run does) against TypeScript's and Java's assess-emit remediation,skill,for=security seam: the same security files (none for no-assertions and Java's refused folder runs), security.json, security.md and security.html byte-identical to Python's and listed in manifest.outputs with Python's digest; every view of security_cases.json renders Python's security.md and security.html in all three engines and Python's equals security_expected.json; the self-test catches a missing or extra security file, one missing from manifest.outputs or with another digest and a one-byte change in each, and both seams refuse for= with an unknown, empty or repeated preset (exit 3).",
+        "pass": "the checker's self-test catches a one-byte change, a missing file, an extra trailing newline, CRLF line endings, a report.pdf Latin-1 byte written as UTF-8 and a missing report.pdf, and refuses an engine started_at that is not YYYY-MM-DDTHH:MM:SSZ; over corpus/quickstart (also with --report-language de), the auditor-view fixture and the 30 generated corpus projects, Python's real assess --emit junit,csv,oscal_xml,public,pdf writes the five files, each engine's own assess exits with Python's code and writes a started_at of Python's shape (then set to Python's value, the clock being the one input that differs), and each engine's report-formats seam renders the five files from that engine's own assertions.json, oscal-ar.json and manifest byte-identical to Python's (Python's own seam included); every case in tools/fixtures/report_formats/cases.json (empty, every outcome out of order, hostile characters, an odd OSCAL document, code-point order, odd started_at values, German) renders the same bytes in all three engines; 33 corpus runs and every case ran; the remediation package and remediation.md (Python's assess --emit remediation, the other engines' assess-emit remediation seam) over those 33 runs, the hostile remediation fixture, a records folder without and with --profile (Java refuses both at exit 3, input.records_unsupported) and the no-assertions run: the same remediation files, each remediation.md byte-identical, each package its engine's canonical bytes, equal to Python's but for generated_from.engine (the engine's manifest block) and its recomputed $id, listed in manifest.outputs with its digest; the self-test catches each remediation tamper class; every package in remediation_md_cases.json renders Python's bytes in all three engines and Python's equals remediation_md_expected.json; the skill folder (Python's assess --emit skill, the other engines' assess-emit remediation,skill seam) over the same runs: the same files under skill/<subject>/, each SKILL.md, findings/*.md and REVERIFY.md byte-identical and listed in manifest.outputs with Python's digest, each skill remediation-package.json held to the remediation package's checks, Java's refused folder runs writing no skill folder; the self-test catches a missing or extra skill file, one missing from manifest.outputs, a one-byte change in SKILL.md, a finding note or REVERIFY.md and a skill package key changed outside engine and $id; every case in skill_cases.json (catalog_version escapes, finding notes, re-verify argv, tool names, file names) renders Python's text in all three engines and Python's equals skill_expected.json The security view (18.16g): over the same runs Python's real assess --for security (a second Python run, exiting as the --emit run does) against TypeScript's and Java's assess-emit remediation,skill,for=security seam: the same security files (none for no-assertions and Java's refused folder runs), security.json, security.md and security.html byte-identical to Python's and listed in manifest.outputs with Python's digest; every view of security_cases.json renders Python's security.md and security.html in all three engines and Python's equals security_expected.json; the self-test catches a missing or extra security file, one missing from manifest.outputs or with another digest and a one-byte change in each, and both seams refuse for= with an unknown, empty or repeated preset (exit 3). The buyer view (18.16h): over six inputs (the buyer-view fixture in en and de, quickstart, the auditor-view fixture, the hostile remediation fixture and no-assertions) Python's real assess --for buyer against TypeScript's and Java's assess-emit for=buyer seam: the same exit code, the same buyer files (none for no-assertions), buyer.json, buyer.md and buyer.html byte-identical to Python's and listed in manifest.outputs with Python's digest; every view of buyer_cases.json renders Python's buyer.md and buyer.html in all three engines and Python's equals buyer_expected.json; the self-test catches the same tamper classes on the buyer files and both seams refuse for=buyer,for=buyer.",
         "fail": "any engine writes a different byte in any of the five files, writes none, exits differently from Python, writes a started_at of another shape, or the checker runs fewer runs than expected, or any remediation or skill file differs, is missing or extra, is not listed in the manifest with its digest, or carries a wrong engine block or $id"
       },
       "faults": [
@@ -2869,14 +2869,56 @@
         {
           "description": "java registers no security entry in AUDIENCE_VIEWS, so the seam refuses for=security",
           "file": "engines/java/src/main/java/org/agentce/Report.java",
-          "search": "            \"security\",\n            new AudienceViewSpec(",
-          "replace": "            \"security-unregistered\",\n            new AudienceViewSpec("
+          "search": "        AUDIENCE_VIEWS.put(\"security\", new AudienceViewSpec(",
+          "replace": "        AUDIENCE_VIEWS.put(\"security-unregistered\", new AudienceViewSpec("
         },
         {
           "description": "typescript writes security.json without recording it in manifest.outputs",
           "file": "engines/typescript/src/report.ts",
           "search": "    (ext) => ext === \"md\" || ext === \"html\",\n    writeJson,\n    writeTextFile,",
           "replace": "    (ext) => ext === \"md\" || ext === \"html\",\n    (name, value) => writeFile(joinPath(outDir, name), canonicalize(value)),\n    writeTextFile,"
+        },
+        {
+          "description": "typescript drops the buyer view's unverified-clause suffix",
+          "file": "engines/typescript/src/report.ts",
+          "search": "  return crosswalkText({ ...entry, framework: \"\", clause: \"\" }, cat);",
+          "replace": "  return \"\";"
+        },
+        {
+          "description": "java drops the unverified-clause suffix from buyer.md answers",
+          "file": "engines/java/src/main/java/org/agentce/Report.java",
+          "search": "String text = sanitizeForMarkdown(buyerAnswerText(entry, cat)) + buyerUnverifiedSuffix(entry, cat);",
+          "replace": "String text = sanitizeForMarkdown(buyerAnswerText(entry, cat));"
+        },
+        {
+          "description": "typescript fills the packaged folder into buyer.html before the code-span pass",
+          "file": "engines/typescript/src/report.ts",
+          "search": "formatTemplate(cat[\"report.buyer_how_to_check\"] as string, { folder: marker })",
+          "replace": "formatTemplate(cat[\"report.buyer_how_to_check\"] as string, { folder: o.reportFolder })"
+        },
+        {
+          "description": "java renders a gap step with no match as no_population",
+          "file": "engines/java/src/main/java/org/agentce/Report.java",
+          "search": "            return List.of(cat.get(\"report.buyer_gap_step_unavailable\"));",
+          "replace": "            return List.of(formatMessage(cat.get(\"report.blind_spots_no_population_text\"), Map.of(\"control\", sanitizeField(entry.get(\"control\").asText()))));"
+        },
+        {
+          "description": "typescript drops the evidence label from buyer.html answers",
+          "file": "engines/typescript/src/report.ts",
+          "search": "subItems += `<li>${escapeHtml(cat[\"report.evidence_label\"] as string)}: ${refs}</li>`;",
+          "replace": "subItems += `<li>${refs}</li>`;"
+        },
+        {
+          "description": "java lists the buyer counts table's outcomes alphabetically instead of _STATEMENT_OUTCOMES order",
+          "file": "engines/java/src/main/java/org/agentce/Report.java",
+          "search": "\"conformant\", \"non-conformant\", \"partial\", \"not_applicable\", \"not_assessed\", \"insufficient_evidence\");",
+          "replace": "\"conformant\", \"insufficient_evidence\", \"non-conformant\", \"not_applicable\", \"not_assessed\", \"partial\");"
+        },
+        {
+          "description": "typescript writes buyer.md without recording it in manifest.outputs",
+          "file": "engines/typescript/src/report.ts",
+          "search": "    (ext) => ext === \"md\" || ext === \"html\",\n    writeJson,\n    writeTextFile,",
+          "replace": "    (ext) => ext === \"md\" || ext === \"html\",\n    writeJson,\n    (name, text) =>\n      name === \"buyer.md\"\n        ? writeFile(joinPath(outDir, name), Buffer.from(text, \"utf-8\"))\n        : writeTextFile(name, text),"
         }
       ],
       "fix_hint": "run verification/gates/report_format_parity.sh and read the MISMATCH lines (each names the file and the first differing byte); the reference is engines/python/agentce/report.py's render_junit, render_csv, render_oscal_xml, render_public_statement and render_pdf, ported as renderJunit, renderCsv, renderOscalXml, renderPublicStatement and renderPdf in engines/typescript/src/report.ts and engines/java/src/main/java/org/agentce/Report.java; the check is tools/report_format_parity_check.py; remediation: render_remediation_package and render_remediation_md (report.py) are ported in engines/typescript/src/remediation.ts and engines/java/src/main/java/org/agentce/Remediation.java, with templating.ts / Templating.java"
