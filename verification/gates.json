@@ -2934,13 +2934,13 @@
         },
         {
           "description": "typescript renders the bare control id where the control's title belongs (_finding_title)",
-          "file": "engines/typescript/src/report.ts",
+          "file": "engines/typescript/src/remediation.ts",
           "search": "return spec?.title ? spec.title : a.control;",
           "replace": "return spec?.title ? a.control : a.control;"
         },
         {
           "description": "java renders an empty catalog title empty instead of falling back to the control id (_finding_title)",
-          "file": "engines/java/src/main/java/org/agentce/Report.java",
+          "file": "engines/java/src/main/java/org/agentce/Remediation.java",
           "search": "return spec != null && spec.title != null && !spec.title.isEmpty() ? spec.title : a.control;",
           "replace": "return spec != null && spec.title != null ? spec.title : a.control;"
         },

@@ -164,16 +164,24 @@ public final class Bundled {
     /** The {@code id@version} of every vendored base catalog, in byte order: the lenses a run can
      * choose (Python's {@code bundled.base_lenses}). */
     static List<String> baseLenses() {
-        Path base = catalogsDir().resolve("base");
-        List<String> lenses = new ArrayList<>();
-        vendoredCatalogs().forEach((label, directory) -> {
-            if (base.equals(directory.getParent())) {
-                lenses.add(label);
-            }
-        });
-        lenses.sort(Json::byteCompare);
+        List<String> lenses = cachedBaseLenses;
+        if (lenses == null) {
+            Path base = catalogsDir().resolve("base");
+            List<String> found = new ArrayList<>();
+            vendoredCatalogs().forEach((label, directory) -> {
+                if (base.equals(directory.getParent())) {
+                    found.add(label);
+                }
+            });
+            found.sort(Json::byteCompare);
+            lenses = List.copyOf(found);
+            cachedBaseLenses = lenses;
+        }
         return lenses;
     }
+
+    /** The vendored catalogs are fixed for the process, so the lens list is read once. */
+    private static volatile List<String> cachedBaseLenses;
 
     /** The vendored quickstart project: an evidence bundle, an applicability profile, and a domain. */
     public static Path quickstartDir() {

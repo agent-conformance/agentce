@@ -58,6 +58,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import functools
 import json
 import os
 import re
@@ -676,6 +677,13 @@ def report_problems(engine: str, reference: Path, candidate: Path) -> list[str]:
     return problems
 
 
+@functools.cache
+def _python_rerender(argv: tuple[str, ...]) -> tuple[str, int]:
+    """Python's stdout and exit code for one `report --from` call, run once and shared by every
+    engine compared against it."""
+    return cpc.run_engine("python", list(argv))
+
+
 def rerender_problems(engine: str, reference: Path, candidate: Path) -> list[str]:
     """`report --from <Python's assertions.json> --format md` and `--format html` printed by `engine`
     against Python's stdout, under the same engine-line rule."""
@@ -684,7 +692,7 @@ def rerender_problems(engine: str, reference: Path, candidate: Path) -> list[str
     problems = []
     for fmt in ("md", "html"):
         argv = ["report", "--from", str(reference / "assertions.json"), "--format", fmt]
-        want, want_code = cpc.run_engine("python", argv)
+        want, want_code = _python_rerender(tuple(argv))
         got, code = cpc.run_engine(engine, argv)
         if code != want_code:
             problems.append(

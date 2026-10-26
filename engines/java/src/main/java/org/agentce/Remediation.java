@@ -48,17 +48,17 @@ final class Remediation {
     }
 
     /** Python's {@code spec.raw.get(key, []) or []} over a catalog list field. */
-    private static List<JsonNode> rawList(Catalog.ControlSpec spec, String key) {
+    static List<JsonNode> rawList(Catalog.ControlSpec spec, String key) {
         return asList(rawField(spec, key));
     }
 
-    private static String severity(Catalog.ControlSpec spec) {
+    static String severity(Catalog.ControlSpec spec) {
         return spec != null && spec.severity != null && SEVERITY_LEVELS.contains(spec.severity)
                 ? spec.severity
                 : "unrated";
     }
 
-    private static String findingTitle(Assertions.Assertion a, Catalog.ControlSpec spec) {
+    static String findingTitle(Assertions.Assertion a, Catalog.ControlSpec spec) {
         return spec != null && spec.title != null && !spec.title.isEmpty() ? spec.title : a.control;
     }
 

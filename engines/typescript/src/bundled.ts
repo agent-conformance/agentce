@@ -56,14 +56,20 @@ export function vendoredCatalogs(): Map<string, string> {
   return found;
 }
 
+/** The vendored catalogs are fixed for the process, so the lens list is read once. */
+let cachedBaseLenses: string[] | undefined;
+
 /** The `id@version` of every vendored base catalog, in byte order: the lenses a run can choose
  * (Python's `bundled.base_lenses`). */
 export function baseLenses(): string[] {
-  const base = join(catalogsDir(), "base");
-  return [...vendoredCatalogs()]
-    .filter(([, directory]) => directory.startsWith(`${base}/`))
-    .map(([label]) => label)
-    .sort(byteCompare);
+  if (cachedBaseLenses === undefined) {
+    const base = join(catalogsDir(), "base");
+    cachedBaseLenses = [...vendoredCatalogs()]
+      .filter(([, directory]) => directory.startsWith(`${base}/`))
+      .map(([label]) => label)
+      .sort(byteCompare);
+  }
+  return [...cachedBaseLenses];
 }
 
 /** The vendored quickstart project: an evidence bundle, an applicability profile, and a domain. */

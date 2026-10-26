@@ -40,21 +40,24 @@ public final class Cli {
     private Cli() {}
 
     private static final String DEFAULT_OUT_DIR = "out";
-    /** The catalog an assessment evaluates when nothing names one: the cross-standard baseline. */
-    private static final String DEFAULT_LENS = Bundled.DEFAULT_LENS;
     private static final List<String> REPORT_FORMATS = List.of("md", "html", "oscal", "sarif", "public", "pack");
     /** The evidence-pack role variants {@code report --role} takes (SPEC §9.4). */
     private static final List<String> REPORT_ROLES = List.of("provider", "deployer");
     private static final Set<String> VERDICT_OUTCOMES = Set.of("conformant", "non-conformant", "insufficient_evidence");
 
     public static void main(String[] args) {
-        // UTF-8 whatever the locale, as Python (UTF-8 mode under the C locale) and Node write: the JVM's
-        // stdout.encoding follows the locale, so LC_ALL=C turned every non-ASCII character into "?".
+        useUtf8Stdio();
+        System.exit(run(args));
+    }
+
+    /** UTF-8 whatever the locale, as Python (UTF-8 mode under the C locale) and Node write: the JVM's
+     * stdout.encoding follows the locale, so LC_ALL=C turned every non-ASCII character into "?". Both
+     * of the jar's entry points ({@code Cli} and {@link Seams}) call it first. */
+    static void useUtf8Stdio() {
         System.setOut(new java.io.PrintStream(new java.io.FileOutputStream(java.io.FileDescriptor.out), true,
                 StandardCharsets.UTF_8));
         System.setErr(new java.io.PrintStream(new java.io.FileOutputStream(java.io.FileDescriptor.err), true,
                 StandardCharsets.UTF_8));
-        System.exit(run(args));
     }
 
     /** Python's {@code agentce --help} (COLUMNS=80), word for word. */
@@ -668,7 +671,7 @@ global options:
      * --catalog} list, else the profile's declared {@code catalogs} when no directory was passed — must
      * resolve to a directory that was passed or to a vendored catalog, and every directory passed must
      * be one the request names (the identity cross-check, with no override). A run that passes no {@code --catalog} and no {@code --catalog-dir}, whose profile declares no
-     * catalogs, evaluates the baseline ({@link #DEFAULT_LENS}).
+     * catalogs, evaluates the baseline ({@link Bundled#DEFAULT_LENS}).
      */
     private static Resolved resolveCatalogs(
             String requested, Profile profile, List<String> catalogDirs, Verify.TrustRoot trust,
@@ -699,7 +702,7 @@ global options:
         } else {
             ids = new ArrayList<>(profile.catalogs);
             if (ids.isEmpty() && requested == null) {
-                ids.add(DEFAULT_LENS);
+                ids.add(Bundled.DEFAULT_LENS);
             }
         }
         if (ids.isEmpty() && loaded.isEmpty()) {

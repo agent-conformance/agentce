@@ -958,13 +958,12 @@ public final class Report {
             List<Assertions.Assertion> assertions, Map<String, Catalog.ControlSpec> byControl) {
         Map<String, List<Assertions.Assertion>> groups = new LinkedHashMap<>();
         for (Assertions.Assertion a : assertions) {
-            Catalog.ControlSpec spec = byControl.get(a.control);
-            String severity = spec != null && spec.severity != null ? spec.severity : "";
-            String level = SEVERITY_LEVELS.contains(severity) ? severity : "unrated";
-            groups.computeIfAbsent(level, k -> new ArrayList<>()).add(a);
+            groups.computeIfAbsent(Remediation.severity(byControl.get(a.control)), k -> new ArrayList<>()).add(a);
         }
+        List<String> order = new ArrayList<>(SEVERITY_LEVELS);
+        order.add("unrated");
         List<Map.Entry<String, List<Assertions.Assertion>>> out = new ArrayList<>();
-        for (String level : List.of("high", "medium", "low", "unrated")) {
+        for (String level : order) {
             if (groups.containsKey(level)) {
                 out.add(Map.entry(level, sortedBySubjectControl(groups.get(level))));
             }
@@ -972,20 +971,13 @@ public final class Report {
         return out;
     }
 
-    private static String findingTitle(Assertions.Assertion a, Catalog.ControlSpec spec) {
-        return spec != null && spec.title != null && !spec.title.isEmpty() ? spec.title : a.control;
-    }
-
     /** The control's technique pointers, the catalog's only machine-readable remediation hint (SPEC
      * §7.3), each stripped of any {@code techniques/} path prefix (report.py's {@code _remediation_hints}). */
     private static List<String> remediationHints(Catalog.ControlSpec spec) {
         List<String> hints = new ArrayList<>();
-        JsonNode refs = spec != null && spec.raw != null ? spec.raw.get("techniques") : null;
-        if (refs != null && refs.isArray()) {
-            for (JsonNode ref : refs) {
-                String text = Readiness.pyStr(ref);
-                hints.add(text.substring(text.lastIndexOf('/') + 1));
-            }
+        for (JsonNode ref : Remediation.rawList(spec, "techniques")) {
+            String text = Readiness.pyStr(ref);
+            hints.add(text.substring(text.lastIndexOf('/') + 1));
         }
         return hints;
     }
@@ -1049,7 +1041,7 @@ public final class Report {
      * technique labels are joined as Python joins them). */
     private static List<String> findingMd(Assertions.Assertion a, Catalog.ControlSpec spec, Map<String, String> cat) {
         List<String> lines = new ArrayList<>();
-        lines.add("- **" + sanitizeForMarkdown(findingTitle(a, spec)) + "** (`" + sanitizeForMarkdown(a.control)
+        lines.add("- **" + sanitizeForMarkdown(Remediation.findingTitle(a, spec)) + "** (`" + sanitizeForMarkdown(a.control)
                 + "` @ `" + sanitizeForMarkdown(a.subject) + "`) -> **"
                 + sanitizeForMarkdown(outcomeLabel(cat, a.outcome)) + "** "
                 + "(rung " + a.rung + ", " + sanitizeForMarkdown(a.mode) + "; "
@@ -1096,7 +1088,7 @@ public final class Report {
         String clauses = a.crosswalk.stream()
                 .map(e -> sanitizeForHtml(crosswalkText(e, cat)))
                 .collect(Collectors.joining("; "));
-        return "<tr><td>" + sanitizeForHtml(findingTitle(a, spec)) + "</td>"
+        return "<tr><td>" + sanitizeForHtml(Remediation.findingTitle(a, spec)) + "</td>"
                 + "<td>" + sanitizeForHtml(a.control) + "</td><td>" + sanitizeForHtml(a.subject) + "</td>"
                 + "<td>" + sanitizeForHtml(spec != null && spec.severity != null ? spec.severity : "") + "</td>"
                 + "<td>" + sanitizeForHtml(outcomeLabel(cat, a.outcome)) + "</td>"

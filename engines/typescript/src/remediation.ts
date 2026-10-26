@@ -38,16 +38,16 @@ function strGet(d: Json, key: string, fallback = ""): string {
 }
 
 /** Python's `spec.raw.get(key, []) or []` over a catalog list field. */
-function rawList(spec: ControlSpec | undefined, key: string): Json[] {
+export function rawList(spec: ControlSpec | undefined, key: string): Json[] {
   const value = spec?.raw[key];
   return Array.isArray(value) ? (value as Json[]) : [];
 }
 
-function severity(spec: ControlSpec | undefined): string {
+export function severity(spec: ControlSpec | undefined): string {
   return spec !== undefined && SEVERITY_LEVELS.has(spec.severity) ? spec.severity : "unrated";
 }
 
-function findingTitle(a: Assertion, spec: ControlSpec | undefined): string {
+export function findingTitle(a: Assertion, spec: ControlSpec | undefined): string {
   return spec?.title ? spec.title : a.control;
 }
 

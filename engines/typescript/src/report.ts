@@ -40,7 +40,13 @@ import {
   computeProjectView,
 } from "./project";
 import { pyTruthy } from "./readiness";
-import { renderRemediationMd, renderRemediationPackage } from "./remediation";
+import {
+  findingTitle,
+  rawList,
+  renderRemediationMd,
+  renderRemediationPackage,
+  severity,
+} from "./remediation";
 import {
   FRAMEWORK_DISPLAY_NAMES,
   FRAMEWORK_VERSIONS,
@@ -772,8 +778,7 @@ function verdictHtml(summary: VerdictSummary, cat: Record<string, string>): stri
 /** The control's technique pointers, the catalog's only machine-readable remediation hint (SPEC
  * §7.3), each stripped of any `techniques/` path prefix (report.py's `_remediation_hints`). */
 function remediationHints(spec: ControlSpec | undefined): string[] {
-  const refs: unknown[] = spec && Array.isArray(spec.raw.techniques) ? spec.raw.techniques : [];
-  return refs.map((ref) => pyStr(ref).split("/").pop() as string);
+  return rawList(spec, "techniques").map((ref) => pyStr(ref).split("/").pop() as string);
 }
 
 const SEVERITY_LEVELS = ["high", "medium", "low"];
@@ -795,17 +800,14 @@ function groupedBySeverity(
 ): [string, Assertion[]][] {
   const groups = new Map<string, Assertion[]>();
   for (const a of assertions) {
-    const severity = byControl.get(a.control)?.severity ?? "";
-    const level = SEVERITY_LEVELS.includes(severity) ? severity : "unrated";
-    groups.set(level, [...(groups.get(level) ?? []), a]);
+    const level = severity(byControl.get(a.control));
+    const group = groups.get(level);
+    if (group) group.push(a);
+    else groups.set(level, [a]);
   }
   return [...SEVERITY_LEVELS, "unrated"]
     .filter((level) => groups.has(level))
     .map((level) => [level, (groups.get(level) as Assertion[]).sort(bySubjectControl)]);
-}
-
-function findingTitle(a: Assertion, spec: ControlSpec | undefined): string {
-  return spec?.title ? spec.title : a.control;
 }
 
 /** The offending nodes a finding's violations name (report.py's `str(v.get("focus"))` for each truthy focus). */
@@ -826,12 +828,8 @@ function catalogLabels(catalogs: Catalog[]): string[] {
   return catalogs.map((c) => `${c.id}@${c.version}`);
 }
 
-function catalogCitationMd(catalogs: string[]): string {
-  return catalogs.length > 0 ? catalogs.map((c) => sanitizeForMarkdown(c)).join(", ") : "(none)";
-}
-
-function catalogCitationHtml(catalogs: string[]): string {
-  return catalogs.length > 0 ? catalogs.map((c) => sanitizeForHtml(c)).join(", ") : "(none)";
+function catalogCitation(catalogs: string[], sanitize: (text: string) => string): string {
+  return catalogs.length > 0 ? catalogs.map((c) => sanitize(c)).join(", ") : "(none)";
 }
 
 /** The provenance every report body carries (SPEC §9.1; report.py's `_provenance_md`). */
@@ -840,7 +838,7 @@ function provenanceMd(catalogs: string[], invocation: string[]): string[] {
     "## Provenance",
     "",
     `- Engine: ${ENGINE_NAME} ${engineVersion()}`,
-    `- Catalog: ${catalogCitationMd(catalogs)}`,
+    `- Catalog: ${catalogCitation(catalogs, sanitizeForMarkdown)}`,
     `- Lenses available: ${lensesText()}`,
     `- Reproduce: \`${reproduceCommand(invocation)}\``,
     "",
@@ -848,7 +846,7 @@ function provenanceMd(catalogs: string[], invocation: string[]): string[] {
 }
 
 function provenanceHtml(catalogs: string[], invocation: string[]): string {
-  return `<section aria-labelledby="provenance"><h2 id="provenance">Provenance</h2><ul><li>Engine: ${escapeHtml(ENGINE_NAME)} ${escapeHtml(engineVersion())}</li><li>Catalog: ${catalogCitationHtml(catalogs)}</li><li>Lenses available: ${escapeHtml(lensesText())}</li><li>Reproduce: <code>${escapeHtml(reproduceCommand(invocation))}</code></li></ul></section>`;
+  return `<section aria-labelledby="provenance"><h2 id="provenance">Provenance</h2><ul><li>Engine: ${escapeHtml(ENGINE_NAME)} ${escapeHtml(engineVersion())}</li><li>Catalog: ${catalogCitation(catalogs, (c) => sanitizeForHtml(c))}</li><li>Lenses available: ${escapeHtml(lensesText())}</li><li>Reproduce: <code>${escapeHtml(reproduceCommand(invocation))}</code></li></ul></section>`;
 }
 
 /** One finding: title, outcome, clause citations, evidence, offending nodes and remediation
@@ -1459,7 +1457,7 @@ function buyerHowToCheckMd(cat: Record<string, string>, o: Required<BuyerRenderO
       ? formatTemplate(cat["report.buyer_how_to_check"] as string, { folder: o.reportFolder })
       : (cat["report.buyer_how_to_check_unpackaged"] as string),
   );
-  lines.push(`- Catalog: ${catalogCitationMd(o.catalogs)}`);
+  lines.push(`- Catalog: ${catalogCitation(o.catalogs, sanitizeForMarkdown)}`);
   lines.push(`- Reproduce: \`${reproduceCommand(o.argv)}\``);
   return lines;
 }
@@ -1473,7 +1471,7 @@ function buyerHowToCheckHtml(cat: Record<string, string>, o: Required<BuyerRende
         .split(marker)
         .join(escapeHtml(o.reportFolder))
     : codeSpansHtml(cat["report.buyer_how_to_check_unpackaged"] as string);
-  return `<p>${line}</p><p>Catalog: ${catalogCitationHtml(o.catalogs)}</p><p>Reproduce: <code>${escapeHtml(reproduceCommand(o.argv))}</code></p>`;
+  return `<p>${line}</p><p>Catalog: ${catalogCitation(o.catalogs, (c) => sanitizeForHtml(c))}</p><p>Reproduce: <code>${escapeHtml(reproduceCommand(o.argv))}</code></p>`;
 }
 
 function buyerOptions(options: BuyerRenderOptions): Required<BuyerRenderOptions> {

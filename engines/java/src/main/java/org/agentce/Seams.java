@@ -21,6 +21,7 @@ public final class Seams {
     private Seams() {}
 
     public static void main(String[] args) {
+        Cli.useUtf8Stdio();
         System.exit(run(args));
     }
 
