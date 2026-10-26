@@ -1,0 +1,17 @@
+id: RMH-03
+version: "2026.09"
+title: ""
+crosswalk: []
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 3
+  min_source_class: self_report
+  minimum_evidence:
+    - {event: Decision, class: any}
+expectations: []
+severity: low
+evidence_strength: weak
+tolerance: {kind: count, max: 0}
+test_cases: []

@@ -1,0 +1,5 @@
+# Domain ontology binding for the VG-AUDITOR-VIEW gate fixture (verification/gates/auditor_view.sh).
+decision_types:
+  - id: "dom:AuditorFixtureDecision"
+    subclass_of: "agentce:ConsequentialDecision"
+    consequential: true

@@ -1,0 +1,10 @@
+{
+  "agentce_bundle_version": 1,
+  "domain": "remediation-hostile-fixture",
+  "files": [
+    {
+      "path": "events/subject.jsonl",
+      "sha256": "b82af5c982291ce0d2ce4fbe6085973d3e0aecba00fcfa7c491b9b841a4c65c7"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+id: RMH-05
+version: "2026.09"
+title: "Shape holds, but only on a self-report record below the control's source class"
+crosswalk:
+  - {framework: eu-ai-act, clause: "Art. 14", relation: supports, verified_against_text: true}
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: enforcement_point
+  minimum_evidence:
+    - {event: Decision, class: any}
+  shape: shapes/RMH-05.ttl
+expectations:
+  - {id: E1, text: "A record from an enforcement point shows the decision."}
+severity: high
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+test_cases: []

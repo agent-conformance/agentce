@@ -1,0 +1,20 @@
+id: RMH-02
+version: "2026.09"
+title: "Needs an enforcement-point record, holds only self-report"
+crosswalk: []
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: enforcement_point
+  minimum_evidence:
+    - {event: Decision, class: any}
+    - {event: ToolCall, class: independent_system}
+  shape: shapes/RMH-02.ttl
+expectations:
+  - {id: E1, text: ""}
+severity: unknown-level
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+test_cases: []

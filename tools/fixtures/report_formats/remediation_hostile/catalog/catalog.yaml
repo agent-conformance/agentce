@@ -1,0 +1,7 @@
+# A small catalog for VG-REPORT-FORMAT-PARITY's remediation run (18.16e): controls whose catalog text
+# carries every character the remediation sanitisers neutralise, a remediation hint, a verified clause,
+# an all-empty expectation list, a source-class gap, and both not-assessed reasons. Not a base or
+# third-party catalog; loaded only via --catalog-dir --allow-unverified-catalog by the parity checker.
+id: remediation-hostile-fixture
+version: "2026.09"
+title: "VG-REPORT-FORMAT-PARITY remediation fixture"

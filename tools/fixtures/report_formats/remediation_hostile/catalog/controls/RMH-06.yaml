@@ -1,0 +1,23 @@
+id: RMH-06
+version: "2026.09"
+title: "Verification flags that are not booleans"
+crosswalk:
+  - {framework: eu-ai-act, clause: "Art. 9", relation: maps, verified_against_text: "false"}
+  - {framework: eu-ai-act, clause: "Art. 10", relation: maps, verified_against_text: "true"}
+  - {framework: eu-ai-act, clause: "Art. 11", relation: maps, verified_against_text: 1}
+  - {framework: eu-ai-act, clause: "Art. 13", relation: maps, verified_against_text: "yes"}
+applicability:
+  applies_to_roles: [both]
+evaluation:
+  mode: automated
+  rung: 2
+  min_source_class: enforcement_point
+  minimum_evidence:
+    - {event: Decision, class: any}
+  shape: shapes/RMH-06.ttl
+expectations:
+  - {id: E1, text: "Only a real true marks a clause verified."}
+severity: medium
+evidence_strength: strong
+tolerance: {kind: count, max: 0}
+test_cases: []
