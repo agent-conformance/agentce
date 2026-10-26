@@ -2909,10 +2909,10 @@
           "replace": "subItems += `<li>${refs}</li>`;"
         },
         {
-          "description": "java lists the buyer counts table's outcomes alphabetically instead of _STATEMENT_OUTCOMES order",
+          "description": "java lists the buyer counts table's outcomes alphabetically instead of the OUTCOMES order (_STATEMENT_OUTCOMES)",
           "file": "engines/java/src/main/java/org/agentce/Report.java",
-          "search": "\"conformant\", \"non-conformant\", \"partial\", \"not_applicable\", \"not_assessed\", \"insufficient_evidence\");",
-          "replace": "\"conformant\", \"insufficient_evidence\", \"non-conformant\", \"not_applicable\", \"not_assessed\", \"partial\");"
+          "search": "for (String o : Assertions.OUTCOMES) {\n            labels.add(outcomeLabel(cat, o));",
+          "replace": "for (String o : Assertions.OUTCOMES.stream().sorted().toList()) {\n            labels.add(outcomeLabel(cat, o));"
         },
         {
           "description": "typescript writes buyer.md without recording it in manifest.outputs",

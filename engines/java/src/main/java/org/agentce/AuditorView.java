@@ -26,7 +26,7 @@ public final class AuditorView {
     private AuditorView() {}
 
     /** Modes whose {@code not_assessed} outcome gets the disclosed not-yet-evaluated note. */
-    private static final Set<String> MANUAL_MODES = Set.of("manual", "semi-automated");
+    static final Set<String> MANUAL_MODES = Set.of("manual", "semi-automated");
 
     /** The register record's six required fields (deviation-register.schema.json), copied verbatim. */
     private static final List<String> DEVIATION_FIELDS =

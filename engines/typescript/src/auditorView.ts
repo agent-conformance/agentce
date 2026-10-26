@@ -15,7 +15,7 @@ import { catalogue } from "./messages";
 import { byteCompare, pyStr } from "./util";
 
 /** Modes whose `not_assessed` outcome gets the disclosed not-yet-evaluated note. */
-const MANUAL_MODES = new Set(["manual", "semi-automated"]);
+export const MANUAL_MODES = new Set(["manual", "semi-automated"]);
 
 /** The register record's six required fields (deviation-register.schema.json), copied verbatim. */
 const DEVIATION_FIELDS = [

@@ -64,8 +64,6 @@ public final class Verify {
         }
     }
 
-    private static final Pattern PARAM = Pattern.compile("\\{(\\w+)\\}");
-
     /** The refusal for catalogue {@code key}: its cause with {@code {params}} filled in (name, value
      * pairs). Mirrors {@code VerificationError.refusal}. */
     static VerifyRefusal refusal(String key, String... params) {
@@ -85,14 +83,7 @@ public final class Verify {
                 keys.addAll(r.keys());
             }
         }
-        Matcher m = PARAM.matcher(ErrorCatalogue.errorCause(key));
-        StringBuilder text = new StringBuilder();
-        while (m.find()) {
-            String value = vars.get(m.group(1));
-            m.appendReplacement(text, Matcher.quoteReplacement(value != null ? value : m.group()));
-        }
-        m.appendTail(text);
-        return new VerifyRefusal(text.toString(), keys);
+        return new VerifyRefusal(Report.formatMessage(ErrorCatalogue.errorCause(key), vars), keys);
     }
 
     /** The fixed 12-byte RFC 8410 SPKI DER prefix every Ed25519 SPKI public key export carries before

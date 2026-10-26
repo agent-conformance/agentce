@@ -10,8 +10,10 @@
  */
 
 import { type Assertion, aggregate, evidencePointerToJson } from "./assertions";
+import { MANUAL_MODES } from "./auditorView";
 import type { BlindSpots, CheckRef } from "./blindSpots";
 import { catalogue } from "./messages";
+import { pyTruthy } from "./readiness";
 import { byteCompare, pyStr } from "./util";
 
 /** The two questionnaire frameworks this view answers, in fixed render order. */
@@ -29,10 +31,6 @@ export const BUYER_QUESTIONNAIRE_TITLES: Record<string, string> = {
   caiq: "the CAIQ",
   "ai-controls-matrix": "the AI Controls Matrix",
 };
-
-/** Modes whose `not_assessed` outcome gets the disclosed not-yet-evaluated note (auditor_view.py's
- * `_MANUAL_MODES`). */
-const MANUAL_MODES = new Set(["manual", "semi-automated"]);
 
 export interface BuyerMissing {
   event: string;
@@ -135,7 +133,7 @@ export function computeBuyerView(
         subject: a.subject,
         outcome: a.outcome,
         mode: a.mode,
-        verified: Boolean(xw.verified ?? false),
+        verified: pyTruthy(xw.verified),
         evidence: a.evidence.map(evidencePointerToJson),
         gap_step:
           a.outcome === "insufficient_evidence"

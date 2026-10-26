@@ -854,7 +854,7 @@ public final class Report {
         return "<!doctype html><html lang=\"" + esc(language) + "\"><head><meta charset=\"utf-8\">"
                 + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
                 + "<meta http-equiv=\"Content-Security-Policy\" "
-                + "content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\">"
+                + "content=\"" + HTML_CSP + "\">"
                 + "<title>" + title + "</title><style>" + HTML_STYLE + "</style></head><body>"
                 + "<main><h1>" + title + "</h1>"
                 + "<section aria-labelledby=\"project-agents\"><h2 id=\"project-agents\">"
@@ -995,7 +995,7 @@ public final class Report {
         return "<!doctype html><html lang=\"" + esc(language) + "\"><head><meta charset=\"utf-8\">"
                 + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
                 + "<meta http-equiv=\"Content-Security-Policy\" "
-                + "content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\">"
+                + "content=\"" + HTML_CSP + "\">"
                 + "<title>" + title + "</title><style>" + HTML_STYLE + "</style></head><body>"
                 + "<main><h1>" + title + "</h1>"
                 + (activity != null ? activityHtml(activity, cat) : "")
@@ -1176,7 +1176,7 @@ public final class Report {
         return "<!doctype html><html lang=\"" + esc(language) + "\"><head><meta charset=\"utf-8\">"
                 + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
                 + "<meta http-equiv=\"Content-Security-Policy\" "
-                + "content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\">"
+                + "content=\"" + HTML_CSP + "\">"
                 + "<title>" + title + "</title><style>" + HTML_STYLE + "</style></head><body>"
                 + "<main><h1>" + title + "</h1><p>" + esc(cat.get("report.security_intro")) + "</p>"
                 + "<section aria-labelledby=\"security-tool-access\"><h2 id=\"security-tool-access\">"
@@ -1210,10 +1210,8 @@ public final class Report {
         return out.toString();
     }
 
-    /** The six outcomes in the order the buyer summary's counts table lists them (report.py's
-     * {@code _STATEMENT_OUTCOMES}). */
-    private static final List<String> STATEMENT_OUTCOMES = List.of(
-            "conformant", "non-conformant", "partial", "not_applicable", "not_assessed", "insufficient_evidence");
+    /** The Content-Security-Policy every HTML page carries, as each of report.py's HTML renderers writes it. */
+    private static final String HTML_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src 'none'";
 
     /** report.py's {@code _reproduce_command}. */
     private static String reproduceCommand(List<String> argv) {
@@ -1320,7 +1318,7 @@ public final class Report {
         List<String> labels = new ArrayList<>();
         List<String> dashes = new ArrayList<>();
         List<String> values = new ArrayList<>();
-        for (String o : STATEMENT_OUTCOMES) {
+        for (String o : Assertions.OUTCOMES) {
             labels.add(outcomeLabel(cat, o));
             dashes.add("---");
             values.add(String.valueOf(countOf(counts, o)));
@@ -1334,7 +1332,7 @@ public final class Report {
     private static String buyerCountsTableHtml(JsonNode counts, Map<String, String> cat) {
         StringBuilder head = new StringBuilder();
         StringBuilder row = new StringBuilder();
-        for (String o : STATEMENT_OUTCOMES) {
+        for (String o : Assertions.OUTCOMES) {
             head.append("<th scope=\"col\">").append(esc(outcomeLabel(cat, o))).append("</th>");
             row.append("<td>").append(countOf(counts, o)).append("</td>");
         }
@@ -1462,7 +1460,7 @@ public final class Report {
         return "<!doctype html><html lang=\"" + esc(o.language()) + "\"><head><meta charset=\"utf-8\">"
                 + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
                 + "<meta http-equiv=\"Content-Security-Policy\" "
-                + "content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\">"
+                + "content=\"" + HTML_CSP + "\">"
                 + "<title>" + title + "</title><style>" + HTML_STYLE + "</style></head><body>"
                 + "<main><h1>" + title + "</h1><p>" + esc(cat.get("report.buyer_intro")) + "</p>"
                 + sections + "</main></body></html>\n";
@@ -2396,15 +2394,17 @@ public final class Report {
                         writeText(outDir, "report.html",
                                 renderReportHtml(assertions, counts, reportLanguage, activityNode, blindSpotsNode)));
             }
+            // The rerun argv (write_report's rerun_argv): the reverify command when given, else the invocation.
+            List<String> rerunArgv = reverifyCommand != null && !reverifyCommand.isEmpty()
+                    ? reverifyCommand
+                    : (invocation != null ? invocation : List.of());
             // This engine writes report.md and report.html on every run until 18.16b wires --emit, so both
             // count as wanted, as Python's `--for security` (sarif, md, html) asks.
             writeAudienceView(
                     SEAM_FOR,
                     new ReportViewContext(
                             activityNode, assertions, reportLanguage, counts, blindSpotsNode,
-                            reverifyCommand != null && !reverifyCommand.isEmpty()
-                                    ? reverifyCommand
-                                    : (invocation != null ? invocation : List.of()),
+                            rerunArgv,
                             false, String.valueOf(outDir), catalogs != null ? catalogs : List.of()),
                     ext -> ext.equals("md") || ext.equals("html"),
                     (name, view) -> outputs.put(name, writeJson(outDir, name, view)),
@@ -2434,7 +2434,6 @@ public final class Report {
 
             if (SEAM_EMIT.contains("remediation") || SEAM_EMIT.contains("skill")) {
                 Map<String, List<JsonNode>> eventsBySubject = Assess.indexBySubject(events != null ? events : List.of());
-                List<String> argv = reverifyCommand != null && !reverifyCommand.isEmpty() ? reverifyCommand : invocation;
                 List<Catalog> catalogList = catalogObjects != null ? catalogObjects : List.of();
                 String assertionsDigest = outputs.get("assertions.json");
                 String skillMd = Skill.renderSkillMd(Version.SPEC_VERSION, Version.ENGINE_VERSION,
@@ -2449,7 +2448,7 @@ public final class Report {
                     }
                     List<JsonNode> subjectEvents = eventsBySubject.getOrDefault(subject, List.of());
                     ObjectNode pkg = Remediation.renderRemediationPackage(
-                            subject, forSubject, catalogList, assertionsDigest, subjectEvents, argv);
+                            subject, forSubject, catalogList, assertionsDigest, subjectEvents, rerunArgv);
                     byte[] pkgBytes = Canonical.canonicalize(pkg);
                     if (SEAM_EMIT.contains("remediation")) {
                         String relDir = "remediation/" + safe(subject);
@@ -2473,7 +2472,7 @@ public final class Report {
                             outputs.put(rel, writeText(outDir, rel, Skill.renderSkillFindingMd(finding, toolCalls)));
                         }
                         List<String> command = new ArrayList<>(List.of("agentce"));
-                        command.addAll(argv);
+                        command.addAll(rerunArgv);
                         outputs.put(relDir + "/REVERIFY.md",
                                 writeText(outDir, relDir + "/REVERIFY.md", Skill.renderReverifyMd(command)));
                     }

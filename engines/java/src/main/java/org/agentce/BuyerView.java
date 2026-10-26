@@ -9,7 +9,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * The buyer view (18.18): generated questionnaire answers, a one-page summary, and how to check the
@@ -34,9 +33,6 @@ public final class BuyerView {
     /** Each framework's display title for the "evidence against {title} {version}" heading. */
     public static final Map<String, String> BUYER_QUESTIONNAIRE_TITLES =
             Map.of("caiq", "the CAIQ", "ai-controls-matrix", "the AI Controls Matrix");
-
-    /** Modes whose {@code not_assessed} outcome gets the disclosed not-yet-evaluated note. */
-    private static final Set<String> MANUAL_MODES = Set.of("manual", "semi-automated");
 
     private static final List<String> SORT_FIELDS =
             List.of("framework", "question", "control", "control_version", "subject", "outcome");
@@ -66,11 +62,10 @@ public final class BuyerView {
             for (String field : List.of("event", "class", "ladder_rung", "owner_key", "step_kind")) {
                 entry.set(field, bs.get(field));
             }
-            List<JsonNode> refs = new ArrayList<>();
-            bs.get("unlocked_checks").forEach(refs::add);
-            bs.get("needed_by_checks").forEach(refs::add);
-            for (JsonNode ref : refs) {
-                missingByKey.computeIfAbsent(refKey(ref), k -> Json.nodes().arrayNode()).add(entry);
+            for (String refs : List.of("unlocked_checks", "needed_by_checks")) {
+                for (JsonNode ref : bs.get(refs)) {
+                    missingByKey.computeIfAbsent(refKey(ref), k -> Json.nodes().arrayNode()).add(entry);
+                }
             }
         }
         Map<List<String>, ObjectNode> index = new HashMap<>();
@@ -127,7 +122,7 @@ public final class BuyerView {
                 } else {
                     entry.putNull("gap_step");
                 }
-                if (MANUAL_MODES.contains(a.mode) && "not_assessed".equals(a.outcome)) {
+                if (AuditorView.MANUAL_MODES.contains(a.mode) && "not_assessed".equals(a.outcome)) {
                     entry.put("manual_checklist_note", note);
                 }
                 answers.add(entry);

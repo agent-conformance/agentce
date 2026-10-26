@@ -1186,17 +1186,6 @@ export function renderSecurityHtml(
   return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${HTML_CSP}"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1><p>${h("report.security_intro")}</p><section aria-labelledby="security-tool-access"><h2 id="security-tool-access">${h("report.security_tool_access_heading")}</h2><ul>${toolItems}</ul></section><section aria-labelledby="security-effect-class"><h2 id="security-effect-class">${h("report.security_effect_class_heading")}</h2><p>${escapeHtml(securityEffectClassText(security.actions_by_effect_class))}</p></section><section aria-labelledby="security-enforcement"><h2 id="security-enforcement">${h("report.security_enforcement_heading")}</h2><p>${h("report.security_enforcement_scope_note")}</p>${enforcementItems}</section><section aria-labelledby="security-drift"><h2 id="security-drift">${h("report.security_drift_heading")}</h2><ul>${driftItems}</ul></section><section aria-labelledby="security-citations"><h2 id="security-citations">${h("report.security_citations_heading")}</h2>${citationsHtml}</section></main></body></html>\n`;
 }
 
-/** The six outcomes in the order the buyer summary's counts table lists them (report.py's
- * `_STATEMENT_OUTCOMES`). */
-const STATEMENT_OUTCOMES = [
-  "conformant",
-  "non-conformant",
-  "partial",
-  "not_applicable",
-  "not_assessed",
-  "insufficient_evidence",
-] as const;
-
 /** report.py's `_reproduce_command`. */
 function reproduceCommand(invocation: string[]): string {
   return invocation.length > 0 ? `agentce ${invocation.join(" ")}` : "agentce quickstart";
@@ -1289,17 +1278,17 @@ function buyerAnswerHtml(entry: BuyerAnswer, cat: Record<string, string>): strin
 
 function buyerCountsTableMd(counts: Record<string, number>, cat: Record<string, string>): string[] {
   return [
-    `| ${STATEMENT_OUTCOMES.map((o) => outcomeLabel(cat, o)).join(" | ")} |`,
-    `|${STATEMENT_OUTCOMES.map(() => "---").join("|")}|`,
-    `| ${STATEMENT_OUTCOMES.map((o) => String(counts[o] ?? 0)).join(" | ")} |`,
+    `| ${OUTCOMES.map((o) => outcomeLabel(cat, o)).join(" | ")} |`,
+    `|${OUTCOMES.map(() => "---").join("|")}|`,
+    `| ${OUTCOMES.map((o) => String(counts[o] ?? 0)).join(" | ")} |`,
   ];
 }
 
 function buyerCountsTableHtml(counts: Record<string, number>, cat: Record<string, string>): string {
-  const head = STATEMENT_OUTCOMES.map(
-    (o) => `<th scope="col">${escapeHtml(outcomeLabel(cat, o))}</th>`,
-  ).join("");
-  const row = STATEMENT_OUTCOMES.map((o) => `<td>${counts[o] ?? 0}</td>`).join("");
+  const head = OUTCOMES.map((o) => `<th scope="col">${escapeHtml(outcomeLabel(cat, o))}</th>`).join(
+    "",
+  );
+  const row = OUTCOMES.map((o) => `<td>${counts[o] ?? 0}</td>`).join("");
   return `<table><thead><tr>${head}</tr></thead><tbody><tr>${row}</tr></tbody></table>`;
 }
 
@@ -2311,6 +2300,10 @@ export function writeReport(
       renderReportHtml(assertions, counts, language, activity, blindSpots),
     );
   }
+  // The rerun argv (write_report's rerun_argv): the reverify command when given, else the invocation.
+  const rerunArgv = options.reverifyCommand?.length
+    ? options.reverifyCommand
+    : (options.invocation ?? []);
   // This engine writes report.md and report.html on every run until 18.16b wires --emit, so both count
   // as wanted, as Python's `--for security` (sarif, md, html) asks.
   writeAudienceView(
@@ -2321,9 +2314,7 @@ export function writeReport(
       language,
       counts,
       blindSpots,
-      reverifyCommand: options.reverifyCommand?.length
-        ? options.reverifyCommand
-        : (options.invocation ?? []),
+      reverifyCommand: rerunArgv,
       packaged: false,
       reportFolder: outDir,
       catalogs: options.catalogs,
@@ -2351,9 +2342,6 @@ export function writeReport(
 
   if (SEAM_EMIT.has("remediation") || SEAM_EMIT.has("skill")) {
     const eventsBySubject = indexBySubject(options.events ?? []);
-    const argv = options.reverifyCommand?.length
-      ? options.reverifyCommand
-      : (options.invocation ?? []);
     const catalogObjects = options.catalogObjects ?? [];
     const assertionsDigest = outputs["assertions.json"] as string;
     const catalogVersion = catalogObjects.map((c) => `${c.id}@${c.version}`).join(", ");
@@ -2366,7 +2354,7 @@ export function writeReport(
         catalogObjects,
         assertionsDigest,
         subjectEvents,
-        argv,
+        rerunArgv,
       );
       const pkgBytes = canonicalize(pkg);
       if (SEAM_EMIT.has("remediation")) {
@@ -2385,7 +2373,7 @@ export function writeReport(
           const name = skillFindingFilename(String(finding.control), i + 1);
           writeTextFile(`${relDir}/findings/${name}`, renderSkillFindingMd(finding, toolCalls));
         });
-        writeTextFile(`${relDir}/REVERIFY.md`, renderReverifyMd(["agentce", ...argv]));
+        writeTextFile(`${relDir}/REVERIFY.md`, renderReverifyMd(["agentce", ...rerunArgv]));
       }
     }
   }
