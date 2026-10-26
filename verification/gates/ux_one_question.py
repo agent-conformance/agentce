@@ -148,13 +148,18 @@ QUESTION_MARK = re.compile(r"\?(?:\W|$)")
 # A sentence and the quote or emphasis marks that close it.
 SENTENCE = re.compile(r"[^.?!]+[.?!]*[\"'*`)\]]*")
 
+
+def collapsed(text: str) -> str:
+    return " ".join(text.split())
+
+
 # Each approved skill's First minute as reviewed for a second question: its raw source between the heading and
 # the next top-level heading, whitespace collapsed (section_text). Reading prose for asks by phrase list passed
 # whatever the list did not know (six verifier FAILs on one premise), so the section fails closed: a changed
 # first minute is refused until a person has read it for a second question and pasted the section here as
 # written in the skill.
 REVIEWED = frozenset(
-    " ".join(section.split())
+    collapsed(section)
     for section in (
         """
 Show the person their first findings before any question. In the repository you were opened
@@ -191,10 +196,6 @@ SKILL_FILES = {
     "skills/agentce-get-evidence/SKILL.md": "618a9d6f639405534f1175bbd08b88a1ddf07ec68799a6466b4e7f937695c536",
     "skills/agentce-prepare-to-share/SKILL.md": "8388a32b224d6353126e58862ff1a70699703932de59ab773656301e469e693e",
 }
-
-
-def collapsed(text: str) -> str:
-    return " ".join(text.split())
 
 
 def file_digest(text: str) -> str:
@@ -376,7 +377,7 @@ def as_read(block: Block) -> str:
     spaces) dropped, any run of whitespace (tab, no-break space) one space, case folded."""
     text = " ".join(line.text for line in block.visible)
     text = "".join(c for c in text if unicodedata.category(c) != "Cf")
-    return " ".join(text.split()).casefold()
+    return collapsed(text).casefold()
 
 
 def first_minute_bounds(
@@ -439,10 +440,10 @@ def read_skill(
     """Check one SKILL.md's first minute; return how many questions it asks there. `reviewed` is the set of
     section texts that pass, and `files` maps each skill's path to its reviewed file_digest (None skips that
     check, for the self-test of the other rules)."""
-    if files is not None and files.get(rel) != (digest := file_digest(text)):
+    if files is not None and (pin := files.get(rel)) != (digest := file_digest(text)):
         errors.append(
             f"ux.one_question.skill_file_unreviewed: {rel} is not a file the gate has reviewed for a second "
-            f"question (pinned {files.get(rel, 'none')}, now {digest}). Read the whole file for any ask "
+            f"question (pinned {pin or 'none'}, now {digest}). Read the whole file for any ask "
             f"beyond the First minute's one '{QUESTION}', then paste the new digest into SKILL_FILES in "
             f"verification/gates/ux_one_question.py; it now reads: {collapsed(text)!r}"
         )
@@ -1210,29 +1211,26 @@ def fixture_reviewed() -> frozenset[str]:
     return frozenset({section_text(raw, start, end)})
 
 
+def fixture_files() -> dict[str, str]:
+    """The fixture pinned whole under demo/SKILL.md, as the reviewed files for FILE_TEST."""
+    return {"demo/SKILL.md": file_digest(GOOD)}
+
+
 def self_test() -> int:
     failed = 0
     runs = 0
-    pinned = {"demo/SKILL.md": file_digest(GOOD)}
     unpinned = [("file: a path with no pin", GOOD, {"skill_file_unreviewed"})]
-    cases: list[
-        tuple[
-            frozenset[str] | None,
-            dict[str, str] | None,
-            str,
-            list[tuple[str, str, set[str]]],
-        ]
-    ] = [
-        (None, None, "demo/SKILL.md", SELF_TEST),
-        (fixture_reviewed(), None, "demo/SKILL.md", REVIEWED_TEST),
-        (None, pinned, "demo/SKILL.md", FILE_TEST),
-        (None, pinned, "other/SKILL.md", unpinned),
+    cases = [
+        (None, None, SELF_TEST),
+        (fixture_reviewed(), None, REVIEWED_TEST),
+        (None, fixture_files(), FILE_TEST),
+        (None, {}, unpinned),
     ]
-    for reviewed, files, rel, table in cases:
+    for reviewed, files, table in cases:
         for name, text, want in table:
             runs += 1
             errors: list[str] = []
-            read_skill(rel, text, errors, reviewed, files)
+            read_skill("demo/SKILL.md", text, errors, reviewed, files)
             got = {e.split(":", 1)[0].removeprefix("ux.one_question.") for e in errors}
             if got != want:
                 failed += 1
