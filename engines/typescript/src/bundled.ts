@@ -50,6 +50,9 @@ export function remediationTemplatePath(): string {
 }
 
 /** The remediation prompt template's text (Python's `bundled.remediation_template()`). */
+let cachedRemediationTemplate: string | undefined;
+
 export function remediationTemplate(): string {
-  return readFileSync(remediationTemplatePath(), "utf-8");
+  cachedRemediationTemplate ??= readFileSync(remediationTemplatePath(), "utf-8");
+  return cachedRemediationTemplate;
 }

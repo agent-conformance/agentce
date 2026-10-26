@@ -276,7 +276,7 @@ final class Remediation {
 
     /** A rebuilt (never mutated) copy of {@code d} with every field in {@code keys} sanitised. */
     private static ObjectNode sanitizeKeys(JsonNode d, String... keys) {
-        ObjectNode out = asObject(d).deepCopy();
+        ObjectNode out = Json.nodes().objectNode().setAll(asObject(d));
         for (String k : keys) {
             out.put(k, Report.sanitizeField(strGet(d, k)));
         }
@@ -309,7 +309,7 @@ final class Remediation {
         out.set("evidence_gap", sanitizeEvidenceGap(f.get("evidence_gap")));
         out.set("evidence", sanitizeEach(f.get("evidence"), "ref"));
         out.set("violations", sanitizeEach(f.get("violations"), "path", "constraint", "message_key"));
-        ObjectNode remediation = asObject(f.get("remediation")).deepCopy();
+        ObjectNode remediation = Json.nodes().objectNode().setAll(asObject(f.get("remediation")));
         remediation.set("techniques", sanitizeEach(remediation.get("techniques"), "ref"));
         out.set("remediation", remediation);
         out.set("acceptance", sanitizeKeys(asObject(f.get("acceptance")), "criteria"));
@@ -317,7 +317,7 @@ final class Remediation {
     }
 
     private static ObjectNode mdContext(JsonNode pkg) {
-        ObjectNode out = asObject(pkg).deepCopy();
+        ObjectNode out = Json.nodes().objectNode().setAll(asObject(pkg));
         out.put("subject", Report.sanitizeField(strGet(pkg, "subject")));
         ArrayNode findings = out.putArray("findings");
         for (JsonNode f : asList(pkg.get("findings"))) {

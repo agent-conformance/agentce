@@ -10,6 +10,8 @@
  * substitution; nothing in the context is evaluated (SPEC §7 injection hardening).
  */
 
+import { isRecord } from "./graph";
+import { pyTruthy } from "./readiness";
 import { pyStr } from "./util";
 
 const TAG_RE = /\{\{([#^/]?)([a-zA-Z0-9_.]+|\.)\}\}/g;
@@ -18,24 +20,6 @@ type Node =
   | { kind: "text"; value: string }
   | { kind: "var"; name: string }
   | { kind: "section" | "inverted"; name: string; children: Node[] };
-
-function isMapping(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-/** Python's truthiness for the JSON kinds: null, false, 0, "", [] and {} are falsy. */
-export function pyTruthy(value: unknown): boolean {
-  if (value === null || value === undefined || value === false || value === 0 || value === "") {
-    return false;
-  }
-  if (Array.isArray(value)) {
-    return value.length > 0;
-  }
-  if (isMapping(value)) {
-    return Object.keys(value).length > 0;
-  }
-  return true;
-}
 
 function parse(template: string): Node[] {
   const root: Node[] = [];
@@ -82,10 +66,10 @@ function lookup(scopes: unknown[], path: string): unknown {
   const [head, ...rest] = path.split(".") as [string, ...string[]];
   for (let i = scopes.length - 1; i >= 0; i--) {
     const scope = scopes[i];
-    if (isMapping(scope) && Object.hasOwn(scope, head)) {
+    if (isRecord(scope) && Object.hasOwn(scope, head)) {
       let value: unknown = scope[head];
       for (const part of rest) {
-        value = isMapping(value) ? value[part] : null;
+        value = isRecord(value) ? value[part] : null;
       }
       return value ?? null;
     }
@@ -107,7 +91,7 @@ function renderNodes(nodes: Node[], scopes: unknown[]): string {
         for (const item of value) {
           out += renderNodes(node.children, [...scopes, item]);
         }
-      } else if (isMapping(value)) {
+      } else if (isRecord(value)) {
         if (Object.keys(value).length > 0) {
           out += renderNodes(node.children, [...scopes, value]);
         }

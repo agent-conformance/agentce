@@ -17,8 +17,9 @@ import { remediationTemplate } from "./bundled";
 import { sha256Hex } from "./canonical";
 import type { Catalog, ControlSpec } from "./catalog";
 import type { Event } from "./graph";
+import { pyTruthy } from "./readiness";
 import { catalogProvenanceDigest, controlIndex, sanitizeField } from "./report";
-import { pyTruthy, render } from "./templating";
+import { render } from "./templating";
 import { byteCompare, pyStr } from "./util";
 import { ENGINE_NAME, SPEC_VERSION, engineVersion } from "./version";
 
@@ -261,9 +262,7 @@ function mdContext(pkg: Json): Json {
     subject: sanitizeField(strGet(pkg, "subject")),
     findings: asList(pkg.findings).map(sanitizeFinding),
     not_assessed: asList(pkg.not_assessed).map((n) => sanitizeKeys(n, ["control", "title"])),
-    deviations_applied: (Array.isArray(pkg.deviations_applied) ? pkg.deviations_applied : []).map(
-      (d: unknown) => sanitizeField(pyStr(d)),
-    ),
+    deviations_applied: asList(pkg.deviations_applied).map((d: unknown) => sanitizeField(pyStr(d))),
   };
 }
 

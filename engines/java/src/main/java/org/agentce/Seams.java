@@ -272,11 +272,12 @@ public final class Seams {
         // assess-emit runs this engine's real `assess` with extra formats written (18.16e): until 18.16b wires
         // `assess --emit` here, report_format_parity_check.py compares the remediation output through it.
         if ("assess-emit".equals(command)) {
-            if (args.length < 2 || !java.util.Arrays.stream(args[1].split(",", -1)).allMatch("remediation"::equals)) {
+            List<String> names = args.length < 2 ? List.of() : List.of(args[1].split(",", -1));
+            if (names.isEmpty() || !names.stream().allMatch("remediation"::equals)) {
                 System.err.println("assess-emit: the only format is remediation");
                 return ExitCode.INPUT_ERROR.code;
             }
-            Report.SEAM_EMIT.addAll(List.of(args[1].split(",", -1)));
+            Report.SEAM_EMIT.addAll(names);
             try {
                 return Cli.run(java.util.Arrays.copyOfRange(args, 2, args.length));
             } finally {

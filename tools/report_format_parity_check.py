@@ -290,7 +290,6 @@ def remediation_problems(
     problems = []
     for rel in want:
         a, b = (reference / rel).read_bytes(), (candidate / rel).read_bytes()
-        own = "sha256:" + hashlib.sha256(b).hexdigest()
         if rel.endswith(".md"):
             if a != b:
                 problems.append(f"{engine} {rel}: " + _first_difference(a, b))
@@ -299,6 +298,7 @@ def remediation_problems(
                     f"{engine} manifest.outputs[{rel}] is not python's digest"
                 )
             continue
+        own = "sha256:" + hashlib.sha256(b).hexdigest()
         package = json.loads(b)
         if own != "sha256:" + digest_of(package):
             problems.append(f"{engine} {rel}: not the canonical bytes of its value")
