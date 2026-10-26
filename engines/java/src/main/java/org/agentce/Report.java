@@ -641,8 +641,8 @@ public final class Report {
             }
             body = b.toString();
         }
-        return "<section aria-labelledby=\"blind-spots\"><h2 id=\"blind-spots\">Where your records can't show it "
-                + "yet</h2>" + body + "</section>";
+        return "<section aria-labelledby=\"blind-spots\"><h2 id=\"blind-spots\">"
+                + esc("Where your records can't show it yet") + "</h2>" + body + "</section>";
     }
 
     /** The lines a command prints for {@code blindSpots}: the same node {@link #blindSpotsMd}/
@@ -878,7 +878,17 @@ public final class Report {
     public static String renderReportMd(
             List<Assertions.Assertion> assertions, Map<String, Integer> counts, String language, ObjectNode activity,
             ObjectNode blindSpots) {
+        return renderReportMd(assertions, counts, language, activity, blindSpots, List.of(), List.of());
+    }
+
+    /** As the five-argument {@link #renderReportMd}, with the run's resolved {@code catalogs} (each
+     * finding's title, severity group and remediation technique) and its {@code invocation} (the
+     * Provenance section's reproduce command); report.py's {@code render_report_md}. */
+    public static String renderReportMd(
+            List<Assertions.Assertion> assertions, Map<String, Integer> counts, String language, ObjectNode activity,
+            ObjectNode blindSpots, List<Catalog> catalogs, List<String> invocation) {
         Map<String, String> cat = Messages.catalogue(language);
+        Map<String, Catalog.ControlSpec> byControl = controlIndex(catalogs);
         List<String> lines = new ArrayList<>();
         lines.add("# " + cat.get("report.title"));
         lines.add("");
@@ -920,19 +930,177 @@ public final class Report {
         if (assertions.isEmpty()) {
             lines.add("_" + cat.get("report.no_controls") + "_");
         }
-        for (Assertions.Assertion a : sortedBySubjectControl(assertions)) {
-            String control = sanitizeForMarkdown(a.control);
-            String subject = sanitizeForMarkdown(a.subject);
-            lines.add("- `" + control + "` @ `" + subject + "` -> **"
-                    + sanitizeForMarkdown(outcomeLabel(cat, a.outcome)) + "** "
-                    + "(rung " + a.rung + ", " + sanitizeForMarkdown(a.mode) + "; "
-                    + a.population[1] + "/" + a.population[0] + " failed)");
-            for (JsonNode entry : a.crosswalk) {
-                // List-item first content: backtick-wrapped.
-                lines.add("  - `" + sanitizeForMarkdown(crosswalkText(entry, cat)) + "`");
+        for (Map.Entry<String, List<Assertions.Assertion>> group : groupedBySeverity(assertions, byControl)) {
+            lines.add("### " + severityHeading(group.getKey(), cat));
+            lines.add("");
+            for (Assertions.Assertion a : group.getValue()) {
+                lines.addAll(findingMd(a, byControl.get(a.control), cat));
+            }
+            lines.add("");
+        }
+        lines.add("");
+        lines.addAll(provenanceMd(catalogLabels(catalogs), invocation));
+        return String.join("\n", lines) + "\n";
+    }
+
+    private static final List<String> SEVERITY_LEVELS = List.of("high", "medium", "low");
+
+    /** report.py's {@code _severity_heading}: a rated level's heading, else the Unrated one. */
+    private static String severityHeading(String level, Map<String, String> cat) {
+        String heading = SEVERITY_LEVELS.contains(level) ? cat.get("report.severity_" + level) : null;
+        return heading != null ? heading : cat.get("report.severity_unrated");
+    }
+
+    /** Findings grouped by control severity, highest first, then {@code unrated} for a control with no
+     * catalog entry or a severity outside the three; each group in (subject, control) order
+     * (report.py's {@code _grouped_by_severity}). */
+    private static List<Map.Entry<String, List<Assertions.Assertion>>> groupedBySeverity(
+            List<Assertions.Assertion> assertions, Map<String, Catalog.ControlSpec> byControl) {
+        Map<String, List<Assertions.Assertion>> groups = new LinkedHashMap<>();
+        for (Assertions.Assertion a : assertions) {
+            Catalog.ControlSpec spec = byControl.get(a.control);
+            String severity = spec != null && spec.severity != null ? spec.severity : "";
+            String level = SEVERITY_LEVELS.contains(severity) ? severity : "unrated";
+            groups.computeIfAbsent(level, k -> new ArrayList<>()).add(a);
+        }
+        List<Map.Entry<String, List<Assertions.Assertion>>> out = new ArrayList<>();
+        for (String level : List.of("high", "medium", "low", "unrated")) {
+            if (groups.containsKey(level)) {
+                out.add(Map.entry(level, sortedBySubjectControl(groups.get(level))));
             }
         }
-        return String.join("\n", lines) + "\n";
+        return out;
+    }
+
+    private static String findingTitle(Assertions.Assertion a, Catalog.ControlSpec spec) {
+        return spec != null && spec.title != null && !spec.title.isEmpty() ? spec.title : a.control;
+    }
+
+    /** The control's technique pointers, the catalog's only machine-readable remediation hint (SPEC
+     * §7.3), each stripped of any {@code techniques/} path prefix (report.py's {@code _remediation_hints}). */
+    private static List<String> remediationHints(Catalog.ControlSpec spec) {
+        List<String> hints = new ArrayList<>();
+        JsonNode refs = spec != null && spec.raw != null ? spec.raw.get("techniques") : null;
+        if (refs != null && refs.isArray()) {
+            for (JsonNode ref : refs) {
+                String text = Readiness.pyStr(ref);
+                hints.add(text.substring(text.lastIndexOf('/') + 1));
+            }
+        }
+        return hints;
+    }
+
+    /** The offending nodes a finding's violations name (report.py's {@code str(v.get("focus"))} for
+     * each truthy focus). */
+    private static List<String> offendingNodes(Assertions.Assertion a) {
+        List<String> nodes = new ArrayList<>();
+        for (JsonNode v : a.violations) {
+            JsonNode focus = v != null && v.isObject() ? v.get("focus") : null;
+            if (focus != null && Readiness.pyTruthy(focus)) {
+                nodes.add(Readiness.pyStr(focus));
+            }
+        }
+        return nodes;
+    }
+
+    /** The lenses a run can choose, the default marked (report.py's {@code _lenses_text}). */
+    private static String lensesText() {
+        List<String> lenses = new ArrayList<>();
+        for (String lens : Bundled.baseLenses()) {
+            lenses.add(lens.equals(Bundled.DEFAULT_LENS) ? lens + " (default)" : lens);
+        }
+        return String.join(", ", lenses) + "; choose one with --catalog <id@version>";
+    }
+
+    private static List<String> catalogLabels(List<Catalog> catalogs) {
+        List<String> labels = new ArrayList<>();
+        for (Catalog c : catalogs) {
+            labels.add(c.id + "@" + c.version);
+        }
+        return labels;
+    }
+
+    private static String catalogCitation(List<String> catalogs, Function<String, String> sanitize) {
+        return catalogs.isEmpty() ? "(none)" : catalogs.stream().map(sanitize).collect(Collectors.joining(", "));
+    }
+
+    /** The provenance every report body carries (SPEC §9.1; report.py's {@code _provenance_md}). */
+    private static List<String> provenanceMd(List<String> catalogs, List<String> invocation) {
+        return List.of(
+                "## Provenance",
+                "",
+                "- Engine: " + Version.ENGINE_NAME + " " + Version.ENGINE_VERSION,
+                "- Catalog: " + catalogCitation(catalogs, Report::sanitizeForMarkdown),
+                "- Lenses available: " + lensesText(),
+                "- Reproduce: `" + reproduceCommand(invocation) + "`",
+                "");
+    }
+
+    private static String provenanceHtml(List<String> catalogs, List<String> invocation) {
+        return "<section aria-labelledby=\"provenance\"><h2 id=\"provenance\">Provenance</h2><ul>"
+                + "<li>Engine: " + esc(Version.ENGINE_NAME) + " " + esc(Version.ENGINE_VERSION) + "</li>"
+                + "<li>Catalog: " + catalogCitation(catalogs, Report::sanitizeForHtml) + "</li>"
+                + "<li>Lenses available: " + esc(lensesText()) + "</li>"
+                + "<li>Reproduce: <code>" + esc(reproduceCommand(invocation)) + "</code></li></ul></section>";
+    }
+
+    /** One finding: title, outcome, clause citations, evidence, offending nodes and remediation
+     * technique, every record- or catalog-derived field sanitised (report.py's {@code _finding_md}; the
+     * technique labels are joined as Python joins them). */
+    private static List<String> findingMd(Assertions.Assertion a, Catalog.ControlSpec spec, Map<String, String> cat) {
+        List<String> lines = new ArrayList<>();
+        lines.add("- **" + sanitizeForMarkdown(findingTitle(a, spec)) + "** (`" + sanitizeForMarkdown(a.control)
+                + "` @ `" + sanitizeForMarkdown(a.subject) + "`) -> **"
+                + sanitizeForMarkdown(outcomeLabel(cat, a.outcome)) + "** "
+                + "(rung " + a.rung + ", " + sanitizeForMarkdown(a.mode) + "; "
+                + a.population[1] + "/" + a.population[0] + " failed)");
+        for (JsonNode entry : a.crosswalk) {
+            // List-item first content: backtick-wrapped.
+            lines.add("  - `" + sanitizeForMarkdown(crosswalkText(entry, cat)) + "`");
+        }
+        if (!a.evidence.isEmpty()) {
+            lines.add("  - " + cat.get("report.evidence_label") + ": " + a.evidence.stream()
+                    .map(e -> "`" + sanitizeField(e.ref) + "`").collect(Collectors.joining(", ")));
+        }
+        List<String> offending = offendingNodes(a);
+        if (!offending.isEmpty()) {
+            lines.add("  - " + cat.get("report.violations_label") + ": " + offending.stream()
+                    .map(node -> "`" + sanitizeField(node) + "`").collect(Collectors.joining(", ")));
+        }
+        List<String> hints = remediationHints(spec);
+        if (!hints.isEmpty()) {
+            lines.add("  - " + cat.get("report.remediation_label") + ": " + String.join(", ", hints));
+        }
+        return lines;
+    }
+
+    /** One finding row; the Details cell joins evidence, offending nodes and remediation technique
+     * (report.py's {@code _row_html}). */
+    private static String rowHtml(Assertions.Assertion a, Catalog.ControlSpec spec, Map<String, String> cat) {
+        List<String> details = new ArrayList<>();
+        if (!a.evidence.isEmpty()) {
+            details.add(esc(cat.get("report.evidence_label")) + ": " + a.evidence.stream()
+                    .map(e -> sanitizeForHtml(e.ref, SANITIZE_EMPTY_FIELD_PLACEHOLDER))
+                    .collect(Collectors.joining(", ")));
+        }
+        List<String> offending = offendingNodes(a);
+        if (!offending.isEmpty()) {
+            details.add(esc(cat.get("report.violations_label")) + ": " + offending.stream()
+                    .map(node -> sanitizeForHtml(node, SANITIZE_EMPTY_FIELD_PLACEHOLDER))
+                    .collect(Collectors.joining(", ")));
+        }
+        List<String> hints = remediationHints(spec);
+        if (!hints.isEmpty()) {
+            details.add(esc(cat.get("report.remediation_label")) + ": " + esc(String.join(", ", hints)));
+        }
+        String clauses = a.crosswalk.stream()
+                .map(e -> sanitizeForHtml(crosswalkText(e, cat)))
+                .collect(Collectors.joining("; "));
+        return "<tr><td>" + sanitizeForHtml(findingTitle(a, spec)) + "</td>"
+                + "<td>" + sanitizeForHtml(a.control) + "</td><td>" + sanitizeForHtml(a.subject) + "</td>"
+                + "<td>" + sanitizeForHtml(spec != null && spec.severity != null ? spec.severity : "") + "</td>"
+                + "<td>" + sanitizeForHtml(outcomeLabel(cat, a.outcome)) + "</td>"
+                + "<td>" + clauses + "</td><td>" + String.join("<br>", details) + "</td></tr>";
     }
 
     private static final String HTML_STYLE =
@@ -969,29 +1137,30 @@ public final class Report {
     public static String renderReportHtml(
             List<Assertions.Assertion> assertions, Map<String, Integer> counts, String language, ObjectNode activity,
             ObjectNode blindSpots) {
+        return renderReportHtml(assertions, counts, language, activity, blindSpots, List.of(), List.of());
+    }
+
+    /** As the five-argument {@link #renderReportHtml}, with the run's resolved {@code catalogs} and its
+     * {@code invocation}, as {@link #renderReportMd} takes them; report.py's {@code render_report_html}. */
+    public static String renderReportHtml(
+            List<Assertions.Assertion> assertions, Map<String, Integer> counts, String language, ObjectNode activity,
+            ObjectNode blindSpots, List<Catalog> catalogs, List<String> invocation) {
         Map<String, String> cat = Messages.catalogue(language);
+        Map<String, Catalog.ControlSpec> byControl = controlIndex(catalogs);
         String title = esc(cat.get("report.title"));
         StringBuilder summary = new StringBuilder();
         for (Map.Entry<String, Integer> e : counts.entrySet()) {
             summary.append("<li>").append(sanitizeForHtml(outcomeLabel(cat, e.getKey()))).append(": ").append(e.getValue()).append("</li>");
         }
         StringBuilder rows = new StringBuilder();
-        for (Assertions.Assertion a : sortedBySubjectControl(assertions)) {
-            StringBuilder clauses = new StringBuilder();
-            for (int i = 0; i < a.crosswalk.size(); i++) {
-                if (i > 0) {
-                    clauses.append("; ");
-                }
-                clauses.append(sanitizeForHtml(crosswalkText(a.crosswalk.get(i), cat)));
+        for (Map.Entry<String, List<Assertions.Assertion>> group : groupedBySeverity(assertions, byControl)) {
+            for (Assertions.Assertion a : group.getValue()) {
+                rows.append(rowHtml(a, byControl.get(a.control), cat));
             }
-            rows.append("<tr><td>").append(sanitizeForHtml(a.control)).append("</td><td>")
-                    .append(sanitizeForHtml(a.subject)).append("</td>")
-                    .append("<td>").append(sanitizeForHtml(outcomeLabel(cat, a.outcome))).append("</td>")
-                    .append("<td>").append(clauses).append("</td></tr>");
         }
         String bodyRows = rows.length() > 0
                 ? rows.toString()
-                : "<tr><td colspan=\"4\">" + esc(cat.get("report.no_controls")) + "</td></tr>";
+                : "<tr><td colspan=\"7\">" + esc(cat.get("report.no_controls")) + "</td></tr>";
         return "<!doctype html><html lang=\"" + esc(language) + "\"><head><meta charset=\"utf-8\">"
                 + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
                 + "<meta http-equiv=\"Content-Security-Policy\" "
@@ -1006,9 +1175,12 @@ public final class Report {
                 + "<section aria-labelledby=\"assertions\"><h2 id=\"assertions\">"
                 + esc(cat.get("report.assertions_heading")) + "</h2>"
                 + "<table><caption>" + esc(cat.get("report.assertions_heading")) + "</caption>"
-                + "<thead><tr><th scope=\"col\">Control</th><th scope=\"col\">Subject</th>"
-                + "<th scope=\"col\">Outcome</th><th scope=\"col\">Clause</th></tr></thead>"
+                + "<thead><tr><th scope=\"col\">Title</th><th scope=\"col\">Control</th>"
+                + "<th scope=\"col\">Subject</th><th scope=\"col\">Severity</th>"
+                + "<th scope=\"col\">Outcome</th><th scope=\"col\">Clause</th><th scope=\"col\">Details</th>"
+                + "</tr></thead>"
                 + "<tbody>" + bodyRows + "</tbody></table></section>"
+                + provenanceHtml(catalogLabels(catalogs), invocation)
                 + "<footer><p>" + esc(cat.get("report.affected_persons")) + "</p></footer>"
                 + "</main></body></html>\n";
     }
@@ -1349,9 +1521,7 @@ public final class Report {
         lines.add(o.packaged()
                 ? formatMessage(cat.get("report.buyer_how_to_check"), Map.of("folder", o.reportFolder()))
                 : cat.get("report.buyer_how_to_check_unpackaged"));
-        List<String> catalogs = new ArrayList<>();
-        o.catalogs().forEach(c -> catalogs.add(sanitizeForMarkdown(c)));
-        lines.add("- Catalog: " + (catalogs.isEmpty() ? "(none)" : String.join(", ", catalogs)));
+        lines.add("- Catalog: " + catalogCitation(o.catalogs(), Report::sanitizeForMarkdown));
         lines.add("- Reproduce: `" + reproduceCommand(o.argv()) + "`");
         return lines;
     }
@@ -1364,9 +1534,7 @@ public final class Report {
                 ? codeSpansHtml(formatMessage(cat.get("report.buyer_how_to_check"), Map.of("folder", marker)))
                         .replace(marker, esc(o.reportFolder()))
                 : codeSpansHtml(cat.get("report.buyer_how_to_check_unpackaged"));
-        List<String> catalogs = new ArrayList<>();
-        o.catalogs().forEach(c -> catalogs.add(sanitizeForHtml(c)));
-        return "<p>" + line + "</p><p>Catalog: " + (catalogs.isEmpty() ? "(none)" : String.join(", ", catalogs))
+        return "<p>" + line + "</p><p>Catalog: " + catalogCitation(o.catalogs(), Report::sanitizeForHtml)
                 + "</p><p>Reproduce: <code>" + esc(reproduceCommand(o.argv())) + "</code></p>";
     }
 
@@ -2271,6 +2439,8 @@ public final class Report {
             Map<String, String> outputs = new LinkedHashMap<>();
             ObjectNode activityNode = activity != null ? activity : Activity.summarizeActivity(List.of(), new Profile());
             ObjectNode blindSpotsNode = blindSpots != null ? blindSpots : emptyBlindSpots();
+            List<Catalog> reportCatalogs = catalogObjects != null ? catalogObjects : List.of();
+            List<String> reportInvocation = invocation != null ? invocation : List.of();
 
             ArrayNode assertionsJson = Json.nodes().arrayNode();
             for (Assertions.Assertion a : assertions) {
@@ -2369,11 +2539,13 @@ public final class Report {
                     outputs.put(
                             rel + "/report.md",
                             writeText(outDir, rel + "/report.md", renderReportMd(
-                                    subjectAssertions, subjectCounts, reportLanguage, subjectActivity, subjectBlindSpots)));
+                                    subjectAssertions, subjectCounts, reportLanguage, subjectActivity, subjectBlindSpots,
+                                    reportCatalogs, reportInvocation)));
                     outputs.put(
                             rel + "/report.html",
                             writeText(outDir, rel + "/report.html", renderReportHtml(
-                                    subjectAssertions, subjectCounts, reportLanguage, subjectActivity, subjectBlindSpots)));
+                                    subjectAssertions, subjectCounts, reportLanguage, subjectActivity, subjectBlindSpots,
+                                    reportCatalogs, reportInvocation)));
                 }
             }
 
@@ -2388,16 +2560,18 @@ public final class Report {
                 outputs.put(
                         "report.md",
                         writeText(outDir, "report.md",
-                                renderReportMd(assertions, counts, reportLanguage, activityNode, blindSpotsNode)));
+                                renderReportMd(assertions, counts, reportLanguage, activityNode, blindSpotsNode,
+                                        reportCatalogs, reportInvocation)));
                 outputs.put(
                         "report.html",
                         writeText(outDir, "report.html",
-                                renderReportHtml(assertions, counts, reportLanguage, activityNode, blindSpotsNode)));
+                                renderReportHtml(assertions, counts, reportLanguage, activityNode, blindSpotsNode,
+                                        reportCatalogs, reportInvocation)));
             }
             // The rerun argv (write_report's rerun_argv): the reverify command when given, else the invocation.
             List<String> rerunArgv = reverifyCommand != null && !reverifyCommand.isEmpty()
                     ? reverifyCommand
-                    : (invocation != null ? invocation : List.of());
+                    : reportInvocation;
             // This engine writes report.md and report.html on every run until 18.16b wires --emit, so both
             // count as wanted, as Python's `--for security` (sarif, md, html) asks.
             writeAudienceView(
@@ -2434,10 +2608,9 @@ public final class Report {
 
             if (SEAM_EMIT.contains("remediation") || SEAM_EMIT.contains("skill")) {
                 Map<String, List<JsonNode>> eventsBySubject = Assess.indexBySubject(events != null ? events : List.of());
-                List<Catalog> catalogList = catalogObjects != null ? catalogObjects : List.of();
                 String assertionsDigest = outputs.get("assertions.json");
                 String skillMd = Skill.renderSkillMd(Version.SPEC_VERSION, Version.ENGINE_VERSION,
-                        String.join(", ", catalogList.stream().map(c -> c.id + "@" + c.version).toList()),
+                        String.join(", ", catalogLabels(reportCatalogs)),
                         assertionsDigest);
                 for (String subject : subjects) {
                     List<Assertions.Assertion> forSubject = new ArrayList<>();
@@ -2448,7 +2621,7 @@ public final class Report {
                     }
                     List<JsonNode> subjectEvents = eventsBySubject.getOrDefault(subject, List.of());
                     ObjectNode pkg = Remediation.renderRemediationPackage(
-                            subject, forSubject, catalogList, assertionsDigest, subjectEvents, rerunArgv);
+                            subject, forSubject, reportCatalogs, assertionsDigest, subjectEvents, rerunArgv);
                     byte[] pkgBytes = Canonical.canonicalize(pkg);
                     if (SEAM_EMIT.contains("remediation")) {
                         String relDir = "remediation/" + safe(subject);

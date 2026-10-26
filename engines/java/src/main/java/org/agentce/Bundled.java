@@ -9,7 +9,10 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
@@ -26,6 +29,10 @@ import java.util.stream.Stream;
  */
 public final class Bundled {
     private Bundled() {}
+
+    /** The cross-standard baseline a run evaluates when nothing names a catalog (Python's
+     * {@code bundled.DEFAULT_LENS}). */
+    static final String DEFAULT_LENS = "baseline@2026.09";
 
     private static volatile Path cachedRoot;
     private static final Map<String, String> TEMPLATES = new java.util.concurrent.ConcurrentHashMap<>();
@@ -118,6 +125,54 @@ public final class Bundled {
     /** The vendored catalogs, laid out as {@code base/<catalog>/} and {@code overlays/<catalog>/}. */
     public static Path catalogsDir() {
         return dataRoot().resolve("catalogs");
+    }
+
+    /** Every catalog the engine ships (base and sector overlays), keyed {@code id@version}. */
+    static Map<String, Path> vendoredCatalogs() {
+        Map<String, Path> found = new LinkedHashMap<>();
+        Path root = catalogsDir();
+        for (String kind : new String[] {"base", "overlays"}) {
+            Path dir = root.resolve(kind);
+            List<String> names = new ArrayList<>();
+            if (Files.isDirectory(dir)) {
+                try (Stream<Path> stream = Files.list(dir)) {
+                    stream.map(p -> p.getFileName().toString()).forEach(names::add);
+                } catch (IOException ignored) {
+                    // no vendored catalogs of this kind
+                }
+            }
+            names.sort(Json::byteCompare);
+            for (String name : names) {
+                Path catalogYaml = dir.resolve(name).resolve("catalog.yaml");
+                if (!Files.isRegularFile(catalogYaml)) {
+                    continue;
+                }
+                try {
+                    com.fasterxml.jackson.databind.JsonNode meta = Yaml.parseFile(catalogYaml);
+                    if (meta != null && meta.isObject() && meta.has("id") && meta.has("version")
+                            && meta.get("id").isTextual() && meta.get("version").isTextual()) {
+                        found.put(meta.get("id").asText() + "@" + meta.get("version").asText(), dir.resolve(name));
+                    }
+                } catch (RuntimeException ignored) {
+                    // a malformed vendored catalog is skipped, never fatal to discovery
+                }
+            }
+        }
+        return found;
+    }
+
+    /** The {@code id@version} of every vendored base catalog, in byte order: the lenses a run can
+     * choose (Python's {@code bundled.base_lenses}). */
+    static List<String> baseLenses() {
+        Path base = catalogsDir().resolve("base");
+        List<String> lenses = new ArrayList<>();
+        vendoredCatalogs().forEach((label, directory) -> {
+            if (base.equals(directory.getParent())) {
+                lenses.add(label);
+            }
+        });
+        lenses.sort(Json::byteCompare);
+        return lenses;
     }
 
     /** The vendored quickstart project: an evidence bundle, an applicability profile, and a domain. */

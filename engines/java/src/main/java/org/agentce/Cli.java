@@ -41,13 +41,19 @@ public final class Cli {
 
     private static final String DEFAULT_OUT_DIR = "out";
     /** The catalog an assessment evaluates when nothing names one: the cross-standard baseline. */
-    private static final String DEFAULT_LENS = "baseline@2026.09";
+    private static final String DEFAULT_LENS = Bundled.DEFAULT_LENS;
     private static final List<String> REPORT_FORMATS = List.of("md", "html", "oscal", "sarif", "public", "pack");
     /** The evidence-pack role variants {@code report --role} takes (SPEC §9.4). */
     private static final List<String> REPORT_ROLES = List.of("provider", "deployer");
     private static final Set<String> VERDICT_OUTCOMES = Set.of("conformant", "non-conformant", "insufficient_evidence");
 
     public static void main(String[] args) {
+        // UTF-8 whatever the locale, as Python (UTF-8 mode under the C locale) and Node write: the JVM's
+        // stdout.encoding follows the locale, so LC_ALL=C turned every non-ASCII character into "?".
+        System.setOut(new java.io.PrintStream(new java.io.FileOutputStream(java.io.FileDescriptor.out), true,
+                StandardCharsets.UTF_8));
+        System.setErr(new java.io.PrintStream(new java.io.FileOutputStream(java.io.FileDescriptor.err), true,
+                StandardCharsets.UTF_8));
         System.exit(run(args));
     }
 
@@ -574,40 +580,6 @@ global options:
         }
     }
 
-    /** Every catalog the engine ships (base and sector overlays), keyed {@code id@version}. */
-    private static Map<String, Path> vendoredCatalogs() {
-        Map<String, Path> found = new LinkedHashMap<>();
-        Path root = Bundled.catalogsDir();
-        for (String kind : new String[] {"base", "overlays"}) {
-            Path dir = root.resolve(kind);
-            List<String> names = new ArrayList<>();
-            if (Files.isDirectory(dir)) {
-                try (Stream<Path> stream = Files.list(dir)) {
-                    stream.map(p -> p.getFileName().toString()).forEach(names::add);
-                } catch (IOException ignored) {
-                    // no vendored catalogs of this kind
-                }
-            }
-            names.sort(Json::byteCompare);
-            for (String name : names) {
-                Path catalogYaml = dir.resolve(name).resolve("catalog.yaml");
-                if (!Files.isRegularFile(catalogYaml)) {
-                    continue;
-                }
-                try {
-                    JsonNode meta = Yaml.parseFile(catalogYaml);
-                    if (meta != null && meta.isObject() && meta.has("id") && meta.has("version")
-                            && meta.get("id").isTextual() && meta.get("version").isTextual()) {
-                        found.put(meta.get("id").asText() + "@" + meta.get("version").asText(), dir.resolve(name));
-                    }
-                } catch (RuntimeException ignored) {
-                    // a malformed vendored catalog is skipped, never fatal to discovery
-                }
-            }
-        }
-        return found;
-    }
-
     private record Resolved(List<Catalog> catalogs, List<String> labels, List<String> limitations) {}
 
     /** The trust root catalog verification consults: {@code --trust-root}, else {@code
@@ -744,7 +716,7 @@ global options:
             }
         }
         if (!unresolved.isEmpty()) {
-            Map<String, Path> vendored = vendoredCatalogs();
+            Map<String, Path> vendored = Bundled.vendoredCatalogs();
             List<String> stillUnresolved = new ArrayList<>();
             for (String u : unresolved) {
                 if (vendored.containsKey(u)) {
@@ -756,7 +728,7 @@ global options:
             unresolved = stillUnresolved;
         }
         if (!unresolved.isEmpty()) {
-            Map<String, Path> vendored = vendoredCatalogs();
+            Map<String, Path> vendored = Bundled.vendoredCatalogs();
             TreeSet<String> available = new TreeSet<>(Json::byteCompare);
             available.addAll(byLabel.keySet());
             available.addAll(vendored.keySet());
@@ -1338,7 +1310,10 @@ global options:
         }
 
         String operatorEnv = System.getenv("AGENTCE_OPERATOR");
-        List<String> invocation = List.of(options.invocationCommand(), scrubPath(bundleDir), scrubPath(profilePath));
+        // commands/__init__.py's `invocation`: quickstart records the bare command, as it reruns.
+        List<String> invocation = options.invocationCommand().equals("quickstart")
+                ? List.of("quickstart")
+                : List.of(options.invocationCommand(), scrubPath(bundleDir), scrubPath(profilePath));
         ObjectNode activity = Activity.summarizeActivity(ingested.accepted, profileObj);
         ObjectNode blindSpots = BlindSpots.computeBlindSpots(evaluated, profileObj, resolved.catalogs(), ingested.accepted);
         String applicabilityProfileDigest = digestOf(Paths.get(profilePath));
@@ -2002,7 +1977,7 @@ global options:
 """;
 
     /** Every control's severity, from the given {@code --catalog-dir}s, else every vendored base
-     * catalog (SPEC §13.3.4). Deliberately <b>not</b> a factoring of {@link #vendoredCatalogs}: that
+     * catalog (SPEC §13.3.4). Deliberately <b>not</b> a factoring of {@link Bundled#vendoredCatalogs}: that
      * method silently skips a subdirectory whose {@code catalog.yaml} fails to parse and also scans
      * {@code overlays/}, neither of which matches this method's own throw-on-malformed, {@code
      * base}-only behaviour (mirrors Python's {@code _readiness_severities}, which has no try/catch

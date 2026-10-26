@@ -250,9 +250,9 @@ allow:
 
   - path: engines/java/src/main/java/org/agentce/Report.java
     pattern: placeholder
-    count: 23
+    count: 25
     class: legitimate
-    justification: "sanitizeForMarkdown/sanitizeForHtml's placeholder parameter and the SANITIZE_EMPTY_NAME_PLACEHOLDER/SANITIZE_EMPTY_FIELD_PLACEHOLDER fallback strings ('(unnamed)'/'(empty)'), mirroring the Python reference's report.py entry above; not an unfinished stub. Newly counted in item 18.24 for the same reason as the report.ts entry above: this file's own two raw NUL bytes hid it from this scanner until they were fixed this session. 18.16h's buyer-view evidence refs cite SANITIZE_EMPTY_FIELD_PLACEHOLDER once, +1."
+    justification: "sanitizeForMarkdown/sanitizeForHtml's placeholder parameter and the SANITIZE_EMPTY_NAME_PLACEHOLDER/SANITIZE_EMPTY_FIELD_PLACEHOLDER fallback strings ('(unnamed)'/'(empty)'), mirroring the Python reference's report.py entry above; not an unfinished stub. Newly counted in item 18.24 for the same reason as the report.ts entry above: this file's own two raw NUL bytes hid it from this scanner until they were fixed this session. 18.16h's buyer-view evidence refs cite SANITIZE_EMPTY_FIELD_PLACEHOLDER once, +1. 18.16i's report.html Details cell cites SANITIZE_EMPTY_FIELD_PLACEHOLDER twice (evidence refs and offending nodes), +2."
 
   - path: engines/python/agentce/commands/__init__.py
     pattern: placeholder
@@ -313,12 +313,6 @@ allow:
     count: 1
     class: legitimate
     justification: "A VG-CLI-TOP-LEVEL seeded fault's description names the state before 18.108, when TypeScript answered an unknown command with cli.not_implemented; it describes the fault the gate must catch, not an unfinished part of the check."
-
-  - path: engines/typescript/src/report.test.ts
-    pattern: todo
-    count: 2
-    class: legitimate
-    justification: "report.md/report.html are derived, locale-varying renderings, not part of the byte-identical canonical set (assertions.json, oscal-ar.json, results.sarif, packs/*/pack.json); the catalog-joined, risk-ranked human-report enrichment is scoped to the Python reference engine only. This test documents that known, deliberate boundary rather than tracking pending work. The second hit is a doc comment on verdictAndTallySpanMd/Html cross-referencing this same test, added by the 18.22 verifier round-1 fix (byte-equal Verdict/tally parity)."
 
   - path: engines/typescript/src/report.test.ts
     pattern: placeholder

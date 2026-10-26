@@ -28,12 +28,9 @@ import org.junit.jupiter.api.io.TempDir;
  * <p>The canonical machine outputs -- OSCAL, SARIF, the evidence pack, and assertions.json -- are
  * byte-identical to the reference and are asserted below. The Verdict section and outcome tally
  * (item 18.22) are also byte-identical to the reference, per {@link #verdictCasesMatchReference}.
- * The per-assertion listing beyond it still diverges from the reference: the reference groups
- * findings by control severity with per-finding evidence/violations/remediation and a provenance
- * block (SPEC §9.3), none of which this engine's renderer emits. Bringing this engine to that
- * parity is engine-parity work owned by a later item (the TypeScript engine tracks the same gap
- * explicitly in {@code report.test.ts}), so only the Verdict-through-outcome-tally span is
- * compared, not the whole document.
+ * The whole of report.md and report.html matches the reference's up to the Provenance section, which
+ * {@code generate_goldens.py} trims ({@link #humanRenderersMatchReference}); VG-REPORT-FORMAT-PARITY
+ * compares the rest over real runs (18.16i).
  */
 class ReportTest {
 
@@ -63,6 +60,41 @@ class ReportTest {
             myAssertions.add(a.toJson());
         }
         assertEquals(Canonical.canonicalString(golden.get("assertions")), Canonical.canonicalString(myAssertions));
+    }
+
+    @Test
+    void humanRenderersMatchReference() throws IOException {
+        JsonNode golden = Json.parseFile(TestPaths.testData().resolve("report-golden.json"));
+        List<Assertions.Assertion> assertions = ovsFailedAssertions();
+        Map<String, Integer> counts = Assertions.aggregate(assertions);
+        String md = Report.renderReportMd(assertions, counts, "en", null, null);
+        String html = Report.renderReportHtml(assertions, counts, "en", null, null);
+        // generate_goldens.py's without_provenance_md/_html.
+        assertEquals(golden.get("md").textValue(), md.substring(0, md.indexOf("\n## Provenance\n")));
+        int section = html.indexOf("<section aria-labelledby=\"provenance\">");
+        assertEquals(golden.get("html").textValue(), html.substring(0, section) + html.substring(html.indexOf("<footer>", section)));
+        assertTrue(md.contains("\n- Engine: agentce-java " + Version.ENGINE_VERSION + "\n- Catalog: (none)\n"));
+        assertTrue(md.endsWith("- Reproduce: `agentce quickstart`\n\n"));
+    }
+
+    @Test
+    void catalogFindingsGroupBySeverityWithTitleAndProvenance() throws IOException {
+        Catalog catalog = Catalog.load(Fixtures.BASE);
+        List<Assertions.Assertion> assertions = ovsFailedAssertions();
+        Map<String, Integer> counts = Assertions.aggregate(assertions);
+        String md = Report.renderReportMd(
+                assertions, counts, "en", null, null, List.of(catalog), List.of("assess", "x"));
+        List<String> order = List.of("### High severity", "### Medium severity", "### Low severity", "### Unrated");
+        List<String> headings = md.lines().filter(l -> l.startsWith("### ")).toList();
+        assertEquals(order.stream().filter(headings::contains).toList(), headings);
+        Catalog.ControlSpec spec = catalog.controls.stream().filter(c -> c.id.equals("OVS-03")).findFirst().orElseThrow();
+        assertTrue(md.contains("- **" + spec.title + "** (`OVS-03`"), "the control's title leads its finding");
+        assertTrue(md.contains("- Catalog: " + catalog.id + "@" + catalog.version + "\n"));
+        assertTrue(md.contains("- Reproduce: `agentce assess x`\n"));
+        String html = Report.renderReportHtml(
+                assertions, counts, "en", null, null, List.of(catalog), List.of("assess", "x"));
+        assertTrue(html.contains("<td>" + spec.severity + "</td>"));
+        assertTrue(html.contains("<section aria-labelledby=\"provenance\">"));
     }
 
     private static Assertions.Assertion assertionOf(String control, String mode) {

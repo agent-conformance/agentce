@@ -137,13 +137,17 @@ class CliTest {
     }
 
     @Test
-    void quickstartAssessesTheBundledProjectOffline(@TempDir Path out) {
+    void quickstartAssessesTheBundledProjectOffline(@TempDir Path out) throws IOException {
         JsonNode env = runJson("quickstart", "--out", out.toString());
         assertEquals(0, env.get("exit_code").asInt());
         assertEquals("ok", env.get("quickstart").asText());
         assertEquals(49, env.get("assertions").asInt());
         assertTrue(Files.isRegularFile(out.resolve("report.md")));
         assertTrue(Files.isRegularFile(out.resolve("report.html")));
+        // Python records quickstart's bare command, which is also report.md's Reproduce line.
+        JsonNode invocation = Json.parseFile(out.resolve("manifest.json")).get("run").get("invocation");
+        assertEquals("[\"quickstart\"]", invocation.toString());
+        assertTrue(Files.readString(out.resolve("report.md")).contains("- Reproduce: `agentce quickstart`\n"));
     }
 
     @Test
