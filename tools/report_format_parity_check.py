@@ -241,6 +241,18 @@ def file_problems(engine: str, reference: Path, candidate: Path) -> list[str]:
     return problems
 
 
+def _assess_emit(engine: str, emit: str, argv: list[str], env: dict[str, str]) -> int:
+    """TypeScript's or Java's `assess-emit <emit>` seam over `argv`; its exit code."""
+    proc = subprocess.run(
+        [*_seam(engine), "assess-emit", emit, *argv],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+        env={**_env(), **env},
+    )
+    return proc.returncode
+
+
 def _assess(engine: str, args: list[str], env: dict[str, str], out: Path) -> int:
     """One engine's real `assess`, Python's with the five formats, remediation and skill emitted (or, as
     "python-security", with `--for security`), the others' through their `assess-emit
@@ -255,14 +267,17 @@ def _assess(engine: str, args: list[str], env: dict[str, str], out: Path) -> int
         )
         _, code = cpc.run_engine("python", [*argv, *extra], env)
         return code
-    proc = subprocess.run(
-        [*_seam(engine), "assess-emit", "remediation,skill,for=security", *argv],
-        capture_output=True,
-        text=True,
-        cwd=ROOT,
-        env={**_env(), **env},
-    )
-    return proc.returncode
+    return _assess_emit(engine, "remediation,skill,for=security", argv, env)
+
+
+def _hostile_args() -> list[str]:
+    """The hostile remediation fixture's assess argv."""
+    return [
+        *cpc._project_args(HOSTILE),
+        "--catalog-dir",
+        str(HOSTILE / "catalog"),
+        "--allow-unverified-catalog",
+    ]
 
 
 def remediation_only_runs(tmp: Path, no_assertions: cpc.Run) -> list[cpc.Run]:
@@ -274,14 +289,8 @@ def remediation_only_runs(tmp: Path, no_assertions: cpc.Run) -> list[cpc.Run]:
     _assess("python", [str(folder)], {}, derived)
     profile = tmp / "records" / "applicability.yaml"
     shutil.copyfile(derived / "applicability.yaml", profile)
-    hostile = [
-        *cpc._project_args(HOSTILE),
-        "--catalog-dir",
-        str(HOSTILE / "catalog"),
-        "--allow-unverified-catalog",
-    ]
     return [
-        ("remediation_hostile", hostile, {}, False),
+        ("remediation_hostile", _hostile_args(), {}, False),
         ("records_folder", [str(folder)], {}, False),
         ("records_folder_profile", [str(folder), "--profile", str(profile)], {}, False),
         no_assertions,
@@ -411,18 +420,12 @@ def buyer_runs() -> list[tuple[str, list[str], dict[str, str]]]:
         "--deviations",
         str(cpc.AUDITOR / "deviations.yaml"),
     ]
-    hostile = [
-        *cpc._project_args(HOSTILE),
-        "--catalog-dir",
-        str(HOSTILE / "catalog"),
-        "--allow-unverified-catalog",
-    ]
     return [
         ("buyer_fixture", fixture, {}),
         ("buyer_fixture_de", [*fixture, "--report-language", "de"], {}),
         ("buyer_quickstart", cpc._project_args(cpc.QUICKSTART), {}),
         ("buyer_auditor_view", auditor, {"AGENTCE_OPERATOR": "Zo\u00eb Corp"}),
-        ("buyer_remediation_hostile", hostile, {}),
+        ("buyer_remediation_hostile", _hostile_args(), {}),
         (
             "buyer_no-assertions",
             cpc._project_args(cpc.QUICKSTART, cpc.NO_ASSERTIONS),
@@ -437,14 +440,7 @@ def _assess_buyer(engine: str, args: list[str], env: dict[str, str], out: Path) 
     if engine == "python":
         _, code = cpc.run_engine("python", [*argv, "--for", "buyer"], env)
         return code
-    proc = subprocess.run(
-        [*_seam(engine), "assess-emit", "for=buyer", *argv],
-        capture_output=True,
-        text=True,
-        cwd=ROOT,
-        env={**_env(), **env},
-    )
-    return proc.returncode
+    return _assess_emit(engine, "for=buyer", argv, env)
 
 
 def check_buyer(
