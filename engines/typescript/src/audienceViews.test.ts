@@ -1,7 +1,9 @@
 /** The audience-view registry and the security view's renderers match Python (18.16g): every case of
  * security_cases.json renders security_expected.json's text, the dispatch writes security.md and
  * security.html only when asked (inbox row 106 M2), and writeReport writes the security files only
- * while the preset is registered (M3). */
+ * while the preset is registered (M3). The buyer view (18.16h): every case of buyer_cases.json renders
+ * buyer_expected.json's text, buyer.md and buyer.html are always written, and compute over the
+ * buyer-view fixture's assessed run gives Python's buyer.json. */
 
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -9,11 +11,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { summarizeActivity } from "./activity";
+import { assertionFromJson } from "./assertions";
+import { type BuyerView, computeBuyerView } from "./buyerView";
+import { canonicalize } from "./canonical";
 import { profileFromDict } from "./profile";
 import {
   AUDIENCE_VIEWS,
   type ReportViewContext,
   SEAM_FOR,
+  renderBuyerHtml,
+  renderBuyerMd,
   renderSecurityHtml,
   renderSecurityMd,
   writeAudienceView,
@@ -45,12 +52,22 @@ for (const c of cases) {
   });
 }
 
-test("the registry's keys are exactly [security]", () => {
-  assert.deepEqual(Object.keys(AUDIENCE_VIEWS), ["security"]);
+test("the registry's keys are exactly [security, buyer]", () => {
+  assert.deepEqual(Object.keys(AUDIENCE_VIEWS), ["security", "buyer"]);
 });
 
 function context(): ReportViewContext {
-  return { activity: summarizeActivity([], profileFromDict({})), assertions: [], language: "en" };
+  return {
+    activity: summarizeActivity([], profileFromDict({})),
+    assertions: [],
+    language: "en",
+    counts: {},
+    blindSpots: { blind_spots: [], no_population: [], coverage_unknown: [] },
+    reverifyCommand: [],
+    packaged: false,
+    reportFolder: "out",
+    catalogs: [],
+  };
 }
 
 function written(preset: string | undefined, wanted: string[]): string[] {
@@ -74,6 +91,12 @@ test("M2: the security view writes .md and .html only when asked", () => {
     "security.md",
     "security.html",
   ]);
+});
+
+test("the buyer view writes buyer.md and buyer.html whatever is asked (alwaysWrite)", () => {
+  for (const wanted of [[], ["md"], ["html"], ["md", "html"]]) {
+    assert.deepEqual(written("buyer", wanted), ["buyer.json", "buyer.md", "buyer.html"]);
+  }
 });
 
 test("an unknown preset and no preset write nothing", () => {
@@ -130,4 +153,69 @@ test("writeReport writes no security file with no preset or an unknown one", () 
     }
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+const buyerCases = (
+  JSON.parse(readFileSync(join(FIXTURES, "buyer_cases.json"), "utf-8")) as {
+    cases: {
+      name: string;
+      language: string;
+      view: BuyerView;
+      packaged: boolean;
+      folder: string;
+      argv: string[];
+      catalogs: [string, string][];
+    }[];
+  }
+).cases;
+const buyerExpected = JSON.parse(
+  readFileSync(join(FIXTURES, "buyer_expected.json"), "utf-8"),
+) as Record<string, string>;
+
+test("buyer_cases.json and buyer_expected.json name the same cases", () => {
+  assert.deepEqual(
+    buyerCases.flatMap((c) => [`${c.name}.md`, `${c.name}.html`]).sort(),
+    Object.keys(buyerExpected).sort(),
+  );
+});
+
+for (const c of buyerCases) {
+  test(`buyer case ${c.name} renders Python's buyer.md and buyer.html`, () => {
+    const options = {
+      language: c.language,
+      argv: c.argv,
+      packaged: c.packaged,
+      reportFolder: c.folder,
+      catalogs: c.catalogs.map(([id, version]) => `${id}@${version}`),
+    };
+    assert.equal(renderBuyerMd(c.view, options), buyerExpected[`${c.name}.md`]);
+    assert.equal(renderBuyerHtml(c.view, options), buyerExpected[`${c.name}.html`]);
+  });
+}
+
+const BUYER_FILES = ["buyer.json", "buyer.md", "buyer.html"];
+
+test("writeReport writes the buyer files, each in manifest.outputs, with SEAM_FOR buyer", () => {
+  const { dir, outputs } = reportWith("buyer");
+  for (const name of BUYER_FILES) {
+    assert.ok(existsSync(join(dir, name)), name);
+    assert.ok(name in outputs, name);
+  }
+  rmSync(dir, { recursive: true, force: true });
+  const none = reportWith(undefined);
+  for (const name of BUYER_FILES) {
+    assert.equal(existsSync(join(none.dir, name)), false, name);
+  }
+  rmSync(none.dir, { recursive: true, force: true });
+});
+
+test("computeBuyerView over an assessed run's assertions and blind spots gives its buyer.json", () => {
+  const golden = join(FIXTURES, "buyer_run");
+  const assertions = JSON.parse(readFileSync(join(golden, "assertions.json"), "utf-8"));
+  const blindSpots = JSON.parse(readFileSync(join(golden, "blind-spots.json"), "utf-8"));
+  const view = computeBuyerView(assertions.map(assertionFromJson), blindSpots);
+  assert.equal(
+    canonicalize(view).toString("utf-8"),
+    readFileSync(join(golden, "buyer.json"), "utf-8"),
+  );
 });
