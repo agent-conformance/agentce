@@ -46,3 +46,26 @@ def test_present_flag_lints_clean_when_required(tmp_path: Path) -> None:
 
 def test_base_catalog_carries_every_flag() -> None:
     assert lint_catalog(_BASE, require_verification_flags=True) == []
+
+
+def test_only_a_boolean_true_marks_a_clause_verified() -> None:
+    # 18.16e: a catalog loaded with --allow-unverified-catalog may carry a string or a number here;
+    # neither assertions.json nor the remediation package may read it as a verification (SPEC 7.3, H4).
+    from types import SimpleNamespace
+
+    from agentce.assess import _crosswalk
+    from agentce.report import _remediation_clauses
+
+    flags = [True, False, "false", "true", 1, "yes", None]
+    control = SimpleNamespace(
+        raw={
+            "crosswalk": [
+                {"framework": "f", "clause": str(i), "verified_against_text": flag}
+                for i, flag in enumerate(flags)
+            ]
+        }
+    )
+    expected = [True, False, False, False, False, False, False]
+    assert [c["verified"] for c in _crosswalk(control)] == expected  # type: ignore[arg-type]
+    clauses = _remediation_clauses(control)  # type: ignore[arg-type]
+    assert [c["verified_against_text"] for c in clauses] == expected

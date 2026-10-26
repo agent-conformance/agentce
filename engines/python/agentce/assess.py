@@ -149,15 +149,15 @@ def _family(control_id: str) -> str:
 def _crosswalk(control: ControlSpec) -> list[dict[str, Any]]:
     """Carry each control's own crosswalk entries into every assertion built for it (SPEC §7.3).
 
-    ``verified`` is read from the control's ``verified_against_text`` and coerced to a real
-    ``bool`` -- never invented, and never set ``True`` by the engine itself; only a human with
+    ``verified`` is ``True`` only when the control's ``verified_against_text`` is the boolean ``True``
+    (a string such as ``"false"`` or ``"yes"``, or ``1``, is not a verification) -- never invented, and never set ``True`` by the engine itself; only a human with
     access to the licensed standard text may flip that flag in the catalog source (human action H4).
     """
     return [
         {
             "framework": entry.get("framework"),
             "clause": entry.get("clause"),
-            "verified": bool(entry.get("verified_against_text", False)),
+            "verified": entry.get("verified_against_text") is True,
         }
         for entry in control.raw.get("crosswalk", []) or []
     ]

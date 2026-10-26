@@ -2629,7 +2629,7 @@ def _remediation_clauses(spec: ControlSpec | None) -> list[dict[str, Any]]:
             "framework": str(entry.get("framework", "")),
             "clause": str(entry.get("clause", "")),
             "relation": str(entry.get("relation", "")),
-            "verified_against_text": bool(entry.get("verified_against_text", False)),
+            "verified_against_text": entry.get("verified_against_text") is True,
         }
         for entry in spec.raw.get("crosswalk", []) or []
     ]
