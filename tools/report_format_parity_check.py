@@ -26,6 +26,13 @@ generated_from.engine (the engine's own manifest block) and the $id derived from
 outputs with its digest. Then every package in `fixtures/report_formats/remediation_md_cases.json` is rendered by each
 engine's `remediation-md` seam and must equal Python's, which must equal the committed `remediation_md_expected.json`.
 
+The fix-list skill folder (SPEC §13.3, Appendix A2 (C); 18.16f) is compared the same way from the same runs: Python
+adds `skill` to its --emit list and the other engines' seam is `assess-emit remediation,skill`. Under each
+skill/<subject>/ the SKILL.md, findings/*.md and REVERIFY.md must equal Python's byte for byte and the
+remediation-package.json gets the remediation package's checks. Then every case in
+`fixtures/report_formats/skill_cases.json` is rendered by each engine's `skill-cases` seam and must equal Python's,
+which must equal the committed `skill_expected.json`.
+
 Modes:
     report_format_parity_check.py                  # three engines (needs `pnpm build` and `:assemble` first)
     report_format_parity_check.py --fail-fast      # the same, stopping at the first mismatching run
@@ -73,12 +80,17 @@ ENGINES = cpc.ENGINES
 MD_CASES = CASES.with_name("remediation_md_cases.json")
 #: Python's remediation.md for each package of MD_CASES, the golden the engines' unit tests read.
 MD_EXPECTED = CASES.with_name("remediation_md_expected.json")
+SKILL_CASES = CASES.with_name("skill_cases.json")
+#: Python's rendering of each case of SKILL_CASES, the golden the engines' unit tests read.
+SKILL_EXPECTED = CASES.with_name("skill_expected.json")
 HOSTILE = CASES.with_name("remediation_hostile")
 #: A records folder for the folder-form runs (`assess <folder>`), copied into the work tree.
 RECORDS = ROOT / "adapters" / "otel-genai" / "fixtures" / "otel-genai-agent-session"
 #: The runs that compare remediation alone: the hostile fixture, the folder without and with
 #: --profile, and no-assertions.
 REMEDIATION_ONLY_RUNS = 4
+#: The emitted folders compared file by file: remediation (18.16e) and the skill folder (18.16f).
+EMITTED = ("remediation", "skill")
 #: Java reads no records folder yet (input.records_unsupported; docs/quickstart-java.md): on the
 #: folder-form runs it must refuse at exit 3 and write no remediation output.
 JAVA_REFUSES = {"records_folder", "records_folder_profile"}
@@ -203,17 +215,19 @@ def file_problems(engine: str, reference: Path, candidate: Path) -> list[str]:
 
 
 def _assess(engine: str, args: list[str], env: dict[str, str], out: Path) -> int:
-    """One engine's real `assess`, Python's with the five formats and remediation emitted, the others'
-    through their `assess-emit remediation` seam; its exit code. Exits 1 and 2 (a non-conformant or
+    """One engine's real `assess`, Python's with the five formats, remediation and skill emitted, the
+    others' through their `assess-emit remediation,skill` seam; its exit code. Exits 1 and 2 (a non-conformant or
     unproven outcome) still write the full report."""
     argv = ["assess", *args, "--out", str(out)]
     if engine == "python":
         _, code = cpc.run_engine(
-            engine, [*argv, "--emit", "junit,csv,oscal_xml,public,pdf,remediation"], env
+            engine,
+            [*argv, "--emit", "junit,csv,oscal_xml,public,pdf,remediation,skill"],
+            env,
         )
         return code
     proc = subprocess.run(
-        [*_seam(engine), "assess-emit", "remediation", *argv],
+        [*_seam(engine), "assess-emit", "remediation,skill", *argv],
         capture_output=True,
         text=True,
         cwd=ROOT,
@@ -245,12 +259,13 @@ def remediation_only_runs(tmp: Path, no_assertions: cpc.Run) -> list[cpc.Run]:
     ]
 
 
-def _remediation_files(report: Path) -> list[str]:
-    root = report / "remediation"
-    return (
-        sorted(p.relative_to(report).as_posix() for p in root.rglob("*") if p.is_file())
-        if root.is_dir()
-        else []
+def _emitted_files(report: Path) -> list[str]:
+    """Every file under the report's remediation/ and skill/ folders."""
+    return sorted(
+        p.relative_to(report).as_posix()
+        for name in EMITTED
+        for p in (report / name).rglob("*")
+        if p.is_file()
     )
 
 
@@ -266,23 +281,25 @@ def _package_body(package: dict[str, object]) -> dict[str, object]:
     return {k: v for k, v in package.items() if k not in ("$schema", "$id")}
 
 
-def remediation_problems(
+def emitted_problems(
     engine: str, reference: Path, candidate: Path, digest_of
 ) -> list[str]:
-    """`candidate`'s remediation output against Python's in `reference`; `digest_of(value)` is the
+    """`candidate`'s remediation and skill output against Python's in `reference`: Markdown byte for
+    byte, each remediation-package.json by value but for its engine identity; `digest_of(value)` is the
     sha256 hex of a value's canonical bytes by Python's canonicalizer."""
-    want, got = _remediation_files(reference), _remediation_files(candidate)
+    want, got = _emitted_files(reference), _emitted_files(candidate)
     if want != got:
-        return [f"{engine} remediation files {got}, python {want}"]
+        return [f"{engine} emitted files {got}, python {want}"]
     if not want:
         return []
     ref_manifest = json.loads((reference / "manifest.json").read_text("utf-8"))
     manifest = json.loads((candidate / "manifest.json").read_text("utf-8"))
     ref_out, out = ref_manifest["outputs"], manifest["outputs"]
-    listed = sorted(k for k in out if k.startswith("remediation/"))
-    if listed != sorted(k for k in ref_out if k.startswith("remediation/")):
+    prefixes = tuple(f"{name}/" for name in EMITTED)
+    listed = sorted(k for k in out if k.startswith(prefixes))
+    if listed != sorted(k for k in ref_out if k.startswith(prefixes)):
         return [
-            f"{engine} manifest.outputs lists remediation files {listed}, python {want}"
+            f"{engine} manifest.outputs lists emitted files {listed}, python {want}"
         ]
     engine_block = {
         k: v for k, v in manifest["engine"].items() if k != "package_digest"
@@ -373,7 +390,7 @@ def check_corpus(
             d / rel
             for e in engines[1:]
             for d in dirs[e]
-            for rel in _remediation_files(d)
+            for rel in _emitted_files(d)
             if rel.endswith(".json")
         ]
     )
@@ -381,15 +398,15 @@ def check_corpus(
     for i, label in enumerate(labels):
         problems: list[str] = []
         py_exit = exits[("python", dirs["python"][i])]
-        # no-assertions' profile names no subject: assess refuses it (exit 3) and writes no remediation.
+        # no-assertions' profile names no subject: assess refuses it (exit 3) and writes no remediation or skill.
         if py_exit not in ((0, 1, 2, 3) if label == "no-assertions" else (0, 1, 2)):
             problems.append(f"python assess exited {py_exit}")
         for engine in engines:
             code = exits[(engine, dirs[engine][i])]
             if engine == "java" and label in JAVA_REFUSES:
-                if code != 3 or _remediation_files(dirs[engine][i]):
+                if code != 3 or _emitted_files(dirs[engine][i]):
                     problems.append(
-                        f"java assess <folder> exited {code}; want 3 (input.records_unsupported), no remediation"
+                        f"java assess <folder> exited {code}; want 3 (input.records_unsupported), no remediation or skill"
                     )
                 continue
             if code != py_exit:
@@ -406,7 +423,7 @@ def check_corpus(
                         tmp / "seam" / engine / str(seam_index[i]),
                     )
                 if engine != "python":
-                    problems += remediation_problems(
+                    problems += emitted_problems(
                         engine, dirs["python"][i], dirs[engine][i], digest_of
                     )
         failures += _report(label, problems)
@@ -551,14 +568,43 @@ cases = json.load(open(sys.argv[1], encoding="utf-8"))["cases"]
 json.dump({c["name"]: render_remediation_md(c["package"]) for c in cases}, open(sys.argv[2], "w", encoding="utf-8"))
 """
 
+PYTHON_SKILL = """
+import json, sys
+from agentce.report import (_skill_finding_filename, _tool_names_for_subject, render_reverify_md,
+                            render_skill_finding_md, render_skill_md)
+def one(c):
+    kind = c["kind"]
+    if kind == "skill":
+        return render_skill_md(spec_version=c["spec_version"], cli_version=c["cli_version"],
+                               catalog_version=c["catalog_version"], assertions_digest=c["assertions_digest"])
+    if kind == "finding":
+        return render_skill_finding_md(c["finding"], c["tool_calls"])
+    if kind == "reverify":
+        return render_reverify_md(c["argv"])
+    if kind == "tool_names":
+        return "\\n".join(_tool_names_for_subject(c["events"]))
+    if kind == "filename":
+        return _skill_finding_filename(c["control"], c["index"])
+    raise SystemExit("unknown kind " + kind)
+cases = json.load(open(sys.argv[1], encoding="utf-8"))["cases"]
+json.dump({c["name"]: one(c) for c in cases}, open(sys.argv[2], "w", encoding="utf-8"))
+"""
 
-def render_md_with(engine: str, out: Path) -> dict[str, str] | str:
-    """One engine's remediation.md for every package of MD_CASES, or the engine's error."""
-    cmd = (
-        _python(PYTHON_MD) if engine == "python" else [*_seam(engine), "remediation-md"]
-    )
+#: The fixed case tables each engine renders through a seam verb: (label, seam verb, cases, Python's
+#: golden, Python's renderer).
+CASE_TABLES = (
+    ("remediation case", "remediation-md", MD_CASES, MD_EXPECTED, PYTHON_MD),
+    ("skill case", "skill-cases", SKILL_CASES, SKILL_EXPECTED, PYTHON_SKILL),
+)
+
+
+def render_table_with(
+    engine: str, out: Path, verb: str, cases: Path, script: str
+) -> dict[str, str] | str:
+    """One engine's rendering of every case of `cases` through its `verb` seam, or the engine's error."""
+    cmd = _python(script) if engine == "python" else [*_seam(engine), verb]
     proc = subprocess.run(
-        [*cmd, str(MD_CASES), str(out)],
+        [*cmd, str(cases), str(out)],
         capture_output=True,
         text=True,
         cwd=ROOT,
@@ -569,34 +615,38 @@ def render_md_with(engine: str, out: Path) -> dict[str, str] | str:
     return json.loads(out.read_text("utf-8"))
 
 
-def check_md_cases(
-    tmp: Path, engines: tuple[str, ...], fail_fast: bool
+def check_case_table(
+    tmp: Path, engines: tuple[str, ...], fail_fast: bool, table: tuple
 ) -> tuple[int, int]:
-    python = render_md_with("python", tmp / "md-python.json")
+    label, verb, cases, expected, script = table
+    python = render_table_with(
+        "python", tmp / f"{verb}-python.json", verb, cases, script
+    )
     if isinstance(python, str):
-        raise SystemExit(f"python remediation-md: {python}")
+        raise SystemExit(f"python {verb}: {python}")
     failures = 0
-    if not MD_EXPECTED.is_file() or MD_EXPECTED.read_text("utf-8") != _expected_text(
-        python
-    ):
+    if not expected.is_file() or expected.read_text("utf-8") != _expected_text(python):
         print(
-            f"MISMATCH: {MD_EXPECTED.name} is not Python's current rendering of {MD_CASES.name}; "
+            f"MISMATCH: {expected.name} is not Python's current rendering of {cases.name}; "
             "run report_format_parity_check.py --write-expected",
             file=sys.stderr,
         )
         failures += 1
-    rendered = {e: render_md_with(e, tmp / f"md-{e}.json") for e in engines[1:]}
+    rendered = {
+        e: render_table_with(e, tmp / f"{verb}-{e}.json", verb, cases, script)
+        for e in engines[1:]
+    }
     for name, want in python.items():
         problems = []
         for engine, got in rendered.items():
             if isinstance(got, str):
-                problems.append(f"{engine} remediation-md seam: {got}")
+                problems.append(f"{engine} {verb} seam: {got}")
             elif got.get(name) != want:
                 problems.append(
-                    f"{engine} remediation.md: "
+                    f"{engine} {verb}: "
                     + _first_difference(want.encode(), str(got.get(name)).encode())
                 )
-        failures += _report(f"remediation case {name}", problems)
+        failures += _report(f"{label} {name}", problems)
         if problems and fail_fast:
             break
     return failures, len(python)
@@ -605,11 +655,15 @@ def check_md_cases(
 def write_expected() -> int:
     with tempfile.TemporaryDirectory(prefix="report-format-expected-") as raw:
         EXPECTED.write_text(_expected_text(python_case_outputs(Path(raw))), "utf-8")
-        md = render_md_with("python", Path(raw) / "md.json")
-        if isinstance(md, str):
-            raise SystemExit(f"python remediation-md: {md}")
-        MD_EXPECTED.write_text(_expected_text(md), "utf-8")
-    print(f"wrote {EXPECTED} and {MD_EXPECTED}")
+        for _, verb, cases, expected, script in CASE_TABLES:
+            rendered = render_table_with(
+                "python", Path(raw) / f"{verb}.json", verb, cases, script
+            )
+            if isinstance(rendered, str):
+                raise SystemExit(f"python {verb}: {rendered}")
+            expected.write_text(_expected_text(rendered), "utf-8")
+            print(f"wrote {expected}")
+    print(f"wrote {EXPECTED}")
     return 0
 
 
@@ -629,10 +683,13 @@ def run_check(engines: tuple[str, ...], fail_fast: bool) -> int:
         # the seam's inputs (assertions.json, oscal-ar.json, the manifest's catalogs) are what assess
         # renders from.
         failures, runs = check_cases(tmp, engines, fail_fast)
-        if not (failures and fail_fast):
-            md_failures, md_runs = check_md_cases(tmp, engines, fail_fast)
-            failures += md_failures
-            runs += md_runs
+        for table in CASE_TABLES:
+            if not (failures and fail_fast):
+                table_failures, table_runs = check_case_table(
+                    tmp, engines, fail_fast, table
+                )
+                failures += table_failures
+                runs += table_runs
         if not (failures and fail_fast):
             corpus_failures, corpus_runs = check_corpus(
                 tmp / "corpus-run", engines, fail_fast
@@ -646,7 +703,10 @@ def run_check(engines: tuple[str, ...], fail_fast: bool) -> int:
         CORPUS_RUNS
         + REMEDIATION_ONLY_RUNS
         + len(json.loads(CASES.read_text("utf-8"))["cases"])
-        + len(json.loads(MD_CASES.read_text("utf-8"))["cases"])
+        + sum(
+            len(json.loads(cases.read_text("utf-8"))["cases"])
+            for _, _, cases, _, _ in CASE_TABLES
+        )
     )
     if runs != expected:
         print(f"ran {runs} runs, expected {expected}", file=sys.stderr)
@@ -706,7 +766,7 @@ def self_test() -> int:
             else:
                 failures.append(f"tamper not caught: {name}")
         failures += _clock_self_test(tmp / "clock")
-        failures += _remediation_self_test(tmp / "remediation")
+        failures += _emitted_self_test(tmp / "emitted")
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
     if failures:
@@ -720,9 +780,9 @@ def _canonical(value: object) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
 
 
-def _remediation_self_test(tmp: Path) -> list[str]:
-    """remediation_problems passes a correct copy and catches each remediation tamper class."""
-    rel = "remediation/s"
+def _emitted_self_test(tmp: Path) -> list[str]:
+    """emitted_problems passes a correct copy and catches each remediation and skill tamper class."""
+    rel, skill = "remediation/s", "skill/s"
     engine = {"impl": "agentce-ts", "version": "0.1.0", "spec_version": "0.6"}
 
     def package(impl: dict[str, str], subject: str = "s") -> dict[str, object]:
@@ -742,6 +802,9 @@ def _remediation_self_test(tmp: Path) -> list[str]:
         return {"$schema": "x", "$id": PACKAGE_ID + digest, **body}
 
     md = b"# Remediation prompt\n"
+    skill_md = b"---\nname: agentce-fix-gaps\n---\n"
+    note = b"# A-01 \xe2\x80\x94 x\n"
+    reverify = b"# Re-verify\n\n`agentce assess .`\n"
     good_pkg = package(engine)
 
     def report(
@@ -763,6 +826,10 @@ def _remediation_self_test(tmp: Path) -> list[str]:
     files = {
         f"{rel}/remediation-package.json": _canonical(good_pkg),
         f"{rel}/remediation.md": md,
+        f"{skill}/SKILL.md": skill_md,
+        f"{skill}/findings/A-01--1.md": note,
+        f"{skill}/REVERIFY.md": reverify,
+        f"{skill}/remediation-package.json": _canonical(good_pkg),
     }
     reference = report(tmp / "reference", files)
     stale = dict(good_pkg, subject="t")
@@ -796,7 +863,10 @@ def _remediation_self_test(tmp: Path) -> list[str]:
             },
             None,
         ),
-        "a remediation file missing": ({f"{rel}/remediation.md": md}, None),
+        "a remediation file missing": (
+            {k: v for k, v in files.items() if k != f"{rel}/remediation-package.json"},
+            None,
+        ),
         "an extra remediation file": (
             {**files, "remediation/u/remediation.md": md},
             None,
@@ -809,18 +879,49 @@ def _remediation_self_test(tmp: Path) -> list[str]:
             {**files, f"{rel}/remediation.md": md.replace(b"#", b"=")},
             None,
         ),
+        "a skill file missing": (
+            {k: v for k, v in files.items() if k != f"{skill}/REVERIFY.md"},
+            None,
+        ),
+        "an extra skill file": (
+            {**files, f"{skill}/findings/A-01--2.md": note},
+            None,
+        ),
+        "a skill file missing from manifest.outputs": (
+            files,
+            {k: v for k, v in files.items() if k != f"{skill}/SKILL.md"},
+        ),
+        "SKILL.md one byte changed": (
+            {**files, f"{skill}/SKILL.md": skill_md.replace(b"fix", b"fax")},
+            None,
+        ),
+        "a finding note one byte changed": (
+            {**files, f"{skill}/findings/A-01--1.md": note.replace(b"x", b"y")},
+            None,
+        ),
+        "REVERIFY.md one byte changed": (
+            {**files, f"{skill}/REVERIFY.md": reverify.replace(b".", b"/")},
+            None,
+        ),
+        "a skill package key changed outside engine and $id": (
+            {
+                **files,
+                f"{skill}/remediation-package.json": _canonical(package(engine, "t")),
+            },
+            None,
+        ),
     }
 
     def digest_of(value: object) -> str:
         return hashlib.sha256(_canonical(value)).hexdigest()
 
     failures = []
-    if remediation_problems(
+    if emitted_problems(
         "typescript", reference, report(tmp / "same", files), digest_of
     ):
         failures.append("a correct remediation copy was flagged")
     for i, (name, (candidate, outputs)) in enumerate(tampers.items()):
-        if remediation_problems(
+        if emitted_problems(
             "java", reference, report(tmp / f"t{i}", candidate, outputs), digest_of
         ):
             print(f"caught: {name}")

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.136.5",
+  "suite_version": "0.136.6",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -2684,7 +2684,7 @@
     },
     {
       "id": "VG-REPORT-FORMAT-PARITY",
-      "title": "TypeScript and Java render report.junit.xml, report.csv, oscal-ar.xml, public-statement.md, report.pdf, the remediation package and remediation.md as Python does over the corpus and hostile case tables",
+      "title": "TypeScript and Java render report.junit.xml, report.csv, oscal-ar.xml, public-statement.md, report.pdf, the remediation package, remediation.md and the fix-list skill folder as Python does over the corpus and hostile case tables",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -2700,8 +2700,8 @@
       "timeout_s": 900,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "the checker's self-test catches a one-byte change, a missing file, an extra trailing newline, CRLF line endings, a report.pdf Latin-1 byte written as UTF-8 and a missing report.pdf, and refuses an engine started_at that is not YYYY-MM-DDTHH:MM:SSZ; over corpus/quickstart (also with --report-language de), the auditor-view fixture and the 30 generated corpus projects, Python's real assess --emit junit,csv,oscal_xml,public,pdf writes the five files, each engine's own assess exits with Python's code and writes a started_at of Python's shape (then set to Python's value, the clock being the one input that differs), and each engine's report-formats seam renders the five files from that engine's own assertions.json, oscal-ar.json and manifest byte-identical to Python's (Python's own seam included); every case in tools/fixtures/report_formats/cases.json (empty, every outcome out of order, hostile characters, an odd OSCAL document, code-point order, odd started_at values, German) renders the same bytes in all three engines; 33 corpus runs and every case ran; the remediation package and remediation.md (Python's assess --emit remediation, the other engines' assess-emit remediation seam) over those 33 runs, the hostile remediation fixture, a records folder without and with --profile (Java refuses both at exit 3, input.records_unsupported) and the no-assertions run: the same remediation files, each remediation.md byte-identical, each package its engine's canonical bytes, equal to Python's but for generated_from.engine (the engine's manifest block) and its recomputed $id, listed in manifest.outputs with its digest; the self-test catches each remediation tamper class; every package in remediation_md_cases.json renders Python's bytes in all three engines and Python's equals remediation_md_expected.json",
-        "fail": "any engine writes a different byte in any of the five files, writes none, exits differently from Python, writes a started_at of another shape, or the checker runs fewer runs than expected, or any remediation file differs, is missing or extra, is not listed in the manifest with its digest, or carries a wrong engine block or $id"
+        "pass": "the checker's self-test catches a one-byte change, a missing file, an extra trailing newline, CRLF line endings, a report.pdf Latin-1 byte written as UTF-8 and a missing report.pdf, and refuses an engine started_at that is not YYYY-MM-DDTHH:MM:SSZ; over corpus/quickstart (also with --report-language de), the auditor-view fixture and the 30 generated corpus projects, Python's real assess --emit junit,csv,oscal_xml,public,pdf writes the five files, each engine's own assess exits with Python's code and writes a started_at of Python's shape (then set to Python's value, the clock being the one input that differs), and each engine's report-formats seam renders the five files from that engine's own assertions.json, oscal-ar.json and manifest byte-identical to Python's (Python's own seam included); every case in tools/fixtures/report_formats/cases.json (empty, every outcome out of order, hostile characters, an odd OSCAL document, code-point order, odd started_at values, German) renders the same bytes in all three engines; 33 corpus runs and every case ran; the remediation package and remediation.md (Python's assess --emit remediation, the other engines' assess-emit remediation seam) over those 33 runs, the hostile remediation fixture, a records folder without and with --profile (Java refuses both at exit 3, input.records_unsupported) and the no-assertions run: the same remediation files, each remediation.md byte-identical, each package its engine's canonical bytes, equal to Python's but for generated_from.engine (the engine's manifest block) and its recomputed $id, listed in manifest.outputs with its digest; the self-test catches each remediation tamper class; every package in remediation_md_cases.json renders Python's bytes in all three engines and Python's equals remediation_md_expected.json; the skill folder (Python's assess --emit skill, the other engines' assess-emit remediation,skill seam) over the same runs: the same files under skill/<subject>/, each SKILL.md, findings/*.md and REVERIFY.md byte-identical and listed in manifest.outputs with Python's digest, each skill remediation-package.json held to the remediation package's checks, Java's refused folder runs writing no skill folder; the self-test catches a missing or extra skill file, one missing from manifest.outputs, a one-byte change in SKILL.md, a finding note or REVERIFY.md and a skill package key changed outside engine and $id; every case in skill_cases.json (catalog_version escapes, finding notes, re-verify argv, tool names, file names) renders Python's text in all three engines and Python's equals skill_expected.json",
+        "fail": "any engine writes a different byte in any of the five files, writes none, exits differently from Python, writes a started_at of another shape, or the checker runs fewer runs than expected, or any remediation or skill file differs, is missing or extra, is not listed in the manifest with its digest, or carries a wrong engine block or $id"
       },
       "faults": [
         {
@@ -2793,6 +2793,48 @@
           "file": "engines/typescript/src/cli.ts",
           "search": "  if (catalogLabels.length > 0) {\n    reverifyCommand.push(",
           "replace": "  if (catalogLabels.length > 0 && options.folder === undefined) {\n    reverifyCommand.push("
+        },
+        {
+          "description": "typescript SKILL.md's double-quoted catalog_version keeps a code point above U+FFFF raw instead of \\UXXXXXXXX",
+          "file": "engines/typescript/src/pyyaml.ts",
+          "search": "        (ch >= 0xe000 && ch <= 0xfffd));",
+          "replace": "        (ch >= 0xe000 && ch <= 0xfffd) ||\n        ch > 0xffff);"
+        },
+        {
+          "description": "java REVERIFY.md no longer sanitises the argv tokens",
+          "file": "engines/java/src/main/java/org/agentce/Skill.java",
+          "search": "argv.forEach(a -> tokens.add(Report.sanitizeForMarkdown(a)));",
+          "replace": "argv.forEach(tokens::add);"
+        },
+        {
+          "description": "typescript dedupes tool names before sanitising them instead of after",
+          "file": "engines/typescript/src/skill.ts",
+          "search": "    names.add(sanitizeForMarkdown(pyStr(name)));\n  }\n  return [...names];",
+          "replace": "    names.add(pyStr(name));\n  }\n  return [...names].map((n) => sanitizeForMarkdown(n));"
+        },
+        {
+          "description": "java finding notes drop the subject's tool calls",
+          "file": "engines/java/src/main/java/org/agentce/Skill.java",
+          "search": "        toolCalls.forEach(calls::add);\n",
+          "replace": ""
+        },
+        {
+          "description": "typescript numbers finding notes from 0 instead of 1",
+          "file": "engines/typescript/src/report.ts",
+          "search": "skillFindingFilename(String(finding.control), i + 1)",
+          "replace": "skillFindingFilename(String(finding.control), i)"
+        },
+        {
+          "description": "java safe() tests Character.isLetterOrDigit per UTF-16 char again, so a non-ASCII number or a supplementary letter becomes _",
+          "file": "engines/java/src/main/java/org/agentce/Report.java",
+          "search": "        name.codePoints().forEach(c -> {\n            if (isAlnum(c) || c == '-'",
+          "replace": "        name.chars().forEach(c -> {\n            if (Character.isLetterOrDigit((char) c) || c == '-'"
+        },
+        {
+          "description": "typescript writes the skill folder's remediation-package.json without recording it in manifest.outputs",
+          "file": "engines/typescript/src/report.ts",
+          "search": "        mkdirSync(joinPath(outDir, relDir, \"findings\"), { recursive: true });\n        writeBytes(`${relDir}/remediation-package.json`, pkgBytes);",
+          "replace": "        mkdirSync(joinPath(outDir, relDir, \"findings\"), { recursive: true });\n        writeFile(joinPath(outDir, `${relDir}/remediation-package.json`), pkgBytes);"
         }
       ],
       "fix_hint": "run verification/gates/report_format_parity.sh and read the MISMATCH lines (each names the file and the first differing byte); the reference is engines/python/agentce/report.py's render_junit, render_csv, render_oscal_xml, render_public_statement and render_pdf, ported as renderJunit, renderCsv, renderOscalXml, renderPublicStatement and renderPdf in engines/typescript/src/report.ts and engines/java/src/main/java/org/agentce/Report.java; the check is tools/report_format_parity_check.py; remediation: render_remediation_package and render_remediation_md (report.py) are ported in engines/typescript/src/remediation.ts and engines/java/src/main/java/org/agentce/Remediation.java, with templating.ts / Templating.java"

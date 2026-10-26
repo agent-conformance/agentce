@@ -3,6 +3,20 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.136.6
+
+- `VG-REPORT-FORMAT-PARITY` (changed, 18.16f): also compares the fix-list skill folder. Python's real assess adds
+  `skill` to its `--emit` list; TypeScript and Java run their own real assess through an `assess-emit
+  remediation,skill` seam until 18.16b wires `--emit`. Over the same runs, every file under `skill/<subject>/` matches
+  Python's: `SKILL.md`, each `findings/<control>--<n>.md` and `REVERIFY.md` byte-identical and listed in the manifest
+  with Python's digest, the skill's `remediation-package.json` held to the remediation package's checks; Java's refused
+  records-folder runs write no skill folder. A `skill-cases` seam renders a 40-case table (catalog-version escapes,
+  finding notes, re-verify argv, tool names, file names) to Python's text. New seeded faults: TypeScript keeps a code
+  point above U+FFFF raw in the double-quoted catalog version, Java stops sanitising re-verify argv, TypeScript dedupes
+  tool names before sanitising, Java drops tool calls from finding notes, TypeScript numbers notes from 0, Java's
+  `safe()` tests `isLetterOrDigit` per UTF-16 char again, TypeScript writes the skill package outside
+  `manifest.outputs`.
+
 ## 0.136.5
 
 - `VG-REPORT-FORMAT-PARITY` (changed, 18.16e): also compares the remediation package and `remediation.md`. Python's
