@@ -28,7 +28,9 @@ import { computeVectorFile } from "./numerics";
 import { OtelGenaiAdapterError, adapt as adaptOtelGenai } from "./otelGenai";
 import { renderRemediationMd } from "./remediation";
 import {
+  AUDIENCE_VIEWS,
   SEAM_EMIT,
+  SEAM_FOR,
   appliedDeviationIds,
   catalogProvenanceDigest,
   renderCsv,
@@ -36,8 +38,10 @@ import {
   renderOscalXml,
   renderPdf,
   renderPublicStatement,
+  renderSecurityHtml,
+  renderSecurityMd,
 } from "./report";
-import { computeSecurityView } from "./securityView";
+import { type SecurityView, computeSecurityView } from "./securityView";
 import {
   renderReverifyMd,
   renderSkillFindingMd,
@@ -263,18 +267,51 @@ export function main(argv: string[]): number {
   if (command === "assess-emit") {
     const [formats, ...assessArgv] = argv.slice(1);
     const names = (formats ?? "").split(",");
-    if (formats === undefined || names.some((name) => name !== "remediation" && name !== "skill")) {
-      console.error("assess-emit: the formats are remediation and skill");
+    const presets = names.filter((name) => name.startsWith("for=")).map((name) => name.slice(4));
+    const emits = names.filter((name) => !name.startsWith("for="));
+    if (
+      formats === undefined ||
+      emits.some((name) => name !== "remediation" && name !== "skill") ||
+      presets.length > 1 ||
+      presets.some((preset) => !Object.hasOwn(AUDIENCE_VIEWS, preset))
+    ) {
+      console.error(
+        "assess-emit: the formats are remediation and skill, plus at most one for=<registered view>",
+      );
       return ExitCode.INPUT_ERROR;
     }
-    for (const name of names) {
+    for (const name of emits) {
       SEAM_EMIT.add(name);
     }
+    SEAM_FOR.preset = presets[0];
     try {
       return cliMain(assessArgv);
     } finally {
       SEAM_EMIT.clear();
+      SEAM_FOR.preset = undefined;
     }
+  }
+
+  // security-cases renders every case of a case file ({cases: [{name, language, view}]}) with the
+  // security view's renderers and writes {"<name>.md": text, "<name>.html": text} as JSON (18.16g).
+  if (command === "security-cases") {
+    const [casefile, outPath] = argv.slice(1);
+    if (casefile === undefined || outPath === undefined) {
+      console.error("security-cases: a case file and an output path are required");
+      return ExitCode.INPUT_ERROR;
+    }
+    const cases = (
+      readBundled(readFileSync(casefile)) as {
+        cases: { name: string; language: string; view: SecurityView }[];
+      }
+    ).cases;
+    const rendered: Record<string, string> = {};
+    for (const c of cases) {
+      rendered[`${c.name}.md`] = renderSecurityMd(c.view, c.language);
+      rendered[`${c.name}.html`] = renderSecurityHtml(c.view, c.language);
+    }
+    writeFileSync(outPath, JSON.stringify(rendered), "utf-8");
+    return 0;
   }
 
   // skill-cases renders every case of a case file ({cases: [{name, kind, ...}]}: skill, finding, reverify,

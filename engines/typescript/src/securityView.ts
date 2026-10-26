@@ -19,6 +19,19 @@ import { byteCompare } from "./util";
  * `aiuc-1`) are out of scope for this view. */
 const CITED_FRAMEWORKS = new Set(["owasp-asi-2026", "mitre-atlas", "owasp-acs"]);
 
+/** Each cited framework's version, shown beside its clauses (security_view.py's `FRAMEWORK_VERSIONS`). */
+export const FRAMEWORK_VERSIONS: Record<string, string> = {
+  "owasp-asi-2026": "2025.12",
+  "mitre-atlas": "2026.09",
+  "owasp-acs": "0.1.0",
+};
+
+/** The maintainer-mandated display name a framework renders under instead of its id and version
+ * (security_view.py's `FRAMEWORK_DISPLAY_NAMES`, 18.16a). */
+export const FRAMEWORK_DISPLAY_NAMES: Record<string, string> = {
+  "owasp-asi-2026": "OWASP Top 10 for Agentic Applications 2026 (ASI01-ASI10)",
+};
+
 export interface StandardsCitation {
   control: string;
   framework: string;

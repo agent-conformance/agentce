@@ -32,6 +32,13 @@ import {
 } from "./project";
 import { renderRemediationMd, renderRemediationPackage } from "./remediation";
 import {
+  FRAMEWORK_DISPLAY_NAMES,
+  FRAMEWORK_VERSIONS,
+  type SecurityView,
+  type StandardsCitation,
+  computeSecurityView,
+} from "./securityView";
+import {
   renderReverifyMd,
   renderSkillFindingMd,
   renderSkillMd,
@@ -434,7 +441,10 @@ const HTML_STYLE =
   "h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}" +
   "table{border-collapse:collapse;width:100%}" +
   "th,td{border:1px solid #999;padding:.35rem .5rem;text-align:left}" +
-  "th{background:#f0f0f0}";
+  "th{background:#f0f0f0}caption{text-align:left;font-weight:bold;margin-bottom:.5rem}" +
+  "@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}" +
+  "@media print{@page{size:A4;margin:1.5cm}body{margin:0}@page :first{size:letter}" +
+  "table{page-break-inside:auto}tr{page-break-inside:avoid}}";
 
 /** `label 3, label 2` for every nonzero count, in the dict's (fixed) key order; `0` when every count
  * is zero -- shared by the Markdown, HTML, and terminal renderings. `labelOf` translates a key to its
@@ -995,6 +1005,235 @@ export function renderProjectHtml(
 function oscalTimestamp(assertions: Assertion[]): string {
   if (assertions.length === 0) return "1970-01-01T00:00:00Z";
   return assertions.map((a) => a.window[0]).sort(byteCompare)[0] as string;
+}
+
+/** One clause citation, labelled unverified when the carried flag is not `true` (SPEC §7.3; report.py's
+ * `_crosswalk_text`). */
+function crosswalkText(entry: Record<string, unknown>, cat: Record<string, string>): string {
+  const part = (key: string): string => (key in entry ? pyStr(entry[key]) : "");
+  let text = `${part("framework")} ${part("clause")}`.trim();
+  if (entry.verified !== true) {
+    text += ` ${cat["report.crosswalk_unverified"]}`;
+  }
+  return text;
+}
+
+function liItems(rows: [string, string][]): string {
+  return rows
+    .map(([label, value]) => `<li><strong>${escapeHtml(label)}</strong>: ${escapeHtml(value)}</li>`)
+    .join("");
+}
+
+function securityToolAccessLines(
+  toolAccess: SecurityView["tool_access"],
+  cat: Record<string, string>,
+): string[] {
+  if (toolAccess.length === 0) {
+    return [cat["report.security_tool_access_none"] as string];
+  }
+  return toolAccess.map(
+    (t) => `${sanitizeField(t.name)} (${sanitizeField(t.server)}, ${sanitizeField(t.protocol)})`,
+  );
+}
+
+/** `activityTallyText` over the same counts, `irreversible` moved first (the security reader's
+ * priority); every other key keeps its order. */
+function securityEffectClassText(actionsByEffectClass: Record<string, number>): string {
+  const reordered: Record<string, number> = {
+    irreversible: actionsByEffectClass.irreversible ?? 0,
+  };
+  for (const [key, n] of Object.entries(actionsByEffectClass)) {
+    if (key !== "irreversible") {
+      reordered[key] = n;
+    }
+  }
+  return activityTallyText(reordered);
+}
+
+function securityDriftLines(drift: SecurityView["drift"], cat: Record<string, string>): string[] {
+  if (drift.tools.length === 0 && drift.models.length === 0) {
+    return [cat["report.security_drift_none"] as string];
+  }
+  const lines: string[] = [];
+  if (drift.tools.length > 0) {
+    lines.push(
+      `${cat["report.activity_undeclared_tools_label"]}: ${drift.tools.map((name) => sanitizeForMarkdown(name)).join(", ")}`,
+    );
+  }
+  if (drift.models.length > 0) {
+    lines.push(
+      `${cat["report.activity_undeclared_models_label"]}: ${drift.models.map((name) => sanitizeForMarkdown(name)).join(", ")}`,
+    );
+  }
+  return lines;
+}
+
+/** One citation with its framework's version, or its display name (18.16a). */
+function securityCitationText(entry: StandardsCitation, cat: Record<string, string>): string {
+  const version = FRAMEWORK_VERSIONS[entry.framework] ?? "";
+  const framework =
+    FRAMEWORK_DISPLAY_NAMES[entry.framework] ||
+    (version ? `${entry.framework} ${version}`.trim() : entry.framework);
+  return crosswalkText({ ...entry, framework }, cat);
+}
+
+function securityCitationRows(
+  citations: StandardsCitation[],
+  cat: Record<string, string>,
+): [string, string][] {
+  return citations.map((entry) => [
+    sanitizeField(entry.control),
+    sanitizeForMarkdown(securityCitationText(entry, cat)),
+  ]);
+}
+
+function securityEnforcementRows(
+  enforcement: SecurityView["enforcement_point_evidence"],
+  cat: Record<string, string>,
+): [string, string][] {
+  const recorderLabels = Object.fromEntries(
+    RECORDER_CLASSES.map((k) => [k, cat[`report.activity_recorder_${k}`] as string]),
+  );
+  const deniedLabels = Object.fromEntries(
+    DENIED_KINDS.map((k) => [k, cat[`report.activity_denied_${k}`] as string]),
+  );
+  return [
+    [
+      cat["report.activity_approvals_label"] as string,
+      activityTallyText(enforcement.approvals_by_recorder, recorderLabels),
+    ],
+    [
+      cat["report.activity_denied_label"] as string,
+      activityTallyText(enforcement.denied_or_blocked, deniedLabels),
+    ],
+  ];
+}
+
+/** The security view (18.16): tool access, actions by effect class (irreversible leads),
+ * enforcement-point evidence, drift, then each cited control's clauses; report.py's
+ * `render_security_md`. */
+export function renderSecurityMd(
+  security: SecurityView,
+  language: string = DEFAULT_LANGUAGE,
+): string {
+  const cat = catalogue(language) as Record<string, string>;
+  const lines = [
+    `# ${cat["report.security_title"]}`,
+    "",
+    cat["report.security_intro"] as string,
+    "",
+    `## ${cat["report.security_tool_access_heading"]}`,
+    "",
+    ...securityToolAccessLines(security.tool_access, cat).map((line) => `- ${line}`),
+    "",
+    `## ${cat["report.security_effect_class_heading"]}`,
+    "",
+    `- ${securityEffectClassText(security.actions_by_effect_class)}`,
+    "",
+    `## ${cat["report.security_enforcement_heading"]}`,
+    "",
+    `- ${cat["report.security_enforcement_scope_note"]}`,
+    ...securityEnforcementRows(security.enforcement_point_evidence, cat).map(
+      ([label, value]) => `- ${label}: ${value}`,
+    ),
+    "",
+    `## ${cat["report.security_drift_heading"]}`,
+    "",
+    ...securityDriftLines(security.drift, cat).map((line) => `- ${line}`),
+    "",
+    `## ${cat["report.security_citations_heading"]}`,
+    "",
+  ];
+  const citationRows = securityCitationRows(security.standards_citations, cat);
+  if (citationRows.length > 0) {
+    lines.push(...citationRows.map(([control, text]) => `- \`${control}\`: ${text}`));
+  } else {
+    lines.push(`- ${cat["report.security_citations_none"]}`);
+  }
+  lines.push("");
+  return `${lines.join("\n")}\n`;
+}
+
+/** As `renderSecurityMd`, as the same self-contained, escaped page shape as `renderReportHtml`. */
+export function renderSecurityHtml(
+  security: SecurityView,
+  language: string = DEFAULT_LANGUAGE,
+): string {
+  const cat = catalogue(language) as Record<string, string>;
+  const h = (key: string): string => escapeHtml(cat[key] as string);
+  const title = h("report.security_title");
+  const toolItems = securityToolAccessLines(security.tool_access, cat)
+    .map((line) => `<li>${sanitizeForHtml(line)}</li>`)
+    .join("");
+  const enforcementItems = securityEnforcementRows(security.enforcement_point_evidence, cat)
+    .map(([label, value]) => `<p>${escapeHtml(label)}: ${escapeHtml(value)}</p>`)
+    .join("");
+  const driftItems = securityDriftLines(security.drift, cat)
+    .map((line) => `<li>${sanitizeForHtml(line)}</li>`)
+    .join("");
+  const citationRows = securityCitationRows(security.standards_citations, cat);
+  const citationsHtml =
+    citationRows.length > 0
+      ? `<ul>${liItems(citationRows)}</ul>`
+      : `<p>${h("report.security_citations_none")}</p>`;
+  return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1><p>${h("report.security_intro")}</p><section aria-labelledby="security-tool-access"><h2 id="security-tool-access">${h("report.security_tool_access_heading")}</h2><ul>${toolItems}</ul></section><section aria-labelledby="security-effect-class"><h2 id="security-effect-class">${h("report.security_effect_class_heading")}</h2><p>${escapeHtml(securityEffectClassText(security.actions_by_effect_class))}</p></section><section aria-labelledby="security-enforcement"><h2 id="security-enforcement">${h("report.security_enforcement_heading")}</h2><p>${h("report.security_enforcement_scope_note")}</p>${enforcementItems}</section><section aria-labelledby="security-drift"><h2 id="security-drift">${h("report.security_drift_heading")}</h2><ul>${driftItems}</ul></section><section aria-labelledby="security-citations"><h2 id="security-citations">${h("report.security_citations_heading")}</h2>${citationsHtml}</section></main></body></html>\n`;
+}
+
+/** What an audience view's `compute`/`renderMd`/`renderHtml` read, built once per `writeReport` call
+ * (report.py's `ReportViewContext`, 18.49). The security view reads these three; the auditor (18.17e)
+ * and buyer (18.16h) views add their own fields. */
+export interface ReportViewContext {
+  activity: Activity;
+  assertions: Assertion[];
+  language: string;
+}
+
+/** One registered audience-view preset (report.py's `AudienceViewSpec`): `<preset>.json` is always
+ * written; `.md`/`.html` when their renderer exists and the extension is in `alwaysWrite` or wanted. */
+export interface AudienceViewSpec {
+  compute: (ctx: ReportViewContext) => unknown;
+  renderMd?: (view: never, ctx: ReportViewContext) => string;
+  renderHtml?: (view: never, ctx: ReportViewContext) => string;
+  alwaysWrite: ReadonlySet<string>;
+}
+
+/** The audience-view registry (report.py's `AUDIENCE_VIEWS`, 18.49): a preset is one entry. */
+export const AUDIENCE_VIEWS: Record<string, AudienceViewSpec> = {
+  security: {
+    compute: (ctx) => computeSecurityView(ctx.activity, ctx.assertions),
+    renderMd: (view: SecurityView, ctx) => renderSecurityMd(view, ctx.language),
+    renderHtml: (view: SecurityView, ctx) => renderSecurityHtml(view, ctx.language),
+    alwaysWrite: new Set(),
+  },
+};
+
+/** write_report's view dispatch: an unregistered or absent preset writes nothing; a registered one
+ * writes `<preset>.json`, then `.md` and `.html` each when its renderer exists and the extension is
+ * in its `alwaysWrite` or `wants` it. */
+export function writeAudienceView(
+  preset: string | undefined,
+  ctx: ReportViewContext,
+  wants: (ext: string) => boolean,
+  writeJson: (name: string, value: unknown) => void,
+  writeText: (name: string, text: string) => void,
+): void {
+  const spec =
+    preset !== undefined && Object.hasOwn(AUDIENCE_VIEWS, preset)
+      ? AUDIENCE_VIEWS[preset]
+      : undefined;
+  if (preset === undefined || spec === undefined) {
+    return;
+  }
+  const view = spec.compute(ctx);
+  writeJson(`${preset}.json`, view);
+  for (const [ext, render] of [
+    ["md", spec.renderMd],
+    ["html", spec.renderHtml],
+  ] as const) {
+    if (render !== undefined && (spec.alwaysWrite.has(ext) || wants(ext))) {
+      writeText(`${preset}.${ext}`, render(view as never, ctx));
+    }
+  }
 }
 
 /** Render `oscal-ar.json` as an importable NIST OSCAL 1.1.2 Assessment Results document (SPEC §9,
@@ -1646,6 +1885,10 @@ export interface WriteReportOptions {
  * --emit` is wired in this engine (18.16b); empty by default, so no run's output changes. */
 export const SEAM_EMIT = new Set<string>();
 
+/** The audience-view preset `writeReport` renders, set only by the `assess-emit` seam's `for=` token
+ * until `assess --for` is wired in this engine (18.16b); unset by default. */
+export const SEAM_FOR: { preset?: string } = {};
+
 function bareSubject(id: string): Subject {
   return {
     id,
@@ -1794,6 +2037,15 @@ export function writeReport(
       renderReportHtml(assertions, counts, language, activity, blindSpots),
     );
   }
+  // This engine writes report.md and report.html on every run until 18.16b wires --emit, so both count
+  // as wanted, as Python's `--for security` (sarif, md, html) asks.
+  writeAudienceView(
+    SEAM_FOR.preset,
+    { activity, assertions, language },
+    (ext) => ext === "md" || ext === "html",
+    writeJson,
+    writeTextFile,
+  );
   writeJson("oscal-ar.json", renderOscal(assertions, options.deviations));
   writeJson("results.sarif", renderSarif(assertions, options.catalogObjects ?? []));
 
