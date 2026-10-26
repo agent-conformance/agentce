@@ -6,14 +6,8 @@
  * engine name is normalised to `agentce-ts` since that is the only engine-specific field. The OSCAL
  * comparison also pins the deterministic `uuid5` findings. `writeReport` is smoke-tested to a temp dir.
  *
- * The canonical machine outputs — OSCAL, SARIF, and assertions.json — are already byte-identical to the
- * reference and are asserted below. The human-readable renderers (report.md, report.html) diverge from
- * the reference and are expected to: those renderers are derived, locale-varying presentations, not part
- * of the byte-identical canonical set, and the reference's catalog-joined, risk-ranked human-report
- * enrichment is scoped to the Python engine only. The comparison below is marked as an expected
- * exception rather than removed so its body still runs and the renderers stay under coverage, without
- * failing the suite over a difference that is a deliberate, permanent scope boundary rather than pending
- * work.
+ * The canonical machine outputs (OSCAL, SARIF, assertions.json) and report.md/report.html are
+ * byte-identical to the reference, the human reports once the engine line names this engine (18.16i).
  */
 
 import assert from "node:assert/strict";
@@ -172,29 +166,60 @@ test("evidence pack matches the Python reference golden, per-assertion evidence 
   }
 });
 
-test(
-  "report human renderers match the Python reference golden",
-  {
-    todo:
-      "deliberate, permanent scope boundary: report.md/report.html are derived, locale-varying " +
-      "renderings outside the byte-identical canonical set, and the reference's humanised, " +
-      "catalog-joined human report is scoped to the Python engine only",
-  },
-  () => {
-    const golden = JSON.parse(readFileSync(join(TESTDATA, "report-golden.json"), "utf-8"));
-    const assertions = ovsFailedAssertions();
-    const counts = aggregate(assertions);
+test("report human renderers match the Python reference golden", () => {
+  const golden = JSON.parse(readFileSync(join(TESTDATA, "report-golden.json"), "utf-8"));
+  const assertions = ovsFailedAssertions();
+  const counts = aggregate(assertions);
+  const engine = (text: string): string => text.replace("agentce-py 0.1.0", "agentce-ts 0.1.0");
 
-    assert.equal(renderReportMd(assertions, counts), golden.md);
-    assert.equal(renderReportHtml(assertions, counts), golden.html);
-  },
-);
+  assert.equal(renderReportMd(assertions, counts), engine(golden.md));
+  assert.equal(renderReportHtml(assertions, counts), engine(golden.html));
+});
+
+test("report.md and report.html group a catalog's findings by severity with title, remediation and provenance", () => {
+  const catalog = loadCatalog(BASE);
+  const assertions = ovsFailedAssertions();
+  const counts = aggregate(assertions);
+  const md = renderReportMd(
+    assertions,
+    counts,
+    "en",
+    undefined,
+    undefined,
+    [catalog],
+    ["assess", "x"],
+  );
+  const headings = md.split("\n").filter((line) => line.startsWith("### "));
+  const order = ["### High severity", "### Medium severity", "### Low severity", "### Unrated"];
+  assert.deepEqual(
+    headings,
+    order.filter((h) => headings.includes(h)),
+  );
+  const spec = catalog.controls.find((c) => c.id === "OVS-03");
+  assert.ok(spec?.title);
+  assert.ok(
+    md.includes(`- **${spec.title}** (\`OVS-03\``),
+    "the control's title leads its finding",
+  );
+  assert.ok(md.includes(`- Catalog: ${catalog.id}@${catalog.version}\n`));
+  assert.ok(md.includes("- Reproduce: `agentce assess x`\n"));
+  const html = renderReportHtml(
+    assertions,
+    counts,
+    "en",
+    undefined,
+    undefined,
+    [catalog],
+    ["assess", "x"],
+  );
+  assert.ok(html.includes(`<td>${spec.severity}</td>`));
+  assert.ok(html.includes('<section aria-labelledby="provenance">'));
+});
 
 /** The `## Verdict` heading through the end of `## Outcome summary`, before `## Assertions` --
  * the part of the human report the contract (P18-18.22 C1(h)/C4) requires byte-equal to Python's
- * rendering. The assertions listing beyond it is the documented, permanent scope boundary (see
- * the "report human renderers" `todo` test above): Python groups it by family/severity and
- * TypeScript does not. */
+ * rendering; the whole document is compared by "report human renderers match the Python
+ * reference golden" above. */
 function verdictAndTallySpanMd(md: string): string {
   return md.slice(0, md.indexOf("\n## Assertions"));
 }
