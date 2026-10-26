@@ -3,6 +3,19 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.136.5
+
+- `VG-REPORT-FORMAT-PARITY` (changed, 18.16e): also compares the remediation package and `remediation.md`. Python's
+  real assess adds `remediation` to its `--emit` list; TypeScript and Java run their own real assess through an
+  `assess-emit remediation` seam until 18.16b wires `--emit`. Over the 33 runs, the hostile remediation fixture, a
+  records folder without and with `--profile` (Java, which reads no records folder yet, must refuse both at exit 3) and
+  the no-assertions run, each engine writes Python's remediation files: `remediation.md` byte-identical, the package
+  equal to Python's but for `generated_from.engine` and its `$id`, in canonical bytes and listed in the manifest with
+  its digest. A `remediation-md` seam renders the shared package case table to Python's bytes. New seeded faults:
+  TypeScript renders an inverted section for a truthy value, Java stops sanitising a clause's relation, TypeScript
+  marks every requirement observed, Java drops the source-class gap, TypeScript digests a technique ref with a trailing newline,
+  Java reads `verified_against_text` by truthiness, TypeScript's folder-form re-verify command omits `--catalog`.
+
 ## 0.136.4
 
 - `VG-UX-ONE-QUESTION` (changed, 18.40a): each approved skill's whole file is pinned as reviewed text. Its raw source,

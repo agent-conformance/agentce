@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "suite_version": "0.136.4",
+  "suite_version": "0.136.5",
   "gates": [
     {
       "id": "VG-DEMO-SHARD-COVERAGE",
@@ -2684,7 +2684,7 @@
     },
     {
       "id": "VG-REPORT-FORMAT-PARITY",
-      "title": "TypeScript and Java render report.junit.xml, report.csv, oscal-ar.xml, public-statement.md and report.pdf byte-identical to Python over the corpus and a hostile case table",
+      "title": "TypeScript and Java render report.junit.xml, report.csv, oscal-ar.xml, public-statement.md, report.pdf, the remediation package and remediation.md as Python does over the corpus and hostile case tables",
       "tier": "quick",
       "cwd": ".",
       "cmd": [
@@ -2700,8 +2700,8 @@
       "timeout_s": 900,
       "invariant": "Every new feature, adapter or catalog adds or extends a build gate in `verification/`",
       "rubric": {
-        "pass": "the checker's self-test catches a one-byte change, a missing file, an extra trailing newline, CRLF line endings, a report.pdf Latin-1 byte written as UTF-8 and a missing report.pdf, and refuses an engine started_at that is not YYYY-MM-DDTHH:MM:SSZ; over corpus/quickstart (also with --report-language de), the auditor-view fixture and the 30 generated corpus projects, Python's real assess --emit junit,csv,oscal_xml,public,pdf writes the five files, each engine's own assess exits with Python's code and writes a started_at of Python's shape (then set to Python's value, the clock being the one input that differs), and each engine's report-formats seam renders the five files from that engine's own assertions.json, oscal-ar.json and manifest byte-identical to Python's (Python's own seam included); every case in tools/fixtures/report_formats/cases.json (empty, every outcome out of order, hostile characters, an odd OSCAL document, code-point order, odd started_at values, German) renders the same bytes in all three engines; 33 corpus runs and every case ran",
-        "fail": "any engine writes a different byte in any of the five files, writes none, exits differently from Python, writes a started_at of another shape, or the checker runs fewer runs than expected"
+        "pass": "the checker's self-test catches a one-byte change, a missing file, an extra trailing newline, CRLF line endings, a report.pdf Latin-1 byte written as UTF-8 and a missing report.pdf, and refuses an engine started_at that is not YYYY-MM-DDTHH:MM:SSZ; over corpus/quickstart (also with --report-language de), the auditor-view fixture and the 30 generated corpus projects, Python's real assess --emit junit,csv,oscal_xml,public,pdf writes the five files, each engine's own assess exits with Python's code and writes a started_at of Python's shape (then set to Python's value, the clock being the one input that differs), and each engine's report-formats seam renders the five files from that engine's own assertions.json, oscal-ar.json and manifest byte-identical to Python's (Python's own seam included); every case in tools/fixtures/report_formats/cases.json (empty, every outcome out of order, hostile characters, an odd OSCAL document, code-point order, odd started_at values, German) renders the same bytes in all three engines; 33 corpus runs and every case ran; the remediation package and remediation.md (Python's assess --emit remediation, the other engines' assess-emit remediation seam) over those 33 runs, the hostile remediation fixture, a records folder without and with --profile (Java refuses both at exit 3, input.records_unsupported) and the no-assertions run: the same remediation files, each remediation.md byte-identical, each package its engine's canonical bytes, equal to Python's but for generated_from.engine (the engine's manifest block) and its recomputed $id, listed in manifest.outputs with its digest; the self-test catches each remediation tamper class; every package in remediation_md_cases.json renders Python's bytes in all three engines and Python's equals remediation_md_expected.json",
+        "fail": "any engine writes a different byte in any of the five files, writes none, exits differently from Python, writes a started_at of another shape, or the checker runs fewer runs than expected, or any remediation file differs, is missing or extra, is not listed in the manifest with its digest, or carries a wrong engine block or $id"
       },
       "faults": [
         {
@@ -2751,9 +2751,51 @@
           "file": "engines/typescript/src/report.ts",
           "search": "/Length ${content.length}",
           "replace": "/Length ${Buffer.byteLength(content.toString(\"latin1\"))}"
+        },
+        {
+          "description": "typescript templating renders an inverted section when the value is truthy",
+          "file": "engines/typescript/src/templating.ts",
+          "search": "    } else if (!pyTruthy(lookup(scopes, node.name))) {",
+          "replace": "    } else if (pyTruthy(lookup(scopes, node.name))) {"
+        },
+        {
+          "description": "java remediation.md no longer sanitises a clause's relation",
+          "file": "engines/java/src/main/java/org/agentce/Remediation.java",
+          "search": "sanitizeEach(f.get(\"clauses\"), \"framework\", \"clause\", \"relation\")",
+          "replace": "sanitizeEach(f.get(\"clauses\"), \"framework\", \"clause\")"
+        },
+        {
+          "description": "typescript evidence_gap lists every requirement as observed for insufficient_evidence",
+          "file": "engines/typescript/src/remediation.ts",
+          "search": "    observed: required.filter((r) => requirementMet(subjectEvents, r)),",
+          "replace": "    observed: [...required],"
+        },
+        {
+          "description": "java missingEvidence drops the source-class gap entries",
+          "file": "engines/java/src/main/java/org/agentce/Assess.java",
+          "search": "            missing.add(Json.nodes().objectNode().put(\"event\", kind).put(\"class\", control.minSourceClass));\n",
+          "replace": ""
+        },
+        {
+          "description": "typescript digests a technique ref with a trailing newline",
+          "file": "engines/typescript/src/remediation.ts",
+          "search": "createHash(\"sha256\").update(pyStr(ref), \"utf-8\")",
+          "replace": "createHash(\"sha256\").update(`${pyStr(ref)}\\n`, \"utf-8\")"
+        },
+        {
+          "description": "java reads verified_against_text by truthiness",
+          "file": "engines/java/src/main/java/org/agentce/Remediation.java",
+          "search": "verified != null && verified.isBoolean() && verified.booleanValue()",
+          "replace": "Readiness.pyTruthy(verified)"
+        },
+        {
+          "description": "typescript folder-form re-verify argv omits --catalog",
+          "file": "engines/typescript/src/cli.ts",
+          "search": "  if (catalogLabels.length > 0) {\n    reverifyCommand.push(",
+          "replace": "  if (catalogLabels.length > 0 && options.folder === undefined) {\n    reverifyCommand.push("
         }
       ],
-      "fix_hint": "run verification/gates/report_format_parity.sh and read the MISMATCH lines (each names the file and the first differing byte); the reference is engines/python/agentce/report.py's render_junit, render_csv, render_oscal_xml, render_public_statement and render_pdf, ported as renderJunit, renderCsv, renderOscalXml, renderPublicStatement and renderPdf in engines/typescript/src/report.ts and engines/java/src/main/java/org/agentce/Report.java; the check is tools/report_format_parity_check.py"
+      "fix_hint": "run verification/gates/report_format_parity.sh and read the MISMATCH lines (each names the file and the first differing byte); the reference is engines/python/agentce/report.py's render_junit, render_csv, render_oscal_xml, render_public_statement and render_pdf, ported as renderJunit, renderCsv, renderOscalXml, renderPublicStatement and renderPdf in engines/typescript/src/report.ts and engines/java/src/main/java/org/agentce/Report.java; the check is tools/report_format_parity_check.py; remediation: render_remediation_package and render_remediation_md (report.py) are ported in engines/typescript/src/remediation.ts and engines/java/src/main/java/org/agentce/Remediation.java, with templating.ts / Templating.java"
     },
     {
       "id": "VG-RECORDS-PROFILE-ROUND-TRIP",

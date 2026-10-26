@@ -19,7 +19,8 @@ compared, and Python's rendering must equal the committed `expected.json` the en
 The remediation package and remediation.md (SPEC §7, Appendix A2; 18.16e) are compared from the same runs: Python
 adds `remediation` to its --emit list, and the other engines run their real assess through their `assess-emit
 remediation` seam. Four more runs compare remediation alone: the hostile remediation fixture, a records folder
-assessed without and with --profile, and the no-assertions run (no remediation directory anywhere). Each remediation.md
+assessed without and with --profile (Java, which reads no records folder yet, must refuse both at exit 3), and the
+no-assertions run (no remediation directory anywhere). Each remediation.md
 must equal Python's byte for byte; each package must be its canonical bytes, equal Python's but for
 generated_from.engine (the engine's own manifest block) and the $id derived from it, and be listed in the manifest's
 outputs with its digest. Then every package in `fixtures/report_formats/remediation_md_cases.json` is rendered by each
@@ -78,6 +79,9 @@ RECORDS = ROOT / "adapters" / "otel-genai" / "fixtures" / "otel-genai-agent-sess
 #: The runs that compare remediation alone: the hostile fixture, the folder without and with
 #: --profile, and no-assertions.
 REMEDIATION_ONLY_RUNS = 4
+#: Java reads no records folder yet (input.records_unsupported; docs/quickstart-java.md): on the
+#: folder-form runs it must refuse at exit 3 and write no remediation output.
+JAVA_REFUSES = {"records_folder", "records_folder_profile"}
 PACKAGE_ID = "urn:agentce:remediation-package:sha256:"
 #: quickstart, quickstart in German, the auditor-view fixture and the 30 generated projects; a checker
 #: that silently drops a run or a case must not print OK.
@@ -382,6 +386,12 @@ def check_corpus(
             problems.append(f"python assess exited {py_exit}")
         for engine in engines:
             code = exits[(engine, dirs[engine][i])]
+            if engine == "java" and label in JAVA_REFUSES:
+                if code != 3 or _remediation_files(dirs[engine][i]):
+                    problems.append(
+                        f"java assess <folder> exited {code}; want 3 (input.records_unsupported), no remediation"
+                    )
+                continue
             if code != py_exit:
                 problems.append(f"{engine} assess exited {code}, python {py_exit}")
             elif clock_problems.get((engine, i)):
