@@ -1,0 +1,601 @@
+{
+  "cases": [
+    {
+      "name": "no_findings",
+      "package": {
+        "$schema": "s",
+        "$id": "i",
+        "package_version": 1,
+        "generated_from": {
+          "assertions_digest": "sha256:d7530640be750297ee517ed9ba3b60dd87b9d280246503ebdac5ba6429e99eeb",
+          "engine": {},
+          "catalogs": []
+        },
+        "subject": "spiffe://corp/agents/md-case",
+        "findings": [],
+        "not_assessed": [],
+        "deviations_applied": []
+      }
+    },
+    {
+      "name": "missing_optional_keys",
+      "package": {
+        "$schema": "s",
+        "$id": "i",
+        "package_version": 1,
+        "generated_from": {
+          "assertions_digest": "sha256:d7530640be750297ee517ed9ba3b60dd87b9d280246503ebdac5ba6429e99eeb",
+          "engine": {},
+          "catalogs": []
+        },
+        "subject": "spiffe://corp/agents/md-case",
+        "findings": [
+          {
+            "control": "MDC-01",
+            "control_version": "1.0.0",
+            "outcome": "non-conformant",
+            "rung": 2,
+            "mode": "automated",
+            "severity": "high",
+            "title": "Plain title",
+            "clauses": [],
+            "expectations": [],
+            "evidence_gap": {
+              "required": [],
+              "observed": [],
+              "missing": []
+            },
+            "violations": [],
+            "evidence": [],
+            "guardrails_ref": "remediation.guardrails.v1"
+          }
+        ],
+        "not_assessed": [],
+        "deviations_applied": []
+      }
+    },
+    {
+      "name": "hostile_fields",
+      "package": {
+        "$schema": "s",
+        "$id": "i",
+        "package_version": 1,
+        "generated_from": {
+          "assertions_digest": "sha256:d7530640be750297ee517ed9ba3b60dd87b9d280246503ebdac5ba6429e99eeb",
+          "engine": {},
+          "catalogs": []
+        },
+        "subject": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+        "findings": [
+          {
+            "control": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+            "control_version": "1.0.0",
+            "outcome": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+            "rung": 2,
+            "mode": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+            "severity": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+            "window": {
+              "start": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+              "end": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n"
+            },
+            "title": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+            "clauses": [
+              {
+                "framework": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+                "clause": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+                "relation": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+                "verified_against_text": true
+              },
+              {
+                "framework": "f",
+                "clause": "c",
+                "relation": "r",
+                "verified_against_text": false
+              }
+            ],
+            "expectations": [
+              {
+                "id": "e",
+                "text": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+                "result": "x"
+              },
+              {
+                "id": "e2",
+                "text": "",
+                "result": "x"
+              }
+            ],
+            "evidence_gap": {
+              "required": [
+                {
+                  "event": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+                  "class": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n"
+                }
+              ],
+              "observed": [],
+              "missing": [
+                {
+                  "event": "E",
+                  "class": "any"
+                }
+              ]
+            },
+            "violations": [
+              {
+                "path": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+                "constraint": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+                "message_key": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n"
+              }
+            ],
+            "evidence": [
+              {
+                "ref": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+                "digest": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+                "source_class": "traces"
+              }
+            ],
+            "remediation": {
+              "techniques": [
+                {
+                  "style": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+                  "ref": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+                  "digest": "sha256:d7530640be750297ee517ed9ba3b60dd87b9d280246503ebdac5ba6429e99eeb"
+                },
+                {
+                  "style": "generic",
+                  "ref": "\u200b\u2060",
+                  "digest": "sha256:d7530640be750297ee517ed9ba3b60dd87b9d280246503ebdac5ba6429e99eeb"
+                }
+              ],
+              "hint": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n"
+            },
+            "acceptance": {
+              "expected_transition": {
+                "from": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+                "to": "conformant"
+              },
+              "criteria": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+              "reverify_command": [
+                "assess",
+                "--bundle",
+                "dir`with\nnewline",
+                "--profile",
+                "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n"
+              ]
+            },
+            "guardrails_ref": "remediation.guardrails.v1"
+          }
+        ],
+        "not_assessed": [
+          {
+            "control": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+            "control_version": "1",
+            "title": "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+            "severity": "low",
+            "reason": "r"
+          },
+          {
+            "control": "",
+            "control_version": "1",
+            "title": "",
+            "severity": "medium",
+            "reason": "r2"
+          }
+        ],
+        "deviations_applied": [
+          "a`b <i>x</i> [l](u) & &#x202E; \u202e\u200d\u00a0\u3000\u2028\ue000\ufe0f\udb40\udc41\tz\\n",
+          "DEV-1",
+          ""
+        ]
+      }
+    },
+    {
+      "name": "hostile_run",
+      "package": {
+        "$id": "urn:agentce:remediation-package:sha256:d6155170e61fe3c1072ba29a964250307ee9e7a488fabf63c8f289c5153ecb93",
+        "$schema": "https://agent-conformance.org/spec/report/remediation-package.schema.json",
+        "deviations_applied": [],
+        "findings": [
+          {
+            "acceptance": {
+              "criteria": "Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO\u202e ZWJ\u200d NBSP\u00a0IDEO\u3000 LS\u2028 PUA\ue000 VS\ufe0f TAG\udb40\udc41 tab\tnl\\n end; Long expectation abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij",
+              "expected_transition": {
+                "from": "non-conformant",
+                "to": "conformant"
+              },
+              "reverify_command": [
+                "assess",
+                "--bundle",
+                "~/agentce/tools/fixtures/report_formats/remediation_hostile/evidence",
+                "--profile",
+                "~/agentce/tools/fixtures/report_formats/remediation_hostile/applicability.yaml",
+                "--catalog",
+                "remediation-hostile-fixture@2026.09",
+                "--catalog-dir",
+                "~/agentce/tools/fixtures/report_formats/remediation_hostile/catalog",
+                "--domain",
+                "~/agentce/tools/fixtures/report_formats/remediation_hostile/domain.linkml.yaml"
+              ]
+            },
+            "clauses": [
+              {
+                "clause": "Art. [1] & \u202e2",
+                "framework": "fw`<x>",
+                "relation": "maps]",
+                "verified_against_text": true
+              },
+              {
+                "clause": "Art. 12",
+                "framework": "eu-ai-act",
+                "relation": "implements",
+                "verified_against_text": false
+              }
+            ],
+            "control": "RMH-01",
+            "control_version": "2026.09",
+            "description": "Fixture: non-conformant (no agent on the Decision). Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO\u202e ZWJ\u200d NBSP\u00a0IDEO\u3000 LS\u2028 PUA\ue000 VS\ufe0f TAG\udb40\udc41 tab\tnl\\n end",
+            "evidence": [
+              {
+                "digest": "sha256:29def764c70d83d60efbe9f123bc603b569696966fe5af0da6ad7c7f6bb51c85",
+                "ref": "agentce:event/remediation-hostile-fixture-dec1<script>alert(1)</script>",
+                "source_class": "self_report"
+              }
+            ],
+            "evidence_gap": {
+              "missing": [],
+              "observed": [
+                {
+                  "class": "any",
+                  "event": "Decision"
+                }
+              ],
+              "required": [
+                {
+                  "class": "any",
+                  "event": "Decision"
+                }
+              ]
+            },
+            "expectations": [
+              {
+                "id": "E1",
+                "result": "non-conformant",
+                "text": "Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO\u202e ZWJ\u200d NBSP\u00a0IDEO\u3000 LS\u2028 PUA\ue000 VS\ufe0f TAG\udb40\udc41 tab\tnl\\n end"
+              },
+              {
+                "id": "E2",
+                "result": "non-conformant",
+                "text": ""
+              },
+              {
+                "id": "E3",
+                "result": "non-conformant",
+                "text": "Long expectation abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij"
+              }
+            ],
+            "guardrails_ref": "remediation.guardrails.v1",
+            "mode": "automated",
+            "outcome": "non-conformant",
+            "remediation": {
+              "hint": "Hint: Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO\u202e ZWJ\u200d NBSP\u00a0IDEO\u3000 LS\u2028 PUA\ue000 VS\ufe0f TAG\udb40\udc41 tab\tnl\\n end",
+              "techniques": [
+                {
+                  "digest": "sha256:74c6b3da2f954ee1a2f3292fb0d49445cf6721716b1a5f024d94d2612c3d0aa4",
+                  "ref": "techniques/`tick`<x>&[y]",
+                  "style": "generic"
+                },
+                {
+                  "digest": "sha256:cc587281c1f70e8baeabea4db65685f0b022c74932e80f99aceee52fbf77a170",
+                  "ref": "techniques/plain",
+                  "style": "generic"
+                },
+                {
+                  "digest": "sha256:5bce4958f3e359f1c7841c0f9d1efdcffc46ad44b40dac0849fae248a559e614",
+                  "ref": "\u200b\u2060",
+                  "style": "generic"
+                }
+              ]
+            },
+            "rung": 2,
+            "severity": "unrated",
+            "title": "Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO\u202e ZWJ\u200d NBSP\u00a0IDEO\u3000 LS\u2028 PUA\ue000 VS\ufe0f TAG\udb40\udc41 tab\tnl\\n end",
+            "violations": [
+              {
+                "constraint": "sh:minCount",
+                "focus": "agentce:event/remediation-hostile-fixture-dec1<script>alert(1)</script>",
+                "message_key": "RMH-01.R1",
+                "path": "prov:wasAssociatedWith"
+              }
+            ],
+            "window": {
+              "end": "2026-02-01T00:00:00Z",
+              "start": "2026-01-01T00:00:00Z"
+            }
+          },
+          {
+            "acceptance": {
+              "criteria": "re-run and reach a conformant outcome for this control.",
+              "expected_transition": {
+                "from": "insufficient_evidence",
+                "to": "conformant"
+              },
+              "reverify_command": [
+                "assess",
+                "--bundle",
+                "~/agentce/tools/fixtures/report_formats/remediation_hostile/evidence",
+                "--profile",
+                "~/agentce/tools/fixtures/report_formats/remediation_hostile/applicability.yaml",
+                "--catalog",
+                "remediation-hostile-fixture@2026.09",
+                "--catalog-dir",
+                "~/agentce/tools/fixtures/report_formats/remediation_hostile/catalog",
+                "--domain",
+                "~/agentce/tools/fixtures/report_formats/remediation_hostile/domain.linkml.yaml"
+              ]
+            },
+            "clauses": [],
+            "control": "RMH-02",
+            "control_version": "2026.09",
+            "evidence": [],
+            "evidence_gap": {
+              "missing": [
+                {
+                  "class": "independent_system",
+                  "event": "ToolCall"
+                }
+              ],
+              "observed": [
+                {
+                  "class": "any",
+                  "event": "Decision"
+                }
+              ],
+              "required": [
+                {
+                  "class": "any",
+                  "event": "Decision"
+                },
+                {
+                  "class": "independent_system",
+                  "event": "ToolCall"
+                }
+              ]
+            },
+            "expectations": [
+              {
+                "id": "E1",
+                "result": "insufficient_evidence",
+                "text": ""
+              }
+            ],
+            "guardrails_ref": "remediation.guardrails.v1",
+            "mode": "automated",
+            "outcome": "insufficient_evidence",
+            "remediation": {
+              "techniques": []
+            },
+            "rung": 2,
+            "severity": "unrated",
+            "title": "Needs an enforcement-point record, holds only self-report",
+            "violations": [],
+            "window": {
+              "end": "2026-02-01T00:00:00Z",
+              "start": "2026-01-01T00:00:00Z"
+            }
+          },
+          {
+            "acceptance": {
+              "criteria": "A record from an enforcement point shows the decision.",
+              "expected_transition": {
+                "from": "insufficient_evidence",
+                "to": "conformant"
+              },
+              "reverify_command": [
+                "assess",
+                "--bundle",
+                "~/agentce/tools/fixtures/report_formats/remediation_hostile/evidence",
+                "--profile",
+                "~/agentce/tools/fixtures/report_formats/remediation_hostile/applicability.yaml",
+                "--catalog",
+                "remediation-hostile-fixture@2026.09",
+                "--catalog-dir",
+                "~/agentce/tools/fixtures/report_formats/remediation_hostile/catalog",
+                "--domain",
+                "~/agentce/tools/fixtures/report_formats/remediation_hostile/domain.linkml.yaml"
+              ]
+            },
+            "clauses": [
+              {
+                "clause": "Art. 14",
+                "framework": "eu-ai-act",
+                "relation": "supports",
+                "verified_against_text": true
+              }
+            ],
+            "control": "RMH-05",
+            "control_version": "2026.09",
+            "evidence": [
+              {
+                "digest": "sha256:29def764c70d83d60efbe9f123bc603b569696966fe5af0da6ad7c7f6bb51c85",
+                "ref": "agentce:event/remediation-hostile-fixture-dec1<script>alert(1)</script>",
+                "source_class": "self_report"
+              }
+            ],
+            "evidence_gap": {
+              "missing": [
+                {
+                  "class": "enforcement_point",
+                  "event": "Decision"
+                }
+              ],
+              "observed": [
+                {
+                  "class": "any",
+                  "event": "Decision"
+                }
+              ],
+              "required": [
+                {
+                  "class": "any",
+                  "event": "Decision"
+                }
+              ]
+            },
+            "expectations": [
+              {
+                "id": "E1",
+                "result": "insufficient_evidence",
+                "text": "A record from an enforcement point shows the decision."
+              }
+            ],
+            "guardrails_ref": "remediation.guardrails.v1",
+            "mode": "automated",
+            "outcome": "insufficient_evidence",
+            "remediation": {
+              "techniques": []
+            },
+            "rung": 2,
+            "severity": "high",
+            "title": "Shape holds, but only on a self-report record below the control's source class",
+            "violations": [],
+            "window": {
+              "end": "2026-02-01T00:00:00Z",
+              "start": "2026-01-01T00:00:00Z"
+            }
+          },
+          {
+            "acceptance": {
+              "criteria": "Only a real true marks a clause verified.",
+              "expected_transition": {
+                "from": "insufficient_evidence",
+                "to": "conformant"
+              },
+              "reverify_command": [
+                "assess",
+                "--bundle",
+                "~/agentce/tools/fixtures/report_formats/remediation_hostile/evidence",
+                "--profile",
+                "~/agentce/tools/fixtures/report_formats/remediation_hostile/applicability.yaml",
+                "--catalog",
+                "remediation-hostile-fixture@2026.09",
+                "--catalog-dir",
+                "~/agentce/tools/fixtures/report_formats/remediation_hostile/catalog",
+                "--domain",
+                "~/agentce/tools/fixtures/report_formats/remediation_hostile/domain.linkml.yaml"
+              ]
+            },
+            "clauses": [
+              {
+                "clause": "Art. 9",
+                "framework": "eu-ai-act",
+                "relation": "maps",
+                "verified_against_text": false
+              },
+              {
+                "clause": "Art. 10",
+                "framework": "eu-ai-act",
+                "relation": "maps",
+                "verified_against_text": false
+              },
+              {
+                "clause": "Art. 11",
+                "framework": "eu-ai-act",
+                "relation": "maps",
+                "verified_against_text": false
+              },
+              {
+                "clause": "Art. 13",
+                "framework": "eu-ai-act",
+                "relation": "maps",
+                "verified_against_text": false
+              }
+            ],
+            "control": "RMH-06",
+            "control_version": "2026.09",
+            "evidence": [
+              {
+                "digest": "sha256:29def764c70d83d60efbe9f123bc603b569696966fe5af0da6ad7c7f6bb51c85",
+                "ref": "agentce:event/remediation-hostile-fixture-dec1<script>alert(1)</script>",
+                "source_class": "self_report"
+              }
+            ],
+            "evidence_gap": {
+              "missing": [
+                {
+                  "class": "enforcement_point",
+                  "event": "Decision"
+                }
+              ],
+              "observed": [
+                {
+                  "class": "any",
+                  "event": "Decision"
+                }
+              ],
+              "required": [
+                {
+                  "class": "any",
+                  "event": "Decision"
+                }
+              ]
+            },
+            "expectations": [
+              {
+                "id": "E1",
+                "result": "insufficient_evidence",
+                "text": "Only a real true marks a clause verified."
+              }
+            ],
+            "guardrails_ref": "remediation.guardrails.v1",
+            "mode": "automated",
+            "outcome": "insufficient_evidence",
+            "remediation": {
+              "techniques": []
+            },
+            "rung": 2,
+            "severity": "medium",
+            "title": "Verification flags that are not booleans",
+            "violations": [],
+            "window": {
+              "end": "2026-02-01T00:00:00Z",
+              "start": "2026-01-01T00:00:00Z"
+            }
+          }
+        ],
+        "generated_from": {
+          "assertions_digest": "sha256:31bd5bf088200385ca161ff242f189701922a32a25928c596902d5fa472ddcbd",
+          "catalogs": [
+            {
+              "digest": "sha256:1c75cbcacad12348cf1e8b166dece9bae54d03b0267ade2c39b2f472fa303f31",
+              "id": "remediation-hostile-fixture",
+              "version": "2026.09"
+            }
+          ],
+          "engine": {
+            "impl": "agentce-py",
+            "spec_version": "0.6",
+            "version": "0.1.0"
+          }
+        },
+        "not_assessed": [
+          {
+            "control": "RMH-03",
+            "control_version": "2026.09",
+            "reason": "rung 3 is not yet evaluated by this engine",
+            "severity": "low",
+            "title": "RMH-03"
+          },
+          {
+            "control": "RMH-04",
+            "control_version": "2026.09",
+            "reason": "no structural shape is defined for this control",
+            "severity": "medium",
+            "title": "Rung 2 with no shape"
+          }
+        ],
+        "package_version": 1,
+        "subject": "spiffe://corp/agents/remediation-hostile-fixture"
+      }
+    }
+  ]
+}

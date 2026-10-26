@@ -1,8 +1,8 @@
 id: RMH-01
 version: "2026.09"
-title: "Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO‮ ZWJ‍ NBSP IDEO　 LS  PUA VS️ TAG󠁁 tab\tnl\\n end"
-description: "Fixture: non-conformant (no agent on the Decision). Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO‮ ZWJ‍ NBSP IDEO　 LS  PUA VS️ TAG󠁁 tab\tnl\\n end"
-remediation_hint: "Hint: Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO‮ ZWJ‍ NBSP IDEO　 LS  PUA VS️ TAG󠁁 tab\tnl\\n end"
+title: "Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO‮ ZWJ‍ NBSP IDEO　 LS\u2028 PUA VS️ TAG󠁁 tab\tnl\\n end"
+description: "Fixture: non-conformant (no agent on the Decision). Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO‮ ZWJ‍ NBSP IDEO　 LS\u2028 PUA VS️ TAG󠁁 tab\tnl\\n end"
+remediation_hint: "Hint: Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO‮ ZWJ‍ NBSP IDEO　 LS\u2028 PUA VS️ TAG󠁁 tab\tnl\\n end"
 crosswalk:
   - {framework: "fw`<x>", clause: "Art. [1] & ‮2", relation: "maps]", verified_against_text: true}
   - {framework: eu-ai-act, clause: "Art. 12", relation: implements, verified_against_text: false}
@@ -16,7 +16,7 @@ evaluation:
     - {event: Decision, class: any}
   shape: shapes/RMH-01.ttl
 expectations:
-  - {id: E1, text: "Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO‮ ZWJ‍ NBSP IDEO　 LS  PUA VS️ TAG󠁁 tab\tnl\\n end"}
+  - {id: E1, text: "Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO‮ ZWJ‍ NBSP IDEO　 LS\u2028 PUA VS️ TAG󠁁 tab\tnl\\n end"}
   - {id: E2, text: ""}
   - {id: E3, text: "Long expectation abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij"}
 techniques: ["techniques/`tick`<x>&[y]", "techniques/plain", "​⁠"]
