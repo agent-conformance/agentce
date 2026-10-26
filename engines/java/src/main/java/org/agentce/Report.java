@@ -115,7 +115,7 @@ public final class Report {
         return "sha256:" + Canonical.sha256Hex((Version.ENGINE_NAME + ":" + Version.ENGINE_VERSION).getBytes(StandardCharsets.UTF_8));
     }
 
-    private static String safe(String name) {
+    static String safe(String name) {
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < name.length(); i++) {
             char c = name.charAt(i);
@@ -127,7 +127,7 @@ public final class Report {
     /** Every control, keyed by id, across every resolved catalog -- so a finding can carry its
      * control's title (SPEC §9.3). A later catalog in the list (an overlay) wins over an earlier one
      * (the base) for the same control id. */
-    private static Map<String, Catalog.ControlSpec> controlIndex(List<Catalog> catalogs) {
+    static Map<String, Catalog.ControlSpec> controlIndex(List<Catalog> catalogs) {
         Map<String, Catalog.ControlSpec> index = new LinkedHashMap<>();
         for (Catalog catalog : catalogs) {
             for (Catalog.ControlSpec control : catalog.controls) {
@@ -354,7 +354,7 @@ public final class Report {
 
     /** {@link #sanitizeForMarkdown} with the field placeholder rather than the name placeholder
      * (mirrors the Python reference's {@code _sanitize_field}). */
-    private static String sanitizeField(String text) {
+    static String sanitizeField(String text) {
         return sanitizeForMarkdown(text, SANITIZE_EMPTY_FIELD_PLACEHOLDER);
     }
 
@@ -1713,6 +1713,27 @@ public final class Report {
             Profile profile, Set<String> declaredSubjectIds, List<JsonNode> events, List<String> limitations,
             String applicabilityProfileDigest, String domainBindingDigest, String deviationRegisterDigest,
             List<JsonNode> deviations, Map<String, byte[]> extraOutputs) {
+        return writeReport(
+                outDir, assertions, bundleDigest, catalogs, operator, invocation, supersedes, reportLanguage,
+                catalogObjects, activity, blindSpots, profile, declaredSubjectIds, events, limitations,
+                applicabilityProfileDigest, domainBindingDigest, deviationRegisterDigest, deviations, extraOutputs,
+                null);
+    }
+
+    /** The extra formats {@link #writeReport} writes, set only by the {@code assess-emit} test seam until
+     * {@code assess --emit} is wired in this engine (18.16b); empty by default, so no run's output changes. */
+    static final Set<String> SEAM_EMIT = new LinkedHashSet<>();
+
+    /** As the twenty-argument {@link #writeReport}, plus the re-verify argv a remediation finding names
+     * (commands/__init__.py's {@code reverify_argv}); the manifest's {@code invocation} when {@code null}
+     * or empty, as in report.py. */
+    public static ObjectNode writeReport(
+            Path outDir, List<Assertions.Assertion> assertions, String bundleDigest, List<String> catalogs,
+            String operator, List<String> invocation, List<String> supersedes, String reportLanguage,
+            List<Catalog> catalogObjects, ObjectNode activity, ObjectNode blindSpots,
+            Profile profile, Set<String> declaredSubjectIds, List<JsonNode> events, List<String> limitations,
+            String applicabilityProfileDigest, String domainBindingDigest, String deviationRegisterDigest,
+            List<JsonNode> deviations, Map<String, byte[]> extraOutputs, List<String> reverifyCommand) {
         Assertions.checkDc5(assertions);
         try {
             Files.createDirectories(outDir);
@@ -1863,6 +1884,28 @@ public final class Report {
                 Files.createDirectories(path.getParent());
                 Outputs.writeFile(path, data);
                 outputs.put(rel, digestBytes(data));
+            }
+
+            if (SEAM_EMIT.contains("remediation")) {
+                Map<String, List<JsonNode>> eventsBySubject = Assess.indexBySubject(events != null ? events : List.of());
+                List<String> argv = reverifyCommand != null && !reverifyCommand.isEmpty() ? reverifyCommand : invocation;
+                for (String subject : subjects) {
+                    List<Assertions.Assertion> forSubject = new ArrayList<>();
+                    for (Assertions.Assertion a : assertions) {
+                        if (a.subject.equals(subject)) {
+                            forSubject.add(a);
+                        }
+                    }
+                    ObjectNode pkg = Remediation.renderRemediationPackage(
+                            subject, forSubject, catalogObjects != null ? catalogObjects : List.of(),
+                            outputs.get("assertions.json"), eventsBySubject.getOrDefault(subject, List.of()), argv);
+                    String relDir = "remediation/" + safe(subject);
+                    Files.createDirectories(outDir.resolve(relDir));
+                    outputs.put(relDir + "/remediation-package.json",
+                            writeBytes(outDir, relDir + "/remediation-package.json", Canonical.canonicalize(pkg)));
+                    outputs.put(relDir + "/remediation.md",
+                            writeText(outDir, relDir + "/remediation.md", Remediation.renderRemediationMd(pkg)));
+                }
             }
 
             ObjectNode manifest = buildManifest(

@@ -269,6 +269,41 @@ public final class Seams {
             return 0;
         }
 
+        // assess-emit runs this engine's real `assess` with extra formats written (18.16e): until 18.16b wires
+        // `assess --emit` here, report_format_parity_check.py compares the remediation output through it.
+        if ("assess-emit".equals(command)) {
+            if (args.length < 2 || !java.util.Arrays.stream(args[1].split(",", -1)).allMatch("remediation"::equals)) {
+                System.err.println("assess-emit: the only format is remediation");
+                return ExitCode.INPUT_ERROR.code;
+            }
+            Report.SEAM_EMIT.addAll(List.of(args[1].split(",", -1)));
+            try {
+                return Cli.run(java.util.Arrays.copyOfRange(args, 2, args.length));
+            } finally {
+                Report.SEAM_EMIT.clear();
+            }
+        }
+
+        // remediation-md renders every package in a case file ({cases: [{name, package}]}) with
+        // renderRemediationMd and writes {name: markdown} as JSON to the output path (18.16e).
+        if ("remediation-md".equals(command)) {
+            if (args.length < 3) {
+                System.err.println("remediation-md: a case file and an output path are required");
+                return ExitCode.INPUT_ERROR.code;
+            }
+            ObjectNode rendered = Json.nodes().objectNode();
+            for (JsonNode c : Json.readBundled(readAll(Paths.get(args[1]))).get("cases")) {
+                rendered.put(c.get("name").asText(), Remediation.renderRemediationMd(c.get("package")));
+            }
+            try {
+                Files.writeString(Paths.get(args[2]), Json.compact(rendered), StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                System.err.println("remediation-md: " + e.getMessage());
+                return 70;
+            }
+            return 0;
+        }
+
         System.err.println("seams: unknown seam '" + (command == null ? "" : command) + "'");
         return ExitCode.INPUT_ERROR.code;
     }

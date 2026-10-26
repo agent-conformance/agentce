@@ -1350,6 +1350,23 @@ global options:
             for (String artifact : ReportValidate.REPORT_DATA_FILES) {
                 extraOutputs.put(artifact, Files.readAllBytes(out.resolve(artifact)));
             }
+            // The re-verify invocation a remediation finding names (SPEC §7), as commands/__init__.py builds
+            // it: every flag needed to reproduce this run's catalog resolution, unlike the positional
+            // `invocation`. Only the bundle form: this engine refuses a records folder before this point.
+            List<String> reverifyCommand = new ArrayList<>(
+                    List.of("assess", "--bundle", scrubPath(bundleDir), "--profile", scrubPath(profilePath)));
+            if (!resolved.labels().isEmpty()) {
+                reverifyCommand.addAll(List.of("--catalog", String.join(",", resolved.labels())));
+            }
+            for (String catalogDir : options.catalogDirs()) {
+                reverifyCommand.addAll(List.of("--catalog-dir", scrubPath(catalogDir)));
+            }
+            if (options.domain() != null) {
+                reverifyCommand.addAll(List.of("--domain", scrubPath(options.domain())));
+            }
+            if (options.deviations() != null) {
+                reverifyCommand.addAll(List.of("--deviations", scrubPath(options.deviations())));
+            }
             Report.writeReport(
                     out, evaluated, bundle.digest(), resolved.labels(),
                     // config.py's operator default (SPEC §8.4); agentce.toml is not read here (Python only).
@@ -1357,7 +1374,7 @@ global options:
                     invocation, supersedes, language, resolved.catalogs(), activity, blindSpots,
                     profileObj, null, ingested.accepted, limitations,
                     applicabilityProfileDigest, domainBindingDigest, deviationRegisterDigest, deviations,
-                    extraOutputs);
+                    extraOutputs, reverifyCommand);
         } catch (IOException | java.io.UncheckedIOException e) {
             throw Outputs.unwritable(out.toString(), Outputs.OUT_DIR);
         }
