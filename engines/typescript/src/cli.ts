@@ -1211,10 +1211,13 @@ function runAssess(options: AssessOptions): CommandResult {
       catalogObjects: catalogs,
       // config.py's `operator` default (SPEC §8.4); agentce.toml is not read here (Python only).
       operator: process.env.AGENTCE_OPERATOR ?? "unset",
+      // commands/__init__.py's `invocation`: quickstart records the bare command, as it reruns.
       invocation:
         options.folder !== undefined
           ? ["assess", scrubPath(options.folder)]
-          : [options.invocationCommand, scrubPath(bundleDir), scrubPath(profilePath)],
+          : options.invocationCommand === "quickstart"
+            ? ["quickstart"]
+            : [options.invocationCommand, scrubPath(bundleDir), scrubPath(profilePath)],
       supersedes,
       activity,
       blindSpots,

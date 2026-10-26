@@ -98,6 +98,8 @@ test("quickstart assesses the vendored project end to end and writes a real repo
     const manifest = JSON.parse(readFileSync(join(out, "manifest.json"), "utf-8"));
     const invocation = (manifest.run as { invocation: string[] }).invocation;
     assert.ok(!invocation.some((part) => part.includes(quickstartDir())), invocation.join(" "));
+    // Python records quickstart's bare command, which is also report.md's Reproduce line.
+    assert.deepEqual(invocation, ["quickstart"]);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
