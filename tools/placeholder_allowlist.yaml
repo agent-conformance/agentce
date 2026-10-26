@@ -250,9 +250,9 @@ allow:
 
   - path: engines/java/src/main/java/org/agentce/Report.java
     pattern: placeholder
-    count: 22
+    count: 23
     class: legitimate
-    justification: "sanitizeForMarkdown/sanitizeForHtml's placeholder parameter and the SANITIZE_EMPTY_NAME_PLACEHOLDER/SANITIZE_EMPTY_FIELD_PLACEHOLDER fallback strings ('(unnamed)'/'(empty)'), mirroring the Python reference's report.py entry above; not an unfinished stub. Newly counted in item 18.24 for the same reason as the report.ts entry above: this file's own two raw NUL bytes hid it from this scanner until they were fixed this session."
+    justification: "sanitizeForMarkdown/sanitizeForHtml's placeholder parameter and the SANITIZE_EMPTY_NAME_PLACEHOLDER/SANITIZE_EMPTY_FIELD_PLACEHOLDER fallback strings ('(unnamed)'/'(empty)'), mirroring the Python reference's report.py entry above; not an unfinished stub. Newly counted in item 18.24 for the same reason as the report.ts entry above: this file's own two raw NUL bytes hid it from this scanner until they were fixed this session. 18.16h's buyer-view evidence refs cite SANITIZE_EMPTY_FIELD_PLACEHOLDER once, +1."
 
   - path: engines/python/agentce/commands/__init__.py
     pattern: placeholder

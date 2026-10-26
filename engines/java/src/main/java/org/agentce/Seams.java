@@ -336,6 +336,36 @@ public final class Seams {
             return 0;
         }
 
+        // buyer-cases renders every case of a case file ({cases: [{name, language, view, packaged, folder,
+        // argv, catalogs: [[id, version]]}]}) with the buyer view's renderers and writes {"<name>.md": text,
+        // "<name>.html": text} as JSON (18.16h).
+        if ("buyer-cases".equals(command)) {
+            if (args.length < 3) {
+                System.err.println("buyer-cases: a case file and an output path are required");
+                return ExitCode.INPUT_ERROR.code;
+            }
+            ObjectNode rendered = Json.nodes().objectNode();
+            for (JsonNode c : Json.readBundled(readAll(Paths.get(args[1]))).get("cases")) {
+                String name = c.get("name").asText();
+                List<String> argv = new ArrayList<>();
+                c.get("argv").forEach(a -> argv.add(a.asText()));
+                List<String> catalogs = new ArrayList<>();
+                c.get("catalogs").forEach(pair -> catalogs.add(pair.get(0).asText() + "@" + pair.get(1).asText()));
+                Report.BuyerRenderOptions options = new Report.BuyerRenderOptions(
+                        c.get("language").asText(), argv, c.get("packaged").asBoolean(), c.get("folder").asText(),
+                        catalogs);
+                rendered.put(name + ".md", Report.renderBuyerMd(c.get("view"), options));
+                rendered.put(name + ".html", Report.renderBuyerHtml(c.get("view"), options));
+            }
+            try {
+                Files.writeString(Paths.get(args[2]), Json.compact(rendered), StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                System.err.println("buyer-cases: " + e.getMessage());
+                return 70;
+            }
+            return 0;
+        }
+
         // skill-cases renders every case of a case file ({cases: [{name, kind, ...}]}: skill, finding, reverify,
         // tool_names, filename) with the skill folder's functions and writes {name: text} as JSON (18.16f).
         if ("skill-cases".equals(command)) {

@@ -1195,10 +1195,301 @@ public final class Report {
                 + "</main></body></html>\n";
     }
 
+    private static final java.util.regex.Pattern MESSAGE_SLOT = java.util.regex.Pattern.compile("\\{(\\w+)\\}");
+
+    /** Fill the {@code {name}} slots of a catalogue template in one pass (i18n_format.format_message's
+     * plain path, Python's {@code str.format}); an unknown name is left as written. */
+    static String formatMessage(String template, Map<String, String> vars) {
+        java.util.regex.Matcher m = MESSAGE_SLOT.matcher(template);
+        StringBuilder out = new StringBuilder();
+        while (m.find()) {
+            String value = vars.get(m.group(1));
+            m.appendReplacement(out, java.util.regex.Matcher.quoteReplacement(value != null ? value : m.group()));
+        }
+        m.appendTail(out);
+        return out.toString();
+    }
+
+    /** The six outcomes in the order the buyer summary's counts table lists them (report.py's
+     * {@code _STATEMENT_OUTCOMES}). */
+    private static final List<String> STATEMENT_OUTCOMES = List.of(
+            "conformant", "non-conformant", "partial", "not_applicable", "not_assessed", "insufficient_evidence");
+
+    /** report.py's {@code _reproduce_command}. */
+    private static String reproduceCommand(List<String> argv) {
+        return argv.isEmpty() ? "agentce quickstart" : "agentce " + String.join(" ", argv);
+    }
+
+    /** The fixed per-outcome answer sentence, the sanitised control id filled into {@code {control}}. */
+    private static String buyerAnswerText(JsonNode entry, Map<String, String> cat) {
+        return formatMessage(
+                cat.get("report.buyer_answer_" + entry.get("outcome").asText()),
+                Map.of("control", sanitizeField(entry.get("control").asText())));
+    }
+
+    /** The "not enough evidence" step for one {@code insufficient_evidence} answer (report.py's
+     * {@code _buyer_gap_lines}). */
+    private static List<String> buyerGapLines(JsonNode entry, Map<String, String> cat) {
+        JsonNode gapStep = entry.get("gap_step");
+        if (gapStep == null || gapStep.isNull()) {
+            return List.of(cat.get("report.buyer_gap_step_unavailable"));
+        }
+        String kind = gapStep.get("kind").asText();
+        if (kind.equals("no_population") || kind.equals("coverage_unknown")) {
+            return List.of(formatMessage(
+                    cat.get("report.blind_spots_" + kind + "_text"),
+                    Map.of("control", sanitizeField(entry.get("control").asText()))));
+        }
+        List<String> lines = new ArrayList<>();
+        for (JsonNode missing : gapStep.get("missing")) {
+            String ownerLabel = cat.get("report.blind_spots_owner_" + missing.get("owner_key").asText());
+            String step = formatMessage(
+                    cat.get("report.blind_spots_step_" + missing.get("step_kind").asText()), Map.of("owner", ownerLabel));
+            lines.add("`" + sanitizeField(missing.get("event").asText()) + "` (`"
+                    + sanitizeField(missing.get("class").asText()) + "`): " + step);
+        }
+        return lines;
+    }
+
+    /** The unverified-clause label (SPEC §7.3), per row (report.py's {@code _buyer_unverified_suffix}). */
+    private static String buyerUnverifiedSuffix(JsonNode entry, Map<String, String> cat) {
+        ObjectNode flag = Json.nodes().objectNode();
+        flag.set("verified", entry.get("verified"));
+        return crosswalkText(flag, cat);
+    }
+
+    private static List<String> buyerAnswerMd(JsonNode entry, Map<String, String> cat) {
+        String text = sanitizeForMarkdown(buyerAnswerText(entry, cat)) + buyerUnverifiedSuffix(entry, cat);
+        List<String> lines = new ArrayList<>();
+        lines.add("- **" + sanitizeField(entry.get("control").asText()) + "** @ `"
+                + sanitizeField(entry.get("control_version").asText()) + "` (`"
+                + sanitizeField(entry.get("subject").asText()) + "`): " + text);
+        if (!entry.get("evidence").isEmpty()) {
+            List<String> refs = new ArrayList<>();
+            entry.get("evidence").forEach(e -> refs.add("`" + sanitizeField(e.get("ref").asText()) + "`"));
+            lines.add("  - " + cat.get("report.evidence_label") + ": " + String.join(", ", refs));
+        }
+        if ("insufficient_evidence".equals(entry.get("outcome").asText())) {
+            buyerGapLines(entry, cat).forEach(g -> lines.add("  - " + g));
+        }
+        if (entry.has("manual_checklist_note")) {
+            lines.add("  - " + entry.get("manual_checklist_note").asText());
+        }
+        return lines;
+    }
+
+    private static final java.util.regex.Pattern CODE_SPAN = java.util.regex.Pattern.compile("`([^`]+)`");
+
+    /** Escape {@code text} and turn each backtick pair into {@code <code>} (report.py's
+     * {@code _code_spans_html}); an unpaired backtick stays literal. */
+    private static String codeSpansHtml(String text) {
+        return CODE_SPAN.matcher(esc(text)).replaceAll(m ->
+                java.util.regex.Matcher.quoteReplacement("<code>" + m.group(1) + "</code>"));
+    }
+
+    private static String buyerAnswerHtml(JsonNode entry, Map<String, String> cat) {
+        String text = esc(buyerAnswerText(entry, cat) + buyerUnverifiedSuffix(entry, cat));
+        String header = "<strong>" + sanitizeForHtml(entry.get("control").asText()) + "</strong> @ <code>"
+                + sanitizeForHtml(entry.get("control_version").asText()) + "</code> ("
+                + sanitizeForHtml(entry.get("subject").asText()) + "): " + text;
+        StringBuilder sub = new StringBuilder();
+        if (!entry.get("evidence").isEmpty()) {
+            List<String> refs = new ArrayList<>();
+            entry.get("evidence").forEach(e ->
+                    refs.add(sanitizeForHtml(e.get("ref").asText(), SANITIZE_EMPTY_FIELD_PLACEHOLDER)));
+            sub.append("<li>").append(esc(cat.get("report.evidence_label"))).append(": ")
+                    .append(String.join(", ", refs)).append("</li>");
+        }
+        if ("insufficient_evidence".equals(entry.get("outcome").asText())) {
+            for (String gapLine : buyerGapLines(entry, cat)) {
+                sub.append("<li>").append(codeSpansHtml(gapLine)).append("</li>");
+            }
+        }
+        if (entry.has("manual_checklist_note")) {
+            sub.append("<li>").append(esc(entry.get("manual_checklist_note").asText())).append("</li>");
+        }
+        return sub.length() > 0 ? "<li>" + header + "<ul>" + sub + "</ul></li>" : "<li>" + header + "</li>";
+    }
+
+    private static int countOf(JsonNode counts, String outcome) {
+        JsonNode n = counts.get(outcome);
+        return n != null ? n.asInt() : 0;
+    }
+
+    private static List<String> buyerCountsTableMd(JsonNode counts, Map<String, String> cat) {
+        List<String> labels = new ArrayList<>();
+        List<String> dashes = new ArrayList<>();
+        List<String> values = new ArrayList<>();
+        for (String o : STATEMENT_OUTCOMES) {
+            labels.add(outcomeLabel(cat, o));
+            dashes.add("---");
+            values.add(String.valueOf(countOf(counts, o)));
+        }
+        return List.of(
+                "| " + String.join(" | ", labels) + " |",
+                "|" + String.join("|", dashes) + "|",
+                "| " + String.join(" | ", values) + " |");
+    }
+
+    private static String buyerCountsTableHtml(JsonNode counts, Map<String, String> cat) {
+        StringBuilder head = new StringBuilder();
+        StringBuilder row = new StringBuilder();
+        for (String o : STATEMENT_OUTCOMES) {
+            head.append("<th scope=\"col\">").append(esc(outcomeLabel(cat, o))).append("</th>");
+            row.append("<td>").append(countOf(counts, o)).append("</td>");
+        }
+        return "<table><thead><tr>" + head + "</tr></thead><tbody><tr>" + row + "</tr></tbody></table>";
+    }
+
+    /** What the buyer renderers read besides the view (render_buyer_md's keyword arguments): the rerun
+     * argv already chosen (reverify command, else invocation), and the catalogs as {@code id@version}. */
+    public record BuyerRenderOptions(
+            String language, List<String> argv, boolean packaged, String reportFolder, List<String> catalogs) {}
+
+    private static List<String> buyerHowToCheckMd(Map<String, String> cat, BuyerRenderOptions o) {
+        List<String> lines = new ArrayList<>(List.of("## " + cat.get("report.buyer_how_to_check_heading"), ""));
+        lines.add(o.packaged()
+                ? formatMessage(cat.get("report.buyer_how_to_check"), Map.of("folder", o.reportFolder()))
+                : cat.get("report.buyer_how_to_check_unpackaged"));
+        List<String> catalogs = new ArrayList<>();
+        o.catalogs().forEach(c -> catalogs.add(sanitizeForMarkdown(c)));
+        lines.add("- Catalog: " + (catalogs.isEmpty() ? "(none)" : String.join(", ", catalogs)));
+        lines.add("- Reproduce: `" + reproduceCommand(o.argv()) + "`");
+        return lines;
+    }
+
+    private static String buyerHowToCheckHtml(Map<String, String> cat, BuyerRenderOptions o) {
+        // The folder is filled in after the code-span pass, so a backtick in the --out path stays inside
+        // its span instead of splitting it.
+        String marker = "\u0000";
+        String line = o.packaged()
+                ? codeSpansHtml(formatMessage(cat.get("report.buyer_how_to_check"), Map.of("folder", marker)))
+                        .replace(marker, esc(o.reportFolder()))
+                : codeSpansHtml(cat.get("report.buyer_how_to_check_unpackaged"));
+        List<String> catalogs = new ArrayList<>();
+        o.catalogs().forEach(c -> catalogs.add(sanitizeForHtml(c)));
+        return "<p>" + line + "</p><p>Catalog: " + (catalogs.isEmpty() ? "(none)" : String.join(", ", catalogs))
+                + "</p><p>Reproduce: <code>" + esc(reproduceCommand(o.argv())) + "</code></p>";
+    }
+
+    /** The questionnaire heading and the "none" sentence for one framework. */
+    private static String[] buyerFrameworkTexts(String framework, Map<String, String> cat) {
+        Map<String, String> vars = Map.of(
+                "framework", BuyerView.BUYER_QUESTIONNAIRE_TITLES.getOrDefault(framework, framework),
+                "version", BuyerView.BUYER_QUESTIONNAIRE_VERSIONS.getOrDefault(framework, ""));
+        return new String[] {
+            formatMessage(cat.get("report.buyer_not_a_certification"), vars),
+            formatMessage(cat.get("report.buyer_framework_none"), vars)
+        };
+    }
+
+    private static List<String> sortedQuestions(JsonNode questions) {
+        List<String> keys = new ArrayList<>();
+        if (questions != null) {
+            questions.fieldNames().forEachRemaining(keys::add);
+        }
+        keys.sort(Json::byteCompare);
+        return keys;
+    }
+
+    /** The buyer view (18.18): how to check this report, a summary, then the generated answers grouped
+     * by question; report.py's {@code render_buyer_md}. Adds no outcome and no rollup (SPEC §9.2). */
+    public static String renderBuyerMd(JsonNode buyer, BuyerRenderOptions o) {
+        Map<String, String> cat = Messages.catalogue(o.language());
+        List<String> lines = new ArrayList<>(
+                List.of("# " + cat.get("report.buyer_title"), "", cat.get("report.buyer_intro"), ""));
+        lines.addAll(buyerHowToCheckMd(cat, o));
+        lines.addAll(List.of("", "## " + cat.get("report.buyer_summary_heading"), ""));
+        lines.addAll(buyerCountsTableMd(buyer.get("counts"), cat));
+        JsonNode answers = buyer.get("answers");
+        for (String framework : BuyerView.BUYER_FRAMEWORKS) {
+            String[] texts = buyerFrameworkTexts(framework, cat);
+            lines.addAll(List.of("", "## " + sanitizeForMarkdown(texts[0]), ""));
+            JsonNode questions = buyer.get("by_question").get(framework);
+            List<String> keys = sortedQuestions(questions);
+            if (keys.isEmpty()) {
+                lines.add("_" + sanitizeForMarkdown(texts[1]) + "_");
+                continue;
+            }
+            for (String question : keys) {
+                lines.add("### " + sanitizeField(question));
+                lines.add("");
+                for (JsonNode index : questions.get(question)) {
+                    lines.addAll(buyerAnswerMd(answers.get(index.asInt()), cat));
+                }
+                lines.add("");
+            }
+        }
+        return String.join("\n", lines) + "\n";
+    }
+
+    /** As {@link #renderBuyerMd}, the same self-contained, escaped page shape as
+     * {@link #renderReportHtml}; report.py's {@code render_buyer_html}. */
+    public static String renderBuyerHtml(JsonNode buyer, BuyerRenderOptions o) {
+        Map<String, String> cat = Messages.catalogue(o.language());
+        String title = esc(cat.get("report.buyer_title"));
+        StringBuilder sections = new StringBuilder();
+        sections.append("<section aria-labelledby=\"buyer-rerun\"><h2 id=\"buyer-rerun\">")
+                .append(esc(cat.get("report.buyer_how_to_check_heading"))).append("</h2>")
+                .append(buyerHowToCheckHtml(cat, o)).append("</section>");
+        sections.append("<section aria-labelledby=\"buyer-summary\"><h2 id=\"buyer-summary\">")
+                .append(esc(cat.get("report.buyer_summary_heading"))).append("</h2>")
+                .append(buyerCountsTableHtml(buyer.get("counts"), cat)).append("</section>");
+        JsonNode answers = buyer.get("answers");
+        for (String framework : BuyerView.BUYER_FRAMEWORKS) {
+            String[] texts = buyerFrameworkTexts(framework, cat);
+            String sectionId = "buyer-" + esc(framework);
+            JsonNode questions = buyer.get("by_question").get(framework);
+            List<String> keys = sortedQuestions(questions);
+            String body;
+            if (keys.isEmpty()) {
+                body = "<p>" + esc(texts[1]) + "</p>";
+            } else {
+                StringBuilder items = new StringBuilder();
+                for (String question : keys) {
+                    StringBuilder answerItems = new StringBuilder();
+                    for (JsonNode index : questions.get(question)) {
+                        answerItems.append(buyerAnswerHtml(answers.get(index.asInt()), cat));
+                    }
+                    items.append("<li>").append(sanitizeForHtml(question)).append("<ul>").append(answerItems)
+                            .append("</ul></li>");
+                }
+                body = "<ul>" + items + "</ul>";
+            }
+            sections.append("<section aria-labelledby=\"").append(sectionId).append("\"><h2 id=\"").append(sectionId)
+                    .append("\">").append(esc(texts[0])).append("</h2>").append(body).append("</section>");
+        }
+        return "<!doctype html><html lang=\"" + esc(o.language()) + "\"><head><meta charset=\"utf-8\">"
+                + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+                + "<meta http-equiv=\"Content-Security-Policy\" "
+                + "content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\">"
+                + "<title>" + title + "</title><style>" + HTML_STYLE + "</style></head><body>"
+                + "<main><h1>" + title + "</h1><p>" + esc(cat.get("report.buyer_intro")) + "</p>"
+                + sections + "</main></body></html>\n";
+    }
+
+    private static BuyerRenderOptions buyerRenderOptions(ReportViewContext ctx) {
+        return new BuyerRenderOptions(
+                ctx.language(), ctx.reverifyCommand(), ctx.packaged(), ctx.reportFolder(), ctx.catalogs());
+    }
+
     /** What an audience view's {@code compute}/{@code renderMd}/{@code renderHtml} read, built once per
      * {@link #writeReport} call (report.py's {@code ReportViewContext}, 18.49). The security view reads
      * these three; the auditor (18.17e) and buyer (18.16h) views add their own fields. */
-    public record ReportViewContext(ObjectNode activity, List<Assertions.Assertion> assertions, String language) {}
+    public record ReportViewContext(
+            ObjectNode activity,
+            List<Assertions.Assertion> assertions,
+            String language,
+            Map<String, Integer> counts,
+            JsonNode blindSpots,
+            /* the rerun argv: the reverify command when one is set, else the invocation */
+            List<String> reverifyCommand,
+            /* always false here: this engine refuses --package-for-sharing (input.package_unsupported) */
+            boolean packaged,
+            /* String.valueOf(outDir), rendered only when packaged */
+            String reportFolder,
+            /* the evaluated catalogs as id@version labels */
+            List<String> catalogs) {}
 
     /** A view renderer: the computed view and the context to one page. */
     public interface ViewRenderer {
@@ -1213,13 +1504,20 @@ public final class Report {
             Set<String> alwaysWrite) {}
 
     /** The audience-view registry (report.py's {@code AUDIENCE_VIEWS}, 18.49): a preset is one entry. */
-    public static final Map<String, AudienceViewSpec> AUDIENCE_VIEWS = new LinkedHashMap<>(Map.of(
-            "security",
-            new AudienceViewSpec(
-                    ctx -> SecurityView.compute(ctx.activity(), ctx.assertions()),
-                    (view, ctx) -> renderSecurityMd(view, ctx.language()),
-                    (view, ctx) -> renderSecurityHtml(view, ctx.language()),
-                    Set.of())));
+    public static final Map<String, AudienceViewSpec> AUDIENCE_VIEWS = new LinkedHashMap<>();
+
+    static {
+        AUDIENCE_VIEWS.put("security", new AudienceViewSpec(
+                ctx -> SecurityView.compute(ctx.activity(), ctx.assertions()),
+                (view, ctx) -> renderSecurityMd(view, ctx.language()),
+                (view, ctx) -> renderSecurityHtml(view, ctx.language()),
+                Set.of()));
+        AUDIENCE_VIEWS.put("buyer", new AudienceViewSpec(
+                ctx -> BuyerView.computeBuyerView(ctx.assertions(), ctx.blindSpots(), ctx.counts()),
+                (view, ctx) -> renderBuyerMd(view, buyerRenderOptions(ctx)),
+                (view, ctx) -> renderBuyerHtml(view, buyerRenderOptions(ctx)),
+                Set.of("md", "html")));
+    }
 
     /** Writes one output file and records it in the manifest. */
     public interface OutputWriter<T> {
@@ -2102,7 +2400,12 @@ public final class Report {
             // count as wanted, as Python's `--for security` (sarif, md, html) asks.
             writeAudienceView(
                     SEAM_FOR,
-                    new ReportViewContext(activityNode, assertions, reportLanguage),
+                    new ReportViewContext(
+                            activityNode, assertions, reportLanguage, counts, blindSpotsNode,
+                            reverifyCommand != null && !reverifyCommand.isEmpty()
+                                    ? reverifyCommand
+                                    : (invocation != null ? invocation : List.of()),
+                            false, String.valueOf(outDir), catalogs != null ? catalogs : List.of()),
                     ext -> ext.equals("md") || ext.equals("html"),
                     (name, view) -> outputs.put(name, writeJson(outDir, name, view)),
                     (name, text) -> outputs.put(name, writeText(outDir, name, text)));
