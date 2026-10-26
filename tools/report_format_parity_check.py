@@ -658,8 +658,6 @@ class CaseTable(NamedTuple):
     cases: Path
     expected: Path
     script: str
-    #: The texts Python renders per case (the security view: security.md and security.html).
-    texts: int = 1
 
 
 CASE_TABLES = (
@@ -671,7 +669,6 @@ CASE_TABLES = (
         SECURITY_CASES,
         SECURITY_EXPECTED,
         PYTHON_SECURITY,
-        texts=2,
     ),
 )
 
@@ -696,7 +693,7 @@ def render_table_with(
 def check_case_table(
     tmp: Path, engines: tuple[str, ...], fail_fast: bool, table: CaseTable
 ) -> tuple[int, int]:
-    label, verb, cases, expected, script, _ = table
+    label, verb, cases, expected, script = table
     python = render_table_with(
         "python", tmp / f"{verb}-python.json", verb, cases, script
     )
@@ -733,7 +730,7 @@ def check_case_table(
 def write_expected() -> int:
     with tempfile.TemporaryDirectory(prefix="report-format-expected-") as raw:
         EXPECTED.write_text(_expected_text(python_case_outputs(Path(raw))), "utf-8")
-        for _, verb, cases, expected, script, _ in CASE_TABLES:
+        for _, verb, cases, expected, script in CASE_TABLES:
             rendered = render_table_with(
                 "python", Path(raw) / f"{verb}.json", verb, cases, script
             )
@@ -782,8 +779,7 @@ def run_check(engines: tuple[str, ...], fail_fast: bool) -> int:
         + REMEDIATION_ONLY_RUNS
         + len(json.loads(CASES.read_text("utf-8"))["cases"])
         + sum(
-            len(json.loads(table.cases.read_text("utf-8"))["cases"]) * table.texts
-            for table in CASE_TABLES
+            len(json.loads(table.expected.read_text("utf-8"))) for table in CASE_TABLES
         )
     )
     if runs != expected:

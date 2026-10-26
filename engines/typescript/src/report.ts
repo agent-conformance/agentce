@@ -436,6 +436,9 @@ export function sanitizeForHtml(
 }
 
 //: A self-contained stylesheet (no external references), mirroring the Python/Java renderers.
+/** The Content-Security-Policy every HTML page carries. */
+const HTML_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src 'none'";
+
 const HTML_STYLE =
   "body{font-family:system-ui,sans-serif;margin:2rem;color:#111;background:#fff;line-height:1.5}" +
   "h1{font-size:1.5rem}h2{font-size:1.2rem;margin-top:1.5rem}" +
@@ -821,11 +824,10 @@ export function renderReportHtml(
     .join("");
   const bodyRows =
     rows || `<tr><td colspan="3">${escapeHtml(cat["report.no_controls"] as string)}</td></tr>`;
-  const csp = "default-src 'none'; style-src 'unsafe-inline'; img-src 'none'";
   const activitySection = activity !== undefined ? activityHtml(activity, cat) : "";
   const blindSpotsSection = blindSpots !== undefined ? blindSpotsHtml(blindSpots) : "";
   const verdictSection = verdictHtml(summarizeVerdict(assertions), cat);
-  return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${csp}"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1>${activitySection}${blindSpotsSection}${verdictSection}<section aria-labelledby="summary"><h2 id="summary">${escapeHtml(cat["report.summary_heading"] as string)}</h2><ul>${summary}</ul></section><section aria-labelledby="assertions"><h2 id="assertions">${escapeHtml(cat["report.assertions_heading"] as string)}</h2><table><tr><th>Control</th><th>Subject</th><th>Outcome</th></tr>${bodyRows}</table></section></main></body></html>\n`;
+  return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${HTML_CSP}"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1>${activitySection}${blindSpotsSection}${verdictSection}<section aria-labelledby="summary"><h2 id="summary">${escapeHtml(cat["report.summary_heading"] as string)}</h2><ul>${summary}</ul></section><section aria-labelledby="assertions"><h2 id="assertions">${escapeHtml(cat["report.assertions_heading"] as string)}</h2><table><tr><th>Control</th><th>Subject</th><th>Outcome</th></tr>${bodyRows}</table></section></main></body></html>\n`;
 }
 
 /** The traversal-proof, collision-resistant directory name `writeReport` writes a subject's own
@@ -995,8 +997,7 @@ export function renderProjectHtml(
       .join("");
     undeclaredHtml = `<section aria-labelledby="project-undeclared"><h2 id="project-undeclared">${escapeHtml(cat["report.project_undeclared_heading"] as string)}</h2><ul>${items}</ul></section>`;
   }
-  const csp = "default-src 'none'; style-src 'unsafe-inline'; img-src 'none'";
-  return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${csp}"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1><section aria-labelledby="project-agents"><h2 id="project-agents">${escapeHtml(cat["report.project_heading"] as string)}</h2><table><tr><th>${escapeHtml(cat["report.project_agent_column"] as string)}</th><th>${escapeHtml(cat["report.project_declared_column"] as string)}</th><th>${escapeHtml(cat["report.project_verdict_column"] as string)}</th><th>${escapeHtml(cat["report.project_what_it_did_column"] as string)}</th><th>${escapeHtml(cat["report.project_deviations_column"] as string)}</th></tr>${bodyRows}</table></section><section aria-labelledby="project-top-gaps"><h2 id="project-top-gaps">${escapeHtml(cat["report.project_top_gaps_heading"] as string)}</h2>${gapsHtml}</section>${undeclaredHtml}</main></body></html>\n`;
+  return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${HTML_CSP}"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1><section aria-labelledby="project-agents"><h2 id="project-agents">${escapeHtml(cat["report.project_heading"] as string)}</h2><table><tr><th>${escapeHtml(cat["report.project_agent_column"] as string)}</th><th>${escapeHtml(cat["report.project_declared_column"] as string)}</th><th>${escapeHtml(cat["report.project_verdict_column"] as string)}</th><th>${escapeHtml(cat["report.project_what_it_did_column"] as string)}</th><th>${escapeHtml(cat["report.project_deviations_column"] as string)}</th></tr>${bodyRows}</table></section><section aria-labelledby="project-top-gaps"><h2 id="project-top-gaps">${escapeHtml(cat["report.project_top_gaps_heading"] as string)}</h2>${gapsHtml}</section>${undeclaredHtml}</main></body></html>\n`;
 }
 
 /** A deterministic OSCAL date-time for this run: the earliest evidence-window start across the
@@ -1054,18 +1055,16 @@ function securityDriftLines(drift: SecurityView["drift"], cat: Record<string, st
   if (drift.tools.length === 0 && drift.models.length === 0) {
     return [cat["report.security_drift_none"] as string];
   }
-  const lines: string[] = [];
-  if (drift.tools.length > 0) {
-    lines.push(
-      `${cat["report.activity_undeclared_tools_label"]}: ${drift.tools.map((name) => sanitizeForMarkdown(name)).join(", ")}`,
+  return (
+    [
+      ["report.activity_undeclared_tools_label", drift.tools],
+      ["report.activity_undeclared_models_label", drift.models],
+    ] as const
+  )
+    .filter(([, names]) => names.length > 0)
+    .map(
+      ([key, names]) => `${cat[key]}: ${names.map((name) => sanitizeForMarkdown(name)).join(", ")}`,
     );
-  }
-  if (drift.models.length > 0) {
-    lines.push(
-      `${cat["report.activity_undeclared_models_label"]}: ${drift.models.map((name) => sanitizeForMarkdown(name)).join(", ")}`,
-    );
-  }
-  return lines;
 }
 
 /** One citation with its framework's version, or its display name (18.16a). */
@@ -1176,7 +1175,7 @@ export function renderSecurityHtml(
     citationRows.length > 0
       ? `<ul>${liItems(citationRows)}</ul>`
       : `<p>${h("report.security_citations_none")}</p>`;
-  return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1><p>${h("report.security_intro")}</p><section aria-labelledby="security-tool-access"><h2 id="security-tool-access">${h("report.security_tool_access_heading")}</h2><ul>${toolItems}</ul></section><section aria-labelledby="security-effect-class"><h2 id="security-effect-class">${h("report.security_effect_class_heading")}</h2><p>${escapeHtml(securityEffectClassText(security.actions_by_effect_class))}</p></section><section aria-labelledby="security-enforcement"><h2 id="security-enforcement">${h("report.security_enforcement_heading")}</h2><p>${h("report.security_enforcement_scope_note")}</p>${enforcementItems}</section><section aria-labelledby="security-drift"><h2 id="security-drift">${h("report.security_drift_heading")}</h2><ul>${driftItems}</ul></section><section aria-labelledby="security-citations"><h2 id="security-citations">${h("report.security_citations_heading")}</h2>${citationsHtml}</section></main></body></html>\n`;
+  return `<!doctype html><html lang="${escapeHtml(language)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${HTML_CSP}"><title>${title}</title><style>${HTML_STYLE}</style></head><body><main><h1>${title}</h1><p>${h("report.security_intro")}</p><section aria-labelledby="security-tool-access"><h2 id="security-tool-access">${h("report.security_tool_access_heading")}</h2><ul>${toolItems}</ul></section><section aria-labelledby="security-effect-class"><h2 id="security-effect-class">${h("report.security_effect_class_heading")}</h2><p>${escapeHtml(securityEffectClassText(security.actions_by_effect_class))}</p></section><section aria-labelledby="security-enforcement"><h2 id="security-enforcement">${h("report.security_enforcement_heading")}</h2><p>${h("report.security_enforcement_scope_note")}</p>${enforcementItems}</section><section aria-labelledby="security-drift"><h2 id="security-drift">${h("report.security_drift_heading")}</h2><ul>${driftItems}</ul></section><section aria-labelledby="security-citations"><h2 id="security-citations">${h("report.security_citations_heading")}</h2>${citationsHtml}</section></main></body></html>\n`;
 }
 
 /** What an audience view's `compute`/`renderMd`/`renderHtml` read, built once per `writeReport` call
@@ -1217,13 +1216,10 @@ export function writeAudienceView(
   writeJson: (name: string, value: unknown) => void,
   writeText: (name: string, text: string) => void,
 ): void {
-  const spec =
-    preset !== undefined && Object.hasOwn(AUDIENCE_VIEWS, preset)
-      ? AUDIENCE_VIEWS[preset]
-      : undefined;
-  if (preset === undefined || spec === undefined) {
+  if (preset === undefined || !Object.hasOwn(AUDIENCE_VIEWS, preset)) {
     return;
   }
+  const spec = AUDIENCE_VIEWS[preset] as AudienceViewSpec;
   const view = spec.compute(ctx);
   writeJson(`${preset}.json`, view);
   for (const [ext, render] of [

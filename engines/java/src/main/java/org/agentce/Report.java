@@ -15,7 +15,6 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -1239,13 +1238,15 @@ public final class Report {
         }
         JsonNode view = spec.compute().apply(ctx);
         writeJson.write(preset + ".json", view);
-        for (Map.Entry<String, ViewRenderer> entry : Arrays.asList(
-                Map.entry("md", spec.renderMd()), Map.entry("html", spec.renderHtml()))) {
-            ViewRenderer render = entry.getValue();
-            String ext = entry.getKey();
-            if (render != null && (spec.alwaysWrite().contains(ext) || wants.test(ext))) {
-                writeText.write(preset + "." + ext, render.render(view, ctx));
-            }
+        writeAudienceText(preset, "md", spec.renderMd(), spec, view, ctx, wants, writeText);
+        writeAudienceText(preset, "html", spec.renderHtml(), spec, view, ctx, wants, writeText);
+    }
+
+    private static void writeAudienceText(
+            String preset, String ext, ViewRenderer render, AudienceViewSpec spec, JsonNode view,
+            ReportViewContext ctx, Predicate<String> wants, OutputWriter<String> writeText) throws IOException {
+        if (render != null && (spec.alwaysWrite().contains(ext) || wants.test(ext))) {
+            writeText.write(preset + "." + ext, render.render(view, ctx));
         }
     }
 
