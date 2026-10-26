@@ -16,6 +16,15 @@ assess renders from. Then every case in `fixtures/report_formats/cases.json` (em
 characters, an odd OSCAL document, code-point order) is rendered by all three engines from the same directory and
 compared, and Python's rendering must equal the committed `expected.json` the engines' unit tests read.
 
+The remediation package and remediation.md (SPEC §7, Appendix A2; 18.16e) are compared from the same runs: Python
+adds `remediation` to its --emit list, and the other engines run their real assess through their `assess-emit
+remediation` seam. Four more runs compare remediation alone: the hostile remediation fixture, a records folder
+assessed without and with --profile, and the no-assertions run (no remediation directory anywhere). Each remediation.md
+must equal Python's byte for byte; each package must be its canonical bytes, equal Python's but for
+generated_from.engine (the engine's own manifest block) and the $id derived from it, and be listed in the manifest's
+outputs with its digest. Then every package in `fixtures/report_formats/remediation_md_cases.json` is rendered by each
+engine's `remediation-md` seam and must equal Python's, which must equal the committed `remediation_md_expected.json`.
+
 Modes:
     report_format_parity_check.py                  # three engines (needs `pnpm build` and `:assemble` first)
     report_format_parity_check.py --fail-fast      # the same, stopping at the first mismatching run
@@ -27,14 +36,17 @@ Modes:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any
 
 import claim_parity_check as cpc
 
@@ -57,6 +69,16 @@ CASE_STARTED_AT = "2026-09-01T00:00:00Z"
 #: The shape every engine's manifest.run.started_at must have (Python's `_now`).
 STARTED_AT_SHAPE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 ENGINES = cpc.ENGINES
+MD_CASES = CASES.with_name("remediation_md_cases.json")
+#: Python's remediation.md for each package of MD_CASES, the golden the engines' unit tests read.
+MD_EXPECTED = CASES.with_name("remediation_md_expected.json")
+HOSTILE = CASES.with_name("remediation_hostile")
+#: A records folder for the folder-form runs (`assess <folder>`), copied into the work tree.
+RECORDS = ROOT / "adapters" / "otel-genai" / "fixtures" / "otel-genai-agent-session"
+#: The runs that compare remediation alone: the hostile fixture, the folder without and with
+#: --profile, and no-assertions.
+REMEDIATION_ONLY_RUNS = 4
+PACKAGE_ID = "urn:agentce:remediation-package:sha256:"
 #: quickstart, quickstart in German, the auditor-view fixture and the 30 generated projects; a checker
 #: that silently drops a run or a case must not print OK.
 CORPUS_RUNS = 33
@@ -106,32 +128,35 @@ def _env() -> dict[str, str]:
     return env
 
 
+def _python(script: str) -> list[str]:
+    return [
+        "uv",
+        "run",
+        "--frozen",
+        "--project",
+        str(cpc.spc.PY_ENGINE),
+        "python",
+        "-c",
+        script,
+    ]
+
+
+def _seam(engine: str) -> list[str]:
+    """The TypeScript or Java seam entry point; the seam verb follows."""
+    if engine == "typescript":
+        return ["node", str(cpc.spc.TS_ENGINE / "dist" / "seams.js")]
+    jar = cpc.spc.readiness_parity_check.java_jar()
+    return ["java", "-Dstdout.encoding=UTF-8", "-cp", str(jar), "org.agentce.Seams"]
+
+
 def render_with(engine: str, out_root: Path, sources: list[Path]) -> str:
     """Run one engine's `report-formats` seam over `sources`; output lands in `out_root/<index>/`.
     Returns the engine's stderr when it fails, else ""."""
-    if engine == "python":
-        cmd = [
-            "uv",
-            "run",
-            "--frozen",
-            "--project",
-            str(cpc.spc.PY_ENGINE),
-            "python",
-            "-c",
-            PYTHON_RENDER,
-        ]
-    elif engine == "typescript":
-        cmd = ["node", str(cpc.spc.TS_ENGINE / "dist" / "seams.js"), "report-formats"]
-    else:
-        jar = cpc.spc.readiness_parity_check.java_jar()
-        cmd = [
-            "java",
-            "-Dstdout.encoding=UTF-8",
-            "-cp",
-            str(jar),
-            "org.agentce.Seams",
-            "report-formats",
-        ]
+    cmd = (
+        _python(PYTHON_RENDER)
+        if engine == "python"
+        else [*_seam(engine), "report-formats"]
+    )
     proc = subprocess.run(
         [*cmd, str(out_root), *map(str, sources)],
         capture_output=True,
@@ -174,22 +199,148 @@ def file_problems(engine: str, reference: Path, candidate: Path) -> list[str]:
 
 
 def _assess(engine: str, args: list[str], env: dict[str, str], out: Path) -> int:
-    """One engine's real `assess` (Python's with the five formats emitted); its exit code. Exits 1 and
-    2 (a non-conformant or unproven outcome) still write the full report."""
-    extra = ["--emit", "junit,csv,oscal_xml,public,pdf"] if engine == "python" else []
-    _, code = cpc.run_engine(engine, ["assess", *args, *extra, "--out", str(out)], env)
-    return code
+    """One engine's real `assess`, Python's with the five formats and remediation emitted, the others'
+    through their `assess-emit remediation` seam; its exit code. Exits 1 and 2 (a non-conformant or
+    unproven outcome) still write the full report."""
+    argv = ["assess", *args, "--out", str(out)]
+    if engine == "python":
+        _, code = cpc.run_engine(
+            engine, [*argv, "--emit", "junit,csv,oscal_xml,public,pdf,remediation"], env
+        )
+        return code
+    proc = subprocess.run(
+        [*_seam(engine), "assess-emit", "remediation", *argv],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+        env={**_env(), **env},
+    )
+    return proc.returncode
+
+
+def remediation_only_runs(tmp: Path, no_assertions: cpc.Run) -> list[cpc.Run]:
+    """The hostile fixture, a records folder without and with --profile (the profile Python derives
+    from the folder), and no-assertions."""
+    folder = tmp / "records" / "rec"
+    shutil.copytree(RECORDS, folder)
+    derived = tmp / "records" / "derived"
+    _assess("python", [str(folder)], {}, derived)
+    profile = tmp / "records" / "applicability.yaml"
+    shutil.copyfile(derived / "applicability.yaml", profile)
+    hostile = [
+        *cpc._project_args(HOSTILE),
+        "--catalog-dir",
+        str(HOSTILE / "catalog"),
+        "--allow-unverified-catalog",
+    ]
+    return [
+        ("remediation_hostile", hostile, {}, False),
+        ("records_folder", [str(folder)], {}, False),
+        ("records_folder_profile", [str(folder), "--profile", str(profile)], {}, False),
+        no_assertions,
+    ]
+
+
+def _remediation_files(report: Path) -> list[str]:
+    root = report / "remediation"
+    return (
+        sorted(p.relative_to(report).as_posix() for p in root.rglob("*") if p.is_file())
+        if root.is_dir()
+        else []
+    )
+
+
+def _without_identity(package: dict[str, object]) -> dict[str, object]:
+    generated = package.get("generated_from")
+    rest = {k: v for k, v in package.items() if k != "$id"}
+    if isinstance(generated, dict):
+        rest["generated_from"] = {k: v for k, v in generated.items() if k != "engine"}
+    return rest
+
+
+def _package_body(package: dict[str, object]) -> dict[str, object]:
+    return {k: v for k, v in package.items() if k not in ("$schema", "$id")}
+
+
+def remediation_problems(
+    engine: str, reference: Path, candidate: Path, digest_of
+) -> list[str]:
+    """`candidate`'s remediation output against Python's in `reference`; `digest_of(value)` is the
+    sha256 hex of a value's canonical bytes by Python's canonicalizer."""
+    want, got = _remediation_files(reference), _remediation_files(candidate)
+    if want != got:
+        return [f"{engine} remediation files {got}, python {want}"]
+    if not want:
+        return []
+    ref_manifest = json.loads((reference / "manifest.json").read_text("utf-8"))
+    manifest = json.loads((candidate / "manifest.json").read_text("utf-8"))
+    ref_out, out = ref_manifest["outputs"], manifest["outputs"]
+    listed = sorted(k for k in out if k.startswith("remediation/"))
+    if listed != sorted(k for k in ref_out if k.startswith("remediation/")):
+        return [
+            f"{engine} manifest.outputs lists remediation files {listed}, python {want}"
+        ]
+    engine_block = {
+        k: v for k, v in manifest["engine"].items() if k != "package_digest"
+    }
+    problems = []
+    for rel in want:
+        a, b = (reference / rel).read_bytes(), (candidate / rel).read_bytes()
+        own = "sha256:" + hashlib.sha256(b).hexdigest()
+        if rel.endswith(".md"):
+            if a != b:
+                problems.append(f"{engine} {rel}: " + _first_difference(a, b))
+            elif out[rel] != ref_out[rel]:
+                problems.append(
+                    f"{engine} manifest.outputs[{rel}] is not python's digest"
+                )
+            continue
+        package = json.loads(b)
+        if own != "sha256:" + digest_of(package):
+            problems.append(f"{engine} {rel}: not the canonical bytes of its value")
+        if out[rel] != own:
+            problems.append(
+                f"{engine} manifest.outputs[{rel}] is not the package's digest"
+            )
+        if package.get("generated_from", {}).get("engine") != engine_block:
+            problems.append(
+                f"{engine} {rel}: generated_from.engine is not the manifest's engine"
+            )
+        if package.get("$id") != PACKAGE_ID + digest_of(_package_body(package)):
+            problems.append(f"{engine} {rel}: $id is not the digest of its body")
+        if _without_identity(package) != _without_identity(json.loads(a)):
+            problems.append(
+                f"{engine} {rel}: differs from python outside engine and $id"
+            )
+    return problems
+
+
+def canonical_digest_table(packages: list[Path]):
+    """A `digest_of` over every package and its body in one Python canonicalizer run."""
+    values = []
+    for path in packages:
+        package = json.loads(path.read_bytes())
+        values += [package, _package_body(package)]
+    keys = [json.dumps(v, sort_keys=True) for v in values]
+    table = (
+        dict(zip(keys, cpc.canonical_digests(values), strict=True)) if values else {}
+    )
+    return lambda value: table.get(json.dumps(value, sort_keys=True), "")
 
 
 def check_corpus(
     tmp: Path, engines: tuple[str, ...], fail_fast: bool
 ) -> tuple[int, int]:
-    runs = [r for r in cpc.runs(cpc.generate_corpus(tmp / "corpus")) if r[3]]
+    every = cpc.runs(cpc.generate_corpus(tmp / "corpus"))
+    runs = [r for r in every if r[3]]
     quickstart = next(r for r in runs if r[0] == "quickstart")
     runs.insert(
         1,
         ("quickstart_de", [*quickstart[1], "--report-language", "de"], {}, True),
     )
+    no_assertions = next(r for r in every if r[0] == "no-assertions")
+    runs += remediation_only_runs(tmp, no_assertions)
+    formats = [i for i, r in enumerate(runs) if r[3]]
     labels = [label for label, _, _, _ in runs]
     dirs = {
         e: [tmp / "assess" / e / label.replace("/", "_") for label in labels]
@@ -206,14 +357,28 @@ def check_corpus(
     clock_problems = {
         (e, i): pin_started_at(dirs["python"][i], dirs[e][i])
         for e in engines[1:]
-        for i in range(len(labels))
+        for i in formats
     }
-    seam_errors = {e: render_with(e, tmp / "seam" / e, dirs[e]) for e in engines}
+    seam_errors = {
+        e: render_with(e, tmp / "seam" / e, [dirs[e][i] for i in formats])
+        for e in engines
+    }
+    seam_index = {i: n for n, i in enumerate(formats)}
+    digest_of = canonical_digest_table(
+        [
+            d / rel
+            for e in engines[1:]
+            for d in dirs[e]
+            for rel in _remediation_files(d)
+            if rel.endswith(".json")
+        ]
+    )
     failures = 0
     for i, label in enumerate(labels):
         problems: list[str] = []
         py_exit = exits[("python", dirs["python"][i])]
-        if py_exit not in (0, 1, 2):
+        # no-assertions' profile names no subject: assess refuses it (exit 3) and writes no remediation.
+        if py_exit not in ((0, 1, 2, 3) if label == "no-assertions" else (0, 1, 2)):
             problems.append(f"python assess exited {py_exit}")
         for engine in engines:
             code = exits[(engine, dirs[engine][i])]
@@ -221,12 +386,19 @@ def check_corpus(
                 problems.append(f"{engine} assess exited {code}, python {py_exit}")
             elif clock_problems.get((engine, i)):
                 problems.append(f"{engine} {clock_problems[(engine, i)]}")
-            elif seam_errors[engine]:
+            elif i in seam_index and seam_errors[engine]:
                 problems.append(f"{engine} report-formats seam: {seam_errors[engine]}")
             elif not problems:
-                problems += file_problems(
-                    engine, dirs["python"][i], tmp / "seam" / engine / str(i)
-                )
+                if i in seam_index:
+                    problems += file_problems(
+                        engine,
+                        dirs["python"][i],
+                        tmp / "seam" / engine / str(seam_index[i]),
+                    )
+                if engine != "python":
+                    problems += remediation_problems(
+                        engine, dirs["python"][i], dirs[engine][i], digest_of
+                    )
         failures += _report(label, problems)
         if problems and fail_fast:
             break
@@ -327,7 +499,7 @@ def python_case_outputs(tmp: Path) -> dict[str, dict[str, str]]:
     }
 
 
-def _expected_text(outputs: dict[str, dict[str, str]]) -> str:
+def _expected_text(outputs: dict[str, Any]) -> str:
     return json.dumps(outputs, indent=2, ensure_ascii=True) + "\n"
 
 
@@ -362,10 +534,72 @@ def check_cases(
     return failures, len(outputs)
 
 
+PYTHON_MD = """
+import json, sys
+from agentce.report import render_remediation_md
+cases = json.load(open(sys.argv[1], encoding="utf-8"))["cases"]
+json.dump({c["name"]: render_remediation_md(c["package"]) for c in cases}, open(sys.argv[2], "w", encoding="utf-8"))
+"""
+
+
+def render_md_with(engine: str, out: Path) -> dict[str, str] | str:
+    """One engine's remediation.md for every package of MD_CASES, or the engine's error."""
+    cmd = (
+        _python(PYTHON_MD) if engine == "python" else [*_seam(engine), "remediation-md"]
+    )
+    proc = subprocess.run(
+        [*cmd, str(MD_CASES), str(out)],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+        env=_env(),
+    )
+    if proc.returncode != 0:
+        return f"exit {proc.returncode}: {proc.stderr.strip()[-400:]}"
+    return json.loads(out.read_text("utf-8"))
+
+
+def check_md_cases(
+    tmp: Path, engines: tuple[str, ...], fail_fast: bool
+) -> tuple[int, int]:
+    python = render_md_with("python", tmp / "md-python.json")
+    if isinstance(python, str):
+        raise SystemExit(f"python remediation-md: {python}")
+    failures = 0
+    if not MD_EXPECTED.is_file() or MD_EXPECTED.read_text("utf-8") != _expected_text(
+        python
+    ):
+        print(
+            f"MISMATCH: {MD_EXPECTED.name} is not Python's current rendering of {MD_CASES.name}; "
+            "run report_format_parity_check.py --write-expected",
+            file=sys.stderr,
+        )
+        failures += 1
+    rendered = {e: render_md_with(e, tmp / f"md-{e}.json") for e in engines[1:]}
+    for name, want in python.items():
+        problems = []
+        for engine, got in rendered.items():
+            if isinstance(got, str):
+                problems.append(f"{engine} remediation-md seam: {got}")
+            elif got.get(name) != want:
+                problems.append(
+                    f"{engine} remediation.md: "
+                    + _first_difference(want.encode(), str(got.get(name)).encode())
+                )
+        failures += _report(f"remediation case {name}", problems)
+        if problems and fail_fast:
+            break
+    return failures, len(python)
+
+
 def write_expected() -> int:
     with tempfile.TemporaryDirectory(prefix="report-format-expected-") as raw:
         EXPECTED.write_text(_expected_text(python_case_outputs(Path(raw))), "utf-8")
-    print(f"wrote {EXPECTED}")
+        md = render_md_with("python", Path(raw) / "md.json")
+        if isinstance(md, str):
+            raise SystemExit(f"python remediation-md: {md}")
+        MD_EXPECTED.write_text(_expected_text(md), "utf-8")
+    print(f"wrote {EXPECTED} and {MD_EXPECTED}")
     return 0
 
 
@@ -386,6 +620,10 @@ def run_check(engines: tuple[str, ...], fail_fast: bool) -> int:
         # renders from.
         failures, runs = check_cases(tmp, engines, fail_fast)
         if not (failures and fail_fast):
+            md_failures, md_runs = check_md_cases(tmp, engines, fail_fast)
+            failures += md_failures
+            runs += md_runs
+        if not (failures and fail_fast):
             corpus_failures, corpus_runs = check_corpus(
                 tmp / "corpus-run", engines, fail_fast
             )
@@ -394,7 +632,12 @@ def run_check(engines: tuple[str, ...], fail_fast: bool) -> int:
     if failures:
         print(f"{failures} of {runs} runs differ", file=sys.stderr)
         return 1
-    expected = CORPUS_RUNS + len(json.loads(CASES.read_text("utf-8"))["cases"])
+    expected = (
+        CORPUS_RUNS
+        + REMEDIATION_ONLY_RUNS
+        + len(json.loads(CASES.read_text("utf-8"))["cases"])
+        + len(json.loads(MD_CASES.read_text("utf-8"))["cases"])
+    )
     if runs != expected:
         print(f"ran {runs} runs, expected {expected}", file=sys.stderr)
         return 1
@@ -453,12 +696,127 @@ def self_test() -> int:
             else:
                 failures.append(f"tamper not caught: {name}")
         failures += _clock_self_test(tmp / "clock")
+        failures += _remediation_self_test(tmp / "remediation")
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
     if failures:
         return 1
     print("SELF-TEST OK")
     return 0
+
+
+def _canonical(value: object) -> bytes:
+    """RFC 8785 bytes for the self-test's plain ASCII values (sorted keys, no whitespace)."""
+    return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+
+
+def _remediation_self_test(tmp: Path) -> list[str]:
+    """remediation_problems passes a correct copy and catches each remediation tamper class."""
+    rel = "remediation/s"
+    engine = {"impl": "agentce-ts", "version": "0.1.0", "spec_version": "0.6"}
+
+    def package(impl: dict[str, str], subject: str = "s") -> dict[str, object]:
+        body = {
+            "package_version": 1,
+            "generated_from": {
+                "assertions_digest": "sha256:ab",
+                "engine": impl,
+                "catalogs": [],
+            },
+            "subject": subject,
+            "findings": [],
+            "not_assessed": [],
+            "deviations_applied": [],
+        }
+        digest = hashlib.sha256(_canonical(body)).hexdigest()
+        return {"$schema": "x", "$id": PACKAGE_ID + digest, **body}
+
+    md = b"# Remediation prompt\n"
+    good_pkg = package(engine)
+
+    def report(
+        d: Path, files: dict[str, bytes], outputs: dict[str, bytes] | None = None
+    ) -> Path:
+        for name, data in files.items():
+            (d / name).parent.mkdir(parents=True, exist_ok=True)
+            (d / name).write_bytes(data)
+        listed = files if outputs is None else outputs
+        manifest = {
+            "engine": {**engine, "package_digest": "sha256:cd"},
+            "outputs": {
+                n: "sha256:" + hashlib.sha256(b).hexdigest() for n, b in listed.items()
+            },
+        }
+        (d / "manifest.json").write_text(json.dumps(manifest), "utf-8")
+        return d
+
+    files = {
+        f"{rel}/remediation-package.json": _canonical(good_pkg),
+        f"{rel}/remediation.md": md,
+    }
+    reference = report(tmp / "reference", files)
+    stale = dict(good_pkg, subject="t")
+    tampers: dict[str, tuple[dict[str, bytes], dict[str, bytes] | None]] = {
+        "a key changed outside engine and $id": (
+            {
+                **files,
+                f"{rel}/remediation-package.json": _canonical(package(engine, "t")),
+            },
+            None,
+        ),
+        "a wrong engine block": (
+            {
+                **files,
+                f"{rel}/remediation-package.json": _canonical(
+                    package({**engine, "impl": "x"})
+                ),
+            },
+            None,
+        ),
+        "a stale $id": (
+            {**files, f"{rel}/remediation-package.json": _canonical(stale)},
+            None,
+        ),
+        "non-canonical package bytes": (
+            {
+                **files,
+                f"{rel}/remediation-package.json": json.dumps(
+                    good_pkg, indent=1
+                ).encode(),
+            },
+            None,
+        ),
+        "a remediation file missing": ({f"{rel}/remediation.md": md}, None),
+        "an extra remediation file": (
+            {**files, "remediation/u/remediation.md": md},
+            None,
+        ),
+        "a remediation file missing from manifest.outputs": (
+            files,
+            {f"{rel}/remediation.md": md},
+        ),
+        "remediation.md one byte changed": (
+            {**files, f"{rel}/remediation.md": md.replace(b"#", b"=")},
+            None,
+        ),
+    }
+
+    def digest_of(value: object) -> str:
+        return hashlib.sha256(_canonical(value)).hexdigest()
+
+    failures = []
+    if remediation_problems(
+        "typescript", reference, report(tmp / "same", files), digest_of
+    ):
+        failures.append("a correct remediation copy was flagged")
+    for i, (name, (candidate, outputs)) in enumerate(tampers.items()):
+        if remediation_problems(
+            "java", reference, report(tmp / f"t{i}", candidate, outputs), digest_of
+        ):
+            print(f"caught: {name}")
+        else:
+            failures.append(f"tamper not caught: {name}")
+    return failures
 
 
 def _clock_self_test(tmp: Path) -> list[str]:
