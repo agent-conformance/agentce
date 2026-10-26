@@ -44,15 +44,28 @@ export function i18nDir(): string {
   return join(dataRoot(), "i18n");
 }
 
-/** The vendored remediation prompt template (the original is `spec/report/templates/remediation.md.tmpl`). */
-export function remediationTemplatePath(): string {
-  return join(dataRoot(), "templates", "remediation.md.tmpl");
+/** A vendored report template (each original is `spec/report/templates/<name>`). */
+export function templatePath(name: string): string {
+  return join(dataRoot(), "templates", name);
+}
+
+const cachedTemplates = new Map<string, string>();
+
+/** A vendored report template's text, read once (Python's `bundled.*_template()`). */
+function template(name: string): string {
+  let text = cachedTemplates.get(name);
+  if (text === undefined) {
+    text = readFileSync(templatePath(name), "utf-8");
+    cachedTemplates.set(name, text);
+  }
+  return text;
 }
 
 /** The remediation prompt template's text (Python's `bundled.remediation_template()`). */
-let cachedRemediationTemplate: string | undefined;
-
-export function remediationTemplate(): string {
-  cachedRemediationTemplate ??= readFileSync(remediationTemplatePath(), "utf-8");
-  return cachedRemediationTemplate;
-}
+export const remediationTemplate = (): string => template("remediation.md.tmpl");
+/** The generated skill's SKILL.md template (Python's `bundled.skill_template()`). */
+export const skillTemplate = (): string => template("skill.md.tmpl");
+/** One finding note's template (Python's `bundled.skill_finding_template()`). */
+export const skillFindingTemplate = (): string => template("skill-finding.md.tmpl");
+/** REVERIFY.md's template (Python's `bundled.skill_reverify_template()`). */
+export const skillReverifyTemplate = (): string => template("skill-reverify.md.tmpl");

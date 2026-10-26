@@ -1,0 +1,1465 @@
+{
+ "cases": [
+  {
+   "name": "skill_one_catalog",
+   "kind": "skill",
+   "spec_version": "0.6",
+   "cli_version": "0.1.0",
+   "catalog_version": "eu-ai-act@2026.09",
+   "assertions_digest": "sha256:abababababababababababababababababababababababababababababababab"
+  },
+  {
+   "name": "skill_two_catalogs",
+   "kind": "skill",
+   "spec_version": "0.6",
+   "cli_version": "0.1.0",
+   "catalog_version": "eu-ai-act@2026.09, nist-ai-rmf@1.0",
+   "assertions_digest": "sha256:abababababababababababababababababababababababababababababababab"
+  },
+  {
+   "name": "skill_no_catalog",
+   "kind": "skill",
+   "spec_version": "0.6",
+   "cli_version": "0.1.0",
+   "catalog_version": "",
+   "assertions_digest": "sha256:abababababababababababababababababababababababababababababababab"
+  },
+  {
+   "name": "skill_yaml_breakers",
+   "kind": "skill",
+   "spec_version": "0.6",
+   "cli_version": "0.1.0",
+   "catalog_version": "{brace}: #hash, 'lead, !!binary x, - dash, ? q, & a * b, | > %",
+   "assertions_digest": "sha256:abababababababababababababababababababababababababababababababab"
+  },
+  {
+   "name": "skill_quote_backslash",
+   "kind": "skill",
+   "spec_version": "0.6",
+   "cli_version": "0.1.0",
+   "catalog_version": "x\"y\\z",
+   "assertions_digest": "sha256:abababababababababababababababababababababababababababababababab"
+  },
+  {
+   "name": "skill_markdown",
+   "kind": "skill",
+   "spec_version": "0.6",
+   "cli_version": "0.1.0",
+   "catalog_version": "`code` <b>x</b> [l](u) &amp;",
+   "assertions_digest": "sha256:abababababababababababababababababababababababababababababababab"
+  },
+  {
+   "name": "skill_whitespace_only",
+   "kind": "skill",
+   "spec_version": "0.6",
+   "cli_version": "0.1.0",
+   "catalog_version": " \t\n ",
+   "assertions_digest": "sha256:abababababababababababababababababababababababababababababababab"
+  },
+  {
+   "name": "skill_controls",
+   "kind": "skill",
+   "spec_version": "0.6",
+   "cli_version": "0.1.0",
+   "catalog_version": "a\tb\nc\u0000d\u0007e\u001bfg h ijk",
+   "assertions_digest": "sha256:abababababababababababababababababababababababababababababababab"
+  },
+  {
+   "name": "skill_invisible",
+   "kind": "skill",
+   "spec_version": "0.6",
+   "cli_version": "0.1.0",
+   "catalog_version": "a‮b‍c﻿d󠁁e️f",
+   "assertions_digest": "sha256:abababababababababababababababababababababababababababababababab"
+  },
+  {
+   "name": "skill_spaces",
+   "kind": "skill",
+   "spec_version": "0.6",
+   "cli_version": "0.1.0",
+   "catalog_version": "a b　c  d",
+   "assertions_digest": "sha256:abababababababababababababababababababababababababababababababab"
+  },
+  {
+   "name": "skill_unicode",
+   "kind": "skill",
+   "spec_version": "0.6",
+   "cli_version": "0.1.0",
+   "catalog_version": "é ü 日本 😀 𐍈 ￾ ￿ ퟿",
+   "assertions_digest": "sha256:abababababababababababababababababababababababababababababababab"
+  },
+  {
+   "name": "skill_long",
+   "kind": "skill",
+   "spec_version": "0.6",
+   "cli_version": "0.1.0",
+   "catalog_version": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+   "assertions_digest": "sha256:abababababababababababababababababababababababababababababababab"
+  },
+  {
+   "name": "skill_odd_versions",
+   "kind": "skill",
+   "spec_version": "9.9",
+   "cli_version": "2.0.0-rc.1",
+   "catalog_version": "x@1",
+   "assertions_digest": "sha256:0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+  },
+  {
+   "name": "finding_missing_optional_keys_1_no_tools",
+   "kind": "finding",
+   "finding": {
+    "control": "MDC-01",
+    "control_version": "1.0.0",
+    "outcome": "non-conformant",
+    "rung": 2,
+    "mode": "automated",
+    "severity": "high",
+    "title": "Plain title",
+    "clauses": [],
+    "expectations": [],
+    "evidence_gap": {
+     "required": [],
+     "observed": [],
+     "missing": []
+    },
+    "violations": [],
+    "evidence": [],
+    "guardrails_ref": "remediation.guardrails.v1"
+   },
+   "tool_calls": []
+  },
+  {
+   "name": "finding_missing_optional_keys_1_tools",
+   "kind": "finding",
+   "finding": {
+    "control": "MDC-01",
+    "control_version": "1.0.0",
+    "outcome": "non-conformant",
+    "rung": 2,
+    "mode": "automated",
+    "severity": "high",
+    "title": "Plain title",
+    "clauses": [],
+    "expectations": [],
+    "evidence_gap": {
+     "required": [],
+     "observed": [],
+     "missing": []
+    },
+    "violations": [],
+    "evidence": [],
+    "guardrails_ref": "remediation.guardrails.v1"
+   },
+   "tool_calls": [
+    "credit.record_decision",
+    "a‘b’"
+   ]
+  },
+  {
+   "name": "finding_hostile_fields_1_no_tools",
+   "kind": "finding",
+   "finding": {
+    "control": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+    "control_version": "1.0.0",
+    "outcome": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+    "rung": 2,
+    "mode": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+    "severity": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+    "window": {
+     "start": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+     "end": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n"
+    },
+    "title": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+    "clauses": [
+     {
+      "framework": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+      "clause": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+      "relation": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+      "verified_against_text": true
+     },
+     {
+      "framework": "f",
+      "clause": "c",
+      "relation": "r",
+      "verified_against_text": false
+     }
+    ],
+    "expectations": [
+     {
+      "id": "e",
+      "text": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+      "result": "x"
+     },
+     {
+      "id": "e2",
+      "text": "",
+      "result": "x"
+     }
+    ],
+    "evidence_gap": {
+     "required": [
+      {
+       "event": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+       "class": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n"
+      }
+     ],
+     "observed": [],
+     "missing": [
+      {
+       "event": "E",
+       "class": "any"
+      }
+     ]
+    },
+    "violations": [
+     {
+      "path": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+      "constraint": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+      "message_key": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n"
+     }
+    ],
+    "evidence": [
+     {
+      "ref": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+      "digest": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+      "source_class": "traces"
+     }
+    ],
+    "remediation": {
+     "techniques": [
+      {
+       "style": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+       "ref": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+       "digest": "sha256:d7530640be750297ee517ed9ba3b60dd87b9d280246503ebdac5ba6429e99eeb"
+      },
+      {
+       "style": "generic",
+       "ref": "​⁠",
+       "digest": "sha256:d7530640be750297ee517ed9ba3b60dd87b9d280246503ebdac5ba6429e99eeb"
+      }
+     ],
+     "hint": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n"
+    },
+    "acceptance": {
+     "expected_transition": {
+      "from": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+      "to": "conformant"
+     },
+     "criteria": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+     "reverify_command": [
+      "assess",
+      "--bundle",
+      "dir`with\nnewline",
+      "--profile",
+      "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n"
+     ]
+    },
+    "guardrails_ref": "remediation.guardrails.v1"
+   },
+   "tool_calls": []
+  },
+  {
+   "name": "finding_hostile_fields_1_tools",
+   "kind": "finding",
+   "finding": {
+    "control": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+    "control_version": "1.0.0",
+    "outcome": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+    "rung": 2,
+    "mode": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+    "severity": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+    "window": {
+     "start": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+     "end": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n"
+    },
+    "title": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+    "clauses": [
+     {
+      "framework": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+      "clause": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+      "relation": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+      "verified_against_text": true
+     },
+     {
+      "framework": "f",
+      "clause": "c",
+      "relation": "r",
+      "verified_against_text": false
+     }
+    ],
+    "expectations": [
+     {
+      "id": "e",
+      "text": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+      "result": "x"
+     },
+     {
+      "id": "e2",
+      "text": "",
+      "result": "x"
+     }
+    ],
+    "evidence_gap": {
+     "required": [
+      {
+       "event": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+       "class": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n"
+      }
+     ],
+     "observed": [],
+     "missing": [
+      {
+       "event": "E",
+       "class": "any"
+      }
+     ]
+    },
+    "violations": [
+     {
+      "path": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+      "constraint": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+      "message_key": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n"
+     }
+    ],
+    "evidence": [
+     {
+      "ref": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+      "digest": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+      "source_class": "traces"
+     }
+    ],
+    "remediation": {
+     "techniques": [
+      {
+       "style": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+       "ref": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+       "digest": "sha256:d7530640be750297ee517ed9ba3b60dd87b9d280246503ebdac5ba6429e99eeb"
+      },
+      {
+       "style": "generic",
+       "ref": "​⁠",
+       "digest": "sha256:d7530640be750297ee517ed9ba3b60dd87b9d280246503ebdac5ba6429e99eeb"
+      }
+     ],
+     "hint": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n"
+    },
+    "acceptance": {
+     "expected_transition": {
+      "from": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+      "to": "conformant"
+     },
+     "criteria": "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n",
+     "reverify_command": [
+      "assess",
+      "--bundle",
+      "dir`with\nnewline",
+      "--profile",
+      "a`b <i>x</i> [l](u) & &#x202E; ‮‍ 　 ️󠁁\tz\\n"
+     ]
+    },
+    "guardrails_ref": "remediation.guardrails.v1"
+   },
+   "tool_calls": [
+    "credit.record_decision",
+    "a‘b’"
+   ]
+  },
+  {
+   "name": "finding_hostile_run_1_no_tools",
+   "kind": "finding",
+   "finding": {
+    "acceptance": {
+     "criteria": "Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO‮ ZWJ‍ NBSP IDEO　 LS  PUA VS️ TAG󠁁 tab\tnl\\n end; Long expectation abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij",
+     "expected_transition": {
+      "from": "non-conformant",
+      "to": "conformant"
+     },
+     "reverify_command": [
+      "assess",
+      "--bundle",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/evidence",
+      "--profile",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/applicability.yaml",
+      "--catalog",
+      "remediation-hostile-fixture@2026.09",
+      "--catalog-dir",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/catalog",
+      "--domain",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/domain.linkml.yaml"
+     ]
+    },
+    "clauses": [
+     {
+      "clause": "Art. [1] & ‮2",
+      "framework": "fw`<x>",
+      "relation": "maps]",
+      "verified_against_text": true
+     },
+     {
+      "clause": "Art. 12",
+      "framework": "eu-ai-act",
+      "relation": "implements",
+      "verified_against_text": false
+     }
+    ],
+    "control": "RMH-01",
+    "control_version": "2026.09",
+    "description": "Fixture: non-conformant (no agent on the Decision). Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO‮ ZWJ‍ NBSP IDEO　 LS  PUA VS️ TAG󠁁 tab\tnl\\n end",
+    "evidence": [
+     {
+      "digest": "sha256:29def764c70d83d60efbe9f123bc603b569696966fe5af0da6ad7c7f6bb51c85",
+      "ref": "agentce:event/remediation-hostile-fixture-dec1<script>alert(1)</script>",
+      "source_class": "self_report"
+     }
+    ],
+    "evidence_gap": {
+     "missing": [],
+     "observed": [
+      {
+       "class": "any",
+       "event": "Decision"
+      }
+     ],
+     "required": [
+      {
+       "class": "any",
+       "event": "Decision"
+      }
+     ]
+    },
+    "expectations": [
+     {
+      "id": "E1",
+      "result": "non-conformant",
+      "text": "Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO‮ ZWJ‍ NBSP IDEO　 LS  PUA VS️ TAG󠁁 tab\tnl\\n end"
+     },
+     {
+      "id": "E2",
+      "result": "non-conformant",
+      "text": ""
+     },
+     {
+      "id": "E3",
+      "result": "non-conformant",
+      "text": "Long expectation abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij"
+     }
+    ],
+    "guardrails_ref": "remediation.guardrails.v1",
+    "mode": "automated",
+    "outcome": "non-conformant",
+    "remediation": {
+     "hint": "Hint: Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO‮ ZWJ‍ NBSP IDEO　 LS  PUA VS️ TAG󠁁 tab\tnl\\n end",
+     "techniques": [
+      {
+       "digest": "sha256:74c6b3da2f954ee1a2f3292fb0d49445cf6721716b1a5f024d94d2612c3d0aa4",
+       "ref": "techniques/`tick`<x>&[y]",
+       "style": "generic"
+      },
+      {
+       "digest": "sha256:cc587281c1f70e8baeabea4db65685f0b022c74932e80f99aceee52fbf77a170",
+       "ref": "techniques/plain",
+       "style": "generic"
+      },
+      {
+       "digest": "sha256:5bce4958f3e359f1c7841c0f9d1efdcffc46ad44b40dac0849fae248a559e614",
+       "ref": "​⁠",
+       "style": "generic"
+      }
+     ]
+    },
+    "rung": 2,
+    "severity": "unrated",
+    "title": "Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO‮ ZWJ‍ NBSP IDEO　 LS  PUA VS️ TAG󠁁 tab\tnl\\n end",
+    "violations": [
+     {
+      "constraint": "sh:minCount",
+      "focus": "agentce:event/remediation-hostile-fixture-dec1<script>alert(1)</script>",
+      "message_key": "RMH-01.R1",
+      "path": "prov:wasAssociatedWith"
+     }
+    ],
+    "window": {
+     "end": "2026-02-01T00:00:00Z",
+     "start": "2026-01-01T00:00:00Z"
+    }
+   },
+   "tool_calls": []
+  },
+  {
+   "name": "finding_hostile_run_1_tools",
+   "kind": "finding",
+   "finding": {
+    "acceptance": {
+     "criteria": "Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO‮ ZWJ‍ NBSP IDEO　 LS  PUA VS️ TAG󠁁 tab\tnl\\n end; Long expectation abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij",
+     "expected_transition": {
+      "from": "non-conformant",
+      "to": "conformant"
+     },
+     "reverify_command": [
+      "assess",
+      "--bundle",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/evidence",
+      "--profile",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/applicability.yaml",
+      "--catalog",
+      "remediation-hostile-fixture@2026.09",
+      "--catalog-dir",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/catalog",
+      "--domain",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/domain.linkml.yaml"
+     ]
+    },
+    "clauses": [
+     {
+      "clause": "Art. [1] & ‮2",
+      "framework": "fw`<x>",
+      "relation": "maps]",
+      "verified_against_text": true
+     },
+     {
+      "clause": "Art. 12",
+      "framework": "eu-ai-act",
+      "relation": "implements",
+      "verified_against_text": false
+     }
+    ],
+    "control": "RMH-01",
+    "control_version": "2026.09",
+    "description": "Fixture: non-conformant (no agent on the Decision). Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO‮ ZWJ‍ NBSP IDEO　 LS  PUA VS️ TAG󠁁 tab\tnl\\n end",
+    "evidence": [
+     {
+      "digest": "sha256:29def764c70d83d60efbe9f123bc603b569696966fe5af0da6ad7c7f6bb51c85",
+      "ref": "agentce:event/remediation-hostile-fixture-dec1<script>alert(1)</script>",
+      "source_class": "self_report"
+     }
+    ],
+    "evidence_gap": {
+     "missing": [],
+     "observed": [
+      {
+       "class": "any",
+       "event": "Decision"
+      }
+     ],
+     "required": [
+      {
+       "class": "any",
+       "event": "Decision"
+      }
+     ]
+    },
+    "expectations": [
+     {
+      "id": "E1",
+      "result": "non-conformant",
+      "text": "Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO‮ ZWJ‍ NBSP IDEO　 LS  PUA VS️ TAG󠁁 tab\tnl\\n end"
+     },
+     {
+      "id": "E2",
+      "result": "non-conformant",
+      "text": ""
+     },
+     {
+      "id": "E3",
+      "result": "non-conformant",
+      "text": "Long expectation abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij"
+     }
+    ],
+    "guardrails_ref": "remediation.guardrails.v1",
+    "mode": "automated",
+    "outcome": "non-conformant",
+    "remediation": {
+     "hint": "Hint: Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO‮ ZWJ‍ NBSP IDEO　 LS  PUA VS️ TAG󠁁 tab\tnl\\n end",
+     "techniques": [
+      {
+       "digest": "sha256:74c6b3da2f954ee1a2f3292fb0d49445cf6721716b1a5f024d94d2612c3d0aa4",
+       "ref": "techniques/`tick`<x>&[y]",
+       "style": "generic"
+      },
+      {
+       "digest": "sha256:cc587281c1f70e8baeabea4db65685f0b022c74932e80f99aceee52fbf77a170",
+       "ref": "techniques/plain",
+       "style": "generic"
+      },
+      {
+       "digest": "sha256:5bce4958f3e359f1c7841c0f9d1efdcffc46ad44b40dac0849fae248a559e614",
+       "ref": "​⁠",
+       "style": "generic"
+      }
+     ]
+    },
+    "rung": 2,
+    "severity": "unrated",
+    "title": "Tick `x` <b>bold</b> [link](http://e.example) & &#x202E; RLO‮ ZWJ‍ NBSP IDEO　 LS  PUA VS️ TAG󠁁 tab\tnl\\n end",
+    "violations": [
+     {
+      "constraint": "sh:minCount",
+      "focus": "agentce:event/remediation-hostile-fixture-dec1<script>alert(1)</script>",
+      "message_key": "RMH-01.R1",
+      "path": "prov:wasAssociatedWith"
+     }
+    ],
+    "window": {
+     "end": "2026-02-01T00:00:00Z",
+     "start": "2026-01-01T00:00:00Z"
+    }
+   },
+   "tool_calls": [
+    "credit.record_decision",
+    "a‘b’"
+   ]
+  },
+  {
+   "name": "finding_hostile_run_2_no_tools",
+   "kind": "finding",
+   "finding": {
+    "acceptance": {
+     "criteria": "re-run and reach a conformant outcome for this control.",
+     "expected_transition": {
+      "from": "insufficient_evidence",
+      "to": "conformant"
+     },
+     "reverify_command": [
+      "assess",
+      "--bundle",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/evidence",
+      "--profile",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/applicability.yaml",
+      "--catalog",
+      "remediation-hostile-fixture@2026.09",
+      "--catalog-dir",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/catalog",
+      "--domain",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/domain.linkml.yaml"
+     ]
+    },
+    "clauses": [],
+    "control": "RMH-02",
+    "control_version": "2026.09",
+    "evidence": [],
+    "evidence_gap": {
+     "missing": [
+      {
+       "class": "independent_system",
+       "event": "ToolCall"
+      }
+     ],
+     "observed": [
+      {
+       "class": "any",
+       "event": "Decision"
+      }
+     ],
+     "required": [
+      {
+       "class": "any",
+       "event": "Decision"
+      },
+      {
+       "class": "independent_system",
+       "event": "ToolCall"
+      }
+     ]
+    },
+    "expectations": [
+     {
+      "id": "E1",
+      "result": "insufficient_evidence",
+      "text": ""
+     }
+    ],
+    "guardrails_ref": "remediation.guardrails.v1",
+    "mode": "automated",
+    "outcome": "insufficient_evidence",
+    "remediation": {
+     "techniques": []
+    },
+    "rung": 2,
+    "severity": "unrated",
+    "title": "Needs an enforcement-point record, holds only self-report",
+    "violations": [],
+    "window": {
+     "end": "2026-02-01T00:00:00Z",
+     "start": "2026-01-01T00:00:00Z"
+    }
+   },
+   "tool_calls": []
+  },
+  {
+   "name": "finding_hostile_run_2_tools",
+   "kind": "finding",
+   "finding": {
+    "acceptance": {
+     "criteria": "re-run and reach a conformant outcome for this control.",
+     "expected_transition": {
+      "from": "insufficient_evidence",
+      "to": "conformant"
+     },
+     "reverify_command": [
+      "assess",
+      "--bundle",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/evidence",
+      "--profile",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/applicability.yaml",
+      "--catalog",
+      "remediation-hostile-fixture@2026.09",
+      "--catalog-dir",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/catalog",
+      "--domain",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/domain.linkml.yaml"
+     ]
+    },
+    "clauses": [],
+    "control": "RMH-02",
+    "control_version": "2026.09",
+    "evidence": [],
+    "evidence_gap": {
+     "missing": [
+      {
+       "class": "independent_system",
+       "event": "ToolCall"
+      }
+     ],
+     "observed": [
+      {
+       "class": "any",
+       "event": "Decision"
+      }
+     ],
+     "required": [
+      {
+       "class": "any",
+       "event": "Decision"
+      },
+      {
+       "class": "independent_system",
+       "event": "ToolCall"
+      }
+     ]
+    },
+    "expectations": [
+     {
+      "id": "E1",
+      "result": "insufficient_evidence",
+      "text": ""
+     }
+    ],
+    "guardrails_ref": "remediation.guardrails.v1",
+    "mode": "automated",
+    "outcome": "insufficient_evidence",
+    "remediation": {
+     "techniques": []
+    },
+    "rung": 2,
+    "severity": "unrated",
+    "title": "Needs an enforcement-point record, holds only self-report",
+    "violations": [],
+    "window": {
+     "end": "2026-02-01T00:00:00Z",
+     "start": "2026-01-01T00:00:00Z"
+    }
+   },
+   "tool_calls": [
+    "credit.record_decision",
+    "a‘b’"
+   ]
+  },
+  {
+   "name": "finding_hostile_run_3_no_tools",
+   "kind": "finding",
+   "finding": {
+    "acceptance": {
+     "criteria": "A record from an enforcement point shows the decision.",
+     "expected_transition": {
+      "from": "insufficient_evidence",
+      "to": "conformant"
+     },
+     "reverify_command": [
+      "assess",
+      "--bundle",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/evidence",
+      "--profile",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/applicability.yaml",
+      "--catalog",
+      "remediation-hostile-fixture@2026.09",
+      "--catalog-dir",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/catalog",
+      "--domain",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/domain.linkml.yaml"
+     ]
+    },
+    "clauses": [
+     {
+      "clause": "Art. 14",
+      "framework": "eu-ai-act",
+      "relation": "supports",
+      "verified_against_text": true
+     }
+    ],
+    "control": "RMH-05",
+    "control_version": "2026.09",
+    "evidence": [
+     {
+      "digest": "sha256:29def764c70d83d60efbe9f123bc603b569696966fe5af0da6ad7c7f6bb51c85",
+      "ref": "agentce:event/remediation-hostile-fixture-dec1<script>alert(1)</script>",
+      "source_class": "self_report"
+     }
+    ],
+    "evidence_gap": {
+     "missing": [
+      {
+       "class": "enforcement_point",
+       "event": "Decision"
+      }
+     ],
+     "observed": [
+      {
+       "class": "any",
+       "event": "Decision"
+      }
+     ],
+     "required": [
+      {
+       "class": "any",
+       "event": "Decision"
+      }
+     ]
+    },
+    "expectations": [
+     {
+      "id": "E1",
+      "result": "insufficient_evidence",
+      "text": "A record from an enforcement point shows the decision."
+     }
+    ],
+    "guardrails_ref": "remediation.guardrails.v1",
+    "mode": "automated",
+    "outcome": "insufficient_evidence",
+    "remediation": {
+     "techniques": []
+    },
+    "rung": 2,
+    "severity": "high",
+    "title": "Shape holds, but only on a self-report record below the control's source class",
+    "violations": [],
+    "window": {
+     "end": "2026-02-01T00:00:00Z",
+     "start": "2026-01-01T00:00:00Z"
+    }
+   },
+   "tool_calls": []
+  },
+  {
+   "name": "finding_hostile_run_3_tools",
+   "kind": "finding",
+   "finding": {
+    "acceptance": {
+     "criteria": "A record from an enforcement point shows the decision.",
+     "expected_transition": {
+      "from": "insufficient_evidence",
+      "to": "conformant"
+     },
+     "reverify_command": [
+      "assess",
+      "--bundle",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/evidence",
+      "--profile",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/applicability.yaml",
+      "--catalog",
+      "remediation-hostile-fixture@2026.09",
+      "--catalog-dir",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/catalog",
+      "--domain",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/domain.linkml.yaml"
+     ]
+    },
+    "clauses": [
+     {
+      "clause": "Art. 14",
+      "framework": "eu-ai-act",
+      "relation": "supports",
+      "verified_against_text": true
+     }
+    ],
+    "control": "RMH-05",
+    "control_version": "2026.09",
+    "evidence": [
+     {
+      "digest": "sha256:29def764c70d83d60efbe9f123bc603b569696966fe5af0da6ad7c7f6bb51c85",
+      "ref": "agentce:event/remediation-hostile-fixture-dec1<script>alert(1)</script>",
+      "source_class": "self_report"
+     }
+    ],
+    "evidence_gap": {
+     "missing": [
+      {
+       "class": "enforcement_point",
+       "event": "Decision"
+      }
+     ],
+     "observed": [
+      {
+       "class": "any",
+       "event": "Decision"
+      }
+     ],
+     "required": [
+      {
+       "class": "any",
+       "event": "Decision"
+      }
+     ]
+    },
+    "expectations": [
+     {
+      "id": "E1",
+      "result": "insufficient_evidence",
+      "text": "A record from an enforcement point shows the decision."
+     }
+    ],
+    "guardrails_ref": "remediation.guardrails.v1",
+    "mode": "automated",
+    "outcome": "insufficient_evidence",
+    "remediation": {
+     "techniques": []
+    },
+    "rung": 2,
+    "severity": "high",
+    "title": "Shape holds, but only on a self-report record below the control's source class",
+    "violations": [],
+    "window": {
+     "end": "2026-02-01T00:00:00Z",
+     "start": "2026-01-01T00:00:00Z"
+    }
+   },
+   "tool_calls": [
+    "credit.record_decision",
+    "a‘b’"
+   ]
+  },
+  {
+   "name": "finding_hostile_run_4_no_tools",
+   "kind": "finding",
+   "finding": {
+    "acceptance": {
+     "criteria": "Only a real true marks a clause verified.",
+     "expected_transition": {
+      "from": "insufficient_evidence",
+      "to": "conformant"
+     },
+     "reverify_command": [
+      "assess",
+      "--bundle",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/evidence",
+      "--profile",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/applicability.yaml",
+      "--catalog",
+      "remediation-hostile-fixture@2026.09",
+      "--catalog-dir",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/catalog",
+      "--domain",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/domain.linkml.yaml"
+     ]
+    },
+    "clauses": [
+     {
+      "clause": "Art. 9",
+      "framework": "eu-ai-act",
+      "relation": "maps",
+      "verified_against_text": false
+     },
+     {
+      "clause": "Art. 10",
+      "framework": "eu-ai-act",
+      "relation": "maps",
+      "verified_against_text": false
+     },
+     {
+      "clause": "Art. 11",
+      "framework": "eu-ai-act",
+      "relation": "maps",
+      "verified_against_text": false
+     },
+     {
+      "clause": "Art. 13",
+      "framework": "eu-ai-act",
+      "relation": "maps",
+      "verified_against_text": false
+     }
+    ],
+    "control": "RMH-06",
+    "control_version": "2026.09",
+    "evidence": [
+     {
+      "digest": "sha256:29def764c70d83d60efbe9f123bc603b569696966fe5af0da6ad7c7f6bb51c85",
+      "ref": "agentce:event/remediation-hostile-fixture-dec1<script>alert(1)</script>",
+      "source_class": "self_report"
+     }
+    ],
+    "evidence_gap": {
+     "missing": [
+      {
+       "class": "enforcement_point",
+       "event": "Decision"
+      }
+     ],
+     "observed": [
+      {
+       "class": "any",
+       "event": "Decision"
+      }
+     ],
+     "required": [
+      {
+       "class": "any",
+       "event": "Decision"
+      }
+     ]
+    },
+    "expectations": [
+     {
+      "id": "E1",
+      "result": "insufficient_evidence",
+      "text": "Only a real true marks a clause verified."
+     }
+    ],
+    "guardrails_ref": "remediation.guardrails.v1",
+    "mode": "automated",
+    "outcome": "insufficient_evidence",
+    "remediation": {
+     "techniques": []
+    },
+    "rung": 2,
+    "severity": "medium",
+    "title": "Verification flags that are not booleans",
+    "violations": [],
+    "window": {
+     "end": "2026-02-01T00:00:00Z",
+     "start": "2026-01-01T00:00:00Z"
+    }
+   },
+   "tool_calls": []
+  },
+  {
+   "name": "finding_hostile_run_4_tools",
+   "kind": "finding",
+   "finding": {
+    "acceptance": {
+     "criteria": "Only a real true marks a clause verified.",
+     "expected_transition": {
+      "from": "insufficient_evidence",
+      "to": "conformant"
+     },
+     "reverify_command": [
+      "assess",
+      "--bundle",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/evidence",
+      "--profile",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/applicability.yaml",
+      "--catalog",
+      "remediation-hostile-fixture@2026.09",
+      "--catalog-dir",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/catalog",
+      "--domain",
+      "~/agentce/tools/fixtures/report_formats/remediation_hostile/domain.linkml.yaml"
+     ]
+    },
+    "clauses": [
+     {
+      "clause": "Art. 9",
+      "framework": "eu-ai-act",
+      "relation": "maps",
+      "verified_against_text": false
+     },
+     {
+      "clause": "Art. 10",
+      "framework": "eu-ai-act",
+      "relation": "maps",
+      "verified_against_text": false
+     },
+     {
+      "clause": "Art. 11",
+      "framework": "eu-ai-act",
+      "relation": "maps",
+      "verified_against_text": false
+     },
+     {
+      "clause": "Art. 13",
+      "framework": "eu-ai-act",
+      "relation": "maps",
+      "verified_against_text": false
+     }
+    ],
+    "control": "RMH-06",
+    "control_version": "2026.09",
+    "evidence": [
+     {
+      "digest": "sha256:29def764c70d83d60efbe9f123bc603b569696966fe5af0da6ad7c7f6bb51c85",
+      "ref": "agentce:event/remediation-hostile-fixture-dec1<script>alert(1)</script>",
+      "source_class": "self_report"
+     }
+    ],
+    "evidence_gap": {
+     "missing": [
+      {
+       "class": "enforcement_point",
+       "event": "Decision"
+      }
+     ],
+     "observed": [
+      {
+       "class": "any",
+       "event": "Decision"
+      }
+     ],
+     "required": [
+      {
+       "class": "any",
+       "event": "Decision"
+      }
+     ]
+    },
+    "expectations": [
+     {
+      "id": "E1",
+      "result": "insufficient_evidence",
+      "text": "Only a real true marks a clause verified."
+     }
+    ],
+    "guardrails_ref": "remediation.guardrails.v1",
+    "mode": "automated",
+    "outcome": "insufficient_evidence",
+    "remediation": {
+     "techniques": []
+    },
+    "rung": 2,
+    "severity": "medium",
+    "title": "Verification flags that are not booleans",
+    "violations": [],
+    "window": {
+     "end": "2026-02-01T00:00:00Z",
+     "start": "2026-01-01T00:00:00Z"
+    }
+   },
+   "tool_calls": [
+    "credit.record_decision",
+    "a‘b’"
+   ]
+  },
+  {
+   "name": "finding_bare",
+   "kind": "finding",
+   "finding": {
+    "control": "X-1"
+   },
+   "tool_calls": []
+  },
+  {
+   "name": "reverify_bundle",
+   "kind": "reverify",
+   "argv": [
+    "agentce",
+    "assess",
+    "--bundle",
+    "~/p/evidence",
+    "--profile",
+    "~/p/applicability.yaml",
+    "--catalog",
+    "eu-ai-act@2026.09"
+   ]
+  },
+  {
+   "name": "reverify_program_only",
+   "kind": "reverify",
+   "argv": [
+    "agentce"
+   ]
+  },
+  {
+   "name": "reverify_hostile",
+   "kind": "reverify",
+   "argv": [
+    "agentce",
+    "assess",
+    "dir`with`ticks",
+    "line\nbreak",
+    "```",
+    "",
+    "  ",
+    "a‮b",
+    "<x>",
+    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+   ]
+  },
+  {
+   "name": "tools_none",
+   "kind": "tool_names",
+   "events": []
+  },
+  {
+   "name": "tools_dedupe_in_order",
+   "kind": "tool_names",
+   "events": [
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": "b"
+      }
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": "a"
+      }
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": "b"
+      }
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": "a "
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "tools_skipped",
+   "kind": "tool_names",
+   "events": [
+    {
+     "data": null
+    },
+    {
+     "data": "ToolCall"
+    },
+    {
+     "data": {
+      "@type": "Decision",
+      "tool": {
+       "name": "x"
+      }
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall"
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": "x"
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {}
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": ""
+      }
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": 0
+      }
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": false
+      }
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": null
+      }
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": []
+      }
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": {}
+      }
+     }
+    },
+    {}
+   ]
+  },
+  {
+   "name": "tools_non_string",
+   "kind": "tool_names",
+   "events": [
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": 5
+      }
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": true
+      }
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": 1.5
+      }
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": [
+        "a",
+        1
+       ]
+      }
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": {
+        "k": "v"
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "tools_hostile",
+   "kind": "tool_names",
+   "events": [
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": "`rm -rf`"
+      }
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": "<script>[x](y)"
+      }
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": "a‮b‍"
+      }
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": " \t "
+      }
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt"
+      }
+     }
+    },
+    {
+     "data": {
+      "@type": "ToolCall",
+      "tool": {
+       "name": " "
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "filename_plain",
+   "kind": "filename",
+   "control": "DOC-03",
+   "index": 1
+  },
+  {
+   "name": "filename_traversal",
+   "kind": "filename",
+   "control": "../../etc/passwd",
+   "index": 2
+  },
+  {
+   "name": "filename_separators",
+   "kind": "filename",
+   "control": "a/b\\c d:e",
+   "index": 3
+  },
+  {
+   "name": "filename_unicode",
+   "kind": "filename",
+   "control": "é日本́²Ⅷx",
+   "index": 10
+  },
+  {
+   "name": "filename_empty",
+   "kind": "filename",
+   "control": "",
+   "index": 1
+  },
+  {
+   "name": "filename_supplementary",
+   "kind": "filename",
+   "control": "𝐀𐍈😀",
+   "index": 4
+  }
+ ]
+}

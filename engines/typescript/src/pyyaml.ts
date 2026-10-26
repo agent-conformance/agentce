@@ -246,6 +246,15 @@ const hex = (code: number, width: number): string =>
 const slice = (text: number[], start: number, end: number): string =>
   String.fromCodePoint(...text.slice(start, end));
 
+/** A double-quoted scalar's escape for one code point (`write_double_quoted`). */
+function escapeCodePoint(ch: number): string {
+  const short = ESCAPE_REPLACEMENTS.get(ch);
+  if (short !== undefined) return `\\${short}`;
+  if (ch <= 0xff) return `\\x${hex(ch, 2)}`;
+  if (ch <= 0xffff) return `\\u${hex(ch, 4)}`;
+  return `\\U${hex(ch, 8)}`;
+}
+
 interface Context {
   root?: boolean;
   mapping?: boolean;
@@ -467,12 +476,7 @@ class Emitter {
           start = end;
         }
         if (ch !== null) {
-          const short = ESCAPE_REPLACEMENTS.get(ch);
-          let data: string;
-          if (short !== undefined) data = `\\${short}`;
-          else if (ch <= 0xff) data = `\\x${hex(ch, 2)}`;
-          else if (ch <= 0xffff) data = `\\u${hex(ch, 4)}`;
-          else data = `\\U${hex(ch, 8)}`;
+          const data = escapeCodePoint(ch);
           this.write(data, data.length);
           start = end + 1;
         }
@@ -542,4 +546,28 @@ class Emitter {
 /** The text `yaml.dump(value, Dumper=_ProfileDumper, sort_keys=False)` returns for `value`. */
 export function safeDump(value: unknown): string {
   return new Emitter().emitDocument(represent(value, new Set()));
+}
+
+/**
+ * The text `yaml.safe_dump(text, default_style='"', allow_unicode=True, width=float("inf"))` returns for a
+ * string, without its trailing newline: one double-quoted scalar, never folded, with every code point PyYAML's
+ * `write_double_quoted` would not write as is under `allow_unicode` escaped.
+ */
+export function doubleQuoted(text: string): string {
+  let out = '"';
+  for (const c of text) {
+    const ch = c.codePointAt(0) as number;
+    const kept =
+      ch !== 0x22 &&
+      ch !== 0x5c &&
+      ch !== 0x85 &&
+      ch !== 0x2028 &&
+      ch !== 0x2029 &&
+      ch !== 0xfeff &&
+      ((ch >= 0x20 && ch <= 0x7e) ||
+        (ch >= 0xa0 && ch <= 0xd7ff) ||
+        (ch >= 0xe000 && ch <= 0xfffd));
+    out += kept ? c : escapeCodePoint(ch);
+  }
+  return `${out}"`;
 }

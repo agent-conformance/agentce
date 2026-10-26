@@ -236,7 +236,7 @@ function sanitizeEvidenceGap(gap: Json): Json {
 
 /** A render-only, rebuilt view of one finding: every catalog- or evidence-derived string the
  * template interpolates is sanitised; the canonical package is untouched. */
-function sanitizeFinding(f: Json): Json {
+export function sanitizeFinding(f: Json): Json {
   const remediation = asJson(f.remediation);
   return {
     ...sanitizeKeys(f, ["control", "title", "mode"]),

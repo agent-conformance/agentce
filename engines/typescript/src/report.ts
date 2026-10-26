@@ -32,6 +32,13 @@ import {
 } from "./project";
 import { renderRemediationMd, renderRemediationPackage } from "./remediation";
 import {
+  renderReverifyMd,
+  renderSkillFindingMd,
+  renderSkillMd,
+  skillFindingFilename,
+  toolNamesForSubject,
+} from "./skill";
+import {
   byteCompare,
   formatTemplate,
   joinPath,
@@ -1804,24 +1811,46 @@ export function writeReport(
     outputs[rel] = digestBytes(data);
   }
 
-  if (SEAM_EMIT.has("remediation")) {
+  if (SEAM_EMIT.has("remediation") || SEAM_EMIT.has("skill")) {
     const eventsBySubject = indexBySubject(options.events ?? []);
     const argv = options.reverifyCommand?.length
       ? options.reverifyCommand
       : (options.invocation ?? []);
+    const catalogObjects = options.catalogObjects ?? [];
+    const assertionsDigest = outputs["assertions.json"] as string;
+    const catalogVersion = catalogObjects.map((c) => `${c.id}@${c.version}`).join(", ");
     for (const subject of subjects) {
+      const subjectEvents = eventsBySubject.get(subject) ?? [];
       const pkg = renderRemediationPackage(
         subject,
         assertions.filter((a) => a.subject === subject),
-        options.catalogObjects ?? [],
-        outputs["assertions.json"] as string,
-        eventsBySubject.get(subject) ?? [],
+        catalogObjects,
+        assertionsDigest,
+        subjectEvents,
         argv,
       );
-      const relDir = `remediation/${safe(subject)}`;
-      mkdirSync(joinPath(outDir, relDir), { recursive: true });
-      writeBytes(`${relDir}/remediation-package.json`, canonicalize(pkg));
-      writeTextFile(`${relDir}/remediation.md`, renderRemediationMd(pkg));
+      const pkgBytes = canonicalize(pkg);
+      if (SEAM_EMIT.has("remediation")) {
+        const relDir = `remediation/${safe(subject)}`;
+        mkdirSync(joinPath(outDir, relDir), { recursive: true });
+        writeBytes(`${relDir}/remediation-package.json`, pkgBytes);
+        writeTextFile(`${relDir}/remediation.md`, renderRemediationMd(pkg));
+      }
+      if (SEAM_EMIT.has("skill")) {
+        const relDir = `skill/${safe(subject)}`;
+        mkdirSync(joinPath(outDir, relDir, "findings"), { recursive: true });
+        writeBytes(`${relDir}/remediation-package.json`, pkgBytes);
+        writeTextFile(
+          `${relDir}/SKILL.md`,
+          renderSkillMd(SPEC_VERSION, engineVersion(), catalogVersion, assertionsDigest),
+        );
+        const toolCalls = toolNamesForSubject(subjectEvents);
+        (pkg.findings as Record<string, unknown>[]).forEach((finding, i) => {
+          const name = skillFindingFilename(String(finding.control), i + 1);
+          writeTextFile(`${relDir}/findings/${name}`, renderSkillFindingMd(finding, toolCalls));
+        });
+        writeTextFile(`${relDir}/REVERIFY.md`, renderReverifyMd(["agentce", ...argv]));
+      }
     }
   }
 

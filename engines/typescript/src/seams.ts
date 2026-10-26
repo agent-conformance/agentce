@@ -12,6 +12,7 @@ import { main as cliMain } from "./cli";
 import { InputError } from "./errors";
 import { ExitCode } from "./exitCodes";
 import { parseFailOn } from "./failOn";
+import type { Event } from "./graph";
 import {
   JsonProfileError,
   type NonCanonicalNumber,
@@ -37,6 +38,13 @@ import {
   renderPublicStatement,
 } from "./report";
 import { computeSecurityView } from "./securityView";
+import {
+  renderReverifyMd,
+  renderSkillFindingMd,
+  renderSkillMd,
+  skillFindingFilename,
+  toolNamesForSubject,
+} from "./skill";
 import { joinPath } from "./util";
 
 type Json = Record<string, unknown>;
@@ -255,8 +263,8 @@ export function main(argv: string[]): number {
   if (command === "assess-emit") {
     const [formats, ...assessArgv] = argv.slice(1);
     const names = (formats ?? "").split(",");
-    if (formats === undefined || names.some((name) => name !== "remediation")) {
-      console.error("assess-emit: the only format is remediation");
+    if (formats === undefined || names.some((name) => name !== "remediation" && name !== "skill")) {
+      console.error("assess-emit: the formats are remediation and skill");
       return ExitCode.INPUT_ERROR;
     }
     for (const name of names) {
@@ -267,6 +275,20 @@ export function main(argv: string[]): number {
     } finally {
       SEAM_EMIT.clear();
     }
+  }
+
+  // skill-cases renders every case of a case file ({cases: [{name, kind, ...}]}: skill, finding, reverify,
+  // tool_names, filename) with the skill folder's functions and writes {name: text} as JSON (18.16f).
+  if (command === "skill-cases") {
+    const [casefile, outPath] = argv.slice(1);
+    if (casefile === undefined || outPath === undefined) {
+      console.error("skill-cases: a case file and an output path are required");
+      return ExitCode.INPUT_ERROR;
+    }
+    const cases = (readBundled(readFileSync(casefile)) as { cases: Json[] }).cases;
+    const rendered = Object.fromEntries(cases.map((c) => [c.name, skillCase(c)]));
+    writeFileSync(outPath, JSON.stringify(rendered), "utf-8");
+    return 0;
   }
 
   // remediation-md renders every package in a case file ({cases: [{name, package}]}) with
@@ -287,6 +309,29 @@ export function main(argv: string[]): number {
 
   console.error(`seams: unknown seam '${command ?? ""}'`);
   return ExitCode.INPUT_ERROR;
+}
+
+/** One skill_cases.json case through the skill folder function its kind names. */
+export function skillCase(c: Json): string {
+  switch (c.kind) {
+    case "skill":
+      return renderSkillMd(
+        c.spec_version as string,
+        c.cli_version as string,
+        c.catalog_version as string,
+        c.assertions_digest as string,
+      );
+    case "finding":
+      return renderSkillFindingMd(c.finding as Json, c.tool_calls as string[]);
+    case "reverify":
+      return renderReverifyMd(c.argv as string[]);
+    case "tool_names":
+      return toolNamesForSubject(c.events as Event[]).join("\n");
+    case "filename":
+      return skillFindingFilename(c.control as string, c.index as number);
+    default:
+      throw new Error(`skill-cases: unknown kind ${String(c.kind)}`);
+  }
 }
 
 interface JsonCase {

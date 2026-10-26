@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { test } from "node:test";
-import { pspTermsPath, remediationTemplatePath } from "./bundled";
+import { pspTermsPath, templatePath } from "./bundled";
 
 const ENGINE = join(__dirname, "..");
 const REPO = join(ENGINE, "..", "..");
@@ -70,10 +70,16 @@ test("the vendored psp-terms.json is byte-identical to spec/rules/psp-terms.json
   assert.ok(vendored.equals(readFileSync(join(REPO, "spec", "rules", "psp-terms.json"))));
 });
 
-test("the vendored remediation.md.tmpl is byte-identical to spec/report/templates/remediation.md.tmpl", () => {
-  // Every engine renders remediation.md from the one language-neutral template (SPEC §7, 18.16e).
-  const vendored = readFileSync(remediationTemplatePath());
-  assert.ok(
-    vendored.equals(readFileSync(join(REPO, "spec", "report", "templates", "remediation.md.tmpl"))),
-  );
-});
+for (const name of [
+  "remediation.md.tmpl",
+  "skill.md.tmpl",
+  "skill-finding.md.tmpl",
+  "skill-reverify.md.tmpl",
+]) {
+  test(`the vendored ${name} is byte-identical to spec/report/templates/${name}`, () => {
+    // Every engine renders remediation.md and the skill folder from the one language-neutral template
+    // (SPEC §7, 18.16e, 18.16f).
+    const vendored = readFileSync(templatePath(name));
+    assert.ok(vendored.equals(readFileSync(join(REPO, "spec", "report", "templates", name))));
+  });
+}
