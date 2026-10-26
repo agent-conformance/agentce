@@ -2137,7 +2137,18 @@ def test_audience_view_registry_removing_a_preset_stops_write_report_rendering_i
     """P18-18.49: proves ``write_report`` genuinely dispatches through ``AUDIENCE_VIEWS`` for the three
     real presets, not merely that a fourth key happens to work -- deleting ``"security"`` from the
     registry (zero change to ``write_report``'s body) must stop ``security.json``/``.md``/``.html`` from
-    being written at all, the same outcome as an unregistered preset today."""
+    being written at all, the same outcome as an unregistered preset today. The registered run comes
+    first, so the deletion is what stops the files (inbox row 106 M3)."""
+    registered = tmp_path / "registered"
+    write_report(
+        registered,
+        [_assertion("conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+        for_preset="security",
+    )
+    for name in ("security.json", "security.md", "security.html"):
+        assert (registered / name).is_file(), name
     monkeypatch.delitem(AUDIENCE_VIEWS, "security")
     out = tmp_path / "o"
     write_report(
@@ -2150,6 +2161,34 @@ def test_audience_view_registry_removing_a_preset_stops_write_report_rendering_i
     assert not (out / "security.json").exists()
     assert not (out / "security.md").exists()
     assert not (out / "security.html").exists()
+
+
+@pytest.mark.parametrize(
+    ("emit", "written"),
+    [
+        ({"sarif"}, {"security.json"}),
+        ({"md"}, {"security.json", "security.md"}),
+        ({"html"}, {"security.json", "security.html"}),
+        ({"md", "html"}, {"security.json", "security.md", "security.html"}),
+    ],
+)
+def test_security_view_writes_md_and_html_only_when_asked(
+    tmp_path: Path, emit: set[str], written: set[str]
+) -> None:
+    """Inbox row 106 M2: `security` has no `always_write`, so its .md/.html follow the emit set while
+    security.json is always written; each written file is in manifest.outputs."""
+    write_report(
+        tmp_path,
+        [_assertion("conformant")],
+        bundle_digest="sha256:" + "a" * 64,
+        catalogs=[_catalog()],
+        for_preset="security",
+        emit=emit,
+    )
+    on_disk = {p.name for p in tmp_path.iterdir() if p.name.startswith("security.")}
+    outputs = json.loads((tmp_path / "manifest.json").read_text())["outputs"]
+    assert on_disk == written
+    assert {k for k in outputs if k.startswith("security.")} == written
 
 
 def _valid_report(tmp_path: Path) -> Path:
