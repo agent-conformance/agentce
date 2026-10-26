@@ -41,6 +41,11 @@ in English and German, quickstart, the auditor-view fixture, the hostile remedia
 buyer.html byte for byte, each listed in manifest.outputs with Python's digest. `security_cases.json` and
 `buyer_cases.json` are rendered by each engine's `security-cases` and `buyer-cases` seams against the committed goldens.
 
+report.md and report.html (18.16i) are compared from the same runs plus the project_view fixture (each agent's
+agents/*/report.md and .html; the top-level pair there is the project view): Python's files from its `--for security`
+run, each engine's byte for byte once the one engine line names that engine's own manifest engine. `report --from
+<Python's assertions.json> --format md|html` over quickstart and the hostile fixture is compared the same way.
+
 Modes:
     report_format_parity_check.py                  # three engines (needs `pnpm build` and `:assemble` first)
     report_format_parity_check.py --fail-fast      # the same, stopping at the first mismatching run
@@ -62,6 +67,7 @@ import sys
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from collections.abc import Mapping
 from typing import Any, NamedTuple
 
 import claim_parity_check as cpc
@@ -125,6 +131,14 @@ PACKAGE_ID = "urn:agentce:remediation-package:sha256:"
 #: quickstart, quickstart in German, the auditor-view fixture and the 30 generated projects; a checker
 #: that silently drops a run or a case must not print OK.
 CORPUS_RUNS = 33
+#: report.md and report.html (18.16i): every engine writes Python's bytes but for the one engine line.
+REPORT_FILES = ("report.md", "report.html")
+#: A project with several agents, compared for agents/*/report.md and .html alone (the top-level report is
+#: the project view).
+PROJECT_VIEW = ROOT / "verification" / "gates" / "fixtures" / "project_view"
+REPORT_ONLY_RUNS = 1
+#: `report --from <Python's assertions.json> --format md|html` re-rendered by every engine over these runs.
+RERENDER_LABELS = ("quickstart", "remediation_hostile")
 
 #: Python's side of the seam: the same five renderings from a report directory's own files, the way
 #: write_report calls them (catalog labels `id@version`, the applied deviation ids, counts from aggregate,
@@ -499,6 +513,13 @@ def check_corpus(
     )
     no_assertions = next(r for r in every if r[0] == "no-assertions")
     runs += remediation_only_runs(tmp, no_assertions)
+    project_view = [
+        *cpc._project_args(PROJECT_VIEW),
+        "--catalog-dir",
+        str(PROJECT_VIEW / "catalog"),
+        "--allow-unverified-catalog",
+    ]
+    runs.append(("project_view", project_view, {}, False))
     formats = [i for i, r in enumerate(runs) if r[3]]
     labels = [label for label, _, _, _ in runs]
     dirs = {
@@ -550,14 +571,22 @@ def check_corpus(
                 if (
                     code != 3
                     or _emitted_files(dirs[engine][i])
-                    or any((dirs[engine][i] / n).exists() for n in SECURITY_FILES)
+                    or any(
+                        (dirs[engine][i] / n).exists()
+                        for n in (*SECURITY_FILES, *REPORT_FILES)
+                    )
                 ):
                     problems.append(
-                        f"java assess <folder> exited {code}; want 3 (input.records_unsupported), no remediation, skill or security files"
+                        f"java assess <folder> exited {code}; want 3 (input.records_unsupported), no remediation, skill, security or report files"
                     )
                 continue
             if code != py_exit:
                 problems.append(f"{engine} assess exited {code}, python {py_exit}")
+            elif label == "project_view":
+                if engine != "python":
+                    problems += report_problems(
+                        engine, dirs["python-security"][i], dirs[engine][i]
+                    )
             elif clock_problems.get((engine, i)):
                 problems.append(f"{engine} {clock_problems[(engine, i)]}")
             elif i in seam_index and seam_errors[engine]:
@@ -576,10 +605,101 @@ def check_corpus(
                     problems += view_problems(
                         engine, dirs["python-security"][i], dirs[engine][i]
                     )
+                    problems += report_problems(
+                        engine, dirs["python-security"][i], dirs[engine][i]
+                    )
+                    if label in RERENDER_LABELS:
+                        problems += rerender_problems(
+                            engine, dirs["python"][i], dirs[engine][i]
+                        )
         failures += _report(label, problems)
         if problems and fail_fast:
             break
     return failures, len(labels)
+
+
+def engine_line(name: str, engine: dict[str, str]) -> bytes:
+    """The one line of report.md (or report.html) that names the engine that ran."""
+    text = f"{engine['impl']} {engine['version']}"
+    return (
+        f"<li>Engine: {text}</li>"
+        if name.endswith(".html")
+        else f"\n- Engine: {text}\n"
+    ).encode()
+
+
+def _report_files(report: Path) -> list[str]:
+    """The report.md/.html files a run wrote: each agent's under agents/ in a project run (the top-level
+    pair is the project view there), else the top-level pair."""
+    agents = report / "agents"
+    if agents.is_dir():
+        return sorted(
+            p.relative_to(report).as_posix()
+            for p in agents.glob("*/*")
+            if p.name in REPORT_FILES
+        )
+    return [n for n in REPORT_FILES if (report / n).is_file()]
+
+
+def as_engine(
+    reference: bytes, name: str, python: dict[str, str], engine: dict[str, str]
+) -> bytes | str:
+    """Python's `reference` report file with its one engine line naming `engine`; the problem when
+    Python's file does not name Python exactly once."""
+    line = engine_line(name, python)
+    if reference.count(line) != 1:
+        return (
+            f"python {name} names its engine {reference.count(line)} times, want once"
+        )
+    return reference.replace(line, engine_line(name, engine))
+
+
+def report_problems(engine: str, reference: Path, candidate: Path) -> list[str]:
+    """`candidate`'s report.md and report.html files against Python's in `reference`: the same files, each
+    Python's bytes once its engine line names the candidate manifest's engine."""
+    want, got = _report_files(reference), _report_files(candidate)
+    if want != got:
+        return [f"{engine} wrote report files {got}, python {want}"]
+    if not want:
+        return []
+    python = json.loads((reference / "manifest.json").read_text("utf-8"))["engine"]
+    own = json.loads((candidate / "manifest.json").read_text("utf-8"))["engine"]
+    problems = []
+    for name in want:
+        expected = as_engine((reference / name).read_bytes(), name, python, own)
+        if isinstance(expected, str):
+            problems.append(expected)
+            continue
+        actual = (candidate / name).read_bytes()
+        if actual != expected:
+            problems.append(f"{engine} {name}: " + _first_difference(expected, actual))
+    return problems
+
+
+def rerender_problems(engine: str, reference: Path, candidate: Path) -> list[str]:
+    """`report --from <Python's assertions.json> --format md` and `--format html` printed by `engine`
+    against Python's stdout, under the same engine-line rule."""
+    python = json.loads((reference / "manifest.json").read_text("utf-8"))["engine"]
+    own = json.loads((candidate / "manifest.json").read_text("utf-8"))["engine"]
+    problems = []
+    for fmt in ("md", "html"):
+        argv = ["report", "--from", str(reference / "assertions.json"), "--format", fmt]
+        want, want_code = cpc.run_engine("python", argv)
+        got, code = cpc.run_engine(engine, argv)
+        if code != want_code:
+            problems.append(
+                f"{engine} report --format {fmt} exited {code}, python {want_code}"
+            )
+            continue
+        expected = as_engine(want.encode(), f"report.{fmt}", python, own)
+        if isinstance(expected, str):
+            problems.append(expected)
+        elif got.encode() != expected:
+            problems.append(
+                f"{engine} report --format {fmt}: "
+                + _first_difference(expected, got.encode())
+            )
+    return problems
 
 
 def pin_started_at(reference: Path, candidate: Path) -> str:
@@ -902,6 +1022,7 @@ def run_check(engines: tuple[str, ...], fail_fast: bool) -> int:
     expected = (
         CORPUS_RUNS
         + REMEDIATION_ONLY_RUNS
+        + REPORT_ONLY_RUNS
         + BUYER_RUNS
         + len(json.loads(CASES.read_text("utf-8"))["cases"])
         + sum(
@@ -970,12 +1091,100 @@ def self_test() -> int:
         failures += _view_self_test(tmp / "security", SECURITY_FILES)
         failures += _view_self_test(tmp / "buyer", BUYER_FILES)
         failures += _seam_for_self_test(tmp / "seam-for")
+        failures += _report_self_test(tmp / "report")
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
     if failures:
         return 1
     print("SELF-TEST OK")
     return 0
+
+
+def _report_self_test(tmp: Path) -> list[str]:
+    """report_problems passes a correct copy, top-level and per agent, and catches each report tamper."""
+    py = {"impl": "agentce-py", "version": "0.1.0"}
+    ts = {"impl": "agentce-ts", "version": "0.1.0"}
+
+    def files(engine: dict[str, str]) -> dict[str, bytes]:
+        return {
+            "report.md": b"# R\n"
+            + engine_line("report.md", engine)
+            + b"- Catalog: (none)\n",
+            "report.html": b"<ul>" + engine_line("report.html", engine) + b"</ul>\n",
+        }
+
+    def write(
+        d: Path, engine: dict[str, str], tree: Mapping[str, bytes | None]
+    ) -> Path:
+        d.mkdir(parents=True)
+        (d / "manifest.json").write_text(json.dumps({"engine": engine}), "utf-8")
+        for name, data in tree.items():
+            if data is not None:
+                (d / name).parent.mkdir(parents=True, exist_ok=True)
+                (d / name).write_bytes(data)
+        return d
+
+    def agents(tree: dict[str, bytes]) -> dict[str, bytes]:
+        return {f"agents/a-1/{n}": b for n, b in tree.items()}
+
+    good = files(ts)
+    md = good["report.md"]
+    tampers: dict[str, tuple[dict[str, bytes], dict[str, bytes | None]]] = {
+        "report one byte changed": (
+            files(py),
+            {"report.md": md.replace(b"(none)", b"(nonE)")},
+        ),
+        "report file missing": (files(py), {"report.html": None}),
+        "agent report file missing": (
+            agents(files(py)),
+            {"agents/a-1/report.md": None},
+        ),
+        "agent report file extra": (agents(files(py)), {"agents/a-2/report.md": md}),
+        "engine line names another engine": (
+            files(py),
+            {"report.md": md.replace(b"agentce-ts", b"agentce-java")},
+        ),
+        "engine line names another version": (
+            files(py),
+            {"report.md": md.replace(b"0.1.0", b"0.1.1")},
+        ),
+        "engine line missing": (
+            files(py),
+            {"report.md": md.replace(engine_line("report.md", ts), b"\n")},
+        ),
+        "engine line twice": (
+            files(py),
+            {"report.md": md + engine_line("report.md", ts)},
+        ),
+        "python reference names no engine": (
+            {**files(py), "report.md": b"# R\n- Catalog: (none)\n"},
+            {},
+        ),
+    }
+    failures = []
+    reference = write(tmp / "reference", py, files(py))
+    if report_problems("typescript", reference, write(tmp / "same", ts, good)):
+        failures.append("a correct report copy was flagged")
+    project = write(tmp / "project-ref", py, {**agents(files(py)), **files(py)})
+    candidate = write(
+        tmp / "project-same", ts, {**agents(good), "report.md": b"project view\n"}
+    )
+    if report_problems("typescript", project, candidate):
+        failures.append(
+            "a correct project run (agents/*, its own project view) was flagged"
+        )
+    for i, (name, (ref_tree, change)) in enumerate(tampers.items()):
+        base = (
+            good if not any(n.startswith("agents/") for n in ref_tree) else agents(good)
+        )
+        ref = write(tmp / f"r{i}", py, ref_tree)
+        if report_problems(
+            "typescript", ref, write(tmp / f"c{i}", ts, {**base, **change})
+        ):
+            print(f"caught: {name}")
+        else:
+            failures.append(f"tamper not caught: {name}")
+    return failures
 
 
 def _canonical(value: object) -> bytes:

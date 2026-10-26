@@ -3,6 +3,16 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.136.9
+
+- `VG-REPORT-FORMAT-PARITY` (changed, 18.16i): also compares report.md and report.html. Over the same runs, plus the
+  project_view fixture (each `agents/*/report.md` and `.html`; the top-level pair there is the project view), every engine
+  writes Python's files byte for byte once the one engine line (`- Engine: agentce-py 0.1.0`,
+  `<li>Engine: agentce-py 0.1.0</li>`) names that engine's own manifest engine; Java's refused folder runs write none.
+  `report --from <Python's assertions.json> --format md|html` over quickstart and the hostile fixture prints Python's
+  text under the same rule. The self-test catches a one-byte change, a missing or extra report file, a wrong, missing or
+  doubled engine line and a Python reference naming no engine. Eight new seeded faults (36 to 43).
+
 ## 0.136.8
 
 - `VG-REPORT-FORMAT-PARITY` (changed, 18.16h): also compares the buyer view. Over six inputs (the buyer-view fixture in
