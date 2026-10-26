@@ -2166,14 +2166,14 @@ def test_audience_view_registry_removing_a_preset_stops_write_report_rendering_i
 @pytest.mark.parametrize(
     ("emit", "written"),
     [
-        ({"sarif"}, {"security.json"}),
-        ({"md"}, {"security.json", "security.md"}),
-        ({"html"}, {"security.json", "security.html"}),
-        ({"md", "html"}, {"security.json", "security.md", "security.html"}),
+        (frozenset({"sarif"}), {"security.json"}),
+        (frozenset({"md"}), {"security.json", "security.md"}),
+        (frozenset({"html"}), {"security.json", "security.html"}),
+        (frozenset({"md", "html"}), {"security.json", "security.md", "security.html"}),
     ],
 )
 def test_security_view_writes_md_and_html_only_when_asked(
-    tmp_path: Path, emit: set[str], written: set[str]
+    tmp_path: Path, emit: frozenset[str], written: set[str]
 ) -> None:
     """Inbox row 106 M2: `security` has no `always_write`, so its .md/.html follow the emit set while
     security.json is always written; each written file is in manifest.outputs."""
