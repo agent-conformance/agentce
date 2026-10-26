@@ -83,6 +83,10 @@ MD_EXPECTED = CASES.with_name("remediation_md_expected.json")
 SKILL_CASES = CASES.with_name("skill_cases.json")
 #: Python's rendering of each case of SKILL_CASES, the golden the engines' unit tests read.
 SKILL_EXPECTED = CASES.with_name("skill_expected.json")
+SECURITY_CASES = CASES.with_name("security_cases.json")
+#: Python's security.md and security.html for each view of SECURITY_CASES, the golden the engines'
+#: unit tests read.
+SECURITY_EXPECTED = CASES.with_name("security_expected.json")
 HOSTILE = CASES.with_name("remediation_hostile")
 #: A records folder for the folder-form runs (`assess <folder>`), copied into the work tree.
 RECORDS = ROOT / "adapters" / "otel-genai" / "fixtures" / "otel-genai-agent-session"
@@ -91,6 +95,9 @@ RECORDS = ROOT / "adapters" / "otel-genai" / "fixtures" / "otel-genai-agent-sess
 REMEDIATION_ONLY_RUNS = 4
 #: The emitted folders compared file by file: remediation (18.16e) and the skill folder (18.16f).
 EMITTED = ("remediation", "skill")
+#: The security view's files (18.16g): Python writes them on a second run with `--for security` (which
+#: refuses --emit), the other engines through the seam's `for=security` token.
+SECURITY_FILES = ("security.json", "security.md", "security.html")
 #: Java reads no records folder yet (input.records_unsupported; docs/quickstart-java.md): on the
 #: folder-form runs it must refuse at exit 3 and write no remediation output.
 JAVA_REFUSES = {"records_folder", "records_folder_profile"}
@@ -215,19 +222,21 @@ def file_problems(engine: str, reference: Path, candidate: Path) -> list[str]:
 
 
 def _assess(engine: str, args: list[str], env: dict[str, str], out: Path) -> int:
-    """One engine's real `assess`, Python's with the five formats, remediation and skill emitted, the
-    others' through their `assess-emit remediation,skill` seam; its exit code. Exits 1 and 2 (a non-conformant or
-    unproven outcome) still write the full report."""
+    """One engine's real `assess`, Python's with the five formats, remediation and skill emitted (or, as
+    "python-security", with `--for security`), the others' through their `assess-emit
+    remediation,skill,for=security` seam; its exit code. Exits 1 and 2 (a non-conformant or unproven
+    outcome) still write the full report."""
     argv = ["assess", *args, "--out", str(out)]
-    if engine == "python":
-        _, code = cpc.run_engine(
-            engine,
-            [*argv, "--emit", "junit,csv,oscal_xml,public,pdf,remediation,skill"],
-            env,
+    if engine.startswith("python"):
+        extra = (
+            ["--for", "security"]
+            if engine == "python-security"
+            else ["--emit", "junit,csv,oscal_xml,public,pdf,remediation,skill"]
         )
+        _, code = cpc.run_engine("python", [*argv, *extra], env)
         return code
     proc = subprocess.run(
-        [*_seam(engine), "assess-emit", "remediation,skill", *argv],
+        [*_seam(engine), "assess-emit", "remediation,skill,for=security", *argv],
         capture_output=True,
         text=True,
         cwd=ROOT,
@@ -336,6 +345,32 @@ def emitted_problems(
     return problems
 
 
+def security_problems(engine: str, reference: Path, candidate: Path) -> list[str]:
+    """`candidate`'s security files against Python's `--for security` run in `reference`: the same
+    files, byte for byte, each listed in manifest.outputs with Python's digest."""
+    want = [n for n in SECURITY_FILES if (reference / n).is_file()]
+    got = [n for n in SECURITY_FILES if (candidate / n).is_file()]
+    if want != got:
+        return [f"{engine} wrote security files {got}, python {want}"]
+    if not want:
+        return []
+    ref_out = json.loads((reference / "manifest.json").read_text("utf-8"))["outputs"]
+    out = json.loads((candidate / "manifest.json").read_text("utf-8"))["outputs"]
+    listed = [n for n in SECURITY_FILES if n in out]
+    if listed != want:
+        return [
+            f"{engine} manifest.outputs lists security files {listed}, python {want}"
+        ]
+    problems = []
+    for name in want:
+        a, b = (reference / name).read_bytes(), (candidate / name).read_bytes()
+        if a != b:
+            problems.append(f"{engine} {name}: " + _first_difference(a, b))
+        elif out[name] != ref_out.get(name):
+            problems.append(f"{engine} manifest.outputs[{name}] is not python's digest")
+    return problems
+
+
 def canonical_digest_table(packages: list[Path]):
     """A `digest_of` over every package and its body in one Python canonicalizer run."""
     values = []
@@ -365,12 +400,12 @@ def check_corpus(
     labels = [label for label, _, _, _ in runs]
     dirs = {
         e: [tmp / "assess" / e / label.replace("/", "_") for label in labels]
-        for e in engines
+        for e in ("python-security", *engines)
     }
     jobs = [
         (e, args, env, dirs[e][i])
         for i, (_, args, env, _) in enumerate(runs)
-        for e in engines
+        for e in ("python-security", *engines)
     ]
     with ThreadPoolExecutor(max_workers=min(8, os.cpu_count() or 2)) as pool:
         codes = list(pool.map(lambda job: _assess(*job), jobs))
@@ -401,12 +436,21 @@ def check_corpus(
         # no-assertions' profile names no subject: assess refuses it (exit 3) and writes no remediation or skill.
         if py_exit not in ((0, 1, 2, 3) if label == "no-assertions" else (0, 1, 2)):
             problems.append(f"python assess exited {py_exit}")
+        security_exit = exits[("python-security", dirs["python-security"][i])]
+        if security_exit != py_exit:
+            problems.append(
+                f"python assess --for security exited {security_exit}, --emit {py_exit}"
+            )
         for engine in engines:
             code = exits[(engine, dirs[engine][i])]
             if engine == "java" and label in JAVA_REFUSES:
-                if code != 3 or _emitted_files(dirs[engine][i]):
+                if (
+                    code != 3
+                    or _emitted_files(dirs[engine][i])
+                    or any((dirs[engine][i] / n).exists() for n in SECURITY_FILES)
+                ):
                     problems.append(
-                        f"java assess <folder> exited {code}; want 3 (input.records_unsupported), no remediation or skill"
+                        f"java assess <folder> exited {code}; want 3 (input.records_unsupported), no remediation, skill or security files"
                     )
                 continue
             if code != py_exit:
@@ -425,6 +469,9 @@ def check_corpus(
                 if engine != "python":
                     problems += emitted_problems(
                         engine, dirs["python"][i], dirs[engine][i], digest_of
+                    )
+                    problems += security_problems(
+                        engine, dirs["python-security"][i], dirs[engine][i]
                     )
         failures += _report(label, problems)
         if problems and fail_fast:
@@ -591,6 +638,18 @@ json.dump({c["name"]: one(c) for c in cases}, open(sys.argv[2], "w", encoding="u
 """
 
 
+PYTHON_SECURITY = """
+import json, sys
+from agentce.report import render_security_html, render_security_md
+cases = json.load(open(sys.argv[1], encoding="utf-8"))["cases"]
+out = {}
+for c in cases:
+    out[c["name"] + ".md"] = render_security_md(c["view"], language=c["language"])
+    out[c["name"] + ".html"] = render_security_html(c["view"], language=c["language"])
+json.dump(out, open(sys.argv[2], "w", encoding="utf-8"))
+"""
+
+
 class CaseTable(NamedTuple):
     """A fixed case table each engine renders through a seam verb, with Python's golden and renderer."""
 
@@ -599,11 +658,21 @@ class CaseTable(NamedTuple):
     cases: Path
     expected: Path
     script: str
+    #: The texts Python renders per case (the security view: security.md and security.html).
+    texts: int = 1
 
 
 CASE_TABLES = (
     CaseTable("remediation case", "remediation-md", MD_CASES, MD_EXPECTED, PYTHON_MD),
     CaseTable("skill case", "skill-cases", SKILL_CASES, SKILL_EXPECTED, PYTHON_SKILL),
+    CaseTable(
+        "security case",
+        "security-cases",
+        SECURITY_CASES,
+        SECURITY_EXPECTED,
+        PYTHON_SECURITY,
+        texts=2,
+    ),
 )
 
 
@@ -627,7 +696,7 @@ def render_table_with(
 def check_case_table(
     tmp: Path, engines: tuple[str, ...], fail_fast: bool, table: CaseTable
 ) -> tuple[int, int]:
-    label, verb, cases, expected, script = table
+    label, verb, cases, expected, script, _ = table
     python = render_table_with(
         "python", tmp / f"{verb}-python.json", verb, cases, script
     )
@@ -664,7 +733,7 @@ def check_case_table(
 def write_expected() -> int:
     with tempfile.TemporaryDirectory(prefix="report-format-expected-") as raw:
         EXPECTED.write_text(_expected_text(python_case_outputs(Path(raw))), "utf-8")
-        for _, verb, cases, expected, script in CASE_TABLES:
+        for _, verb, cases, expected, script, _ in CASE_TABLES:
             rendered = render_table_with(
                 "python", Path(raw) / f"{verb}.json", verb, cases, script
             )
@@ -713,7 +782,7 @@ def run_check(engines: tuple[str, ...], fail_fast: bool) -> int:
         + REMEDIATION_ONLY_RUNS
         + len(json.loads(CASES.read_text("utf-8"))["cases"])
         + sum(
-            len(json.loads(table.cases.read_text("utf-8"))["cases"])
+            len(json.loads(table.cases.read_text("utf-8"))["cases"]) * table.texts
             for table in CASE_TABLES
         )
     )
@@ -776,6 +845,8 @@ def self_test() -> int:
                 failures.append(f"tamper not caught: {name}")
         failures += _clock_self_test(tmp / "clock")
         failures += _emitted_self_test(tmp / "emitted")
+        failures += _security_self_test(tmp / "security")
+        failures += _seam_for_self_test(tmp / "seam-for")
     for failure in failures:
         print(f"SELF-TEST FAIL: {failure}", file=sys.stderr)
     if failures:
@@ -936,6 +1007,91 @@ def _emitted_self_test(tmp: Path) -> list[str]:
             print(f"caught: {name}")
         else:
             failures.append(f"tamper not caught: {name}")
+    return failures
+
+
+def _security_self_test(tmp: Path) -> list[str]:
+    """security_problems passes a correct copy and catches each security tamper class."""
+    good = {
+        "security.json": b'{"drift":{"models":[],"tools":[]}}',
+        "security.md": b"# Security view\n",
+        "security.html": b"<!doctype html><title>Security view</title>\n",
+    }
+
+    def report(
+        d: Path, files: dict[str, bytes], outputs: dict[str, bytes] | None = None
+    ) -> Path:
+        d.mkdir(parents=True)
+        for name, data in files.items():
+            (d / name).write_bytes(data)
+        listed = files if outputs is None else outputs
+        digests = {
+            n: "sha256:" + hashlib.sha256(b).hexdigest() for n, b in listed.items()
+        }
+        (d / "manifest.json").write_text(json.dumps({"outputs": digests}), "utf-8")
+        return d
+
+    reference = report(tmp / "reference", good)
+    tampers: dict[str, tuple[dict[str, bytes], dict[str, bytes] | None]] = {
+        "a security file missing": (
+            {k: v for k, v in good.items() if k != "security.md"},
+            None,
+        ),
+        "an extra security file": (good, None),
+        "a security file missing from manifest.outputs": (
+            good,
+            {k: v for k, v in good.items() if k != "security.html"},
+        ),
+        "a security digest not python's": (good, {**good, "security.json": b"x"}),
+        **{
+            f"{name} one byte changed": (
+                {**good, name: data[:-1] + bytes([data[-1] ^ 1])},
+                None,
+            )
+            for name, data in good.items()
+        },
+    }
+    failures = []
+    if security_problems("typescript", reference, report(tmp / "same", good)):
+        failures.append("a correct security copy was flagged")
+    for i, (name, (files, outputs)) in enumerate(tampers.items()):
+        ref = reference
+        if name == "an extra security file":
+            ref = report(
+                tmp / f"r{i}", {k: v for k, v in good.items() if k != "security.html"}
+            )
+        if security_problems("java", ref, report(tmp / f"t{i}", files, outputs)):
+            print(f"caught: {name}")
+        else:
+            failures.append(f"tamper not caught: {name}")
+    return failures
+
+
+def _seam_for_self_test(tmp: Path) -> list[str]:
+    """Each engine's assess-emit seam refuses for= with an unknown, empty or repeated preset (exit 3)."""
+    failures = []
+    for engine in ENGINES[1:]:
+        for token in ("for=nonsense", "for=", "for=security,for=security"):
+            proc = subprocess.run(
+                [
+                    *_seam(engine),
+                    "assess-emit",
+                    token,
+                    "assess",
+                    "--out",
+                    str(tmp / engine),
+                ],
+                capture_output=True,
+                text=True,
+                cwd=ROOT,
+                env=_env(),
+            )
+            if proc.returncode != 3:
+                failures.append(
+                    f"{engine} assess-emit {token!r} exited {proc.returncode}, want 3"
+                )
+            else:
+                print(f"caught: {engine} assess-emit {token!r}")
     return failures
 
 

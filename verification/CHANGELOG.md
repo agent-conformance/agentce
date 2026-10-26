@@ -3,6 +3,19 @@
 Every change to a build gate (added, changed or retired) is recorded here, newest first. The registry lint
 fails if a gate in `gates.json` is not named in this file.
 
+## 0.136.7
+
+- `VG-REPORT-FORMAT-PARITY` (changed, 18.16g): also compares the security view. Python's real assess runs a second
+  time per input with `--for security` (which refuses `--emit`); TypeScript and Java run their own real assess through
+  the `assess-emit remediation,skill,for=security` seam until 18.16b wires `--for`. Over the same runs every engine
+  writes the same security files, `security.json`, `security.md` and `security.html` byte-identical to Python's and
+  listed in the manifest with Python's digest; no-assertions and Java's refused records-folder runs write none. A
+  `security-cases` seam renders a 30-view table (en and de) to Python's 60 texts. The self-test also catches security
+  file tampers and runs both seams' `for=` refusals. New seeded faults: TypeScript stops moving irreversible first,
+  Java escapes tool lines without sanitising them, TypeScript ignores the framework display names, Java stops
+  sanitising undeclared model names, TypeScript treats a truthy non-boolean `verified` as verified, Java registers no
+  security entry, TypeScript writes `security.json` outside `manifest.outputs`.
+
 ## 0.136.6
 
 - `VG-REPORT-FORMAT-PARITY` (changed, 18.16f): also compares the fix-list skill folder. Python's real assess adds

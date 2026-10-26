@@ -8,14 +8,11 @@
 # digest: comparing engines to each other, not each to itself, is what makes the parity claim
 # non-vacuous).
 #
-# `--for security` writing security.json/.md/.html through a real `assess` run is Python-only today:
-# TypeScript and Java have `compute_security_view`/`SecurityView.compute` (18.16 C4) but no
-# `--for`/multi-format `write_report` at all yet (a pre-existing, disclosed scope gap -- see
-# `securityView.ts`'s and `SecurityView.java`'s own "not part of the public assess command surface"
-# comment, TRADEOFFS.md row 1 for 18.16). So checks (a)-(e) below run against the Python engine's own
-# real output only; check (f), the three-engine parity claim, runs against the pure computation via
-# each engine's test-only `security-view` CLI verb instead -- the part of this item that genuinely
-# is ported three ways.
+# Checks (a)-(e) below run against the Python engine's own `assess --for security` output: TypeScript
+# and Java have no public `--for` until 18.16b. Their security.json/.md/.html from a real assess (through
+# the test-only `assess-emit ... for=security` seam) are compared with Python's byte for byte by
+# VG-REPORT-FORMAT-PARITY (18.16g); check (f) here diffs the pure computation via each engine's
+# test-only `security-view` CLI verb.
 #
 # The fixture (verification/gates/fixtures/security_view/) declares one subject and no
 # `declared_tools`/`declared_models`, with an EMPTY `catalogs` list -- not an explicit
