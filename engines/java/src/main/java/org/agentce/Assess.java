@@ -140,6 +140,24 @@ public final class Assess {
         return false;
     }
 
+    /** What an insufficient_evidence {@code assertion} lacks: each {@code minimum_evidence} entry
+     * {@code events} do not meet, then a record of each type whose class held a focus below the
+     * control's {@code min_source_class} (HR-5), at that minimum (the Python reference's
+     * {@code missing_evidence}). The remediation package names the gap with it (18.16e). */
+    static List<JsonNode> missingEvidence(
+            Catalog.ControlSpec control, List<JsonNode> events, Assertions.Assertion assertion) {
+        List<JsonNode> missing = new ArrayList<>();
+        for (JsonNode requirement : control.minimumEvidence) {
+            if (!requirementMet(events, requirement)) {
+                missing.add(requirement);
+            }
+        }
+        for (String kind : assertion.classGap) {
+            missing.add(Json.nodes().objectNode().put("event", kind).put("class", control.minSourceClass));
+        }
+        return missing;
+    }
+
     private static boolean hasMinimumEvidence(List<JsonNode> events, List<JsonNode> minimum) {
         for (JsonNode requirement : minimum) {
             if (!requirementMet(events, requirement)) {

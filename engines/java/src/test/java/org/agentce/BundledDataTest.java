@@ -59,6 +59,15 @@ class BundledDataTest {
 
     /** The engine refuses exactly the shapes spec/rules/psp_check.py refuses only while both read the
      * same term list (18.78). */
+    /** Every engine renders remediation.md from the one language-neutral template (SPEC §7, 18.16e). */
+    @Test
+    void bundledRemediationTemplateIsByteIdenticalToSpec() throws IOException, URISyntaxException {
+        assertArrayEquals(
+                Files.readAllBytes(TestPaths.repoRoot().resolve("spec/report/templates/remediation.md.tmpl")),
+                Files.readAllBytes(onClasspath("/templates/remediation.md.tmpl")),
+                "re-sync engines/java/src/main/resources/templates/remediation.md.tmpl from spec/report/templates/");
+    }
+
     @Test
     void bundledPspTermsAreByteIdenticalToSpecRules() throws IOException, URISyntaxException {
         assertArrayEquals(
