@@ -2827,7 +2827,7 @@
         {
           "description": "java safe() tests Character.isLetterOrDigit per UTF-16 char again, so a non-ASCII number or a supplementary letter becomes _",
           "file": "engines/java/src/main/java/org/agentce/Report.java",
-          "search": "        name.codePoints().forEach(c -> {\n            if (isAlnum(c) || c == '-'",
+          "search": "        name.codePoints().forEach(c -> {\n            if (isLetterOrNumber(c) || c == '-'",
           "replace": "        name.chars().forEach(c -> {\n            if (Character.isLetterOrDigit((char) c) || c == '-'"
         },
         {

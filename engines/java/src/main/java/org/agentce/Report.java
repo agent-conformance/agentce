@@ -120,19 +120,13 @@ public final class Report {
     static String safe(String name) {
         StringBuilder out = new StringBuilder();
         name.codePoints().forEach(c -> {
-            if (isAlnum(c) || c == '-' || c == '.' || c == '_') {
+            if (isLetterOrNumber(c) || c == '-' || c == '.' || c == '_') {
                 out.appendCodePoint(c);
             } else {
                 out.append('_');
             }
         });
         return out.toString();
-    }
-
-    private static boolean isAlnum(int c) {
-        int type = Character.getType(c);
-        return Character.isLetter(c) || type == Character.DECIMAL_DIGIT_NUMBER
-                || type == Character.LETTER_NUMBER || type == Character.OTHER_NUMBER;
     }
 
     /** Every control, keyed by id, across every resolved catalog -- so a finding can carry its
@@ -1902,11 +1896,9 @@ public final class Report {
                 List<String> argv = reverifyCommand != null && !reverifyCommand.isEmpty() ? reverifyCommand : invocation;
                 List<Catalog> catalogList = catalogObjects != null ? catalogObjects : List.of();
                 String assertionsDigest = outputs.get("assertions.json");
-                List<String> versions = new ArrayList<>();
-                for (Catalog c : catalogList) {
-                    versions.add(c.id + "@" + c.version);
-                }
-                String catalogVersion = String.join(", ", versions);
+                String skillMd = Skill.renderSkillMd(Version.SPEC_VERSION, Version.ENGINE_VERSION,
+                        String.join(", ", catalogList.stream().map(c -> c.id + "@" + c.version).toList()),
+                        assertionsDigest);
                 for (String subject : subjects) {
                     List<Assertions.Assertion> forSubject = new ArrayList<>();
                     for (Assertions.Assertion a : assertions) {
@@ -1931,8 +1923,7 @@ public final class Report {
                         Files.createDirectories(outDir.resolve(relDir + "/findings"));
                         outputs.put(relDir + "/remediation-package.json",
                                 writeBytes(outDir, relDir + "/remediation-package.json", pkgBytes));
-                        outputs.put(relDir + "/SKILL.md", writeText(outDir, relDir + "/SKILL.md", Skill.renderSkillMd(
-                                Version.SPEC_VERSION, Version.ENGINE_VERSION, catalogVersion, assertionsDigest)));
+                        outputs.put(relDir + "/SKILL.md", writeText(outDir, relDir + "/SKILL.md", skillMd));
                         List<String> toolCalls = Skill.toolNamesForSubject(subjectEvents);
                         int i = 0;
                         for (JsonNode finding : pkg.get("findings")) {

@@ -10,7 +10,7 @@
  */
 
 import { skillFindingTemplate, skillReverifyTemplate, skillTemplate } from "./bundled";
-import type { Event } from "./graph";
+import { type Event, dataOf, isRecord } from "./graph";
 import { doubleQuoted } from "./pyyaml";
 import { pyTruthy } from "./readiness";
 import { sanitizeFinding } from "./remediation";
@@ -20,18 +20,14 @@ import { pyStr } from "./util";
 
 type Json = Record<string, unknown>;
 
-const isObject = (value: unknown): value is Json =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
 /** Every distinct tool name this subject's own ToolCall events name, sanitised, in first-seen order
  * (Python's `_tool_names_for_subject`). */
 export function toolNamesForSubject(subjectEvents: Event[]): string[] {
   const names = new Set<string>();
   for (const event of subjectEvents) {
-    const data = (event as { data?: unknown }).data;
-    if (!isObject(data) || data["@type"] !== "ToolCall") continue;
-    const tool = data.tool;
-    const name = isObject(tool) ? tool.name : undefined;
+    const data = dataOf(event);
+    if (data["@type"] !== "ToolCall") continue;
+    const name = isRecord(data.tool) ? data.tool.name : undefined;
     if (!pyTruthy(name)) continue;
     names.add(sanitizeForMarkdown(pyStr(name)));
   }

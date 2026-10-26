@@ -54,7 +54,7 @@ import sys
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import claim_parity_check as cpc
 
@@ -590,11 +590,20 @@ cases = json.load(open(sys.argv[1], encoding="utf-8"))["cases"]
 json.dump({c["name"]: one(c) for c in cases}, open(sys.argv[2], "w", encoding="utf-8"))
 """
 
-#: The fixed case tables each engine renders through a seam verb: (label, seam verb, cases, Python's
-#: golden, Python's renderer).
+
+class CaseTable(NamedTuple):
+    """A fixed case table each engine renders through a seam verb, with Python's golden and renderer."""
+
+    label: str
+    verb: str
+    cases: Path
+    expected: Path
+    script: str
+
+
 CASE_TABLES = (
-    ("remediation case", "remediation-md", MD_CASES, MD_EXPECTED, PYTHON_MD),
-    ("skill case", "skill-cases", SKILL_CASES, SKILL_EXPECTED, PYTHON_SKILL),
+    CaseTable("remediation case", "remediation-md", MD_CASES, MD_EXPECTED, PYTHON_MD),
+    CaseTable("skill case", "skill-cases", SKILL_CASES, SKILL_EXPECTED, PYTHON_SKILL),
 )
 
 
@@ -616,7 +625,7 @@ def render_table_with(
 
 
 def check_case_table(
-    tmp: Path, engines: tuple[str, ...], fail_fast: bool, table: tuple
+    tmp: Path, engines: tuple[str, ...], fail_fast: bool, table: CaseTable
 ) -> tuple[int, int]:
     label, verb, cases, expected, script = table
     python = render_table_with(
@@ -704,8 +713,8 @@ def run_check(engines: tuple[str, ...], fail_fast: bool) -> int:
         + REMEDIATION_ONLY_RUNS
         + len(json.loads(CASES.read_text("utf-8"))["cases"])
         + sum(
-            len(json.loads(cases.read_text("utf-8"))["cases"])
-            for _, _, cases, _, _ in CASE_TABLES
+            len(json.loads(table.cases.read_text("utf-8"))["cases"])
+            for table in CASE_TABLES
         )
     )
     if runs != expected:

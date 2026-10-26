@@ -1819,6 +1819,7 @@ export function writeReport(
     const catalogObjects = options.catalogObjects ?? [];
     const assertionsDigest = outputs["assertions.json"] as string;
     const catalogVersion = catalogObjects.map((c) => `${c.id}@${c.version}`).join(", ");
+    const skillMd = renderSkillMd(SPEC_VERSION, engineVersion(), catalogVersion, assertionsDigest);
     for (const subject of subjects) {
       const subjectEvents = eventsBySubject.get(subject) ?? [];
       const pkg = renderRemediationPackage(
@@ -1840,10 +1841,7 @@ export function writeReport(
         const relDir = `skill/${safe(subject)}`;
         mkdirSync(joinPath(outDir, relDir, "findings"), { recursive: true });
         writeBytes(`${relDir}/remediation-package.json`, pkgBytes);
-        writeTextFile(
-          `${relDir}/SKILL.md`,
-          renderSkillMd(SPEC_VERSION, engineVersion(), catalogVersion, assertionsDigest),
-        );
+        writeTextFile(`${relDir}/SKILL.md`, skillMd);
         const toolCalls = toolNamesForSubject(subjectEvents);
         (pkg.findings as Record<string, unknown>[]).forEach((finding, i) => {
           const name = skillFindingFilename(String(finding.control), i + 1);
