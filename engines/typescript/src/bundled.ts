@@ -8,6 +8,7 @@
  * (`bundled.py`).
  */
 
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /** The cross-standard baseline a run evaluates when nothing names a catalog (Python's
@@ -41,4 +42,14 @@ export function argvGrammarPath(): string {
 /** The vendored ICU MessageFormat catalogue (the language-neutral original lives in `spec/i18n/`). */
 export function i18nDir(): string {
   return join(dataRoot(), "i18n");
+}
+
+/** The vendored remediation prompt template (the original is `spec/report/templates/remediation.md.tmpl`). */
+export function remediationTemplatePath(): string {
+  return join(dataRoot(), "templates", "remediation.md.tmpl");
+}
+
+/** The remediation prompt template's text (Python's `bundled.remediation_template()`). */
+export function remediationTemplate(): string {
+  return readFileSync(remediationTemplatePath(), "utf-8");
 }

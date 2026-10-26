@@ -30,6 +30,7 @@ import {
   checksBySubject,
   computeProjectView,
 } from "./project";
+import { renderRemediationMd, renderRemediationPackage } from "./remediation";
 import {
   byteCompare,
   formatTemplate,
@@ -264,7 +265,7 @@ function uuid5(...parts: string[]): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 
-function safe(name: string): string {
+export function safe(name: string): string {
   return [...name].map((c) => (/[\p{L}\p{N}]/u.test(c) || "-._".includes(c) ? c : "_")).join("");
 }
 
@@ -570,7 +571,7 @@ function blindSpotStepText(stepKind: string, ownerLabel: string): string {
  * `no_population` entry's `subject` can be records-derived, and the section renders right after
  * activity and before the verdict (RFC 0008 Sec.7) -- the same position P11 (item 18.4 rework)
  * forged a fake verdict line through. */
-function sanitizeField(value: string): string {
+export function sanitizeField(value: string): string {
   return sanitizeForMarkdown(value, SANITIZE_EMPTY_FIELD_PLACEHOLDER);
 }
 
@@ -1092,7 +1093,7 @@ export function renderOscal(
   };
 }
 
-function controlIndex(catalogs: Catalog[]): Map<string, ControlSpec> {
+export function controlIndex(catalogs: Catalog[]): Map<string, ControlSpec> {
   const index = new Map<string, ControlSpec>();
   for (const catalog of catalogs) {
     for (const control of catalog.controls) {
@@ -1629,7 +1630,14 @@ export interface WriteReportOptions {
   /** Each name and its bytes is written verbatim and its digest recorded in the manifest's `outputs`,
    * as report.py's `extra_outputs` does, for the data files assess writes before the report (18.184e). */
   extraOutputs?: Record<string, Buffer>;
+  /** The re-verify argv a remediation finding names (commands/__init__.py's `reverify_argv`); the
+   * manifest's `invocation` when unset, as in report.py. */
+  reverifyCommand?: string[];
 }
+
+/** The extra formats `writeReport` writes, set only by the `assess-emit` test seam until `assess
+ * --emit` is wired in this engine (18.16b); empty by default, so no run's output changes. */
+export const SEAM_EMIT = new Set<string>();
 
 function bareSubject(id: string): Subject {
   return {
@@ -1794,6 +1802,27 @@ export function writeReport(
     mkdirSync(dirname(path), { recursive: true });
     writeFile(path, data);
     outputs[rel] = digestBytes(data);
+  }
+
+  if (SEAM_EMIT.has("remediation")) {
+    const eventsBySubject = indexBySubject(options.events ?? []);
+    const argv = options.reverifyCommand?.length
+      ? options.reverifyCommand
+      : (options.invocation ?? []);
+    for (const subject of subjects) {
+      const pkg = renderRemediationPackage(
+        subject,
+        assertions.filter((a) => a.subject === subject),
+        options.catalogObjects ?? [],
+        outputs["assertions.json"] as string,
+        eventsBySubject.get(subject) ?? [],
+        argv,
+      );
+      const relDir = `remediation/${safe(subject)}`;
+      mkdirSync(joinPath(outDir, relDir), { recursive: true });
+      writeBytes(`${relDir}/remediation-package.json`, canonicalize(pkg));
+      writeTextFile(`${relDir}/remediation.md`, renderRemediationMd(pkg));
+    }
   }
 
   const manifest = buildManifest({

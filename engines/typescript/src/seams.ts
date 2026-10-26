@@ -8,6 +8,7 @@ import type { Activity } from "./activity";
 import { aggregate, assertionFromJson } from "./assertions";
 import { computeAuditorView } from "./auditorView";
 import { CanonicalizationError, canonicalString } from "./canonical";
+import { main as cliMain } from "./cli";
 import { InputError } from "./errors";
 import { ExitCode } from "./exitCodes";
 import { parseFailOn } from "./failOn";
@@ -24,7 +25,9 @@ import {
 } from "./json";
 import { computeVectorFile } from "./numerics";
 import { OtelGenaiAdapterError, adapt as adaptOtelGenai } from "./otelGenai";
+import { renderRemediationMd } from "./remediation";
 import {
+  SEAM_EMIT,
   appliedDeviationIds,
   catalogProvenanceDigest,
   renderCsv,
@@ -35,6 +38,8 @@ import {
 } from "./report";
 import { computeSecurityView } from "./securityView";
 import { joinPath } from "./util";
+
+type Json = Record<string, unknown>;
 
 export function main(argv: string[]): number {
   const command = argv[0];
@@ -242,6 +247,41 @@ export function main(argv: string[]): number {
     }
     const cases = (readBundled(readFileSync(casefile)) as { cases: JsonCase[] }).cases;
     console.log(JSON.stringify(cases.map((c) => [c.id, jsonCaseResult(c)])));
+    return 0;
+  }
+
+  // assess-emit runs this engine's real `assess` with extra formats written (18.16e): until 18.16b wires
+  // `assess --emit` here, report_format_parity_check.py compares the remediation output through it.
+  if (command === "assess-emit") {
+    const [formats, ...assessArgv] = argv.slice(1);
+    const names = (formats ?? "").split(",");
+    if (formats === undefined || names.some((name) => name !== "remediation")) {
+      console.error("assess-emit: the only format is remediation");
+      return ExitCode.INPUT_ERROR;
+    }
+    for (const name of names) {
+      SEAM_EMIT.add(name);
+    }
+    try {
+      return cliMain(assessArgv);
+    } finally {
+      SEAM_EMIT.clear();
+    }
+  }
+
+  // remediation-md renders every package in a case file ({cases: [{name, package}]}) with
+  // renderRemediationMd and writes {name: markdown} as JSON to the output path (18.16e).
+  if (command === "remediation-md") {
+    const [casefile, outPath] = argv.slice(1);
+    if (casefile === undefined || outPath === undefined) {
+      console.error("remediation-md: a case file and an output path are required");
+      return ExitCode.INPUT_ERROR;
+    }
+    const cases = (
+      readBundled(readFileSync(casefile)) as { cases: { name: string; package: Json }[] }
+    ).cases;
+    const rendered = Object.fromEntries(cases.map((c) => [c.name, renderRemediationMd(c.package)]));
+    writeFileSync(outPath, JSON.stringify(rendered), "utf-8");
     return 0;
   }
 

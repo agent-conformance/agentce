@@ -1207,6 +1207,28 @@ function runAssess(options: AssessOptions): CommandResult {
   for (const artifact of REPORT_DATA_FILES) {
     extraOutputs[artifact] = readFileSync(joinPath(out, artifact));
   }
+  // The re-verify invocation a remediation finding names (SPEC §7), as commands/__init__.py builds it:
+  // every flag needed to reproduce this run's catalog resolution, unlike the positional `invocation`.
+  const reverifyCommand =
+    options.folder === undefined
+      ? ["assess", "--bundle", scrubPath(bundleDir), "--profile", scrubPath(profilePath)]
+      : [
+          "assess",
+          scrubPath(options.folder),
+          ...(options.profile !== undefined ? ["--profile", scrubPath(profilePath)] : []),
+        ];
+  if (catalogLabels.length > 0) {
+    reverifyCommand.push("--catalog", catalogLabels.join(","));
+  }
+  for (const catalogDir of options.catalogDirs) {
+    reverifyCommand.push("--catalog-dir", scrubPath(catalogDir));
+  }
+  if (options.domain !== undefined) {
+    reverifyCommand.push("--domain", scrubPath(options.domain));
+  }
+  if (options.deviations !== undefined) {
+    reverifyCommand.push("--deviations", scrubPath(options.deviations));
+  }
   writingInto(out, OUT_DIR, () =>
     writeReport(out, evaluated, {
       bundleDigest: bundle.digest,
@@ -1231,6 +1253,7 @@ function runAssess(options: AssessOptions): CommandResult {
       declaredSubjectIds,
       reportLanguage: language,
       extraOutputs,
+      reverifyCommand,
     }),
   );
   if (state !== null) {
