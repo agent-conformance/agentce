@@ -15,6 +15,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -24,6 +25,8 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -1025,6 +1028,227 @@ public final class Report {
         return earliest != null ? earliest : "1970-01-01T00:00:00Z";
     }
 
+    private static String liItems(List<Map.Entry<String, String>> rows) {
+        StringBuilder out = new StringBuilder();
+        for (Map.Entry<String, String> row : rows) {
+            out.append("<li><strong>").append(esc(row.getKey())).append("</strong>: ")
+                    .append(esc(row.getValue())).append("</li>");
+        }
+        return out.toString();
+    }
+
+    private static List<String> securityToolAccessLines(JsonNode toolAccess, Map<String, String> cat) {
+        if (toolAccess.isEmpty()) {
+            return List.of(cat.get("report.security_tool_access_none"));
+        }
+        List<String> lines = new ArrayList<>();
+        for (JsonNode t : toolAccess) {
+            lines.add(sanitizeField(t.get("name").asText()) + " (" + sanitizeField(t.get("server").asText()) + ", "
+                    + sanitizeField(t.get("protocol").asText()) + ")");
+        }
+        return lines;
+    }
+
+    /** {@link #activityTallyText} over the same counts, {@code irreversible} moved first (the security
+     * reader's priority); every other key keeps its order. */
+    private static String securityEffectClassText(ObjectNode actionsByEffectClass) {
+        ObjectNode reordered = Json.nodes().objectNode();
+        JsonNode irreversible = actionsByEffectClass.get("irreversible");
+        reordered.set("irreversible", irreversible != null ? irreversible : Json.nodes().numberNode(0));
+        actionsByEffectClass.fields().forEachRemaining(e -> {
+            if (!e.getKey().equals("irreversible")) {
+                reordered.set(e.getKey(), e.getValue());
+            }
+        });
+        return activityTallyText(reordered, null);
+    }
+
+    private static List<String> securityDriftLines(JsonNode drift, Map<String, String> cat) {
+        JsonNode tools = drift.get("tools");
+        JsonNode models = drift.get("models");
+        if (tools.isEmpty() && models.isEmpty()) {
+            return List.of(cat.get("report.security_drift_none"));
+        }
+        List<String> lines = new ArrayList<>();
+        if (!tools.isEmpty()) {
+            lines.add(cat.get("report.activity_undeclared_tools_label") + ": " + sanitizedNames(tools));
+        }
+        if (!models.isEmpty()) {
+            lines.add(cat.get("report.activity_undeclared_models_label") + ": " + sanitizedNames(models));
+        }
+        return lines;
+    }
+
+    private static String sanitizedNames(JsonNode names) {
+        List<String> out = new ArrayList<>();
+        names.forEach(n -> out.add(sanitizeForMarkdown(n.asText())));
+        return String.join(", ", out);
+    }
+
+    /** One citation with its framework's version, or its display name (18.16a). */
+    private static String securityCitationText(JsonNode entry, Map<String, String> cat) {
+        String id = entry.get("framework").asText();
+        String display = SecurityView.FRAMEWORK_DISPLAY_NAMES.getOrDefault(id, "");
+        String version = SecurityView.FRAMEWORK_VERSIONS.getOrDefault(id, "");
+        String framework = !display.isEmpty() ? display : !version.isEmpty() ? (id + " " + version).strip() : id;
+        ObjectNode withFramework = ((ObjectNode) entry).deepCopy();
+        withFramework.put("framework", framework);
+        return crosswalkText(withFramework, cat);
+    }
+
+    private static List<Map.Entry<String, String>> securityCitationRows(JsonNode citations, Map<String, String> cat) {
+        List<Map.Entry<String, String>> rows = new ArrayList<>();
+        for (JsonNode entry : citations) {
+            rows.add(Map.entry(
+                    sanitizeField(entry.get("control").asText()),
+                    sanitizeForMarkdown(securityCitationText(entry, cat))));
+        }
+        return rows;
+    }
+
+    private static List<Map.Entry<String, String>> securityEnforcementRows(JsonNode enforcement, Map<String, String> cat) {
+        Map<String, String> recorderLabels = new LinkedHashMap<>();
+        for (String k : Activity.RECORDER_CLASSES) recorderLabels.put(k, cat.get("report.activity_recorder_" + k));
+        Map<String, String> deniedLabels = new LinkedHashMap<>();
+        for (String k : Activity.DENIED_KINDS) deniedLabels.put(k, cat.get("report.activity_denied_" + k));
+        return List.of(
+                Map.entry(cat.get("report.activity_approvals_label"),
+                        activityTallyText((ObjectNode) enforcement.get("approvals_by_recorder"), recorderLabels)),
+                Map.entry(cat.get("report.activity_denied_label"),
+                        activityTallyText((ObjectNode) enforcement.get("denied_or_blocked"), deniedLabels)));
+    }
+
+    /** The security view (18.16): tool access, actions by effect class (irreversible leads),
+     * enforcement-point evidence, drift, then each cited control's clauses; report.py's
+     * {@code render_security_md}. */
+    public static String renderSecurityMd(JsonNode security, String language) {
+        Map<String, String> cat = Messages.catalogue(language);
+        List<String> lines = new ArrayList<>(List.of(
+                "# " + cat.get("report.security_title"), "", cat.get("report.security_intro"), "",
+                "## " + cat.get("report.security_tool_access_heading"), ""));
+        for (String line : securityToolAccessLines(security.get("tool_access"), cat)) {
+            lines.add("- " + line);
+        }
+        lines.addAll(List.of(
+                "", "## " + cat.get("report.security_effect_class_heading"), "",
+                "- " + securityEffectClassText((ObjectNode) security.get("actions_by_effect_class")), "",
+                "## " + cat.get("report.security_enforcement_heading"), "",
+                "- " + cat.get("report.security_enforcement_scope_note")));
+        for (Map.Entry<String, String> row : securityEnforcementRows(security.get("enforcement_point_evidence"), cat)) {
+            lines.add("- " + row.getKey() + ": " + row.getValue());
+        }
+        lines.addAll(List.of("", "## " + cat.get("report.security_drift_heading"), ""));
+        for (String line : securityDriftLines(security.get("drift"), cat)) {
+            lines.add("- " + line);
+        }
+        lines.addAll(List.of("", "## " + cat.get("report.security_citations_heading"), ""));
+        List<Map.Entry<String, String>> citationRows = securityCitationRows(security.get("standards_citations"), cat);
+        if (citationRows.isEmpty()) {
+            lines.add("- " + cat.get("report.security_citations_none"));
+        }
+        for (Map.Entry<String, String> row : citationRows) {
+            lines.add("- `" + row.getKey() + "`: " + row.getValue());
+        }
+        lines.add("");
+        return String.join("\n", lines) + "\n";
+    }
+
+    /** As {@link #renderSecurityMd}, as the same self-contained, escaped page shape as
+     * {@link #renderReportHtml}. */
+    public static String renderSecurityHtml(JsonNode security, String language) {
+        Map<String, String> cat = Messages.catalogue(language);
+        String title = esc(cat.get("report.security_title"));
+        StringBuilder toolItems = new StringBuilder();
+        for (String line : securityToolAccessLines(security.get("tool_access"), cat)) {
+            toolItems.append("<li>").append(sanitizeForHtml(line)).append("</li>");
+        }
+        StringBuilder enforcementItems = new StringBuilder();
+        for (Map.Entry<String, String> row : securityEnforcementRows(security.get("enforcement_point_evidence"), cat)) {
+            enforcementItems.append("<p>").append(esc(row.getKey())).append(": ").append(esc(row.getValue())).append("</p>");
+        }
+        StringBuilder driftItems = new StringBuilder();
+        for (String line : securityDriftLines(security.get("drift"), cat)) {
+            driftItems.append("<li>").append(sanitizeForHtml(line)).append("</li>");
+        }
+        List<Map.Entry<String, String>> citationRows = securityCitationRows(security.get("standards_citations"), cat);
+        String citationsHtml = citationRows.isEmpty()
+                ? "<p>" + esc(cat.get("report.security_citations_none")) + "</p>"
+                : "<ul>" + liItems(citationRows) + "</ul>";
+        return "<!doctype html><html lang=\"" + esc(language) + "\"><head><meta charset=\"utf-8\">"
+                + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+                + "<meta http-equiv=\"Content-Security-Policy\" "
+                + "content=\"default-src 'none'; style-src 'unsafe-inline'; img-src 'none'\">"
+                + "<title>" + title + "</title><style>" + HTML_STYLE + "</style></head><body>"
+                + "<main><h1>" + title + "</h1><p>" + esc(cat.get("report.security_intro")) + "</p>"
+                + "<section aria-labelledby=\"security-tool-access\"><h2 id=\"security-tool-access\">"
+                + esc(cat.get("report.security_tool_access_heading")) + "</h2><ul>" + toolItems + "</ul></section>"
+                + "<section aria-labelledby=\"security-effect-class\"><h2 id=\"security-effect-class\">"
+                + esc(cat.get("report.security_effect_class_heading")) + "</h2>"
+                + "<p>" + esc(securityEffectClassText((ObjectNode) security.get("actions_by_effect_class"))) + "</p></section>"
+                + "<section aria-labelledby=\"security-enforcement\"><h2 id=\"security-enforcement\">"
+                + esc(cat.get("report.security_enforcement_heading")) + "</h2>"
+                + "<p>" + esc(cat.get("report.security_enforcement_scope_note")) + "</p>"
+                + enforcementItems + "</section>"
+                + "<section aria-labelledby=\"security-drift\"><h2 id=\"security-drift\">"
+                + esc(cat.get("report.security_drift_heading")) + "</h2><ul>" + driftItems + "</ul></section>"
+                + "<section aria-labelledby=\"security-citations\"><h2 id=\"security-citations\">"
+                + esc(cat.get("report.security_citations_heading")) + "</h2>" + citationsHtml + "</section>"
+                + "</main></body></html>\n";
+    }
+
+    /** What an audience view's {@code compute}/{@code renderMd}/{@code renderHtml} read, built once per
+     * {@link #writeReport} call (report.py's {@code ReportViewContext}, 18.49). The security view reads
+     * these three; the auditor (18.17e) and buyer (18.16h) views add their own fields. */
+    public record ReportViewContext(ObjectNode activity, List<Assertions.Assertion> assertions, String language) {}
+
+    /** A view renderer: the computed view and the context to one page. */
+    public interface ViewRenderer {
+        String render(JsonNode view, ReportViewContext ctx);
+    }
+
+    /** One registered audience-view preset (report.py's {@code AudienceViewSpec}): {@code <preset>.json}
+     * is always written; {@code .md}/{@code .html} when their renderer is not {@code null} and the
+     * extension is in {@code alwaysWrite} or wanted. */
+    public record AudienceViewSpec(
+            Function<ReportViewContext, JsonNode> compute, ViewRenderer renderMd, ViewRenderer renderHtml,
+            Set<String> alwaysWrite) {}
+
+    /** The audience-view registry (report.py's {@code AUDIENCE_VIEWS}, 18.49): a preset is one entry. */
+    public static final Map<String, AudienceViewSpec> AUDIENCE_VIEWS = new LinkedHashMap<>(Map.of(
+            "security",
+            new AudienceViewSpec(
+                    ctx -> SecurityView.compute(ctx.activity(), ctx.assertions()),
+                    (view, ctx) -> renderSecurityMd(view, ctx.language()),
+                    (view, ctx) -> renderSecurityHtml(view, ctx.language()),
+                    Set.of())));
+
+    /** Writes one output file and records it in the manifest. */
+    public interface OutputWriter<T> {
+        void write(String name, T value) throws IOException;
+    }
+
+    /** write_report's view dispatch: an unregistered or absent preset writes nothing; a registered one
+     * writes {@code <preset>.json}, then {@code .md} and {@code .html} each when its renderer exists and
+     * the extension is in its {@code alwaysWrite} or {@code wants} it. */
+    public static void writeAudienceView(
+            String preset, ReportViewContext ctx, Predicate<String> wants, OutputWriter<JsonNode> writeJson,
+            OutputWriter<String> writeText) throws IOException {
+        AudienceViewSpec spec = preset != null ? AUDIENCE_VIEWS.get(preset) : null;
+        if (spec == null) {
+            return;
+        }
+        JsonNode view = spec.compute().apply(ctx);
+        writeJson.write(preset + ".json", view);
+        for (Map.Entry<String, ViewRenderer> entry : Arrays.asList(
+                Map.entry("md", spec.renderMd()), Map.entry("html", spec.renderHtml()))) {
+            ViewRenderer render = entry.getValue();
+            String ext = entry.getKey();
+            if (render != null && (spec.alwaysWrite().contains(ext) || wants.test(ext))) {
+                writeText.write(preset + "." + ext, render.render(view, ctx));
+            }
+        }
+    }
+
     /** Render {@code oscal-ar.json} as an importable NIST OSCAL 1.1.2 Assessment Results document
      * (SPEC §9, §9.4): every result carries real {@code observations[]} built from the assertion's
      * own evidence pointers, every finding resolves to the observation that backs it and links to its
@@ -1729,6 +1953,11 @@ public final class Report {
      * {@code assess --emit} is wired in this engine (18.16b); empty by default, so no run's output changes. */
     static final Set<String> SEAM_EMIT = new LinkedHashSet<>();
 
+    /** The audience-view preset {@link #writeReport} renders, set only by the {@code assess-emit} seam's
+     * {@code for=} token until {@code assess --for} is wired in this engine (18.16b); {@code null} by
+     * default. */
+    static String SEAM_FOR = null;
+
     /** As the twenty-argument {@link #writeReport}, plus the re-verify argv a remediation finding names
      * (commands/__init__.py's {@code reverify_argv}); the manifest's {@code invocation} when {@code null}
      * or empty, as in report.py. */
@@ -1868,6 +2097,14 @@ public final class Report {
                         writeText(outDir, "report.html",
                                 renderReportHtml(assertions, counts, reportLanguage, activityNode, blindSpotsNode)));
             }
+            // This engine writes report.md and report.html on every run until 18.16b wires --emit, so both
+            // count as wanted, as Python's `--for security` (sarif, md, html) asks.
+            writeAudienceView(
+                    SEAM_FOR,
+                    new ReportViewContext(activityNode, assertions, reportLanguage),
+                    ext -> ext.equals("md") || ext.equals("html"),
+                    (name, view) -> outputs.put(name, writeJson(outDir, name, view)),
+                    (name, text) -> outputs.put(name, writeText(outDir, name, text)));
             outputs.put("oscal-ar.json", writeJson(outDir, "oscal-ar.json", renderOscal(assertions, deviations)));
             outputs.put("results.sarif", writeJson(outDir, "results.sarif", renderSarif(assertions, catalogObjects)));
 

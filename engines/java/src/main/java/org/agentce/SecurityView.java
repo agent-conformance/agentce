@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.Comparator;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -27,6 +28,15 @@ public final class SecurityView {
      * {@code nist-ai-rmf}, {@code aiuc-1}) are out of scope for this view.
      */
     private static final Set<String> CITED_FRAMEWORKS = Set.of("owasp-asi-2026", "mitre-atlas", "owasp-acs");
+
+    /** Each cited framework's version, shown beside its clauses (security_view.py's {@code FRAMEWORK_VERSIONS}). */
+    public static final Map<String, String> FRAMEWORK_VERSIONS =
+            Map.of("owasp-asi-2026", "2025.12", "mitre-atlas", "2026.09", "owasp-acs", "0.1.0");
+
+    /** The maintainer-mandated display name a framework renders under instead of its id and version
+     * (security_view.py's {@code FRAMEWORK_DISPLAY_NAMES}, 18.16a). */
+    public static final Map<String, String> FRAMEWORK_DISPLAY_NAMES =
+            Map.of("owasp-asi-2026", "OWASP Top 10 for Agentic Applications 2026 (ASI01-ASI10)");
 
     private record Citation(String control, String framework, String clause, boolean verified) {}
 

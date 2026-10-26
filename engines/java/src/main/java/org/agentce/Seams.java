@@ -273,15 +273,23 @@ public final class Seams {
         // `assess --emit` here, report_format_parity_check.py compares the remediation output through it.
         if ("assess-emit".equals(command)) {
             List<String> names = args.length < 2 ? List.of() : List.of(args[1].split(",", -1));
-            if (names.isEmpty() || !names.stream().allMatch(n -> n.equals("remediation") || n.equals("skill"))) {
-                System.err.println("assess-emit: the formats are remediation and skill");
+            List<String> presets = names.stream().filter(n -> n.startsWith("for=")).map(n -> n.substring(4)).toList();
+            List<String> emits = names.stream().filter(n -> !n.startsWith("for=")).toList();
+            if (names.isEmpty()
+                    || !emits.stream().allMatch(n -> n.equals("remediation") || n.equals("skill"))
+                    || presets.size() > 1
+                    || !presets.stream().allMatch(Report.AUDIENCE_VIEWS::containsKey)) {
+                System.err.println(
+                        "assess-emit: the formats are remediation and skill, plus at most one for=<registered view>");
                 return ExitCode.INPUT_ERROR.code;
             }
-            Report.SEAM_EMIT.addAll(names);
+            Report.SEAM_EMIT.addAll(emits);
+            Report.SEAM_FOR = presets.isEmpty() ? null : presets.get(0);
             try {
                 return Cli.run(java.util.Arrays.copyOfRange(args, 2, args.length));
             } finally {
                 Report.SEAM_EMIT.clear();
+                Report.SEAM_FOR = null;
             }
         }
 
@@ -300,6 +308,29 @@ public final class Seams {
                 Files.writeString(Paths.get(args[2]), Json.compact(rendered), StandardCharsets.UTF_8);
             } catch (IOException e) {
                 System.err.println("remediation-md: " + e.getMessage());
+                return 70;
+            }
+            return 0;
+        }
+
+        // security-cases renders every case of a case file ({cases: [{name, language, view}]}) with the
+        // security view's renderers and writes {"<name>.md": text, "<name>.html": text} as JSON (18.16g).
+        if ("security-cases".equals(command)) {
+            if (args.length < 3) {
+                System.err.println("security-cases: a case file and an output path are required");
+                return ExitCode.INPUT_ERROR.code;
+            }
+            ObjectNode rendered = Json.nodes().objectNode();
+            for (JsonNode c : Json.readBundled(readAll(Paths.get(args[1]))).get("cases")) {
+                String name = c.get("name").asText();
+                String language = c.get("language").asText();
+                rendered.put(name + ".md", Report.renderSecurityMd(c.get("view"), language));
+                rendered.put(name + ".html", Report.renderSecurityHtml(c.get("view"), language));
+            }
+            try {
+                Files.writeString(Paths.get(args[2]), Json.compact(rendered), StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                System.err.println("security-cases: " + e.getMessage());
                 return 70;
             }
             return 0;
